@@ -114,7 +114,10 @@ sealed interface WithdrawalOrderStrategy
         }
     }
 
-    /** Draws from the sub-pools in a fixed priority order (taxable / traditional / roth first). */
+    /**
+     * Draws from the sub-pools in the fixed priority order {@link WithdrawalOrder#drawSequence()}
+     * defines (taxable / traditional / roth first).
+     */
     final class OrderedWithdrawalOrder implements WithdrawalOrderStrategy {
         private final WithdrawalOrder order;
 
@@ -125,23 +128,29 @@ sealed interface WithdrawalOrderStrategy
         @Override
         public Result execute(BigDecimal need, BigDecimal taxable, BigDecimal traditional, BigDecimal roth) {
             BigDecimal remaining = need;
-            BigDecimal[] pools = switch (order) {
-                case TRADITIONAL_FIRST -> new BigDecimal[]{traditional, taxable, roth};
-                case ROTH_FIRST -> new BigDecimal[]{roth, taxable, traditional};
-                default -> new BigDecimal[]{taxable, traditional, roth};
-            };
+            BigDecimal fromTaxable = BigDecimal.ZERO;
+            BigDecimal fromTraditional = BigDecimal.ZERO;
+            BigDecimal fromRoth = BigDecimal.ZERO;
 
-            BigDecimal[] drawn = new BigDecimal[3];
-            for (int i = 0; i < 3; i++) {
-                drawn[i] = remaining.min(pools[i]);
-                remaining = remaining.subtract(drawn[i]);
+            for (String pool : order.drawSequence()) {
+                switch (pool) {
+                    case PoolStrategy.POOL_TAXABLE -> {
+                        fromTaxable = remaining.min(taxable);
+                        remaining = remaining.subtract(fromTaxable);
+                    }
+                    case PoolStrategy.POOL_TRADITIONAL -> {
+                        fromTraditional = remaining.min(traditional);
+                        remaining = remaining.subtract(fromTraditional);
+                    }
+                    case PoolStrategy.POOL_ROTH -> {
+                        fromRoth = remaining.min(roth);
+                        remaining = remaining.subtract(fromRoth);
+                    }
+                    default -> throw new IllegalStateException("Unknown pool token: " + pool);
+                }
             }
 
-            return switch (order) {
-                case TRADITIONAL_FIRST -> new Result(drawn[1], drawn[0], drawn[2]);
-                case ROTH_FIRST -> new Result(drawn[1], drawn[2], drawn[0]);
-                default -> new Result(drawn[0], drawn[1], drawn[2]);
-            };
+            return new Result(fromTaxable, fromTraditional, fromRoth);
         }
     }
 }

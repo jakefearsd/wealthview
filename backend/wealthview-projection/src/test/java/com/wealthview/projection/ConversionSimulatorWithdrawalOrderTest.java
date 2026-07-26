@@ -17,23 +17,25 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Characterization of the spending-withdrawal step inside conversion scoring
- * ({@link ConversionSimulator#simulateForFraction}) for the withdrawal-order strings production
- * actually supplies.
+ * The spending-withdrawal step inside conversion scoring
+ * ({@link ConversionSimulator#simulateForFraction}) must honour the withdrawal-order strings
+ * production actually supplies, which are enum wire tokens ("taxable_first", "traditional_first",
+ * ...) rather than pool name lists.
  *
- * <p><strong>Pinned defect.</strong> {@code ConversionSimulator.parseWithdrawalOrder()} splits the
- * configured order on commas and matches each token against the pool names
- * ("taxable"/"traditional"/"roth"), but every production caller passes an enum WIRE TOKEN:
- * {@code OptimizationContextBuilder} defaults to {@code "taxable_first"} and hands it to
- * {@code JointConversionSearch}, which forwards it into the optimizer's assumptions. A single
- * token like {@code "taxable_first"} matches no pool, so the ordered strategy's switch falls to
- * its {@code default -> skip} arm: for age >= 59.5 non-dynamic-sequencing runs the spending
- * withdrawal drains NOTHING and accrues ZERO withdrawal tax. The tests below pin that no-op so the
- * fix has something to flip.
+ * <p><strong>Regression guard.</strong> The simulator used to split the order on commas and match
+ * each token against a pool name, while every production caller passed a wire token
+ * ({@code OptimizationContextBuilder} defaults to {@code "taxable_first"}, which
+ * {@code JointConversionSearch} forwards into the optimizer's assumptions). A token like
+ * {@code "taxable_first"} matched no pool, so the ordered strategy's switch fell to its
+ * default-skip arm: for age >= 59.5 non-dynamic-sequencing runs the spending withdrawal drained
+ * nothing and accrued zero withdrawal tax. The order is now resolved through
+ * {@code WithdrawalOrder.fromString(...).drawSequence()}.
  *
  * <p>Fixture: one year, retirement age 65 (past the early-withdrawal proxy, before RMD age 75),
  * zero conversion fraction and no rentals, so the only balance movement is growth plus the
- * spending withdrawal. {@code lifetimeTax} therefore equals the withdrawal tax alone.
+ * spending withdrawal. {@code lifetimeTax} therefore equals the withdrawal tax alone. The
+ * withdrawal tax is accounted but not debited from the pools, so pool balances reflect the draws
+ * only.
  */
 class ConversionSimulatorWithdrawalOrderTest {
 
@@ -79,34 +81,66 @@ class ConversionSimulatorWithdrawalOrderTest {
     }
 
     @Test
-    void selectWithdrawalStrategy_enumTokenOrder_currentlySkipsAllPools_bugPin() {
+    void simulateForFraction_taxableFirstEnumToken_drawsTheWholeNeedFromTaxable() {
         var result = simulateOneYear("taxable_first", AMPLE_TAXABLE);
 
-        // Correct behavior would be taxable = AMPLE_TAXABLE * GROWTH - ESSENTIAL_FLOOR. The
-        // "taxable_first" token matches no pool name, so nothing is drawn at all.
-        assertThat(result.taxableBalance()[0]).isEqualTo(AMPLE_TAXABLE * GROWTH, offset(1e-6));
+        assertThat(result.taxableBalance()[0])
+                .isEqualTo(AMPLE_TAXABLE * GROWTH - ESSENTIAL_FLOOR, offset(1e-6));
         assertThat(result.traditionalBalance()[0]).isEqualTo(INIT_TRADITIONAL * GROWTH, offset(1e-6));
         assertThat(result.rothBalance()[0]).isEqualTo(INIT_ROTH * GROWTH, offset(1e-6));
     }
 
     @Test
-    void selectWithdrawalStrategy_enumTokenOrderWithThinTaxable_currentlyAccruesNoWithdrawalTax_bugPin() {
+    void simulateForFraction_taxableFirstEnumTokenWithThinTaxable_tapsTraditionalAndTaxesIt() {
         var result = simulateOneYear("taxable_first", THIN_TAXABLE);
 
-        // Taxable growth (10,500) cannot cover the 40,000 floor, so a working sequence would tap
-        // traditional and owe tax on it. The skipped switch leaves every pool whole and tax at zero.
-        assertThat(result.traditionalBalance()[0]).isEqualTo(INIT_TRADITIONAL * GROWTH, offset(1e-6));
+        double fromTraditional = ESSENTIAL_FLOOR - THIN_TAXABLE * GROWTH;
+        assertThat(result.taxableBalance()[0]).isEqualTo(0.0, offset(1e-6));
+        assertThat(result.traditionalBalance()[0])
+                .isEqualTo(INIT_TRADITIONAL * GROWTH - fromTraditional, offset(1e-6));
+        assertThat(result.rothBalance()[0]).isEqualTo(INIT_ROTH * GROWTH, offset(1e-6));
+        assertThat(result.lifetimeTax()).isEqualTo(fromTraditional * TAX_RATE, offset(1e-6));
+    }
+
+    @Test
+    void simulateForFraction_traditionalFirstEnumToken_drawsTraditionalBeforeTaxable() {
+        var result = simulateOneYear("traditional_first", AMPLE_TAXABLE);
+
+        assertThat(result.traditionalBalance()[0])
+                .isEqualTo(INIT_TRADITIONAL * GROWTH - ESSENTIAL_FLOOR, offset(1e-6));
+        assertThat(result.taxableBalance()[0]).isEqualTo(AMPLE_TAXABLE * GROWTH, offset(1e-6));
+        assertThat(result.lifetimeTax()).isEqualTo(ESSENTIAL_FLOOR * TAX_RATE, offset(1e-6));
+    }
+
+    @Test
+    void simulateForFraction_rothFirstEnumToken_drawsRothBeforeTaxable() {
+        var result = simulateOneYear("roth_first", AMPLE_TAXABLE);
+
+        assertThat(result.rothBalance()[0]).isEqualTo(INIT_ROTH * GROWTH - ESSENTIAL_FLOOR, offset(1e-6));
+        assertThat(result.taxableBalance()[0]).isEqualTo(AMPLE_TAXABLE * GROWTH, offset(1e-6));
         assertThat(result.lifetimeTax()).isEqualTo(0.0, offset(1e-6));
     }
 
     @Test
-    void selectWithdrawalStrategy_commaListOrder_drawsFromTaxable() {
-        // Control: the ordered strategy itself works. Only the token FORMAT is broken, which is why
-        // the defect never surfaced -- every unit test passed the comma-list form.
-        var result = simulateOneYear("taxable,traditional,roth", AMPLE_TAXABLE);
+    void simulateForFraction_proRataEnumToken_drawsTaxableFirst() {
+        // Conversion scoring has no proportional mode: pro-rata resolves to the taxable-first
+        // sequence, matching how the Monte Carlo trial path treats it.
+        var result = simulateOneYear("pro_rata", AMPLE_TAXABLE);
 
         assertThat(result.taxableBalance()[0])
                 .isEqualTo(AMPLE_TAXABLE * GROWTH - ESSENTIAL_FLOOR, offset(1e-6));
         assertThat(result.traditionalBalance()[0]).isEqualTo(INIT_TRADITIONAL * GROWTH, offset(1e-6));
+    }
+
+    @Test
+    void simulateForFraction_legacyCommaListOrder_fallsBackToTaxableFirst() {
+        // Persisted scenarios may still hold the pre-enum comma-list form. WithdrawalOrder.fromString
+        // maps anything unrecognized to taxable-first, which is how the rest of the engine has always
+        // treated these strings -- the draw must still happen.
+        var result = simulateOneYear("roth,taxable,traditional", AMPLE_TAXABLE);
+
+        assertThat(result.taxableBalance()[0])
+                .isEqualTo(AMPLE_TAXABLE * GROWTH - ESSENTIAL_FLOOR, offset(1e-6));
+        assertThat(result.rothBalance()[0]).isEqualTo(INIT_ROTH * GROWTH, offset(1e-6));
     }
 }

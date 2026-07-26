@@ -76,7 +76,7 @@ class RothConversionOptimizerTest {
         private double essentialFloor = 40_000;
         private FilingStatus filingStatus = FilingStatus.SINGLE;
         private FederalTaxCalculator calc = taxCalculator;
-        private String withdrawalOrder = "taxable,traditional,roth";
+        private String withdrawalOrder = "taxable_first";
         private List<ProjectionIncomeSourceInput> incomeSources = null;
         private RentalLossCalculator rentalLossCalculator = null;
         private double rmdBracketHeadroom = 0.10;
@@ -1036,7 +1036,7 @@ class RothConversionOptimizerTest {
         var tfOptimizer = testBuilder()
                 .traditional(1_000_000)
                 .taxable(200_000)
-                .build();  // defaults to "taxable,traditional,roth"
+                .build();  // defaults to "taxable_first"
 
         var dsResult = dsOptimizer.optimize();
         var tfResult = tfOptimizer.optimize();

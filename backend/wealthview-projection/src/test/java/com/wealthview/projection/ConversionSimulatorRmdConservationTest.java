@@ -56,7 +56,7 @@ class ConversionSimulatorRmdConservationTest {
                 0.22, 0.12, RETURN_MEAN,
                 0.0, // essentialFloor = 0 -> zero spending withdrawal, isolates the RMD step
                 FilingStatus.SINGLE, flatRateTaxCalculator(),
-                "taxable,traditional,roth", 0.10, 0.0,
+                "taxable_first", 0.10, 0.0,
                 endAge - RETIREMENT_AGE, RmdCalculator.rmdStartAge(BIRTH_YEAR),
                 rentalCalc);
 

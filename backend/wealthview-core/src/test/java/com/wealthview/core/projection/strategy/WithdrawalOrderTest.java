@@ -41,4 +41,53 @@ class WithdrawalOrderTest {
         assertThat(WithdrawalOrder.fromString("dynamic_sequencing"))
                 .isEqualTo(WithdrawalOrder.DYNAMIC_SEQUENCING);
     }
+
+    @Test
+    void drawSequence_taxableFirst_drawsTaxableThenTraditionalThenRoth() {
+        assertThat(WithdrawalOrder.TAXABLE_FIRST.drawSequence())
+                .containsExactly(WithdrawalOrder.POOL_TAXABLE, WithdrawalOrder.POOL_TRADITIONAL,
+                        WithdrawalOrder.POOL_ROTH);
+    }
+
+    @Test
+    void drawSequence_traditionalFirst_drawsTraditionalThenTaxableThenRoth() {
+        assertThat(WithdrawalOrder.TRADITIONAL_FIRST.drawSequence())
+                .containsExactly(WithdrawalOrder.POOL_TRADITIONAL, WithdrawalOrder.POOL_TAXABLE,
+                        WithdrawalOrder.POOL_ROTH);
+    }
+
+    @Test
+    void drawSequence_rothFirst_drawsRothThenTaxableThenTraditional() {
+        assertThat(WithdrawalOrder.ROTH_FIRST.drawSequence())
+                .containsExactly(WithdrawalOrder.POOL_ROTH, WithdrawalOrder.POOL_TAXABLE,
+                        WithdrawalOrder.POOL_TRADITIONAL);
+    }
+
+    @Test
+    void drawSequence_proRata_fallsBackToTaxableFirstSequence() {
+        // Pro-rata has no strict priority sequence: consumers that support proportional allocation
+        // dispatch it before asking for a sequence, and the Monte Carlo path draws it taxable-first.
+        assertThat(WithdrawalOrder.PRO_RATA.drawSequence())
+                .containsExactly(WithdrawalOrder.POOL_TAXABLE, WithdrawalOrder.POOL_TRADITIONAL,
+                        WithdrawalOrder.POOL_ROTH);
+    }
+
+    @Test
+    void drawSequence_dynamicSequencing_fallsBackToTaxableFirstSequence() {
+        // Dynamic sequencing is bracket-driven and dispatched ahead of the ordered strategies; the
+        // sequence is only reached as the documented "no bracket rate configured" fallback.
+        assertThat(WithdrawalOrder.DYNAMIC_SEQUENCING.drawSequence())
+                .containsExactly(WithdrawalOrder.POOL_TAXABLE, WithdrawalOrder.POOL_TRADITIONAL,
+                        WithdrawalOrder.POOL_ROTH);
+    }
+
+    @Test
+    void drawSequence_everyOrder_permutesTheThreePoolsExactlyOnce() {
+        for (WithdrawalOrder order : WithdrawalOrder.values()) {
+            assertThat(order.drawSequence())
+                    .as("draw sequence for %s", order)
+                    .containsExactlyInAnyOrder(WithdrawalOrder.POOL_TAXABLE,
+                            WithdrawalOrder.POOL_TRADITIONAL, WithdrawalOrder.POOL_ROTH);
+        }
+    }
 }

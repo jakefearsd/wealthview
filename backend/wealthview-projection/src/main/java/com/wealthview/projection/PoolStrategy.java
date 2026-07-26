@@ -31,10 +31,14 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
     static final int SCALE = 4;
     static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
 
-    /** Account type keys used for grouping and pool map lookups. */
-    static final String POOL_TAXABLE = "taxable";
-    static final String POOL_TRADITIONAL = "traditional";
-    static final String POOL_ROTH = "roth";
+    /**
+     * Account type keys used for grouping and pool map lookups. Aliased to the pool tokens
+     * {@link WithdrawalOrder#drawSequence()} yields so the spelling is defined exactly once: a
+     * divergence between the two would silently break every greedy draw that walks a sequence.
+     */
+    static final String POOL_TAXABLE = WithdrawalOrder.POOL_TAXABLE;
+    static final String POOL_TRADITIONAL = WithdrawalOrder.POOL_TRADITIONAL;
+    static final String POOL_ROTH = WithdrawalOrder.POOL_ROTH;
 
     /** Withdrawal order string for the dynamic sequencing strategy. */
     static final String WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING = "dynamic_sequencing";

@@ -2,10 +2,12 @@ package com.wealthview.projection;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.wealthview.core.common.CompoundGrowth;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
 
@@ -55,7 +57,12 @@ final class ConversionSimulator {
     private final int birthYear;
     private final int rmdStartAge;
     private final int years;
-    private final String withdrawalOrder;
+    /**
+     * Resolved once from the configured wire token: every caller supplies an enum token
+     * ("taxable_first", "dynamic_sequencing", ...), and unrecognized or legacy comma-list values
+     * degrade to taxable-first exactly as they do everywhere else in the engine.
+     */
+    private final WithdrawalOrder withdrawalOrder;
     private final FilingStatus filingStatus;
     private final FederalTaxCalculator taxCalculator;
     private final RentalAdjustmentCalculator rentalAdjustmentCalculator;
@@ -72,7 +79,7 @@ final class ConversionSimulator {
         this.birthYear = config.birthYear();
         this.rmdStartAge = config.rmdStartAge();
         this.years = config.years();
-        this.withdrawalOrder = config.withdrawalOrder();
+        this.withdrawalOrder = WithdrawalOrder.fromString(config.withdrawalOrder());
         this.filingStatus = config.filingStatus();
         this.taxCalculator = config.taxCalculator();
         this.rentalAdjustmentCalculator = config.rentalAdjustmentCalculator();
@@ -307,14 +314,14 @@ final class ConversionSimulator {
     }
 
     /**
-     * Ordered withdrawal: draws from pools in a configurable comma-separated order
-     * (e.g., "taxable,traditional,roth"). Traditional draws incur incremental tax.
+     * Ordered withdrawal: draws from the pools in the priority order the configured
+     * {@link WithdrawalOrder} defines. Traditional draws incur incremental tax.
      */
     private final class OrderedWithdrawalStrategy implements SpendingWithdrawalStrategy {
-        private final String[] pools;
+        private final List<String> pools;
 
-        OrderedWithdrawalStrategy(String... pools) {
-            this.pools = pools.clone();
+        OrderedWithdrawalStrategy(List<String> pools) {
+            this.pools = pools;
         }
 
         @Override
@@ -348,7 +355,7 @@ final class ConversionSimulator {
                         roth -= draw;
                         remaining -= draw;
                     }
-                    default -> { /* unrecognized pool type — skip */ }
+                    default -> throw new IllegalStateException("Unknown pool token: " + pool);
                 }
             }
 
@@ -360,11 +367,10 @@ final class ConversionSimulator {
         if (age < RetirementAges.EARLY_WITHDRAWAL_AGE) {
             return new EarlyWithdrawalStrategy();
         }
-        if (PoolStrategy.WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING.equals(withdrawalOrder)
-                && dynamicSequencingBracketRate > 0) {
+        if (withdrawalOrder == WithdrawalOrder.DYNAMIC_SEQUENCING && dynamicSequencingBracketRate > 0) {
             return new DynamicSequencingWithdrawalStrategy(dynamicSequencingBracketRate);
         }
-        return new OrderedWithdrawalStrategy(parseWithdrawalOrder());
+        return new OrderedWithdrawalStrategy(withdrawalOrder.drawSequence());
     }
 
     private WithdrawalResult processSpendingWithdrawal(
@@ -519,12 +525,5 @@ final class ConversionSimulator {
             }
         }
         return lo;
-    }
-
-    private String[] parseWithdrawalOrder() {
-        if (withdrawalOrder == null || withdrawalOrder.isBlank()) {
-            return new String[]{PoolStrategy.POOL_TAXABLE, PoolStrategy.POOL_TRADITIONAL, PoolStrategy.POOL_ROTH};
-        }
-        return withdrawalOrder.split(",");
     }
 }

@@ -1212,6 +1212,8 @@ final class TrialSimulator {
      * Split a withdrawal need across three pools using the specified ordering.
      * Returns a {@link PoolWithdrawal} describing how much comes from each pool.
      * When preAge595 is true, only the taxable pool is available (59.5 early withdrawal rule).
+     * Every order other than dynamic sequencing is a fixed pool priority, delegated to
+     * {@link PoolWithdrawal#greedy}.
      */
     static PoolWithdrawal splitWithdrawal(double taxable, double traditional, double roth,
                                            double need, String order, boolean preAge595,
@@ -1236,45 +1238,19 @@ final class TrialSimulator {
             return new PoolWithdrawal(drawn, 0, 0);
         }
 
-        // Scalar greedy draw in priority order — no per-call array allocation. Each
-        // branch draws pools in its order, capping at the available balance, and
-        // returns the result mapped to (taxable, traditional, roth).
-        switch (order) {
-            case DYNAMIC_SEQUENCING: {
-                // Traditional first up to bracket space, then taxable, then Roth.
-                double bracketSpace = Math.max(0,
-                        dsBracketCeiling - otherIncome - conversionAmount - rmdAmount);
-                double fromTrad = Math.min(bracketSpace, Math.min(Math.max(0, traditional), need));
-                double remaining = need - fromTrad;
-                double fromTax = Math.min(remaining, Math.max(0, taxable));
-                remaining -= fromTax;
-                double fromRoth = Math.min(remaining, Math.max(0, roth));
-                return new PoolWithdrawal(fromTax, fromTrad, fromRoth);
-            }
-            case TRADITIONAL_FIRST: {
-                double fromTrad = Math.min(need, Math.max(0, traditional));
-                double remaining = need - fromTrad;
-                double fromTax = Math.min(remaining, Math.max(0, taxable));
-                remaining -= fromTax;
-                double fromRoth = Math.min(remaining, Math.max(0, roth));
-                return new PoolWithdrawal(fromTax, fromTrad, fromRoth);
-            }
-            case ROTH_FIRST: {
-                double fromRoth = Math.min(need, Math.max(0, roth));
-                double remaining = need - fromRoth;
-                double fromTax = Math.min(remaining, Math.max(0, taxable));
-                remaining -= fromTax;
-                double fromTrad = Math.min(remaining, Math.max(0, traditional));
-                return new PoolWithdrawal(fromTax, fromTrad, fromRoth);
-            }
-            default: { // TAXABLE_FIRST (and PRO_RATA, which the MC path treats as taxable-first)
-                double fromTax = Math.min(need, Math.max(0, taxable));
-                double remaining = need - fromTax;
-                double fromTrad = Math.min(remaining, Math.max(0, traditional));
-                remaining -= fromTrad;
-                double fromRoth = Math.min(remaining, Math.max(0, roth));
-                return new PoolWithdrawal(fromTax, fromTrad, fromRoth);
-            }
+        if (order == WithdrawalOrder.DYNAMIC_SEQUENCING) {
+            // Bracket-driven, not a fixed priority order: traditional first up to the bracket
+            // space, then taxable, then Roth.
+            double bracketSpace = Math.max(0,
+                    dsBracketCeiling - otherIncome - conversionAmount - rmdAmount);
+            double fromTrad = Math.min(bracketSpace, Math.min(Math.max(0, traditional), need));
+            double remaining = need - fromTrad;
+            double fromTax = Math.min(remaining, Math.max(0, taxable));
+            remaining -= fromTax;
+            double fromRoth = Math.min(remaining, Math.max(0, roth));
+            return new PoolWithdrawal(fromTax, fromTrad, fromRoth);
         }
+
+        return PoolWithdrawal.greedy(order, taxable, traditional, roth, need);
     }
 }
