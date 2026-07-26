@@ -41,7 +41,7 @@ public final class ScenarioMother {
 
     /**
      * The guardrail/Monte-Carlo fixture: retirement date 2030-01-01, end age 90, 3% inflation --
-     * dominant across {@code GuardrailProfileServiceTest} (43 of its 45 constructions), where name
+     * dominant across {@code GuardrailProfileServiceTest} (42 of its 45 constructions), where name
      * and {@code params_json} are the only components that vary per test.
      */
     public static ProjectionScenarioEntity guardrailScenario(
