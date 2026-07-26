@@ -1,62 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { defaultOptimizerConfig, fromProfile, toRequest } from './optimizerConfig';
-import type { GuardrailProfileResponse, RothConversionScheduleResponse } from '../types/projection';
-
-function makeSchedule(overrides: Partial<RothConversionScheduleResponse> = {}): RothConversionScheduleResponse {
-    return {
-        lifetime_tax_with_conversions: 100000,
-        lifetime_tax_without: 150000,
-        tax_savings: 50000,
-        exhaustion_age: 85,
-        exhaustion_target_met: true,
-        conversion_bracket_rate: 0.24,
-        rmd_target_bracket_rate: 0.12,
-        traditional_exhaustion_buffer: 3,
-        mc_exhaustion_pct: null,
-        target_traditional_balance: null,
-        rmd_bracket_headroom: 0.15,
-        years: [],
-        ...overrides,
-    };
-}
-
-function makeProfile(overrides: Partial<GuardrailProfileResponse> = {}): GuardrailProfileResponse {
-    return {
-        id: 'g1',
-        scenario_id: 's1',
-        name: 'My Plan',
-        essential_floor: 45000,
-        terminal_balance_target: 250000,
-        return_mean: 0.07,
-        trial_count: 2500,
-        confidence_level: 0.7,
-        phases: [
-            { name: 'Go-go', start_age: 62, end_age: 74, priority_weight: 3, target_spending: 90000 },
-        ],
-        yearly_spending: [],
-        median_final_balance: 1000000,
-        failure_rate: 0.05,
-        success_probability: 0.9,
-        success_probability_with_rules: null,
-        gated_on: 'no_adaptation',
-        floor_reduced: false,
-        original_floor_success_probability: null,
-        fixed_return_share: null,
-        percentile10_final: 400000,
-        stale: false,
-        created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-01T00:00:00Z',
-        portfolio_floor: 100000,
-        max_annual_adjustment_rate: 0.08,
-        phase_blend_years: 2,
-        risk_tolerance: 'aggressive',
-        cash_reserve_years: 3,
-        cash_return_rate: 0.045,
-        conversion_schedule: null,
-        stochastic_mortality: null,
-        ...overrides,
-    };
-}
+import { makeProfile, makeSchedule } from '../testutil/builders';
 
 describe('defaultOptimizerConfig', () => {
     it('matches the configure-form defaults', () => {

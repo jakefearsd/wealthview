@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithRouter } from '../test-utils';
 import SpendingProfilesPage from './SpendingProfilesPage';
-import type { SpendingProfile, GuardrailProfileResponse } from '../types/projection';
+import type { SpendingProfile } from '../types/projection';
+import { makeProfile, makeScenario } from '../testutil/builders';
 
 const mockProfiles: SpendingProfile[] = [
     {
@@ -29,7 +30,7 @@ const mockProfiles: SpendingProfile[] = [
     },
 ];
 
-const mockGuardrailProfile: GuardrailProfileResponse = {
+const mockGuardrailProfile = makeProfile({
     id: 'gp-1',
     scenario_id: 'sc-1',
     name: 'Optimized Plan',
@@ -45,26 +46,16 @@ const mockGuardrailProfile: GuardrailProfileResponse = {
         { year: 2030, age: 62, recommended: 75000, corridor_low: 62000, corridor_high: 91000, essential_floor: 30000, discretionary: 45000, income_offset: 0, portfolio_withdrawal: 75000, phase_name: 'Early', portfolio_balance_median: 480000, portfolio_balance_p10: 200000, portfolio_balance_p25: 350000 },
     ],
     median_final_balance: 250000,
-    failure_rate: 0.05,
     success_probability: 0.95,
-    success_probability_with_rules: null,
-    gated_on: 'no_adaptation',
-    floor_reduced: false,
-    original_floor_success_probability: null,
-    fixed_return_share: null,
     percentile10_final: 100000,
-    stale: false,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
-    portfolio_floor: 100000,
     max_annual_adjustment_rate: 0.05,
     phase_blend_years: 1,
     risk_tolerance: 'moderate',
     cash_reserve_years: 2,
     cash_return_rate: 0.04,
-    conversion_schedule: null,
-    stochastic_mortality: null,
-};
+});
 
 vi.mock('../api/spendingProfiles', () => ({
     listSpendingProfiles: vi.fn(),
@@ -173,7 +164,7 @@ describe('SpendingProfilesPage', () => {
 
     it('shows guardrail profiles section when profiles exist', async () => {
         mockUseApiQuery.mockReturnValue({ data: mockProfiles, loading: false, error: null, refetch: vi.fn() });
-        mockListScenarios.mockResolvedValue([{ id: 'sc-1', name: 'Test Scenario', retirement_date: '2030-01-01', end_age: 90, inflation_rate: 0.03, params_json: null, accounts: [], spending_profile: null, guardrail_profile: null, income_sources: [], created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' }]);
+        mockListScenarios.mockResolvedValue([makeScenario({ retirement_date: '2030-01-01' })]);
         mockGetGuardrailProfile.mockResolvedValue(mockGuardrailProfile);
 
         renderWithRouter(<SpendingProfilesPage />);

@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ProjectionCacheProvider } from '../context/ProjectionCacheContext';
 import ProjectionDetailPage from './ProjectionDetailPage';
 import type { ProjectionResult, ProjectionYear, Scenario } from '../types/projection';
+import { makeAccount, makeScenario } from '../testutil/builders';
 
 function makeYear(overrides: Partial<ProjectionYear> & { year: number; age: number }): ProjectionYear {
     return {
@@ -38,26 +39,11 @@ function makeResult(overrides: Partial<ProjectionResult> = {}): ProjectionResult
     };
 }
 
-const mockScenario: Scenario = {
+const mockScenario = makeScenario({
     id: 'abc-123',
     name: 'Test Plan',
-    retirement_date: '2045-01-01',
-    end_age: 90,
-    inflation_rate: 0.03,
-    params_json: null,
-    accounts: [
-        {
-            id: 'a1', linked_account_id: null, name: 'Brokerage', initial_balance: 100000, annual_contribution: 10000,
-            expected_return: 0.07, account_type: 'taxable', cost_basis: null, allocation: null, allocation_is_override: false,
-            owner: 'primary',
-        },
-    ],
-    spending_profile: null,
-    guardrail_profile: null,
-    income_sources: [],
-    created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:00:00Z',
-};
+    accounts: [makeAccount()],
+});
 
 vi.mock('../api/projections', () => ({
     getScenario: vi.fn(),

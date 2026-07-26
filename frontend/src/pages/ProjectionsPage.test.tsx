@@ -3,37 +3,19 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithRouter } from '../test-utils';
 import ProjectionsPage from './ProjectionsPage';
-import type { Scenario } from '../types/projection';
+import { makeScenario } from '../testutil/builders';
 
-const mockScenarios: Scenario[] = [
-    {
-        id: '1',
-        name: 'Early Retirement',
-        retirement_date: '2045-01-01',
-        end_age: 90,
-        inflation_rate: 0.03,
-        params_json: null,
-        accounts: [],
-        spending_profile: null,
-        guardrail_profile: null,
-        income_sources: [],
-        created_at: '2024-01-01T00:00:00Z',
-        updated_at: '2024-01-01T00:00:00Z',
-    },
-    {
+const mockScenarios = [
+    makeScenario({ id: '1', name: 'Early Retirement' }),
+    makeScenario({
         id: '2',
         name: 'Conservative Plan',
         retirement_date: '2050-06-15',
         end_age: 85,
         inflation_rate: 0.025,
-        params_json: null,
-        accounts: [],
-        spending_profile: null,
-        guardrail_profile: null,
-        income_sources: [],
         created_at: '2024-02-01T00:00:00Z',
         updated_at: '2024-02-01T00:00:00Z',
-    },
+    }),
 ];
 
 vi.mock('../api/projections', () => ({

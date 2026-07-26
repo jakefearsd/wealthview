@@ -39,30 +39,18 @@ import { useApiQuery } from '../hooks/useApiQuery';
 import ScenarioForm from './ScenarioForm';
 import type { Scenario, ProjectionAccount } from '../types/projection';
 import type { Account } from '../types/account';
+import { makeAccount, makeScenario as buildScenario } from '../testutil/builders';
 
 const mockUseApiQuery = vi.mocked(useApiQuery);
 
 const spendingProfile = { id: 'sp-1', name: 'Base Plan', essential_expenses: 50000, discretionary_expenses: 20000 };
 
+/** This form only ever exercises a single account, so overrides target that account directly. */
 function makeScenario(account: Partial<ProjectionAccount>): Scenario {
-    return {
-        id: 'sc-1',
+    return buildScenario({
         name: 'Existing Plan',
-        retirement_date: '2045-01-01',
-        end_age: 90,
-        inflation_rate: 0.03,
-        params_json: null,
-        accounts: [{
-            id: 'a1', linked_account_id: null, name: 'Brokerage', initial_balance: 100000,
-            annual_contribution: 10000, expected_return: null, account_type: 'taxable',
-            cost_basis: null, allocation: null, allocation_is_override: false, owner: 'primary', ...account,
-        }],
-        spending_profile: null,
-        guardrail_profile: null,
-        income_sources: [],
-        created_at: '2024-01-01T00:00:00Z',
-        updated_at: '2024-01-01T00:00:00Z',
-    };
+        accounts: [makeAccount({ expected_return: null, ...account })],
+    });
 }
 
 function setupMocks({ profiles = [spendingProfile], accounts = [] as Account[], incomeSources = [] } = {}) {

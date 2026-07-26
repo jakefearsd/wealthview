@@ -2,8 +2,9 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Scenario, GuardrailProfileResponse, GuardrailPhase, GuardrailYearlySpending } from '../types/projection';
+import type { GuardrailPhase, GuardrailProfileResponse, GuardrailYearlySpending } from '../types/projection';
 import { computePlanDiagnostics } from './SpendingOptimizerPage';
+import { makeAccount, makeProfile, makeScenario } from '../testutil/builders';
 
 vi.mock('../api/projections', () => ({
     getScenario: vi.fn(),
@@ -32,26 +33,15 @@ const mockGetScenario = vi.mocked(getScenario);
 const mockGetProfile = vi.mocked(getGuardrailProfile);
 const mockOptimizeSpending = vi.mocked(optimizeSpending);
 
-const mockScenario: Scenario = {
+const mockScenario = makeScenario({
     id: 'sc-1',
     name: 'Test Scenario',
     retirement_date: '2030-01-01',
-    end_age: 90,
-    inflation_rate: 0.03,
     params_json: '{"birth_year":1968}',
-    accounts: [{
-        id: 'a1', linked_account_id: null, name: 'Brokerage', initial_balance: 500000, annual_contribution: 0,
-        expected_return: 0.07, account_type: 'taxable', cost_basis: null, allocation: null, allocation_is_override: false,
-        owner: 'primary',
-    }],
-    spending_profile: null,
-    guardrail_profile: null,
-    income_sources: [],
-    created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:00:00Z',
-};
+    accounts: [makeAccount({ initial_balance: 500000, annual_contribution: 0 })],
+});
 
-const mockProfile: GuardrailProfileResponse = {
+const mockProfile = makeProfile({
     id: 'gp-1',
     scenario_id: 'sc-1',
     name: 'Optimized Plan',
@@ -70,26 +60,15 @@ const mockProfile: GuardrailProfileResponse = {
         { year: 2041, age: 73, recommended: 50000, corridor_low: 40000, corridor_high: 65000, essential_floor: 30000, discretionary: 20000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'Mid', portfolio_balance_median: 300000, portfolio_balance_p10: 50000, portfolio_balance_p25: 180000 },
     ],
     median_final_balance: 250000,
-    failure_rate: 0.05,
-    success_probability: 0.9,
-    success_probability_with_rules: null,
-    gated_on: 'no_adaptation',
-    floor_reduced: false,
-    original_floor_success_probability: null,
-    fixed_return_share: null,
     percentile10_final: 100000,
-    stale: false,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
-    portfolio_floor: 100000,
     max_annual_adjustment_rate: 0.05,
     phase_blend_years: 1,
     risk_tolerance: 'moderate',
     cash_reserve_years: 2,
     cash_return_rate: 0.04,
-    conversion_schedule: null,
-    stochastic_mortality: null,
-};
+});
 
 function renderPage() {
     return render(

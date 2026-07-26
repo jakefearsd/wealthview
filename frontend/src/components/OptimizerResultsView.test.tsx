@@ -26,8 +26,9 @@ vi.mock('./NearTermSpendingGuide', () => ({ default: () => <div data-testid="nea
 
 import { computePlanDiagnostics } from '../pages/SpendingOptimizerPage';
 import OptimizerResultsView from './OptimizerResultsView';
+import { makeProfile } from '../testutil/builders';
 
-const baseResult = {
+const baseResult = makeProfile({
     id: 'g-1',
     name: 'Opt 1',
     stale: false,
@@ -36,16 +37,20 @@ const baseResult = {
     percentile10_final: 500000,
     phases: [],
     yearly_spending: [
-        { year: 2035, sustainable_spending: 80000, portfolio_balance_p25: 1_000_000 },
+        {
+            year: 2035, age: 67, recommended: 80000, corridor_low: 70000, corridor_high: 90000,
+            essential_floor: 40000, discretionary: 40000, income_offset: 0, portfolio_withdrawal: 80000,
+            phase_name: 'Go-go', portfolio_balance_median: 1_200_000, portfolio_balance_p10: 700_000,
+            portfolio_balance_p25: 1_000_000,
+        },
     ],
-};
+});
 
 describe('OptimizerResultsView', () => {
     it('renders failure rate card with formatted value', () => {
         render(
             <OptimizerResultsView
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                result={baseResult as any}
+                result={baseResult}
                 onReoptimize={vi.fn()}
                 retirementDate="2035-01-01"
             />
@@ -57,8 +62,7 @@ describe('OptimizerResultsView', () => {
     it('renders success probability card with formatted value', () => {
         render(
             <OptimizerResultsView
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                result={baseResult as any}
+                result={baseResult}
                 onReoptimize={vi.fn()}
                 retirementDate="2035-01-01"
             />
@@ -71,8 +75,7 @@ describe('OptimizerResultsView', () => {
         const onReoptimize = vi.fn();
         render(
             <OptimizerResultsView
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                result={{ ...baseResult, stale: true } as any}
+                result={{ ...baseResult, stale: true }}
                 onReoptimize={onReoptimize}
                 retirementDate="2035-01-01"
             />
@@ -87,12 +90,13 @@ describe('OptimizerResultsView', () => {
             warnings: ['High failure rate — consider reducing spending'],
             failureRateSeverity: 'danger',
             phases: [],
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any);
+            overallAchievement: 0,
+            depletionAgeP10: null,
+            depletionAgeP25: null,
+        });
         render(
             <OptimizerResultsView
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                result={baseResult as any}
+                result={baseResult}
                 onReoptimize={vi.fn()}
                 retirementDate="2035-01-01"
             />
@@ -104,8 +108,7 @@ describe('OptimizerResultsView', () => {
     it('renders the with-rules card when success_probability_with_rules is present', () => {
         render(
             <OptimizerResultsView
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                result={{ ...baseResult, success_probability_with_rules: 0.97, gated_on: 'with_rules' } as any}
+                result={{ ...baseResult, success_probability_with_rules: 0.97, gated_on: 'with_rules' }}
                 onReoptimize={vi.fn()}
                 retirementDate="2035-01-01"
             />
@@ -118,8 +121,7 @@ describe('OptimizerResultsView', () => {
     it('marks the "With Guardrail Cuts" card as certified when gated_on is with_rules', () => {
         render(
             <OptimizerResultsView
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                result={{ ...baseResult, success_probability_with_rules: 0.97, gated_on: 'with_rules' } as any}
+                result={{ ...baseResult, success_probability_with_rules: 0.97, gated_on: 'with_rules' }}
                 onReoptimize={vi.fn()}
                 retirementDate="2035-01-01"
             />
@@ -133,8 +135,7 @@ describe('OptimizerResultsView', () => {
     it('marks the "Success Probability" card as certified when gated_on is no_adaptation', () => {
         render(
             <OptimizerResultsView
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                result={{ ...baseResult, success_probability_with_rules: 0.97, gated_on: 'no_adaptation' } as any}
+                result={{ ...baseResult, success_probability_with_rules: 0.97, gated_on: 'no_adaptation' }}
                 onReoptimize={vi.fn()}
                 retirementDate="2035-01-01"
             />
@@ -148,8 +149,7 @@ describe('OptimizerResultsView', () => {
     it('omits the with-rules card when success_probability_with_rules is null', () => {
         render(
             <OptimizerResultsView
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                result={{ ...baseResult, success_probability_with_rules: null } as any}
+                result={{ ...baseResult, success_probability_with_rules: null }}
                 onReoptimize={vi.fn()}
                 retirementDate="2035-01-01"
             />
@@ -164,8 +164,7 @@ describe('OptimizerResultsView', () => {
                     ...baseResult,
                     floor_reduced: true,
                     original_floor_success_probability: 0.62,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                } as any}
+                }}
                 onReoptimize={vi.fn()}
                 retirementDate="2035-01-01"
             />
@@ -177,8 +176,7 @@ describe('OptimizerResultsView', () => {
     it('omits the floor-reduced banner when floor_reduced is false', () => {
         render(
             <OptimizerResultsView
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                result={{ ...baseResult, floor_reduced: false } as any}
+                result={{ ...baseResult, floor_reduced: false }}
                 onReoptimize={vi.fn()}
                 retirementDate="2035-01-01"
             />
@@ -189,8 +187,7 @@ describe('OptimizerResultsView', () => {
     it('renders the fixed-return-share note when the share exceeds 50%', () => {
         render(
             <OptimizerResultsView
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                result={{ ...baseResult, fixed_return_share: 0.75 } as any}
+                result={{ ...baseResult, fixed_return_share: 0.75 }}
                 onReoptimize={vi.fn()}
                 retirementDate="2035-01-01"
             />
@@ -202,8 +199,7 @@ describe('OptimizerResultsView', () => {
     it('omits the fixed-return-share note when the share is at or below 50%', () => {
         render(
             <OptimizerResultsView
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                result={{ ...baseResult, fixed_return_share: 0.5 } as any}
+                result={{ ...baseResult, fixed_return_share: 0.5 }}
                 onReoptimize={vi.fn()}
                 retirementDate="2035-01-01"
             />
@@ -222,8 +218,7 @@ describe('OptimizerResultsView', () => {
         it('renders the lifetime and longevity-conditional success labels with the median second-death age', () => {
             render(
                 <OptimizerResultsView
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    result={{ ...baseResult, stochastic_mortality: stochasticMortality } as any}
+                    result={{ ...baseResult, stochastic_mortality: stochasticMortality }}
                     onReoptimize={vi.fn()}
                     retirementDate="2035-01-01"
                 />
@@ -243,8 +238,7 @@ describe('OptimizerResultsView', () => {
         it('renders neither stochastic-mortality label and does not crash when the block is null', () => {
             render(
                 <OptimizerResultsView
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    result={{ ...baseResult, stochastic_mortality: null } as any}
+                    result={{ ...baseResult, stochastic_mortality: null }}
                     onReoptimize={vi.fn()}
                     retirementDate="2035-01-01"
                 />
@@ -257,8 +251,7 @@ describe('OptimizerResultsView', () => {
         it('renders neither stochastic-mortality label and does not crash when the field is absent entirely', () => {
             render(
                 <OptimizerResultsView
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    result={baseResult as any}
+                    result={baseResult}
                     onReoptimize={vi.fn()}
                     retirementDate="2035-01-01"
                 />
@@ -270,8 +263,7 @@ describe('OptimizerResultsView', () => {
     it('embeds the expected child charts', () => {
         render(
             <OptimizerResultsView
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                result={baseResult as any}
+                result={baseResult}
                 onReoptimize={vi.fn()}
                 retirementDate="2035-01-01"
             />
