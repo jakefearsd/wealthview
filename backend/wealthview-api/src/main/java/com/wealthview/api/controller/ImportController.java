@@ -22,6 +22,8 @@ import com.wealthview.core.importservice.ImportService;
 import com.wealthview.core.importservice.PositionImportService;
 import com.wealthview.core.importservice.dto.ImportJobResponse;
 
+import static com.wealthview.api.logging.LogSanitizer.sanitize;
+
 @RestController
 @RequestMapping("/api/v1/import")
 public class ImportController {
@@ -51,7 +53,7 @@ public class ImportController {
             @RequestParam(required = false) String format) throws IOException {
         validateFileType(file);
         log.info("CSV import requested for account {} file='{}' size={}B format={}",
-                accountId, sanitizeForLog(file.getOriginalFilename()), file.getSize(), sanitizeForLog(format));
+                accountId, sanitize(file.getOriginalFilename()), file.getSize(), sanitize(format));
         var result = (format != null && !format.isBlank())
                 ? importService.importCsv(principal.tenantId(), accountId, file.getInputStream(), format)
                 : importService.importCsv(principal.tenantId(), accountId, file.getInputStream());
@@ -66,8 +68,8 @@ public class ImportController {
             @RequestParam(required = false) String format) throws IOException {
         validateFileType(file);
         log.info("Positions import requested for account {} file='{}' size={}B format={}",
-                accountId, sanitizeForLog(file.getOriginalFilename()), file.getSize(),
-                sanitizeForLog(format != null ? format : "fidelityPositions"));
+                accountId, sanitize(file.getOriginalFilename()), file.getSize(),
+                sanitize(format != null ? format : "fidelityPositions"));
         var result = positionImportService.importPositions(
                 principal.tenantId(), accountId, file.getInputStream(),
                 format != null ? format : "fidelityPositions");
@@ -81,16 +83,9 @@ public class ImportController {
             @RequestParam("file") MultipartFile file) throws IOException {
         validateFileType(file);
         log.info("OFX import requested for account {} file='{}' size={}B",
-                accountId, sanitizeForLog(file.getOriginalFilename()), file.getSize());
+                accountId, sanitize(file.getOriginalFilename()), file.getSize());
         var result = importService.importOfx(principal.tenantId(), accountId, file.getInputStream());
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
-    }
-
-    static String sanitizeForLog(String value) {
-        if (value == null) {
-            return null;
-        }
-        return value.replaceAll("[\\r\\n]", "_");
     }
 
     @GetMapping("/jobs")
