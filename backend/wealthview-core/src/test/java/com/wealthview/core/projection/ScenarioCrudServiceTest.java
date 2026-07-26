@@ -25,6 +25,7 @@ import com.wealthview.core.projection.dto.CreateProjectionAccountRequest;
 import com.wealthview.core.projection.dto.ScenarioRequest;
 import com.wealthview.core.projection.dto.ScenarioIncomeSourceInput;
 import com.wealthview.core.tenant.TenantLookup;
+import com.wealthview.core.testutil.ScenarioRequestBuilder;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
@@ -101,77 +102,12 @@ class ScenarioCrudServiceTest {
                 incomeSourceRepository, guardrailProfileRepository, classificationService, meterRegistry);
     }
 
-    private ScenarioRequest scenarioRequestWithAccounts(List<CreateProjectionAccountRequest> accounts) {
-        return new ScenarioRequest(
-                "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, accounts, null, null, null);
-    }
-
-    private ScenarioRequest scenarioRequestWithDividendYield(BigDecimal dividendYield) {
-        return new ScenarioRequest(
-                "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                dividendYield, null, List.of(), null, null, null);
-    }
-
-    private ScenarioRequest scenarioRequestWithFeeRate(BigDecimal feeRate) {
-        return new ScenarioRequest(
-                "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, feeRate, List.of(), null, null, null);
-    }
-
-    private ScenarioRequest scenarioRequestWithInterestYield(BigDecimal interestYield) {
-        return new ScenarioRequest(
-                "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, null, interestYield,
-                null, null, null, null, null,
-                null, null, null, null,
-                List.of(), null, null, null);
-    }
-
-    private ScenarioRequest scenarioRequestWithHousehold(Integer spouseBirthYear, Integer primaryDeathAge,
-                                                          Integer spouseDeathAge, BigDecimal survivorSpendingFactor,
-                                                          Boolean communityProperty) {
-        return new ScenarioRequest(
-                "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, null, null,
-                spouseBirthYear, primaryDeathAge, spouseDeathAge, survivorSpendingFactor, communityProperty,
-                null, null, null, null,
-                List.of(), null, null, null);
-    }
-
-    private ScenarioRequest scenarioRequestWithStochasticMortality(Integer spouseBirthYear, String primarySex,
-                                                                     String spouseSex,
-                                                                     Integer longevityConditionalAge) {
-        return new ScenarioRequest(
-                "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, null, null,
-                spouseBirthYear, null, null, null, null,
-                Boolean.TRUE, primarySex, spouseSex, longevityConditionalAge,
-                List.of(), null, null, null);
-    }
-
     private ScenarioRequest scenarioRequestWithAccountOwner(String owner, String accountType) {
-        return scenarioRequestWithAccounts(List.of(new CreateProjectionAccountRequest(
-                null, new BigDecimal("100000"), new BigDecimal("5000"),
-                new BigDecimal("0.07"), null, null, accountType, owner)));
+        return ScenarioRequestBuilder.builder()
+                .withAccounts(List.of(new CreateProjectionAccountRequest(
+                        null, new BigDecimal("100000"), new BigDecimal("5000"),
+                        new BigDecimal("0.07"), null, null, accountType, owner)))
+                .build();
     }
 
     private ProjectionScenarioEntity captureSavedScenario() {
@@ -184,23 +120,17 @@ class ScenarioCrudServiceTest {
     void createScenario_validRequest_createsAndReturns() {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
-        var request = new ScenarioRequest(
-                "Retirement Plan",
-                LocalDate.of(2055, 1, 1),
-                90,
-                new BigDecimal("0.0300"),
-                1990,
-                new BigDecimal("0.04"),
-                null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, List.of(new CreateProjectionAccountRequest(
+        var request = ScenarioRequestBuilder.builder()
+                .withName("Retirement Plan")
+                .withBirthYear(1990)
+                .withWithdrawalRate(new BigDecimal("0.04"))
+                .withAccounts(List.of(new CreateProjectionAccountRequest(
                         null,
                         new BigDecimal("100000"),
                         new BigDecimal("10000"),
                         new BigDecimal("0.07"),
-                        null)),
-                null, null, null);
+                        null)))
+                .build();
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -223,25 +153,20 @@ class ScenarioCrudServiceTest {
     void createScenario_withDynamicStrategy_persistsInParamsJson() {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
-        var request = new ScenarioRequest(
-                "Dynamic Plan",
-                LocalDate.of(2055, 1, 1),
-                90,
-                new BigDecimal("0.0300"),
-                1990,
-                new BigDecimal("0.04"),
-                "vanguard_dynamic_spending",
-                new BigDecimal("0.05"),
-                new BigDecimal("-0.025"),
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, List.of(new CreateProjectionAccountRequest(
+        var request = ScenarioRequestBuilder.builder()
+                .withName("Dynamic Plan")
+                .withBirthYear(1990)
+                .withWithdrawalRate(new BigDecimal("0.04"))
+                .withWithdrawalStrategy("vanguard_dynamic_spending")
+                .withDynamicCeiling(new BigDecimal("0.05"))
+                .withDynamicFloor(new BigDecimal("-0.025"))
+                .withAccounts(List.of(new CreateProjectionAccountRequest(
                         null,
                         new BigDecimal("100000"),
                         new BigDecimal("10000"),
                         new BigDecimal("0.07"),
-                        null)),
-                null, null, null);
+                        null)))
+                .build();
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -260,22 +185,16 @@ class ScenarioCrudServiceTest {
     void createScenario_withAccountTypes_persistsTypes() {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
-        var request = new ScenarioRequest(
-                "Multi-Pool Plan",
-                LocalDate.of(2055, 1, 1),
-                90,
-                new BigDecimal("0.0300"),
-                1990,
-                new BigDecimal("0.04"),
-                null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, List.of(
+        var request = ScenarioRequestBuilder.builder()
+                .withName("Multi-Pool Plan")
+                .withBirthYear(1990)
+                .withWithdrawalRate(new BigDecimal("0.04"))
+                .withAccounts(List.of(
                         new CreateProjectionAccountRequest(null, new BigDecimal("200000"),
                                 new BigDecimal("10000"), new BigDecimal("0.07"), "traditional"),
                         new CreateProjectionAccountRequest(null, new BigDecimal("100000"),
-                                new BigDecimal("5000"), new BigDecimal("0.07"), "roth")),
-                null, null, null);
+                                new BigDecimal("5000"), new BigDecimal("0.07"), "roth")))
+                .build();
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -295,20 +214,14 @@ class ScenarioCrudServiceTest {
     void createScenario_hypotheticalAccountWithCostBasis_persistsCostBasis() {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
-        var request = new ScenarioRequest(
-                "Taxable Plan",
-                LocalDate.of(2055, 1, 1),
-                90,
-                new BigDecimal("0.0300"),
-                1990,
-                new BigDecimal("0.04"),
-                null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, List.of(new CreateProjectionAccountRequest(
+        var request = ScenarioRequestBuilder.builder()
+                .withName("Taxable Plan")
+                .withBirthYear(1990)
+                .withWithdrawalRate(new BigDecimal("0.04"))
+                .withAccounts(List.of(new CreateProjectionAccountRequest(
                         null, new BigDecimal("100000"), new BigDecimal("10000"),
-                        new BigDecimal("0.07"), new BigDecimal("62000"), "taxable")),
-                null, null, null);
+                        new BigDecimal("0.07"), new BigDecimal("62000"), "taxable")))
+                .build();
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -331,20 +244,14 @@ class ScenarioCrudServiceTest {
         when(classificationService.deriveAllocation(tenantId, linkedAccount.getId()))
                 .thenReturn(new SecurityClassificationService.AllocationResult(AssetAllocation.ALL_US, Set.of()));
 
-        var request = new ScenarioRequest(
-                "Linked Plan",
-                LocalDate.of(2055, 1, 1),
-                90,
-                new BigDecimal("0.0300"),
-                1990,
-                new BigDecimal("0.04"),
-                null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, List.of(new CreateProjectionAccountRequest(
+        var request = ScenarioRequestBuilder.builder()
+                .withName("Linked Plan")
+                .withBirthYear(1990)
+                .withWithdrawalRate(new BigDecimal("0.04"))
+                .withAccounts(List.of(new CreateProjectionAccountRequest(
                         linkedAccountId, new BigDecimal("100000"), new BigDecimal("10000"),
-                        new BigDecimal("0.07"), new BigDecimal("62000"), "taxable")),
-                null, null, null);
+                        new BigDecimal("0.07"), new BigDecimal("62000"), "taxable")))
+                .build();
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -367,9 +274,11 @@ class ScenarioCrudServiceTest {
 
         var alloc = new AllocationDto(new BigDecimal("60"), new BigDecimal("20"),
                 new BigDecimal("15"), new BigDecimal("5"));
-        var request = scenarioRequestWithAccounts(List.of(new CreateProjectionAccountRequest(
-                null, new BigDecimal("100000"), new BigDecimal("0"), null, new BigDecimal("90000"),
-                alloc, "taxable")));
+        var request = ScenarioRequestBuilder.builder()
+                .withAccounts(List.of(new CreateProjectionAccountRequest(
+                        null, new BigDecimal("100000"), new BigDecimal("0"), null, new BigDecimal("90000"),
+                        alloc, "taxable")))
+                .build();
 
         service.createScenario(tenantId, request);
 
@@ -383,8 +292,10 @@ class ScenarioCrudServiceTest {
     void createScenario_allocationSumNot100_throws() {
         var bad = new AllocationDto(new BigDecimal("60"), new BigDecimal("20"),
                 new BigDecimal("15"), new BigDecimal("10"));
-        var request = scenarioRequestWithAccounts(List.of(new CreateProjectionAccountRequest(
-                null, new BigDecimal("100000"), new BigDecimal("0"), null, null, bad, "taxable")));
+        var request = ScenarioRequestBuilder.builder()
+                .withAccounts(List.of(new CreateProjectionAccountRequest(
+                        null, new BigDecimal("100000"), new BigDecimal("0"), null, null, bad, "taxable")))
+                .build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -580,24 +491,18 @@ class ScenarioCrudServiceTest {
     void createScenario_withWithdrawalOrder_persistsInParamsJson() {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
-        var request = new ScenarioRequest(
-                "Traditional First Plan",
-                LocalDate.of(2055, 1, 1),
-                90,
-                new BigDecimal("0.0300"),
-                1990,
-                new BigDecimal("0.04"),
-                null, null, null,
-                null, null, null,
-                "traditional_first", null, null, null, null,
-                null, null, null,
-                null, null, List.of(new CreateProjectionAccountRequest(
+        var request = ScenarioRequestBuilder.builder()
+                .withName("Traditional First Plan")
+                .withBirthYear(1990)
+                .withWithdrawalRate(new BigDecimal("0.04"))
+                .withWithdrawalOrder("traditional_first")
+                .withAccounts(List.of(new CreateProjectionAccountRequest(
                         null,
                         new BigDecimal("100000"),
                         new BigDecimal("10000"),
                         new BigDecimal("0.07"),
-                        "traditional")),
-                null, null, null);
+                        "traditional")))
+                .build();
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -614,24 +519,20 @@ class ScenarioCrudServiceTest {
     void createScenario_withFillBracketStrategy_persistsInParamsJson() {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
-        var request = new ScenarioRequest(
-                "Fill Bracket Plan",
-                LocalDate.of(2055, 1, 1),
-                90,
-                new BigDecimal("0.0300"),
-                1990,
-                new BigDecimal("0.04"),
-                null, null, null,
-                "single", null, null, null,
-                null, "fill_bracket", new BigDecimal("0.12"), null,
-                null, null, null,
-                null, null, List.of(new CreateProjectionAccountRequest(
+        var request = ScenarioRequestBuilder.builder()
+                .withName("Fill Bracket Plan")
+                .withBirthYear(1990)
+                .withWithdrawalRate(new BigDecimal("0.04"))
+                .withFilingStatus("single")
+                .withRothConversionStrategy("fill_bracket")
+                .withTargetBracketRate(new BigDecimal("0.12"))
+                .withAccounts(List.of(new CreateProjectionAccountRequest(
                         null,
                         new BigDecimal("200000"),
                         new BigDecimal("10000"),
                         new BigDecimal("0.07"),
-                        "traditional")),
-                null, null, null);
+                        "traditional")))
+                .build();
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -660,15 +561,12 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new ScenarioRequest(
-                "Linked Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, List.of(new CreateProjectionAccountRequest(
+        var request = ScenarioRequestBuilder.builder()
+                .withName("Linked Plan")
+                .withAccounts(List.of(new CreateProjectionAccountRequest(
                         linkedAccountId, new BigDecimal("100000"),
-                        new BigDecimal("10000"), new BigDecimal("0.07"), "taxable")),
-                null, null, null);
+                        new BigDecimal("10000"), new BigDecimal("0.07"), "taxable")))
+                .build();
 
         service.createScenario(tenantId, request);
 
@@ -762,20 +660,18 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new ScenarioRequest(
-                "Updated Plan",
-                LocalDate.of(2060, 6, 15),
-                95,
-                new BigDecimal("0.0250"),
-                1985,
-                new BigDecimal("0.035"),
-                "dynamic_percentage",
-                null, null, null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, List.of(new CreateProjectionAccountRequest(
+        var request = ScenarioRequestBuilder.builder()
+                .withName("Updated Plan")
+                .withRetirementDate(LocalDate.of(2060, 6, 15))
+                .withEndAge(95)
+                .withInflationRate(new BigDecimal("0.0250"))
+                .withBirthYear(1985)
+                .withWithdrawalRate(new BigDecimal("0.035"))
+                .withWithdrawalStrategy("dynamic_percentage")
+                .withAccounts(List.of(new CreateProjectionAccountRequest(
                         null, new BigDecimal("200000"),
-                        new BigDecimal("15000"), new BigDecimal("0.08"), "traditional")),
-                null, null, null);
+                        new BigDecimal("15000"), new BigDecimal("0.08"), "traditional")))
+                .build();
 
         var result = service.updateScenario(tenantId, scenarioId, request);
 
@@ -794,14 +690,10 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_endAgeOver120_throwsIllegalArgument() {
-        var request = new ScenarioRequest(
-                "Bad Plan",
-                LocalDate.of(2055, 1, 1),
-                150,
-                new BigDecimal("0.03"),
-                null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null, null, null, List.of(), null, null, null);
+        var request = ScenarioRequestBuilder.builder()
+                .withName("Bad Plan")
+                .withEndAge(150)
+                .build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -810,14 +702,10 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_endAgeBelow50_throwsIllegalArgument() {
-        var request = new ScenarioRequest(
-                "Bad Plan",
-                LocalDate.of(2055, 1, 1),
-                30,
-                new BigDecimal("0.03"),
-                null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null, null, null, List.of(), null, null, null);
+        var request = ScenarioRequestBuilder.builder()
+                .withName("Bad Plan")
+                .withEndAge(30)
+                .build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -826,11 +714,9 @@ class ScenarioCrudServiceTest {
 
     @Test
     void updateScenario_endAgeOver120_throwsIllegalArgument() {
-        var request = new ScenarioRequest(
-                "Plan", LocalDate.of(2055, 1, 1), 200,
-                new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null, null, null, List.of(), null, null, null);
+        var request = ScenarioRequestBuilder.builder()
+                .withEndAge(200)
+                .build();
 
         assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -839,7 +725,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_dividendYieldAboveMax_throwsIllegalArgument() {
-        var request = scenarioRequestWithDividendYield(new BigDecimal("0.15"));
+        var request = ScenarioRequestBuilder.builder().withDividendYield(new BigDecimal("0.15")).build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -852,7 +738,7 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = scenarioRequestWithDividendYield(new BigDecimal("0.05"));
+        var request = ScenarioRequestBuilder.builder().withDividendYield(new BigDecimal("0.05")).build();
 
         var result = service.createScenario(tenantId, request);
 
@@ -865,7 +751,7 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = scenarioRequestWithDividendYield(null);
+        var request = ScenarioRequestBuilder.builder().withDividendYield(null).build();
 
         var result = service.createScenario(tenantId, request);
 
@@ -874,7 +760,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void updateScenario_dividendYieldAboveMax_throwsIllegalArgument() {
-        var request = scenarioRequestWithDividendYield(new BigDecimal("0.15"));
+        var request = ScenarioRequestBuilder.builder().withDividendYield(new BigDecimal("0.15")).build();
 
         assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -885,7 +771,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_feeRateAboveMax_throwsIllegalArgument() {
-        var request = scenarioRequestWithFeeRate(new BigDecimal("0.05"));
+        var request = ScenarioRequestBuilder.builder().withFeeRate(new BigDecimal("0.05")).build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -894,7 +780,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_feeRateBelowZero_throwsIllegalArgument() {
-        var request = scenarioRequestWithFeeRate(new BigDecimal("-0.001"));
+        var request = ScenarioRequestBuilder.builder().withFeeRate(new BigDecimal("-0.001")).build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -907,7 +793,7 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = scenarioRequestWithFeeRate(new BigDecimal("0.01"));
+        var request = ScenarioRequestBuilder.builder().withFeeRate(new BigDecimal("0.01")).build();
 
         var result = service.createScenario(tenantId, request);
 
@@ -920,7 +806,7 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = scenarioRequestWithFeeRate(null);
+        var request = ScenarioRequestBuilder.builder().withFeeRate(null).build();
 
         var result = service.createScenario(tenantId, request);
 
@@ -936,7 +822,7 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = scenarioRequestWithFeeRate(BigDecimal.ZERO);
+        var request = ScenarioRequestBuilder.builder().withFeeRate(BigDecimal.ZERO).build();
 
         service.createScenario(tenantId, request);
 
@@ -946,7 +832,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void updateScenario_feeRateAboveMax_throwsIllegalArgument() {
-        var request = scenarioRequestWithFeeRate(new BigDecimal("0.05"));
+        var request = ScenarioRequestBuilder.builder().withFeeRate(new BigDecimal("0.05")).build();
 
         assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -958,7 +844,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_interestYieldAboveMax_throwsIllegalArgument() {
-        var request = scenarioRequestWithInterestYield(new BigDecimal("0.15"));
+        var request = ScenarioRequestBuilder.builder().withInterestYield(new BigDecimal("0.15")).build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -967,7 +853,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_interestYieldBelowZero_throwsIllegalArgument() {
-        var request = scenarioRequestWithInterestYield(new BigDecimal("-0.001"));
+        var request = ScenarioRequestBuilder.builder().withInterestYield(new BigDecimal("-0.001")).build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -980,7 +866,7 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = scenarioRequestWithInterestYield(new BigDecimal("0.04"));
+        var request = ScenarioRequestBuilder.builder().withInterestYield(new BigDecimal("0.04")).build();
 
         var result = service.createScenario(tenantId, request);
 
@@ -993,7 +879,7 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = scenarioRequestWithInterestYield(null);
+        var request = ScenarioRequestBuilder.builder().withInterestYield(null).build();
 
         var result = service.createScenario(tenantId, request);
 
@@ -1009,7 +895,7 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = scenarioRequestWithInterestYield(BigDecimal.ZERO);
+        var request = ScenarioRequestBuilder.builder().withInterestYield(BigDecimal.ZERO).build();
 
         service.createScenario(tenantId, request);
 
@@ -1019,7 +905,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void updateScenario_interestYieldAboveMax_throwsIllegalArgument() {
-        var request = scenarioRequestWithInterestYield(new BigDecimal("0.15"));
+        var request = ScenarioRequestBuilder.builder().withInterestYield(new BigDecimal("0.15")).build();
 
         assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1031,7 +917,10 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_primaryDeathAgeAboveMax_throwsIllegalArgument() {
-        var request = scenarioRequestWithHousehold(null, 150, null, null, null);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(null).withPrimaryDeathAge(150).withSpouseDeathAge(null)
+                .withSurvivorSpendingFactor(null).withCommunityProperty(null)
+                .build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1040,7 +929,10 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_primaryDeathAgeBelowMin_throwsIllegalArgument() {
-        var request = scenarioRequestWithHousehold(null, 30, null, null, null);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(null).withPrimaryDeathAge(30).withSpouseDeathAge(null)
+                .withSurvivorSpendingFactor(null).withCommunityProperty(null)
+                .build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1053,7 +945,10 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = scenarioRequestWithHousehold(null, 88, null, null, null);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(null).withPrimaryDeathAge(88).withSpouseDeathAge(null)
+                .withSurvivorSpendingFactor(null).withCommunityProperty(null)
+                .build();
 
         var result = service.createScenario(tenantId, request);
 
@@ -1062,7 +957,10 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_spouseDeathAgeAboveMax_throwsIllegalArgument() {
-        var request = scenarioRequestWithHousehold(1972, null, 150, null, null);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(1972).withPrimaryDeathAge(null).withSpouseDeathAge(150)
+                .withSurvivorSpendingFactor(null).withCommunityProperty(null)
+                .build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1071,7 +969,10 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_spouseDeathAgeWithoutSpouseBirthYear_throwsIllegalArgument() {
-        var request = scenarioRequestWithHousehold(null, null, 88, null, null);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(null).withPrimaryDeathAge(null).withSpouseDeathAge(88)
+                .withSurvivorSpendingFactor(null).withCommunityProperty(null)
+                .build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1080,7 +981,10 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_survivorSpendingFactorWithoutSpouseBirthYear_throwsIllegalArgument() {
-        var request = scenarioRequestWithHousehold(null, null, null, new BigDecimal("0.8"), null);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(null).withPrimaryDeathAge(null).withSpouseDeathAge(null)
+                .withSurvivorSpendingFactor(new BigDecimal("0.8")).withCommunityProperty(null)
+                .build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1089,7 +993,10 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_communityPropertyWithoutSpouseBirthYear_throwsIllegalArgument() {
-        var request = scenarioRequestWithHousehold(null, null, null, null, Boolean.TRUE);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(null).withPrimaryDeathAge(null).withSpouseDeathAge(null)
+                .withSurvivorSpendingFactor(null).withCommunityProperty(Boolean.TRUE)
+                .build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1098,7 +1005,10 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_survivorSpendingFactorBelowMin_throwsIllegalArgument() {
-        var request = scenarioRequestWithHousehold(1972, null, null, new BigDecimal("0.3"), null);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(1972).withPrimaryDeathAge(null).withSpouseDeathAge(null)
+                .withSurvivorSpendingFactor(new BigDecimal("0.3")).withCommunityProperty(null)
+                .build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1107,7 +1017,10 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_survivorSpendingFactorAboveMax_throwsIllegalArgument() {
-        var request = scenarioRequestWithHousehold(1972, null, null, new BigDecimal("1.1"), null);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(1972).withPrimaryDeathAge(null).withSpouseDeathAge(null)
+                .withSurvivorSpendingFactor(new BigDecimal("1.1")).withCommunityProperty(null)
+                .build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1120,7 +1033,10 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = scenarioRequestWithHousehold(1972, 88, 90, new BigDecimal("0.8"), Boolean.TRUE);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(1972).withPrimaryDeathAge(88).withSpouseDeathAge(90)
+                .withSurvivorSpendingFactor(new BigDecimal("0.8")).withCommunityProperty(Boolean.TRUE)
+                .build();
 
         service.createScenario(tenantId, request);
 
@@ -1134,7 +1050,10 @@ class ScenarioCrudServiceTest {
 
     @Test
     void updateScenario_spouseDeathAgeWithoutSpouseBirthYear_throwsIllegalArgument() {
-        var request = scenarioRequestWithHousehold(null, null, 88, null, null);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(null).withPrimaryDeathAge(null).withSpouseDeathAge(88)
+                .withSurvivorSpendingFactor(null).withCommunityProperty(null)
+                .build();
 
         assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1145,7 +1064,10 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_primarySexInvalid_throwsIllegalArgument() {
-        var request = scenarioRequestWithStochasticMortality(null, "unknown", null, null);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(null).withStochasticMortality(Boolean.TRUE)
+                .withPrimarySex("unknown").withSpouseSex(null).withLongevityConditionalAge(null)
+                .build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1154,7 +1076,10 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_spouseSexInvalid_throwsIllegalArgument() {
-        var request = scenarioRequestWithStochasticMortality(1972, null, "unknown", null);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(1972).withStochasticMortality(Boolean.TRUE)
+                .withPrimarySex(null).withSpouseSex("unknown").withLongevityConditionalAge(null)
+                .build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1163,7 +1088,10 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_spouseSexWithoutSpouseBirthYear_throwsIllegalArgument() {
-        var request = scenarioRequestWithStochasticMortality(null, null, "female", null);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(null).withStochasticMortality(Boolean.TRUE)
+                .withPrimarySex(null).withSpouseSex("female").withLongevityConditionalAge(null)
+                .build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1172,7 +1100,10 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_longevityConditionalAgeBelowMin_throwsIllegalArgument() {
-        var request = scenarioRequestWithStochasticMortality(null, null, null, 79);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(null).withStochasticMortality(Boolean.TRUE)
+                .withPrimarySex(null).withSpouseSex(null).withLongevityConditionalAge(79)
+                .build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1181,7 +1112,10 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_longevityConditionalAgeAboveMax_throwsIllegalArgument() {
-        var request = scenarioRequestWithStochasticMortality(null, null, null, 111);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(null).withStochasticMortality(Boolean.TRUE)
+                .withPrimarySex(null).withSpouseSex(null).withLongevityConditionalAge(111)
+                .build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1196,7 +1130,10 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = scenarioRequestWithStochasticMortality(null, null, null, 80);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(null).withStochasticMortality(Boolean.TRUE)
+                .withPrimarySex(null).withSpouseSex(null).withLongevityConditionalAge(80)
+                .build();
 
         assertThatCode(() -> service.createScenario(tenantId, request)).doesNotThrowAnyException();
     }
@@ -1209,7 +1146,10 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = scenarioRequestWithStochasticMortality(null, null, null, 110);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(null).withStochasticMortality(Boolean.TRUE)
+                .withPrimarySex(null).withSpouseSex(null).withLongevityConditionalAge(110)
+                .build();
 
         assertThatCode(() -> service.createScenario(tenantId, request)).doesNotThrowAnyException();
     }
@@ -1220,7 +1160,10 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = scenarioRequestWithStochasticMortality(1972, "male", "female", 100);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(1972).withStochasticMortality(Boolean.TRUE)
+                .withPrimarySex("male").withSpouseSex("female").withLongevityConditionalAge(100)
+                .build();
 
         var result = service.createScenario(tenantId, request);
 
@@ -1233,7 +1176,10 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = scenarioRequestWithStochasticMortality(1972, "male", "female", 100);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(1972).withStochasticMortality(Boolean.TRUE)
+                .withPrimarySex("male").withSpouseSex("female").withLongevityConditionalAge(100)
+                .build();
 
         service.createScenario(tenantId, request);
 
@@ -1246,7 +1192,10 @@ class ScenarioCrudServiceTest {
 
     @Test
     void updateScenario_spouseSexWithoutSpouseBirthYear_throwsIllegalArgument() {
-        var request = scenarioRequestWithStochasticMortality(null, null, "female", null);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(null).withStochasticMortality(Boolean.TRUE)
+                .withPrimarySex(null).withSpouseSex("female").withLongevityConditionalAge(null)
+                .build();
 
         assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1336,11 +1285,7 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.empty());
 
-        var request = new ScenarioRequest(
-                "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null, null, null, List.of(), null, null, null);
+        var request = ScenarioRequestBuilder.builder().build();
 
         assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
                 .isInstanceOf(EntityNotFoundException.class);
@@ -1361,17 +1306,13 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new ScenarioRequest(
-                "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, List.of(
+        var request = ScenarioRequestBuilder.builder()
+                .withAccounts(List.of(
                         new CreateProjectionAccountRequest(null, new BigDecimal("200000"),
                                 new BigDecimal("10000"), new BigDecimal("0.07"), "traditional"),
                         new CreateProjectionAccountRequest(null, new BigDecimal("100000"),
-                                new BigDecimal("5000"), new BigDecimal("0.07"), "roth")),
-                null, null, null);
+                                new BigDecimal("5000"), new BigDecimal("0.07"), "roth")))
+                .build();
 
         var result = service.updateScenario(tenantId, scenarioId, request);
 
@@ -1445,16 +1386,16 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new ScenarioRequest(
-                "Plan with Income", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), 1990, new BigDecimal("0.04"),
-                null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, List.of(new CreateProjectionAccountRequest(
+        var request = ScenarioRequestBuilder.builder()
+                .withName("Plan with Income")
+                .withBirthYear(1990)
+                .withWithdrawalRate(new BigDecimal("0.04"))
+                .withAccounts(List.of(new CreateProjectionAccountRequest(
                         null, new BigDecimal("100000"),
-                        new BigDecimal("10000"), new BigDecimal("0.07"), "taxable")),
-                null, null,
-                List.of(new ScenarioIncomeSourceInput(incomeSourceId, new BigDecimal("30000"))));
+                        new BigDecimal("10000"), new BigDecimal("0.07"), "taxable")))
+                .withIncomeSources(
+                        List.of(new ScenarioIncomeSourceInput(incomeSourceId, new BigDecimal("30000"))))
+                .build();
 
         service.createScenario(tenantId, request);
 
@@ -1475,13 +1416,9 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new ScenarioRequest(
-                "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, List.of(), null, null,
-                List.of(new ScenarioIncomeSourceInput(badId, null)));
+        var request = ScenarioRequestBuilder.builder()
+                .withIncomeSources(List.of(new ScenarioIncomeSourceInput(badId, null)))
+                .build();
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(EntityNotFoundException.class)
@@ -1508,13 +1445,10 @@ class ScenarioCrudServiceTest {
         when(incomeSourceRepository.findByTenant_IdAndId(tenantId, incomeSourceId))
                 .thenReturn(Optional.of(incomeSource));
 
-        var request = new ScenarioRequest(
-                "Updated Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, List.of(), null, null,
-                List.of(new ScenarioIncomeSourceInput(incomeSourceId, null)));
+        var request = ScenarioRequestBuilder.builder()
+                .withName("Updated Plan")
+                .withIncomeSources(List.of(new ScenarioIncomeSourceInput(incomeSourceId, null)))
+                .build();
 
         service.updateScenario(tenantId, scenarioId, request);
 
@@ -1573,12 +1507,9 @@ class ScenarioCrudServiceTest {
                 .thenReturn(Optional.of(guardrailProfile));
 
         // Change endAge to trigger hash change
-        var request = new ScenarioRequest(
-                "Old Plan", LocalDate.of(2055, 1, 1), 95,
-                new BigDecimal("0.03"), 1990, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, List.of(), null, null, null);
+        var request = ScenarioRequestBuilder.builder()
+                .withName("Old Plan").withEndAge(95).withBirthYear(1990)
+                .build();
 
         service.updateScenario(tenantId, scenarioId, request);
 
@@ -1609,12 +1540,9 @@ class ScenarioCrudServiceTest {
                 .thenReturn(Optional.of(guardrailProfile));
 
         // Change endAge to trigger hash change so currentIncomeSourceSignatures actually runs.
-        var request = new ScenarioRequest(
-                "Old Plan", LocalDate.of(2055, 1, 1), 95,
-                new BigDecimal("0.03"), 1990, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, List.of(), null, null, null);
+        var request = ScenarioRequestBuilder.builder()
+                .withName("Old Plan").withEndAge(95).withBirthYear(1990)
+                .build();
 
         service.updateScenario(tenantId, scenarioId, request);
 
@@ -1656,16 +1584,12 @@ class ScenarioCrudServiceTest {
         // Same balance/contribution/return/birth-year/dates — only the allocation weights change.
         var newAllocation = new AllocationDto(
                 new BigDecimal("80"), new BigDecimal("10"), new BigDecimal("10"), BigDecimal.ZERO);
-        var request = new ScenarioRequest(
-                "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), 1990, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null,
-                List.of(new CreateProjectionAccountRequest(
+        var request = ScenarioRequestBuilder.builder()
+                .withBirthYear(1990)
+                .withAccounts(List.of(new CreateProjectionAccountRequest(
                         null, new BigDecimal("100000"), BigDecimal.ZERO, new BigDecimal("0.07"),
-                        null, newAllocation, "taxable")),
-                null, null, null);
+                        null, newAllocation, "taxable")))
+                .build();
 
         service.updateScenario(tenantId, scenarioId, request);
 
@@ -1695,7 +1619,10 @@ class ScenarioCrudServiceTest {
                 .thenReturn(Optional.of(guardrailProfile));
 
         // Same spouse_birth_year -- only spouse_death_age changes: 88 -> 90.
-        var request = scenarioRequestWithHousehold(1992, null, 90, null, null);
+        var request = ScenarioRequestBuilder.builder()
+                .withSpouseBirthYear(1992).withPrimaryDeathAge(null).withSpouseDeathAge(90)
+                .withSurvivorSpendingFactor(null).withCommunityProperty(null)
+                .build();
 
         service.updateScenario(tenantId, scenarioId, request);
 
@@ -1756,12 +1683,7 @@ class ScenarioCrudServiceTest {
                 .thenReturn(Optional.of(guardrailProfile));
 
         // Same fields — no real change
-        var request = new ScenarioRequest(
-                "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), 1990, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, List.of(), null, null, null);
+        var request = ScenarioRequestBuilder.builder().withBirthYear(1990).build();
 
         service.updateScenario(tenantId, scenarioId, request);
 
@@ -1790,13 +1712,11 @@ class ScenarioCrudServiceTest {
                 .thenReturn(Optional.of(guardrailProfile));
 
         // Add filing_status and withdrawal_strategy — these should NOT affect guardrail hash
-        var request = new ScenarioRequest(
-                "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), 1990, null,
-                "vanguard_dynamic_spending", null, null,
-                "married_filing_jointly", null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, List.of(), null, null, null);
+        var request = ScenarioRequestBuilder.builder()
+                .withBirthYear(1990)
+                .withWithdrawalStrategy("vanguard_dynamic_spending")
+                .withFilingStatus("married_filing_jointly")
+                .build();
 
         service.updateScenario(tenantId, scenarioId, request);
 
@@ -1848,12 +1768,10 @@ class ScenarioCrudServiceTest {
         when(guardrailProfileRepository.findByScenario_Id(scenarioId))
                 .thenReturn(Optional.empty());
 
-        var request = new ScenarioRequest(
-                "Updated", LocalDate.of(2060, 1, 1), 95,
-                new BigDecimal("0.02"), null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, List.of(), null, null, null);
+        var request = ScenarioRequestBuilder.builder()
+                .withName("Updated").withRetirementDate(LocalDate.of(2060, 1, 1))
+                .withEndAge(95).withInflationRate(new BigDecimal("0.02"))
+                .build();
 
         service.updateScenario(tenantId, scenarioId, request);
 
@@ -1884,12 +1802,10 @@ class ScenarioCrudServiceTest {
         when(guardrailProfileRepository.findByScenario_Id(scenarioId))
                 .thenReturn(Optional.empty());
 
-        var request = new ScenarioRequest(
-                "Updated", LocalDate.of(2060, 1, 1), 95,
-                new BigDecimal("0.02"), null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, List.of(), null, null, null);
+        var request = ScenarioRequestBuilder.builder()
+                .withName("Updated").withRetirementDate(LocalDate.of(2060, 1, 1))
+                .withEndAge(95).withInflationRate(new BigDecimal("0.02"))
+                .build();
 
         service.updateScenario(tenantId, scenarioId, request);
 
