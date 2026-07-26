@@ -118,8 +118,7 @@ public class GuardrailProfileService {
 
             var saved = guardrailRepository.save(entity);
 
-            scenario.setSpendingProfile(null);
-            scenario.setGuardrailProfile(saved);
+            scenario.activateGuardrailProfile(saved);
             scenarioRepository.save(scenario);
 
             log.info("Guardrail profile optimized for scenario {} tenant {}", scenarioId, tenantId);
@@ -156,7 +155,7 @@ public class GuardrailProfileService {
 
     private void deleteExistingProfile(ProjectionScenarioEntity scenario, UUID scenarioId) {
         guardrailRepository.findByScenario_Id(scenarioId).ifPresent(existing -> {
-            scenario.setGuardrailProfile(null);
+            scenario.clearGuardrailProfile();
             guardrailRepository.delete(existing);
             guardrailRepository.flush();
         });
@@ -235,7 +234,7 @@ public class GuardrailProfileService {
                 .orElseThrow(Entities.notFound("Guardrail profile"));
 
         scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId).ifPresent(scenario -> {
-            scenario.setGuardrailProfile(null);
+            scenario.clearGuardrailProfile();
             scenarioRepository.save(scenario);
         });
 

@@ -1820,6 +1820,43 @@ class ScenarioCrudServiceTest {
         verify(guardrailProfileRepository, never()).save(any(GuardrailSpendingProfileEntity.class));
     }
 
+    // Pin: the spending-plan XOR invariant (CLAUDE.md-critical) has a documented subtlety here —
+    // omitting spending_profile_id ("None" selected in the UI) clears any active spending profile
+    // but must PRESERVE an existing guardrail profile FK, since guardrail profiles are managed by
+    // the optimizer, not the scenario edit form. No prior test asserted this directly (the
+    // staleness tests below cover the guardrail *row*, not the scenario's guardrailProfile FK).
+    // This pins CURRENT behavior ahead of migrating updateScenario to the entity's tell-don't-ask
+    // mutators (activateSpendingProfile/clearSpendingProfile) — it passes against the pre-refactor
+    // paired-setter code too.
+    @Test
+    void updateScenario_nullSpendingProfileId_preservesExistingGuardrailProfile() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var guardrailProfile = new GuardrailSpendingProfileEntity(
+                tenant, scenario, "Guardrail", new BigDecimal("30000"));
+        scenario.setGuardrailProfile(guardrailProfile);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(guardrailProfileRepository.findByScenario_Id(scenarioId))
+                .thenReturn(Optional.empty());
+
+        var request = new ScenarioRequest(
+                "Updated", LocalDate.of(2060, 1, 1), 95,
+                new BigDecimal("0.02"), null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
+                null, null, null,
+                null, null, List.of(), null, null, null);
+
+        service.updateScenario(tenantId, scenarioId, request);
+
+        assertThat(scenario.getGuardrailProfile()).isEqualTo(guardrailProfile);
+        assertThat(scenario.getSpendingProfile()).isNull();
+    }
+
     @Test
     void getScenario_withRentalPropertyIncomeSource_populatesNetCashFlow() {
         var scenario = new ProjectionScenarioEntity(

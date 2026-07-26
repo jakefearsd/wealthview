@@ -173,13 +173,12 @@ public class ScenarioCrudService {
         if (request.spendingProfileId() != null) {
             var profile = spendingProfileRepository.findByTenant_IdAndId(tenantId, request.spendingProfileId())
                     .orElse(null);
-            scenario.setSpendingProfile(profile);
-            scenario.setGuardrailProfile(null);
+            scenario.activateSpendingProfile(profile);
         } else {
             // No spending profile selected — clear it. Preserve any existing guardrail
             // profile unless a new spending profile was explicitly chosen (handled above).
             // Guardrail profiles are managed by the optimizer, not the scenario edit form.
-            scenario.setSpendingProfile(null);
+            scenario.clearSpendingProfile();
         }
 
         scenario.getAccounts().clear();
