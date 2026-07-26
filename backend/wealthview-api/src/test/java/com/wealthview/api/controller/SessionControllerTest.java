@@ -6,18 +6,11 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.wealthview.api.exception.GlobalExceptionHandler;
-import com.wealthview.api.security.JwtAuthenticationFilter;
-import com.wealthview.api.security.SecurityConfig;
-import com.wealthview.api.testutil.TestMetricsConfig;
-import com.wealthview.core.auth.JwtTokenProvider;
+import com.wealthview.api.testutil.WealthViewControllerTest;
 import com.wealthview.core.auth.SessionService;
-import com.wealthview.core.auth.SessionStateValidator;
 import com.wealthview.core.auth.dto.SessionResponse;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.USER_ID;
@@ -30,8 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(SessionController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandler.class, JwtAuthenticationFilter.class, TestMetricsConfig.class})
+@WealthViewControllerTest(SessionController.class)
 class SessionControllerTest {
 
     @Autowired
@@ -40,11 +32,6 @@ class SessionControllerTest {
     @MockitoBean
     private SessionService sessionService;
 
-    @MockitoBean
-    private JwtTokenProvider jwtTokenProvider;
-
-    @MockitoBean
-    private SessionStateValidator sessionStateValidator;
 
     private static final UUID SESSION_ID = UUID.randomUUID();
 

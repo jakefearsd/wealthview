@@ -2,17 +2,10 @@ package com.wealthview.api.controller;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.wealthview.api.exception.GlobalExceptionHandler;
-import com.wealthview.api.security.JwtAuthenticationFilter;
-import com.wealthview.api.security.SecurityConfig;
-import com.wealthview.api.testutil.TestMetricsConfig;
-import com.wealthview.core.auth.JwtTokenProvider;
-import com.wealthview.core.auth.SessionStateValidator;
+import com.wealthview.api.testutil.WealthViewControllerTest;
 import com.wealthview.core.price.PriceService;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedSuperAdmin;
@@ -28,8 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p>Uses a separate test class without @MockitoBean for PriceSyncService
  * so that it is null (injected as @Nullable), triggering the 503 branch.
  */
-@WebMvcTest(AdminPriceController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandler.class, JwtAuthenticationFilter.class, TestMetricsConfig.class})
+@WealthViewControllerTest(AdminPriceController.class)
 class AdminPriceControllerNoPriceSyncTest {
 
     @Autowired
@@ -40,11 +32,6 @@ class AdminPriceControllerNoPriceSyncTest {
     @MockitoBean
     private PriceService priceService;
 
-    @MockitoBean
-    private JwtTokenProvider jwtTokenProvider;
-
-    @MockitoBean
-    private SessionStateValidator sessionStateValidator;
 
     @Test
     void triggerPriceSync_whenFinnhubNotConfigured_returns503() throws Exception {

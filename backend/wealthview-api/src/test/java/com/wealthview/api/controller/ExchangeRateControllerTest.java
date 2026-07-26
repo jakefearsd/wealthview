@@ -6,18 +6,11 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.wealthview.api.exception.GlobalExceptionHandler;
-import com.wealthview.api.security.JwtAuthenticationFilter;
-import com.wealthview.api.security.SecurityConfig;
-import com.wealthview.api.testutil.TestMetricsConfig;
-import com.wealthview.core.auth.JwtTokenProvider;
-import com.wealthview.core.auth.SessionStateValidator;
+import com.wealthview.api.testutil.WealthViewControllerTest;
 import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.core.exchangerate.dto.ExchangeRateRequest;
 import com.wealthview.core.exchangerate.dto.ExchangeRateResponse;
@@ -36,8 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(ExchangeRateController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandler.class, JwtAuthenticationFilter.class, TestMetricsConfig.class})
+@WealthViewControllerTest(ExchangeRateController.class)
 class ExchangeRateControllerTest {
 
     @Autowired
@@ -49,11 +41,6 @@ class ExchangeRateControllerTest {
     @MockitoBean
     private ExchangeRateService exchangeRateService;
 
-    @MockitoBean
-    private JwtTokenProvider jwtTokenProvider;
-
-    @MockitoBean
-    private SessionStateValidator sessionStateValidator;
 
     private ExchangeRateResponse eurResponse() {
         return new ExchangeRateResponse("EUR", new BigDecimal("1.0850"), OffsetDateTime.now());

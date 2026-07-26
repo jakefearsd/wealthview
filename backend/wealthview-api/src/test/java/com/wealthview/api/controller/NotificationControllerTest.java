@@ -4,18 +4,11 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.wealthview.api.exception.GlobalExceptionHandler;
-import com.wealthview.api.security.JwtAuthenticationFilter;
-import com.wealthview.api.security.SecurityConfig;
-import com.wealthview.api.testutil.TestMetricsConfig;
-import com.wealthview.core.auth.JwtTokenProvider;
-import com.wealthview.core.auth.SessionStateValidator;
+import com.wealthview.api.testutil.WealthViewControllerTest;
 import com.wealthview.core.notification.NotificationPreferenceService;
 import com.wealthview.core.notification.dto.NotificationPreferenceRequest;
 import com.wealthview.core.notification.dto.NotificationPreferenceResponse;
@@ -32,8 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(NotificationController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandler.class, JwtAuthenticationFilter.class, TestMetricsConfig.class})
+@WealthViewControllerTest(NotificationController.class)
 class NotificationControllerTest {
 
     @Autowired
@@ -42,11 +34,6 @@ class NotificationControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockitoBean
-    private JwtTokenProvider jwtTokenProvider;
-
-    @MockitoBean
-    private SessionStateValidator sessionStateValidator;
 
     @MockitoBean
     private NotificationPreferenceService preferenceService;

@@ -2,23 +2,17 @@ package com.wealthview.api.security;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.wealthview.api.controller.AuthController;
-import com.wealthview.api.exception.GlobalExceptionHandler;
-import com.wealthview.api.testutil.TestMetricsConfig;
+import com.wealthview.api.testutil.WealthViewControllerTest;
 import com.wealthview.core.auth.AuthService;
-import com.wealthview.core.auth.JwtTokenProvider;
-import com.wealthview.core.auth.SessionStateValidator;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 
-@WebMvcTest(AuthController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandler.class, JwtAuthenticationFilter.class, TestMetricsConfig.class})
+@WealthViewControllerTest(AuthController.class)
 class SecurityHeadersTest {
 
     @Autowired
@@ -27,11 +21,6 @@ class SecurityHeadersTest {
     @MockitoBean
     private AuthService authService;
 
-    @MockitoBean
-    private JwtTokenProvider jwtTokenProvider;
-
-    @MockitoBean
-    private SessionStateValidator sessionStateValidator;
 
     @Test
     void publicResponse_includesPermissionsPolicyHeaderDisablingSensitiveFeatures() throws Exception {

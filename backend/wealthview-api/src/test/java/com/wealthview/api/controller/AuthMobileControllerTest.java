@@ -4,27 +4,19 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.wealthview.api.exception.GlobalExceptionHandler;
-import com.wealthview.api.security.JwtAuthenticationFilter;
-import com.wealthview.api.security.SecurityConfig;
-import com.wealthview.api.testutil.TestMetricsConfig;
+import com.wealthview.api.testutil.WealthViewControllerTest;
+import com.wealthview.core.auth.AuthRequestContext;
 import com.wealthview.core.auth.AuthService;
-import com.wealthview.core.auth.JwtTokenProvider;
-import com.wealthview.core.auth.SessionStateValidator;
 import com.wealthview.core.auth.dto.AuthResult;
 import com.wealthview.core.auth.dto.LoginOutcome;
 import com.wealthview.core.auth.dto.LoginRequest;
 import com.wealthview.core.auth.dto.MobileAuthResponse;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
-import com.wealthview.core.auth.AuthRequestContext;
-
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
@@ -32,8 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(AuthMobileController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandler.class, JwtAuthenticationFilter.class, TestMetricsConfig.class})
+@WealthViewControllerTest(AuthMobileController.class)
 class AuthMobileControllerTest {
 
     @Autowired
@@ -42,11 +33,6 @@ class AuthMobileControllerTest {
     @MockitoBean
     private AuthService authService;
 
-    @MockitoBean
-    private JwtTokenProvider jwtTokenProvider;
-
-    @MockitoBean
-    private SessionStateValidator sessionStateValidator;
 
     private AuthResult sampleAuthResult() {
         return new AuthResult("access-jwt", "refresh-jwt",

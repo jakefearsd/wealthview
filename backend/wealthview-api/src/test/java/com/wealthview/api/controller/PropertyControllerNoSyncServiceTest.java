@@ -4,18 +4,11 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.wealthview.api.exception.GlobalExceptionHandler;
-import com.wealthview.api.security.JwtAuthenticationFilter;
-import com.wealthview.api.security.SecurityConfig;
-import com.wealthview.api.testutil.TestMetricsConfig;
-import com.wealthview.core.auth.JwtTokenProvider;
-import com.wealthview.core.auth.SessionStateValidator;
+import com.wealthview.api.testutil.WealthViewControllerTest;
 import com.wealthview.core.property.PropertyAnalyticsService;
 import com.wealthview.core.property.PropertyRoiService;
 import com.wealthview.core.property.PropertyService;
@@ -33,8 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p>Uses a separate test class without @MockitoBean for PropertyValuationSyncService
  * so that the @Nullable injection resolves to null, triggering the 503 paths.
  */
-@WebMvcTest(PropertyController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandler.class, JwtAuthenticationFilter.class, TestMetricsConfig.class})
+@WealthViewControllerTest(PropertyController.class)
 class PropertyControllerNoSyncServiceTest {
 
     @Autowired
@@ -54,11 +46,6 @@ class PropertyControllerNoSyncServiceTest {
 
     // PropertyValuationSyncService intentionally NOT mocked — @Nullable → null → 503
 
-    @MockitoBean
-    private JwtTokenProvider jwtTokenProvider;
-
-    @MockitoBean
-    private SessionStateValidator sessionStateValidator;
 
     private static final UUID PROPERTY_ID = UUID.randomUUID();
 

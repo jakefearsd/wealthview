@@ -5,17 +5,10 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.wealthview.api.exception.GlobalExceptionHandler;
-import com.wealthview.api.security.JwtAuthenticationFilter;
-import com.wealthview.api.security.SecurityConfig;
-import com.wealthview.api.testutil.TestMetricsConfig;
-import com.wealthview.core.auth.JwtTokenProvider;
-import com.wealthview.core.auth.SessionStateValidator;
+import com.wealthview.api.testutil.WealthViewControllerTest;
 import com.wealthview.core.property.PropertyAnalyticsService;
 import com.wealthview.core.property.PropertyRoiService;
 import com.wealthview.core.property.PropertyService;
@@ -33,8 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(PropertyController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandler.class, JwtAuthenticationFilter.class, TestMetricsConfig.class})
+@WealthViewControllerTest(PropertyController.class)
 class PropertyControllerRoiTest {
 
     @Autowired
@@ -45,8 +37,6 @@ class PropertyControllerRoiTest {
     @MockitoBean private PropertyAnalyticsService analyticsService;
     @MockitoBean private PropertyRoiService roiService;
     @MockitoBean(name = "propertyValuationSyncService") private PropertyValuationSyncService syncService;
-    @MockitoBean private JwtTokenProvider jwtTokenProvider;
-    @MockitoBean private SessionStateValidator sessionStateValidator;
 
     private static final UUID PROPERTY_ID = UUID.randomUUID();
     private static final UUID SOURCE_ID = UUID.randomUUID();
