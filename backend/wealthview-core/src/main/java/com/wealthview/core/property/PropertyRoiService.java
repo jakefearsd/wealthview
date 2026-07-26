@@ -11,7 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.wealthview.core.common.CompoundGrowth;
 import com.wealthview.core.common.Entities;
-import com.wealthview.core.common.Money;
 import com.wealthview.core.property.dto.HoldScenarioResult;
 import com.wealthview.core.property.dto.RoiAnalysisResponse;
 import com.wealthview.core.property.dto.SellScenarioResult;
@@ -131,26 +130,15 @@ public class PropertyRoiService {
         var endingPropertyValue = compound(property.getCurrentValue(), appreciationRate, years);
 
         // Project mortgage balance
-        BigDecimal endingMortgageBalance;
-        BigDecimal annualMortgagePayment;
-        if (property.hasLoanDetails()) {
-            // Deliberately ZERO (not the manual mortgageBalance) without loan details:
-            // a manual balance is a snapshot and cannot be projected years ahead.
-            endingMortgageBalance = PropertyFinance.mortgageBalanceAsOf(
-                    property, LocalDate.now().plusYears(years));
-            annualMortgagePayment = AmortizationCalculator.monthlyPayment(
-                    property.getLoanAmount(), property.getAnnualInterestRate(),
-                    property.getLoanTermMonths()).multiply(new BigDecimal("12"));
-        } else {
-            endingMortgageBalance = BigDecimal.ZERO;
-            annualMortgagePayment = BigDecimal.ZERO;
-        }
+        // Deliberately ZERO (not the manual mortgageBalance) without loan details:
+        // a manual balance is a snapshot and cannot be projected years ahead.
+        BigDecimal endingMortgageBalance = property.hasLoanDetails()
+                ? PropertyFinance.mortgageBalanceAsOf(property, LocalDate.now().plusYears(years))
+                : BigDecimal.ZERO;
+        BigDecimal annualMortgagePayment = PropertyFinance.annualMortgagePayment(property);
 
         // Annual operating expenses from property entity
-        var baseExpenses = Money.sum(
-                property.getAnnualPropertyTax(),
-                property.getAnnualInsuranceCost(),
-                property.getAnnualMaintenanceCost());
+        var baseExpenses = PropertyFinance.annualOperatingExpenses(property);
 
         // Accumulate net cash flow year by year
         var cumulativeNetCashFlow = BigDecimal.ZERO;

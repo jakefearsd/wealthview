@@ -72,6 +72,33 @@ public final class PropertyFinance {
         return Optional.of(new AnnualDebtService(interest, principal));
     }
 
+    /**
+     * The annualized mortgage payment (monthly payment &times; 12) for a property with
+     * loan details, or {@link BigDecimal#ZERO} when there are none. Consolidates the
+     * {@code monthlyPayment(...).multiply(12)} clump that recurred across the ROI and
+     * analytics services.
+     */
+    public static BigDecimal annualMortgagePayment(PropertyEntity property) {
+        if (!property.hasLoanDetails()) {
+            return BigDecimal.ZERO;
+        }
+        return AmortizationCalculator.monthlyPayment(
+                property.getLoanAmount(), property.getAnnualInterestRate(), property.getLoanTermMonths())
+                .multiply(MONTHS_PER_YEAR);
+    }
+
+    /**
+     * The sum of a property's annual property tax, insurance, and maintenance costs
+     * (each treated as zero when unset). Consolidates the tax/insurance/maintenance
+     * triple that recurred across the ROI, analytics, and scenario services.
+     */
+    public static BigDecimal annualOperatingExpenses(PropertyEntity property) {
+        return Money.sum(
+                property.getAnnualPropertyTax(),
+                property.getAnnualInsuranceCost(),
+                property.getAnnualMaintenanceCost());
+    }
+
     private static BigDecimal remainingBalance(PropertyEntity property, LocalDate asOf) {
         return AmortizationCalculator.remainingBalance(
                 property.getLoanAmount(),

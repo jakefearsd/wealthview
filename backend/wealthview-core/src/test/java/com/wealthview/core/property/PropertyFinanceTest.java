@@ -129,4 +129,49 @@ class PropertyFinanceTest {
 
         assertThat(debtService).isEmpty();
     }
+
+    // ── annualMortgagePayment ──────────────────────────────────────────────
+
+    @Test
+    void annualMortgagePayment_withLoanDetails_returnsMonthlyPaymentTimesTwelve() {
+        var property = propertyWithLoan();
+
+        var payment = PropertyFinance.annualMortgagePayment(property);
+
+        var expected = AmortizationCalculator.monthlyPayment(LOAN_AMOUNT, RATE, TERM_MONTHS)
+                .multiply(new BigDecimal("12"));
+        assertThat(payment).isEqualByComparingTo(expected);
+    }
+
+    @Test
+    void annualMortgagePayment_withoutLoanDetails_isZero() {
+        var property = propertyWithoutLoan();
+
+        var payment = PropertyFinance.annualMortgagePayment(property);
+
+        assertThat(payment).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    // ── annualOperatingExpenses ───────────────────────────────────────────
+
+    @Test
+    void annualOperatingExpenses_withAllFieldsSet_sumsTaxInsuranceAndMaintenance() {
+        var property = propertyWithoutLoan();
+        property.setAnnualPropertyTax(new BigDecimal("6000"));
+        property.setAnnualInsuranceCost(new BigDecimal("1200"));
+        property.setAnnualMaintenanceCost(new BigDecimal("2400"));
+
+        var expenses = PropertyFinance.annualOperatingExpenses(property);
+
+        assertThat(expenses).isEqualByComparingTo("9600");
+    }
+
+    @Test
+    void annualOperatingExpenses_withNullFields_treatsNullAsZero() {
+        var property = propertyWithoutLoan();
+
+        var expenses = PropertyFinance.annualOperatingExpenses(property);
+
+        assertThat(expenses).isEqualByComparingTo(BigDecimal.ZERO);
+    }
 }

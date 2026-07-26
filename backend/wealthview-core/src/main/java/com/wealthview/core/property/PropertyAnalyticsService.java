@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.wealthview.core.common.Entities;
-import com.wealthview.core.common.Money;
 import com.wealthview.core.property.dto.EquityGrowthPoint;
 import com.wealthview.core.property.dto.MortgageProgress;
 import com.wealthview.core.property.dto.PropertyAnalyticsResponse;
@@ -79,22 +78,12 @@ public class PropertyAnalyticsService {
                     || property.getAnnualMaintenanceCost() != null;
 
             if (hasEntityFields) {
-                var totalOperatingExpenses = Money.sum(
-                        property.getAnnualPropertyTax(),
-                        property.getAnnualInsuranceCost(),
-                        property.getAnnualMaintenanceCost());
+                var totalOperatingExpenses = PropertyFinance.annualOperatingExpenses(property);
 
                 annualNoi = totalIncome.subtract(totalOperatingExpenses);
                 capRate = percentageOf(annualNoi, property.getCurrentValue());
 
-                var totalAllExpenses = totalOperatingExpenses;
-                if (property.hasLoanDetails()) {
-                    var annualMortgage = AmortizationCalculator.monthlyPayment(
-                            property.getLoanAmount(), property.getAnnualInterestRate(),
-                            property.getLoanTermMonths())
-                            .multiply(new BigDecimal("12"));
-                    totalAllExpenses = totalAllExpenses.add(annualMortgage);
-                }
+                var totalAllExpenses = totalOperatingExpenses.add(PropertyFinance.annualMortgagePayment(property));
 
                 annualNetCashFlow = totalIncome.subtract(totalAllExpenses);
             } else {

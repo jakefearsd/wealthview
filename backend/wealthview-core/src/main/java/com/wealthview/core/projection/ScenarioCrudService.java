@@ -14,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.wealthview.core.account.AccountService;
 import com.wealthview.core.common.Entities;
-import com.wealthview.core.common.Money;
 import com.wealthview.core.projection.dto.AllocationDto;
 import com.wealthview.core.projection.dto.AssetAllocation;
 import com.wealthview.core.projection.dto.AssetClass;
@@ -481,9 +480,7 @@ public class ScenarioCrudService {
         if (!"rental_property".equals(incomeType) || property == null) {
             return null;
         }
-        var expenses = Money.sum(property.getAnnualInsuranceCost(),
-                property.getAnnualMaintenanceCost(),
-                property.getAnnualPropertyTax())
+        var expenses = PropertyFinance.annualOperatingExpenses(property)
                 .add(PropertyFinance.annualDebtService(property, LocalDate.now())
                         .map(PropertyFinance.AnnualDebtService::total)
                         .orElse(BigDecimal.ZERO));
