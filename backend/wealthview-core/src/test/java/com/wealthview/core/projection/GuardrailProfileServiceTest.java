@@ -22,7 +22,6 @@ import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.GuardrailOptimizationRequest;
 import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 import com.wealthview.core.projection.dto.GuardrailProfileResponse;
-import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.testutil.ScenarioMother;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
@@ -72,52 +71,18 @@ class GuardrailProfileServiceTest {
 
     @Test
     void optimize_validRequest_callsOptimizerAndPersists() {
-        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
-                .thenReturn(Optional.of(scenario));
-        when(projectionInputBuilder.build(scenario, tenantId))
-                .thenReturn(new com.wealthview.core.projection.dto.ProjectionInput(
-                        scenarioId, "Test Scenario", LocalDate.of(2030, 1, 1), 90,
-                        new BigDecimal("0.03"), "{\"birth_year\":1968}",
-                        List.of(new HypotheticalAccountInput(
-                                new BigDecimal("500000"), BigDecimal.ZERO,
-                                new BigDecimal("0.07"), "taxable")),
-                        null));
-        when(guardrailRepository.findByScenario_Id(scenarioId))
-                .thenReturn(Optional.empty());
+        stubOptimizeHappyPath();
 
         var phases = List.of(
                 new GuardrailPhaseInput("Early", 62, 72, 3),
                 new GuardrailPhaseInput("Late", 73, null, 1));
 
-        var optimizerResponse = new GuardrailProfileResponse(
-                null, scenarioId, "Optimized Plan",
-                new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.10"),
-                5000, new BigDecimal("0.95"),
-                phases,
-                List.of(new GuardrailYearlySpending(
-                        2030, 62, new BigDecimal("75000"), new BigDecimal("62000"),
-                        new BigDecimal("91000"), new BigDecimal("30000"),
-                        new BigDecimal("45000"), new BigDecimal("12000"),
-                        new BigDecimal("63000"), "Early")),
-                new BigDecimal("250000"), new BigDecimal("0.05"), new BigDecimal("0.95"),
-                new BigDecimal("100000"),
-                false, OffsetDateTime.now(), OffsetDateTime.now(),
-                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
-
         when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
-                .thenReturn(optimizerResponse);
+                .thenReturn(baseOptimizerResponse());
         when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new GuardrailOptimizationRequest(
-                scenarioId, "Optimized Plan",
-                new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.10"),
-                5000, new BigDecimal("0.95"), phases,
-                null, null, null, null,
-                null, null,
-                null, null, null, null, null, null);
+        var request = buildRequest(req -> req.withName("Optimized Plan").withPhases(phases));
 
         var result = service.optimize(tenantId, scenarioId, request);
 
@@ -131,21 +96,14 @@ class GuardrailProfileServiceTest {
     // rather than losing it in the save/re-hydrate round trip through GuardrailProfileResponse.from.
     @Test
     void optimize_optimizerDisclosesFloorClamp_threadsBothFieldsIntoFinalResponse() {
-        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
-                .thenReturn(Optional.of(scenario));
-        when(projectionInputBuilder.build(scenario, tenantId))
-                .thenReturn(new com.wealthview.core.projection.dto.ProjectionInput(
-                        scenarioId, "Test Scenario", LocalDate.of(2030, 1, 1), 90,
-                        new BigDecimal("0.03"), "{\"birth_year\":1968}",
-                        List.of(new HypotheticalAccountInput(
-                                new BigDecimal("500000"), BigDecimal.ZERO,
-                                new BigDecimal("0.07"), "taxable")),
-                        null));
-        when(guardrailRepository.findByScenario_Id(scenarioId))
-                .thenReturn(Optional.empty());
+        stubOptimizeHappyPath();
 
         var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
 
+        // Variant fixture (Audit C6): essentialFloor/trialCount/medianFinalBalance/failureRate/
+        // successProbability/percentile10Final and the Disclosure all diverge from
+        // baseOptimizerResponse() to exercise the floor-clamp edge case, so this stays a literal
+        // construction rather than a base()+override reconstruction.
         var optimizerResponse = new GuardrailProfileResponse(
                 null, scenarioId, "Optimized Plan",
                 new BigDecimal("80000"), BigDecimal.ZERO,
@@ -165,14 +123,8 @@ class GuardrailProfileServiceTest {
         when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new GuardrailOptimizationRequest(
-                scenarioId, "Optimized Plan",
-                new BigDecimal("80000"), BigDecimal.ZERO,
-                new BigDecimal("0.10"),
-                500, new BigDecimal("0.95"), phases,
-                null, null, null, null,
-                null, null,
-                null, null, null, null, null, null);
+        var request = buildRequest(req -> req.withName("Optimized Plan")
+                .withEssentialFloor(new BigDecimal("80000")).withTrialCount(500).withPhases(phases));
 
         var result = service.optimize(tenantId, scenarioId, request);
 
@@ -182,40 +134,18 @@ class GuardrailProfileServiceTest {
 
     @Test
     void optimize_nullEssentialFloor_defaultsToZero() {
-        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
-                .thenReturn(Optional.of(scenario));
-        when(projectionInputBuilder.build(scenario, tenantId))
-                .thenReturn(new com.wealthview.core.projection.dto.ProjectionInput(
-                        scenarioId, "Test Scenario", LocalDate.of(2030, 1, 1), 90,
-                        new BigDecimal("0.03"), "{\"birth_year\":1968}",
-                        List.of(new HypotheticalAccountInput(
-                                new BigDecimal("500000"), BigDecimal.ZERO,
-                                new BigDecimal("0.07"), "taxable")),
-                        null));
-        when(guardrailRepository.findByScenario_Id(scenarioId))
-                .thenReturn(Optional.empty());
+        stubOptimizeHappyPath();
 
-        var optimizerResponse = new GuardrailProfileResponse(
-                null, scenarioId, null, BigDecimal.ZERO, BigDecimal.ZERO,
-                new BigDecimal("0.10"), 5000, new BigDecimal("0.95"),
-                List.of(), List.of(),
-                new BigDecimal("250000"), new BigDecimal("0.05"), new BigDecimal("0.95"),
-                new BigDecimal("100000"), false,
-                OffsetDateTime.now(), OffsetDateTime.now(),
-                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
         when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
-                .thenReturn(optimizerResponse);
+                .thenReturn(baseOptimizerResponse());
         when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
         // A minimal request body (every field null) — the optimize endpoint must
-        // not NPE; essentialFloor should fall back to ZERO like the other knobs.
-        var request = new GuardrailOptimizationRequest(
-                scenarioId, null, null, null,
-                null, null, null, null,
-                null, null, null, null,
-                null, null,
-                null, null, null, null, null, null);
+        // not NPE; essentialFloor should fall back to ZERO like the other knobs. Built via the
+        // production Builder (not the file-local RequestBuilder, whose defaults are non-null) so
+        // every field genuinely stays unset, matching the deleted raw 20-arg construction exactly.
+        var request = GuardrailOptimizationRequest.builder().scenarioId(scenarioId).build();
 
         service.optimize(tenantId, scenarioId, request);
 
@@ -229,12 +159,10 @@ class GuardrailProfileServiceTest {
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.empty());
 
-        var request = new GuardrailOptimizationRequest(
-                scenarioId, "Plan", new BigDecimal("30000"), BigDecimal.ZERO,
-                null, null, null, List.of(),
-                null, null, null, null,
-                null, null,
-                null, null, null, null, null, null);
+        // Request field values are irrelevant here: validateConversionRequest short-circuits (no
+        // conversion optimization requested) and the scenario lookup miss throws before anything
+        // else reads the request, so the RequestBuilder's own defaults are safe to use verbatim.
+        var request = buildRequest(req -> req);
 
         assertThatThrownBy(() -> service.optimize(tenantId, scenarioId, request))
                 .isInstanceOf(EntityNotFoundException.class);
@@ -244,41 +172,19 @@ class GuardrailProfileServiceTest {
     void optimize_existingProfile_replacesIt() {
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.of(scenario));
-        when(projectionInputBuilder.build(scenario, tenantId))
-                .thenReturn(new com.wealthview.core.projection.dto.ProjectionInput(
-                        scenarioId, "Test Scenario", LocalDate.of(2030, 1, 1), 90,
-                        new BigDecimal("0.03"), "{\"birth_year\":1968}",
-                        List.of(new HypotheticalAccountInput(
-                                new BigDecimal("500000"), BigDecimal.ZERO,
-                                new BigDecimal("0.07"), "taxable")),
-                        null));
+        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(simpleProjectionInput());
 
         var existing = new GuardrailSpendingProfileEntity(
                 tenant, scenario, "Old", new BigDecimal("25000"));
         when(guardrailRepository.findByScenario_Id(scenarioId))
                 .thenReturn(Optional.of(existing));
 
-        var optimizerResponse = new GuardrailProfileResponse(
-                null, scenarioId, "New Plan",
-                new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.10"),
-                5000, new BigDecimal("0.95"),
-                List.of(), List.of(),
-                new BigDecimal("250000"), new BigDecimal("0.05"), new BigDecimal("0.95"),
-                new BigDecimal("100000"),
-                false, OffsetDateTime.now(), OffsetDateTime.now(),
-                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
         when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
-                .thenReturn(optimizerResponse);
+                .thenReturn(baseOptimizerResponse());
         when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new GuardrailOptimizationRequest(
-                scenarioId, "New Plan", new BigDecimal("30000"), BigDecimal.ZERO,
-                null, null, null, List.of(),
-                null, null, null, null,
-                null, null,
-                null, null, null, null, null, null);
+        var request = buildRequest(req -> req.withName("New Plan"));
 
         service.optimize(tenantId, scenarioId, request);
 
@@ -376,40 +282,14 @@ class GuardrailProfileServiceTest {
     void optimize_setsGuardrailProfileOnScenarioAndClearsSpendingProfile() {
         scenario.setSpendingProfile(new com.wealthview.persistence.entity.SpendingProfileEntity(
                 tenant, "Manual", new BigDecimal("40000"), new BigDecimal("20000"), "[]"));
-        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
-                .thenReturn(Optional.of(scenario));
-        when(projectionInputBuilder.build(scenario, tenantId))
-                .thenReturn(new com.wealthview.core.projection.dto.ProjectionInput(
-                        scenarioId, "Test Scenario", LocalDate.of(2030, 1, 1), 90,
-                        new BigDecimal("0.03"), "{\"birth_year\":1968}",
-                        List.of(new HypotheticalAccountInput(
-                                new BigDecimal("500000"), BigDecimal.ZERO,
-                                new BigDecimal("0.07"), "taxable")),
-                        null));
-        when(guardrailRepository.findByScenario_Id(scenarioId))
-                .thenReturn(Optional.empty());
+        stubOptimizeHappyPath();
 
-        var optimizerResponse = new GuardrailProfileResponse(
-                null, scenarioId, "Guardrail",
-                new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.10"),
-                5000, new BigDecimal("0.95"),
-                List.of(), List.of(),
-                new BigDecimal("250000"), new BigDecimal("0.05"), new BigDecimal("0.95"),
-                new BigDecimal("100000"),
-                false, OffsetDateTime.now(), OffsetDateTime.now(),
-                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
         when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
-                .thenReturn(optimizerResponse);
+                .thenReturn(baseOptimizerResponse());
         when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new GuardrailOptimizationRequest(
-                scenarioId, "Guardrail", new BigDecimal("30000"), BigDecimal.ZERO,
-                null, null, null, List.of(),
-                null, null, null, null,
-                null, null,
-                null, null, null, null, null, null);
+        var request = buildRequest(req -> req.withName("Guardrail"));
 
         service.optimize(tenantId, scenarioId, request);
 
@@ -431,34 +311,10 @@ class GuardrailProfileServiceTest {
         entity.setConfidenceLevel(new BigDecimal("0.95"));
         entity.setTerminalBalanceTarget(BigDecimal.ZERO);
 
-        when(guardrailRepository.findByTenant_IdAndScenario_Id(tenantId, scenarioId))
-                .thenReturn(Optional.of(entity));
-        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
-                .thenReturn(Optional.of(scenario));
-        when(projectionInputBuilder.build(scenario, tenantId))
-                .thenReturn(new com.wealthview.core.projection.dto.ProjectionInput(
-                        scenarioId, "Test Scenario", LocalDate.of(2030, 1, 1), 90,
-                        new BigDecimal("0.03"), "{\"birth_year\":1968}",
-                        List.of(new HypotheticalAccountInput(
-                                new BigDecimal("500000"), BigDecimal.ZERO,
-                                new BigDecimal("0.07"), "taxable")),
-                        null));
-        when(guardrailRepository.findByScenario_Id(scenarioId))
-                .thenReturn(Optional.of(entity));
+        stubReoptimizeHappyPath(entity);
 
-        var optimizerResponse = new GuardrailProfileResponse(
-                null, scenarioId, "Existing Plan",
-                new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.10"),
-                5000, new BigDecimal("0.95"),
-                List.of(new GuardrailPhaseInput("Early", 62, 72, 3)),
-                List.of(),
-                new BigDecimal("250000"), new BigDecimal("0.05"), new BigDecimal("0.95"),
-                new BigDecimal("100000"),
-                false, OffsetDateTime.now(), OffsetDateTime.now(),
-                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
         when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
-                .thenReturn(optimizerResponse);
+                .thenReturn(baseOptimizerResponse());
         when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -481,12 +337,7 @@ class GuardrailProfileServiceTest {
         entity.setTerminalBalanceTarget(BigDecimal.ZERO);
         entity.setGateOnAdaptiveRules(true);
 
-        when(guardrailRepository.findByTenant_IdAndScenario_Id(tenantId, scenarioId))
-                .thenReturn(Optional.of(entity));
-        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
-                .thenReturn(Optional.of(scenario));
-        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(simpleProjectionInput());
-        when(guardrailRepository.findByScenario_Id(scenarioId)).thenReturn(Optional.of(entity));
+        stubReoptimizeHappyPath(entity);
         var captor = ArgumentCaptor.forClass(GuardrailOptimizationInput.class);
         when(spendingOptimizer.optimize(captor.capture())).thenReturn(baseOptimizerResponse());
         when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
@@ -510,12 +361,7 @@ class GuardrailProfileServiceTest {
         entity.setTerminalBalanceTarget(BigDecimal.ZERO);
         // gateOnAdaptiveRules left at its default (false).
 
-        when(guardrailRepository.findByTenant_IdAndScenario_Id(tenantId, scenarioId))
-                .thenReturn(Optional.of(entity));
-        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
-                .thenReturn(Optional.of(scenario));
-        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(simpleProjectionInput());
-        when(guardrailRepository.findByScenario_Id(scenarioId)).thenReturn(Optional.of(entity));
+        stubReoptimizeHappyPath(entity);
         var captor = ArgumentCaptor.forClass(GuardrailOptimizationInput.class);
         when(spendingOptimizer.optimize(captor.capture())).thenReturn(baseOptimizerResponse());
         when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
@@ -602,23 +448,14 @@ class GuardrailProfileServiceTest {
 
     @Test
     void resolveConfidence_moderateRiskTolerance_returnsNinetyPercent() {
-        var request = new GuardrailOptimizationRequest(
-                scenarioId, "Plan", new BigDecimal("30000"), BigDecimal.ZERO,
-                null, null, null, List.of(),
-                null, null, null, "moderate",
-                null, null,
-                null, null, null, null, null, null);
+        var request = buildRequest(req -> req.withConfidence(null).withRiskTolerance("moderate"));
         assertThat(service.resolveConfidence(request)).isEqualByComparingTo(new BigDecimal("0.90"));
     }
 
     @Test
     void resolveConfidence_explicitConfidence_overridesPreset() {
-        var request = new GuardrailOptimizationRequest(
-                scenarioId, "Plan", new BigDecimal("30000"), BigDecimal.ZERO,
-                null, null, new BigDecimal("0.97"), List.of(),
-                null, null, null, "aggressive",
-                null, null,
-                null, null, null, null, null, null);
+        var request = buildRequest(
+                req -> req.withConfidence(new BigDecimal("0.97")).withRiskTolerance("aggressive"));
         assertThat(service.resolveConfidence(request)).isEqualByComparingTo(new BigDecimal("0.97"));
     }
 
@@ -717,10 +554,7 @@ class GuardrailProfileServiceTest {
     // => the persisted entity carries true and the response reports gated_on == with_rules.
     @Test
     void optimize_gateOnAdaptiveRulesOmittedWithPositiveRate_responseGatedOnWithRules() {
-        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
-                .thenReturn(Optional.of(scenario));
-        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(simpleProjectionInput());
-        when(guardrailRepository.findByScenario_Id(scenarioId)).thenReturn(Optional.empty());
+        stubOptimizeHappyPath();
         when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
                 .thenReturn(baseOptimizerResponse());
         var savedCaptor = ArgumentCaptor.forClass(GuardrailSpendingProfileEntity.class);
@@ -736,10 +570,7 @@ class GuardrailProfileServiceTest {
 
     @Test
     void optimize_gateOnAdaptiveRulesTrue_propagatesToInputEntityAndResponse() {
-        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
-                .thenReturn(Optional.of(scenario));
-        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(simpleProjectionInput());
-        when(guardrailRepository.findByScenario_Id(scenarioId)).thenReturn(Optional.empty());
+        stubOptimizeHappyPath();
         when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
                 .thenReturn(baseOptimizerResponse());
         var savedCaptor = ArgumentCaptor.forClass(GuardrailSpendingProfileEntity.class);
@@ -759,10 +590,7 @@ class GuardrailProfileServiceTest {
 
     @Test
     void optimize_gateOnAdaptiveRulesTrueButZeroAdjustmentRate_responseGatedOnStaysNoAdaptation() {
-        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
-                .thenReturn(Optional.of(scenario));
-        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(simpleProjectionInput());
-        when(guardrailRepository.findByScenario_Id(scenarioId)).thenReturn(Optional.empty());
+        stubOptimizeHappyPath();
         when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
                 .thenReturn(baseOptimizerResponse());
         when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
@@ -793,11 +621,11 @@ class GuardrailProfileServiceTest {
         // the RESOLVED effective REAL rate the optimizer actually used — echoed back on
         // GuardrailProfileResponse.returnMean — not the raw (null) request value and not a
         // hardcoded 0.10 default.
-        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
-                .thenReturn(Optional.of(scenario));
-        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(simpleProjectionInput());
-        when(guardrailRepository.findByScenario_Id(scenarioId)).thenReturn(Optional.empty());
+        stubOptimizeHappyPath();
 
+        // Variant fixture: returnMean is the one field this test asserts on, deliberately diverging
+        // from baseOptimizerResponse()'s 0.10 -- kept as its own literal construction (a base()+
+        // override reconstruction here would just clone withSchedule()'s 23-field base.x() prefix).
         var resolvedReal = new BigDecimal("0.0658");
         var optimizerResponse = new GuardrailProfileResponse(
                 null, scenarioId, "Plan",
@@ -836,12 +664,7 @@ class GuardrailProfileServiceTest {
         entity.setConfidenceLevel(new BigDecimal("0.95"));
         entity.setTerminalBalanceTarget(BigDecimal.ZERO);
 
-        when(guardrailRepository.findByTenant_IdAndScenario_Id(tenantId, scenarioId))
-                .thenReturn(Optional.of(entity));
-        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
-                .thenReturn(Optional.of(scenario));
-        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(simpleProjectionInput());
-        when(guardrailRepository.findByScenario_Id(scenarioId)).thenReturn(Optional.of(entity));
+        stubReoptimizeHappyPath(entity);
 
         var captor = ArgumentCaptor.forClass(GuardrailOptimizationInput.class);
         when(spendingOptimizer.optimize(captor.capture())).thenReturn(baseOptimizerResponse());
@@ -960,10 +783,7 @@ class GuardrailProfileServiceTest {
 
     @Test
     void optimize_optimizerReturnsConversionSchedule_persistsIt() {
-        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
-                .thenReturn(Optional.of(scenario));
-        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(simpleProjectionInput());
-        when(guardrailRepository.findByScenario_Id(scenarioId)).thenReturn(Optional.empty());
+        stubOptimizeHappyPath();
 
         var schedule = new com.wealthview.core.projection.dto.RothConversionScheduleResponse(
                 new BigDecimal("50000"), new BigDecimal("75000"), new BigDecimal("25000"),
@@ -994,12 +814,7 @@ class GuardrailProfileServiceTest {
         entity.setConfidenceLevel(new BigDecimal("0.95"));
         entity.setTerminalBalanceTarget(BigDecimal.ZERO);
 
-        when(guardrailRepository.findByTenant_IdAndScenario_Id(tenantId, scenarioId))
-                .thenReturn(Optional.of(entity));
-        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
-                .thenReturn(Optional.of(scenario));
-        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(simpleProjectionInput());
-        when(guardrailRepository.findByScenario_Id(scenarioId)).thenReturn(Optional.of(entity));
+        stubReoptimizeHappyPath(entity);
         when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
                 .thenReturn(baseOptimizerResponse());
         when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
@@ -1401,6 +1216,10 @@ class GuardrailProfileServiceTest {
     void optimize_mixedOverrideAccounts_setsFixedReturnShareOnResponse() {
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.of(scenario));
+        // Variant fixture: a genuinely two-account ProjectionInput (60/40 balance split, one
+        // account carrying a fixed-return override) is the entire point of this test -- it is not
+        // a copy of simpleProjectionInput()'s single-account body, so it stays a literal
+        // construction rather than migrating onto the shared helper.
         when(projectionInputBuilder.build(scenario, tenantId))
                 .thenReturn(new com.wealthview.core.projection.dto.ProjectionInput(
                         scenarioId, "Test Scenario", LocalDate.of(2030, 1, 1), 90,
@@ -1420,12 +1239,7 @@ class GuardrailProfileServiceTest {
         when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new GuardrailOptimizationRequest(
-                scenarioId, "Plan", new BigDecimal("30000"), BigDecimal.ZERO,
-                null, null, null, List.of(),
-                null, null, null, null,
-                null, null,
-                null, null, null, null, null, null);
+        var request = buildRequest(req -> req);
 
         var result = service.optimize(tenantId, scenarioId, request);
 
@@ -1455,6 +1269,33 @@ class GuardrailProfileServiceTest {
     }
 
     // ---- helpers ----
+
+    /**
+     * The fresh-optimize happy-path preamble shared by every {@code service.optimize(...)} test
+     * that needs to inspect the RESPONSE (or a custom save/optimizer captor) rather than the
+     * captured {@link GuardrailOptimizationInput} -- {@link #captureOptimizationInput} already
+     * covers that latter case end-to-end. Stubs scenario lookup (found), the projection input
+     * (the shared single-account fixture), and "no existing profile to replace". Callers still add
+     * their own {@code spendingOptimizer.optimize(...)} and {@code guardrailRepository.save(...)}
+     * stubs, since those two vary (plain {@code any()}, a captor, or a non-{@link
+     * #baseOptimizerResponse()} response).
+     */
+    private void stubOptimizeHappyPath() {
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)).thenReturn(Optional.of(scenario));
+        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(simpleProjectionInput());
+        when(guardrailRepository.findByScenario_Id(scenarioId)).thenReturn(Optional.empty());
+    }
+
+    /**
+     * Same as {@link #stubOptimizeHappyPath()}, but for {@code service.reoptimize(...)} tests: an
+     * existing profile is found (both by scenario id and by tenant+scenario id) instead of absent.
+     */
+    private void stubReoptimizeHappyPath(GuardrailSpendingProfileEntity entity) {
+        when(guardrailRepository.findByTenant_IdAndScenario_Id(tenantId, scenarioId)).thenReturn(Optional.of(entity));
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)).thenReturn(Optional.of(scenario));
+        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(simpleProjectionInput());
+        when(guardrailRepository.findByScenario_Id(scenarioId)).thenReturn(Optional.of(entity));
+    }
 
     private GuardrailOptimizationInput captureOptimizationInput(GuardrailOptimizationRequest request) {
         return captureOptimizationInput(request, scenario);
@@ -1538,10 +1379,12 @@ class GuardrailProfileServiceTest {
         private Boolean gateOnAdaptiveRules;
 
         RequestBuilder(UUID scenarioId) { this.scenarioId = scenarioId; }
+        RequestBuilder withName(String v) { this.name = v; return this; }
         RequestBuilder withGateOnAdaptiveRules(Boolean v) { this.gateOnAdaptiveRules = v; return this; }
         RequestBuilder withConfidence(BigDecimal v) { this.confidence = v; return this; }
         RequestBuilder withRiskTolerance(String v) { this.riskTolerance = v; return this; }
         RequestBuilder withReturnMean(BigDecimal v) { this.returnMean = v; return this; }
+        RequestBuilder withEssentialFloor(BigDecimal v) { this.essentialFloor = v; return this; }
         RequestBuilder withTrialCount(Integer v) { this.trialCount = v; return this; }
         RequestBuilder withPortfolioFloor(BigDecimal v) { this.portfolioFloor = v; return this; }
         RequestBuilder withMaxAnnualAdjustmentRate(BigDecimal v) { this.maxAnnualAdjustmentRate = v; return this; }
@@ -1555,16 +1398,33 @@ class GuardrailProfileServiceTest {
         RequestBuilder withRmdTargetBracketRate(BigDecimal v) { this.rmdTargetBracketRate = v; return this; }
         RequestBuilder withBuffer(Integer v) { this.buffer = v; return this; }
 
+        // Delegates to the production Builder (named setters) instead of the record's positional
+        // canonical constructor, so this file-local builder can't silently drift out of field
+        // order with it. rmdBracketHeadroom and dynamicSequencingBracketRate are left unset (always
+        // null) here: this builder covers GuardrailProfileService's own wiring, while those two are
+        // exercised against real values in RothConversionOptimizerTest.
         GuardrailOptimizationRequest build() {
-            return new GuardrailOptimizationRequest(scenarioId, name, essentialFloor,
-                    terminalBalanceTarget, returnMean, trialCount, confidence, phases,
-                    portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears, riskTolerance,
-                    cashReserveYears, cashReturnRate, optimizeConversions,
-                    conversionBracketRate, rmdTargetBracketRate, buffer,
-                    // rmdBracketHeadroom and dynamicSequencingBracketRate are always absent here:
-                    // this builder covers GuardrailProfileService's own wiring, while those two are
-                    // exercised against real values in RothConversionOptimizerTest.
-                    null, null, gateOnAdaptiveRules);
+            return GuardrailOptimizationRequest.builder()
+                    .scenarioId(scenarioId)
+                    .name(name)
+                    .essentialFloor(essentialFloor)
+                    .terminalBalanceTarget(terminalBalanceTarget)
+                    .returnMean(returnMean)
+                    .trialCount(trialCount)
+                    .confidenceLevel(confidence)
+                    .phases(phases)
+                    .portfolioFloor(portfolioFloor)
+                    .maxAnnualAdjustmentRate(maxAnnualAdjustmentRate)
+                    .phaseBlendYears(phaseBlendYears)
+                    .riskTolerance(riskTolerance)
+                    .cashReserveYears(cashReserveYears)
+                    .cashReturnRate(cashReturnRate)
+                    .optimizeConversions(optimizeConversions)
+                    .conversionBracketRate(conversionBracketRate)
+                    .rmdTargetBracketRate(rmdTargetBracketRate)
+                    .traditionalExhaustionBuffer(buffer)
+                    .gateOnAdaptiveRules(gateOnAdaptiveRules)
+                    .build();
         }
     }
 }
