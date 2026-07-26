@@ -2,6 +2,7 @@ package com.wealthview.api.controller;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -9,6 +10,7 @@ import com.wealthview.api.testutil.WealthViewControllerTest;
 import com.wealthview.core.price.PriceService;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedSuperAdmin;
+import static com.wealthview.api.testutil.ControllerTestUtils.errorEnvelope;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -37,7 +39,6 @@ class AdminPriceControllerNoPriceSyncTest {
     void triggerPriceSync_whenFinnhubNotConfigured_returns503() throws Exception {
         mockMvc.perform(post("/api/v1/admin/prices/sync")
                         .with(authenticatedSuperAdmin()))
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.error").value("SERVICE_UNAVAILABLE"));
+                .andExpect(errorEnvelope(HttpStatus.SERVICE_UNAVAILABLE));
     }
 }

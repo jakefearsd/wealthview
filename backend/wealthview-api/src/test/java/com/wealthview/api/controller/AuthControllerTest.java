@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -31,6 +32,7 @@ import static com.wealthview.api.testutil.ControllerTestUtils.EMAIL;
 import static com.wealthview.api.testutil.ControllerTestUtils.TENANT_ID;
 import static com.wealthview.api.testutil.ControllerTestUtils.USER_ID;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
+import static com.wealthview.api.testutil.ControllerTestUtils.errorEnvelope;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -98,8 +100,7 @@ class AuthControllerTest {
                         .content("""
                                 {"email": "test@example.com", "password": "wrong"}
                                 """))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+                .andExpect(errorEnvelope(HttpStatus.UNAUTHORIZED));
     }
 
     @Test
@@ -212,8 +213,7 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .with(csrf())
                         .cookie(new Cookie("refresh_token", "   ")))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+                .andExpect(errorEnvelope(HttpStatus.UNAUTHORIZED));
     }
 
     @Test
@@ -223,7 +223,6 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .with(csrf())
                         .cookie(new Cookie("some_other_cookie", "value")))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+                .andExpect(errorEnvelope(HttpStatus.UNAUTHORIZED));
     }
 }

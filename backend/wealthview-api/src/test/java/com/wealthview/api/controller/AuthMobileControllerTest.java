@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -17,6 +18,7 @@ import com.wealthview.core.auth.dto.LoginRequest;
 import com.wealthview.core.auth.dto.MobileAuthResponse;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
+import static com.wealthview.api.testutil.ControllerTestUtils.errorEnvelope;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
@@ -79,8 +81,7 @@ class AuthMobileControllerTest {
                         .content("""
                                 {"email": "mobile@example.com"}
                                 """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+                .andExpect(errorEnvelope(HttpStatus.BAD_REQUEST));
     }
 
     @Test
@@ -104,8 +105,7 @@ class AuthMobileControllerTest {
                         .content("""
                                 {"email": "new@example.com"}
                                 """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+                .andExpect(errorEnvelope(HttpStatus.BAD_REQUEST));
     }
 
     @Test
@@ -128,8 +128,7 @@ class AuthMobileControllerTest {
                         .content("""
                                 {}
                                 """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+                .andExpect(errorEnvelope(HttpStatus.BAD_REQUEST));
     }
 
     @Test

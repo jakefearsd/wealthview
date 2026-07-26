@@ -2,6 +2,7 @@ package com.wealthview.api.controller;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -9,6 +10,7 @@ import com.wealthview.api.testutil.WealthViewControllerTest;
 import com.wealthview.core.split.StockSplitService;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedSuperAdmin;
+import static com.wealthview.api.testutil.ControllerTestUtils.errorEnvelope;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -40,9 +42,7 @@ class StockSplitControllerNoSyncServiceTest {
     void sync_whenServiceUnavailable_returns503WithStandardEnvelope() throws Exception {
         mockMvc.perform(post("/api/v1/admin/stock-splits/sync")
                         .with(authenticatedSuperAdmin()))
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.error").value("SERVICE_UNAVAILABLE"))
-                .andExpect(jsonPath("$.status").value(503))
+                .andExpect(errorEnvelope(HttpStatus.SERVICE_UNAVAILABLE))
                 .andExpect(jsonPath("$.message").value(
                         "Stock split sync is not configured. Set app.finnhub.api-key in your environment."));
     }

@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -22,7 +23,9 @@ import tools.jackson.databind.ObjectMapper;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.TENANT_ID;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
+import static com.wealthview.api.testutil.ControllerTestUtils.errorEnvelope;
 import static com.wealthview.persistence.entity.TransactionType.BUY;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -112,8 +115,7 @@ class TransactionControllerTest {
                                 {"date": "2025-01-15", "type": "buy", "symbol": "AAPL",
                                  "quantity": 10, "amount": 1500.00}
                                 """))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+                .andExpect(errorEnvelope(HttpStatus.NOT_FOUND));
     }
 
     @Test
@@ -152,9 +154,29 @@ class TransactionControllerTest {
                                 {"date": "2025-01-15", "type": "teleport", "symbol": "AAPL",
                                  "quantity": 10, "amount": 1500.00}
                                 """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("BAD_REQUEST"))
-                .andExpect(jsonPath("$.status").value(400));
+                .andExpect(errorEnvelope(HttpStatus.BAD_REQUEST))
+                .andExpect(jsonPath("$.message").value(containsString("Unknown transaction type")));
+    }
+
+    /**
+     * {@code TransactionType.fromValue} tolerates any letter case (broker CSVs arrive
+     * uppercase). Pins that the HTTP JSON path is equally tolerant and that the response
+     * echoes back the canonical lowercase token, not the wire casing.
+     */
+    @Test
+    void create_uppercaseTransactionType_returns201WithNormalizedType() throws Exception {
+        when(transactionService.create(eq(TENANT_ID), eq(ACCOUNT_ID), any(TransactionRequest.class)))
+                .thenReturn(sampleResponse());
+
+        mockMvc.perform(post("/api/v1/accounts/{accountId}/transactions", ACCOUNT_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"date": "2025-01-15", "type": "BUY", "symbol": "AAPL",
+                                 "quantity": 10, "amount": 1500.00}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.type").value("buy"));
     }
 
     @Test

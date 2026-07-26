@@ -10,6 +10,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -36,6 +37,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.TENANT_ID;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
+import static com.wealthview.api.testutil.ControllerTestUtils.errorEnvelope;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -195,8 +197,7 @@ class PropertyControllerTest {
                                  "purchase_date": "2020-06-01", "current_value": 375000,
                                  "mortgage_balance": 195000}
                                 """))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+                .andExpect(errorEnvelope(HttpStatus.NOT_FOUND));
     }
 
     @Test
@@ -440,8 +441,7 @@ class PropertyControllerTest {
 
         mockMvc.perform(get("/api/v1/properties/{id}/depreciation-schedule", PROPERTY_ID)
                         .with(authenticatedAdmin()))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+                .andExpect(errorEnvelope(HttpStatus.NOT_FOUND));
     }
 
     @Test

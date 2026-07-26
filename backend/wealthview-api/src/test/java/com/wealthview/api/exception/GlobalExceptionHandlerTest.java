@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.http.MockHttpInputMessage;
 import org.springframework.security.access.AccessDeniedException;
@@ -26,6 +27,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.wealthview.api.dto.ErrorResponse;
 import com.wealthview.core.exception.DuplicateEntityException;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidInviteCodeException;
@@ -72,10 +74,7 @@ class GlobalExceptionHandlerTest {
 
         var response = handler.handleNotFound(ex, request);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(response.getBody().status()).isEqualTo(404);
-        assertThat(response.getBody().error()).isEqualTo("NOT_FOUND");
-        assertThat(response.getBody().message()).isEqualTo("Account not found");
+        assertErrorEnvelope(response, HttpStatus.NOT_FOUND, "NOT_FOUND", "Account not found");
         assertCounter("EntityNotFoundException", "404", 1);
     }
 
@@ -97,10 +96,8 @@ class GlobalExceptionHandlerTest {
 
         var response = handler.handleServiceUnavailable(ex, request);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
-        assertThat(response.getBody().status()).isEqualTo(503);
-        assertThat(response.getBody().error()).isEqualTo("SERVICE_UNAVAILABLE");
-        assertThat(response.getBody().message()).isEqualTo("Yahoo Finance client is not configured");
+        assertErrorEnvelope(response, HttpStatus.SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE",
+                "Yahoo Finance client is not configured");
         assertCounter("ServiceUnavailableException", "503", 1);
     }
 
@@ -228,10 +225,7 @@ class GlobalExceptionHandlerTest {
 
         var response = handler.handleNoResourceFound(ex, request);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(response.getBody().status()).isEqualTo(404);
-        assertThat(response.getBody().error()).isEqualTo("NOT_FOUND");
-        assertThat(response.getBody().message()).isEqualTo("Resource not found");
+        assertErrorEnvelope(response, HttpStatus.NOT_FOUND, "NOT_FOUND", "Resource not found");
         assertCounter("NoResourceFoundException", "404", 1);
     }
 
@@ -407,6 +401,14 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().message()).contains("2024-99");
         assertCounter("DateTimeParseException", "400", 1);
+    }
+
+    private void assertErrorEnvelope(
+            ResponseEntity<ErrorResponse> response, HttpStatus status, String error, String message) {
+        assertThat(response.getStatusCode()).isEqualTo(status);
+        assertThat(response.getBody().status()).isEqualTo(status.value());
+        assertThat(response.getBody().error()).isEqualTo(error);
+        assertThat(response.getBody().message()).isEqualTo(message);
     }
 
     private void assertCounter(String exception, String status, double expected) {

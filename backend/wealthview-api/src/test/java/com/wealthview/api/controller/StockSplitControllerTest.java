@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -22,6 +23,7 @@ import tools.jackson.databind.ObjectMapper;
 import static com.wealthview.api.testutil.ControllerTestUtils.TENANT_ID;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedSuperAdmin;
+import static com.wealthview.api.testutil.ControllerTestUtils.errorEnvelope;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -103,8 +105,7 @@ class StockSplitControllerTest {
                                     "denominator": 1
                                 }
                                 """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+                .andExpect(errorEnvelope(HttpStatus.BAD_REQUEST));
     }
 
     @Test
@@ -120,8 +121,7 @@ class StockSplitControllerTest {
                                     "denominator": -1
                                 }
                                 """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+                .andExpect(errorEnvelope(HttpStatus.BAD_REQUEST));
     }
 
     @Test
@@ -156,8 +156,7 @@ class StockSplitControllerTest {
 
         mockMvc.perform(delete("/api/v1/admin/stock-splits/{id}", SPLIT_ID)
                         .with(authenticatedSuperAdmin()))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+                .andExpect(errorEnvelope(HttpStatus.NOT_FOUND));
     }
 
     @Test

@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -15,6 +16,7 @@ import com.wealthview.core.property.PropertyService;
 import com.wealthview.core.property.PropertyValuationService;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
+import static com.wealthview.api.testutil.ControllerTestUtils.errorEnvelope;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -53,9 +55,7 @@ class PropertyControllerNoSyncServiceTest {
     void refreshValuation_whenSyncServiceUnavailable_returns503WithErrorEnvelope() throws Exception {
         mockMvc.perform(post("/api/v1/properties/{id}/valuations/refresh", PROPERTY_ID)
                         .with(authenticatedAdmin()))
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.error").value("SERVICE_UNAVAILABLE"))
-                .andExpect(jsonPath("$.status").value(503));
+                .andExpect(errorEnvelope(HttpStatus.SERVICE_UNAVAILABLE));
     }
 
     @Test
@@ -66,8 +66,6 @@ class PropertyControllerNoSyncServiceTest {
                         .content("""
                                 {"zpid": "12345"}
                                 """))
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.error").value("SERVICE_UNAVAILABLE"))
-                .andExpect(jsonPath("$.status").value(503));
+                .andExpect(errorEnvelope(HttpStatus.SERVICE_UNAVAILABLE));
     }
 }

@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -20,6 +21,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.TENANT_ID;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
+import static com.wealthview.api.testutil.ControllerTestUtils.errorEnvelope;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -105,8 +107,7 @@ class HoldingControllerTest {
                                 {"account_id": "%s", "symbol": "AAPL",
                                  "quantity": 15, "cost_basis": 2250.00}
                                 """.formatted(ACCOUNT_ID)))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+                .andExpect(errorEnvelope(HttpStatus.NOT_FOUND));
     }
 
     @Test
@@ -128,8 +129,7 @@ class HoldingControllerTest {
 
         mockMvc.perform(get("/api/v1/holdings/{id}", HOLDING_ID)
                         .with(authenticatedAdmin()))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+                .andExpect(errorEnvelope(HttpStatus.NOT_FOUND));
     }
 
     @Test

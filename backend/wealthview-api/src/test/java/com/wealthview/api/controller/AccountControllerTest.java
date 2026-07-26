@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -28,6 +29,7 @@ import tools.jackson.databind.ObjectMapper;
 import static com.wealthview.api.testutil.ControllerTestUtils.TENANT_ID;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedViewer;
+import static com.wealthview.api.testutil.ControllerTestUtils.errorEnvelope;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -132,8 +134,7 @@ class AccountControllerTest {
 
         mockMvc.perform(get("/api/v1/accounts/{id}", ACCOUNT_ID)
                         .with(authenticatedAdmin()))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+                .andExpect(errorEnvelope(HttpStatus.NOT_FOUND));
     }
 
     @Test
@@ -161,8 +162,7 @@ class AccountControllerTest {
                         .content("""
                                 {"name": "Brokerage", "type": "brokerage", "institution": "Fidelity"}
                                 """))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+                .andExpect(errorEnvelope(HttpStatus.NOT_FOUND));
     }
 
     @Test
@@ -218,7 +218,6 @@ class AccountControllerTest {
 
         mockMvc.perform(get("/api/v1/accounts/{id}/theoretical-history", ACCOUNT_ID)
                         .with(authenticatedAdmin()))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+                .andExpect(errorEnvelope(HttpStatus.NOT_FOUND));
     }
 }

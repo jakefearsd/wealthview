@@ -2,6 +2,7 @@ package com.wealthview.api.controller;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -9,6 +10,7 @@ import com.wealthview.api.testutil.WealthViewControllerTest;
 import com.wealthview.core.mobile.MobileAppVersionService;
 import com.wealthview.core.mobile.dto.VersionCheckResponse;
 
+import static com.wealthview.api.testutil.ControllerTestUtils.errorEnvelope;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -47,16 +49,14 @@ class AppVersionControllerTest {
     void versionCheck_missingPlatform_returns400() throws Exception {
         mockMvc.perform(get("/api/v1/app/version-check")
                         .param("version", "2.1.0"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+                .andExpect(errorEnvelope(HttpStatus.BAD_REQUEST));
     }
 
     @Test
     void versionCheck_missingVersion_returns400() throws Exception {
         mockMvc.perform(get("/api/v1/app/version-check")
                         .param("platform", "android"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+                .andExpect(errorEnvelope(HttpStatus.BAD_REQUEST));
     }
 
     @Test

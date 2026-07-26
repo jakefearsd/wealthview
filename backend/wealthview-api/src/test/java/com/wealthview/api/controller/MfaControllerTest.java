@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -18,6 +19,7 @@ import com.wealthview.core.auth.mfa.dto.MfaStatusResponse;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.USER_ID;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
+import static com.wealthview.api.testutil.ControllerTestUtils.errorEnvelope;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -80,8 +82,7 @@ class MfaControllerTest {
                         .content("""
                                 {"totp_code": "000000"}
                                 """))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+                .andExpect(errorEnvelope(HttpStatus.UNAUTHORIZED));
     }
 
     @Test
@@ -92,8 +93,7 @@ class MfaControllerTest {
                         .content("""
                                 {}
                                 """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+                .andExpect(errorEnvelope(HttpStatus.BAD_REQUEST));
     }
 
     @Test
@@ -120,8 +120,7 @@ class MfaControllerTest {
                         .content("""
                                 {"totp_code": "999999"}
                                 """))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+                .andExpect(errorEnvelope(HttpStatus.UNAUTHORIZED));
     }
 
     @Test

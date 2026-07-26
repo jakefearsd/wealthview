@@ -2,13 +2,18 @@ package com.wealthview.api.testutil;
 
 import java.util.UUID;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
+import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.wealthview.api.security.TenantUserPrincipal;
+
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 public final class ControllerTestUtils {
 
@@ -64,6 +69,21 @@ public final class ControllerTestUtils {
             request = (org.springframework.mock.web.MockHttpServletRequest)
                     SecurityMockMvcRequestPostProcessors.securityContext(context).postProcessRequest(request);
             return SecurityMockMvcRequestPostProcessors.csrf().postProcessRequest(request);
+        };
+    }
+
+    /**
+     * Asserts the standard error envelope (see CLAUDE.md's {@code { "error", "message", "status" }}
+     * shape) for a given {@link HttpStatus}: the HTTP response status itself, {@code $.error}
+     * (always the {@code HttpStatus} enum name -- see {@code GlobalExceptionHandler}), and
+     * {@code $.status}. Callers that also want to pin {@code $.message} should chain an additional
+     * {@code jsonPath("$.message")} expectation.
+     */
+    public static ResultMatcher errorEnvelope(HttpStatus status) {
+        return result -> {
+            status().is(status.value()).match(result);
+            jsonPath("$.error").value(status.name()).match(result);
+            jsonPath("$.status").value(status.value()).match(result);
         };
     }
 }
