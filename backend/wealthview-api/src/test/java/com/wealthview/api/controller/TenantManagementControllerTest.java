@@ -1,6 +1,5 @@
 package com.wealthview.api.controller;
 
-import java.lang.reflect.Field;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -16,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.wealthview.api.exception.GlobalExceptionHandler;
 import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
+import com.wealthview.api.testutil.TestEntityHelper;
 import com.wealthview.api.testutil.TestMetricsConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
 import com.wealthview.core.auth.SessionStateValidator;
@@ -64,29 +64,23 @@ class TenantManagementControllerTest {
     @MockitoBean
     private SessionStateValidator sessionStateValidator;
 
-    private static void setField(Object target, String fieldName, Object value) throws Exception {
-        Field field = target.getClass().getDeclaredField(fieldName);
-        field.setAccessible(true);
-        field.set(target, value);
-    }
-
-    private TenantEntity createTenantEntity() throws Exception {
+    private TenantEntity createTenantEntity() {
         var tenant = new TenantEntity("Test Tenant");
-        setField(tenant, "id", UUID.randomUUID());
+        TestEntityHelper.setId(tenant, UUID.randomUUID());
         return tenant;
     }
 
-    private InviteCodeEntity createInviteCode() throws Exception {
+    private InviteCodeEntity createInviteCode() {
         var tenant = createTenantEntity();
         var user = createUserEntity(tenant);
         var invite = new InviteCodeEntity(tenant, "ABC123", user, OffsetDateTime.now().plusDays(7));
-        setField(invite, "id", UUID.randomUUID());
+        TestEntityHelper.setId(invite, UUID.randomUUID());
         return invite;
     }
 
-    private UserEntity createUserEntity(TenantEntity tenant) throws Exception {
+    private UserEntity createUserEntity(TenantEntity tenant) {
         var user = new UserEntity(tenant, "user@example.com", "hash", "member");
-        setField(user, "id", UUID.randomUUID());
+        TestEntityHelper.setId(user, UUID.randomUUID());
         return user;
     }
 
