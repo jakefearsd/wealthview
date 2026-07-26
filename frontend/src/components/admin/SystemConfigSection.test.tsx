@@ -66,4 +66,27 @@ describe('SystemConfigSection', () => {
             expect(setConfig).toHaveBeenCalledWith('cors.allowed-origins', 'https://new.local');
         });
     });
+
+    it('keeps an in-progress edit open when a boolean toggle on another row succeeds', async () => {
+        vi.mocked(setConfig).mockResolvedValue(undefined);
+        render(<SystemConfigSection />);
+        await screen.findByText('cors.allowed-origins');
+
+        // Open the cors row's editor (same walk as the edit test above).
+        const corsValue = screen.getByText('https://app.local');
+        const row = corsValue.closest('div[style*="display: flex"]');
+        expect(row).not.toBeNull();
+        const editBtn = row!.querySelector('button');
+        if (editBtn) fireEvent.click(editBtn);
+        expect(screen.getByDisplayValue('https://app.local')).toBeInTheDocument();
+
+        // Toggle zillow.scraper.enabled (a different row) and let it succeed.
+        fireEvent.click(screen.getByTitle('Enabled'));
+        await waitFor(() => {
+            expect(setConfig).toHaveBeenCalledWith('zillow.scraper.enabled', 'false');
+        });
+
+        // The unrelated toggle's success must not discard the in-progress edit.
+        expect(screen.getByDisplayValue('https://app.local')).toBeInTheDocument();
+    });
 });

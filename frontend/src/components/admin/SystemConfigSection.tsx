@@ -70,8 +70,10 @@ export default function SystemConfigSection() {
         (input: { key: string; value: string }) => setConfig(input.key, input.value),
         {
             successMessage: 'Config updated',
-            onSuccess: () => {
-                setEditingKey(null);
+            onSuccess: (_, input) => {
+                // Only close the editor when the save was for the row being edited —
+                // a boolean toggle on another row must not discard an in-progress edit.
+                setEditingKey((current) => (current === input.key ? null : current));
                 refetch();
             },
         },
