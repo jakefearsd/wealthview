@@ -1,23 +1,13 @@
-export interface DashboardSummary {
-    net_worth: number;
-    total_investments: number;
-    total_cash: number;
-    total_property_equity: number;
-    accounts: AccountSummary[];
-    allocation: AllocationEntry[];
-}
-
-export interface AccountSummary {
-    name: string;
-    type: string;
-    balance: number;
-}
-
-export interface AllocationEntry {
-    category: string;
-    value: number;
-    percentage: number;
-}
+// The dashboard summary wire-format trio is owned by @wealthview/shared (used
+// by both web and mobile); this module re-exports it under the existing local
+// names to keep existing import paths and identifiers stable. The portfolio
+// history / projection snapshot types below have no mobile consumer yet and
+// stay defined here.
+export type {
+    DashboardSummaryResponse as DashboardSummary,
+    DashboardAccountSummary as AccountSummary,
+    DashboardAllocationEntry as AllocationEntry,
+} from '@wealthview/shared';
 
 export interface CombinedPortfolioDataPoint {
     date: string;
