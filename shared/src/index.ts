@@ -1,3 +1,4 @@
+export { extractErrorMessage } from './errorMessage';
 export {
     formatCurrency,
     toPercent,

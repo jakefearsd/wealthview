@@ -7,6 +7,7 @@ import React, {
     useReducer,
     useRef,
 } from 'react';
+import { extractErrorMessage } from '@wealthview/shared';
 import type { MeResponse, MobileAuthResponse } from '@wealthview/shared';
 import { tokenStorage } from './tokenStorage';
 import { serverUrlStorage } from '../config/serverUrlStorage';
@@ -92,17 +93,6 @@ function reducer(state: AuthState, action: Action): AuthState {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-function extractErrorMessage(err: unknown, fallback: string): string {
-    if (typeof err === 'object' && err !== null) {
-        const response = (err as { response?: { data?: { message?: unknown } } }).response;
-        const message = response?.data?.message;
-        if (typeof message === 'string' && message.length > 0) {
-            return message;
-        }
-    }
-    return fallback;
-}
 
 export function AuthProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
     const [state, dispatch] = useReducer(reducer, initial);
@@ -254,7 +244,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
             } catch (err) {
                 dispatch({
                     type: 'login_failure',
-                    error: extractErrorMessage(err, 'Could not sign in. Check your credentials and try again.'),
+                    error: extractErrorMessage(err),
                 });
             }
         },

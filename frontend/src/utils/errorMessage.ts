@@ -1,24 +1,5 @@
-import type { AxiosError } from 'axios';
-
-interface ApiErrorBody {
-    message?: string;
-    error?: string;
-}
-
-/**
- * Extracts a human-readable error message from an Axios error or generic exception.
- * Prioritises the server's error body, falls back to the HTTP status text,
- * then the JS exception message.
- */
-export function extractErrorMessage(err: unknown): string {
-    if (err && typeof err === 'object' && 'isAxiosError' in err) {
-        const axiosErr = err as AxiosError<ApiErrorBody>;
-        const body = axiosErr.response?.data;
-        if (body?.message) return body.message;
-        if (axiosErr.response) return `Server error: ${axiosErr.response.status} ${axiosErr.response.statusText}`;
-        if (axiosErr.request) return 'No response from server — is the backend running?';
-        return axiosErr.message;
-    }
-    if (err instanceof Error) return err.message;
-    return 'An unexpected error occurred';
-}
+// Re-export from @wealthview/shared keeps the existing import path stable
+// while migrating this utility to the shared workspace package — it's also
+// consumed directly by mobile's AuthContext. New code may import directly
+// from '@wealthview/shared'.
+export { extractErrorMessage } from '@wealthview/shared';

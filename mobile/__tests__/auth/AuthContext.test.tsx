@@ -220,7 +220,11 @@ describe('AuthContext', () => {
     });
 
     it('login() with bad credentials surfaces an error and stays unauthenticated', async () => {
+        // isAxiosError: true mirrors what axios actually attaches to a real rejected
+        // response — extractErrorMessage (shared/src/errorMessage.ts) keys off it to
+        // decide whether to read response.data.message.
         mockAuthApi.login.mockRejectedValue({
+            isAxiosError: true,
             response: {
                 status: 401,
                 data: { error: 'UNAUTHORIZED', message: 'Invalid email or password', status: 401 },
