@@ -50,6 +50,27 @@ final class OptimizationContextBuilder {
     private record IncomeArrays(double[] incomeByYear, double[] taxableIncomeByYear,
                                 double[] surplusTaxByYear) {}
 
+    /**
+     * Task 15: the clock/floor clump that recurs across every quintet assembly site (main pre/post
+     * phase, the stochastic joint phase, each survivor regime) -- always the SAME values within one
+     * {@link #build} call, only ever read, never re-derived per regime. Bundling it removes the
+     * parallel per-method parameter lists ({@code retirementYear, retirementAge, years,
+     * retirementYearOffsetFromBase, essentialFloor, inflationRate, birthYear}) that previously had to
+     * be threaded, in the same order, through every private signature below.
+     */
+    private record RunFrame(int retirementYear, int retirementAge, int years,
+                            int retirementYearOffsetFromBase, double essentialFloor,
+                            double inflationRate, int birthYear) {}
+
+    /**
+     * Task 15: the audit-verified quintet's output for ONE regime -- the income pipeline plus the
+     * co-computed ordinary/LTCG tax tables, dynamic-sequencing bracket ceilings, and rental-income
+     * delta (all year-indexed identically), assembled together by {@link #buildRegime}.
+     */
+    private record RegimeArrays(IncomePipeline pipeline, OrdinaryTaxTable[] ordinaryTables,
+                                LtcgTaxTable[] ltcgTables, @Nullable double[] dsBracketCeilings,
+                                double[] rentalIncomeByYear) {}
+
     OptimizationSetup build(GuardrailOptimizationInput input, RealReturnMatrix matrix) {
         int retirementYear = input.retirementDate().getYear();
         int retirementAge = retirementYear - input.birthYear();
@@ -117,23 +138,28 @@ final class OptimizationContextBuilder {
         // indices above drive every trial unchanged. Task 6 will consume these in the trial loop.
         MortalityDraws mortalityDraws = resolveMortalityDraws(input, retirementYear, years, trialCount);
 
-        // Both-alive income pipeline, spliced with the survivor phase from an in-window first death
-        // (extracted so build() stays under the PMD NPath threshold — the no-regression policy).
-        var income = resolveIncomeArrays(input, household, filingStatus, retirementAge, years,
-                retirementYearOffsetFromBase, essentialFloor, retirementYear, inflationRate);
-        IncomeYearData[] incomeData = income.incomeData();
-        double[] incomeByYear = income.incomeByYear();
-        double[] taxableIncomeByYear = income.taxableIncomeByYear();
-        double[] surplusTaxByYear = income.surplusTaxByYear();
-        double[] rentalAwareTaxableIncome = income.rentalAwareTaxableIncome();
+        // Task 15: the clock/floor clump shared by every quintet assembly site below (main pre/post,
+        // the stochastic joint phase, each survivor regime) -- built once, read everywhere.
+        RunFrame frame = new RunFrame(retirementYear, retirementAge, years, retirementYearOffsetFromBase,
+                essentialFloor, inflationRate, input.birthYear());
 
+        // Both-alive income+tax quintet, spliced with the survivor phase from an in-window first death
+        // (extracted so build() stays under the PMD NPath threshold -- the no-regression policy).
+        RegimeArrays mainRegime = resolveMainRegime(input, household, filingStatus, frame, withdrawalOrder);
+        IncomeYearData[] incomeData = mainRegime.pipeline().incomeData();
+        double[] incomeByYear = mainRegime.pipeline().incomeByYear();
+        double[] taxableIncomeByYear = mainRegime.pipeline().taxableIncomeByYear();
+        double[] surplusTaxByYear = mainRegime.pipeline().surplusTaxByYear();
+        double[] rentalAwareTaxableIncome = mainRegime.pipeline().rentalAwareTaxableIncome();
         // T18a-3: the per-year net rental income contribution, isolated as the delta between the
         // rental-aware base and the crude (non-rental-aware) base taxable income. rentalAwareTaxableIncome
         // floors its aggregate at zero (IncomeProjector#computeRentalAwareTaxable), so this delta can
         // under-count in the rare year where that floor actually clips (a documented approximation;
         // see TaxContext's javadoc) -- acceptable for the NIIT surtax's secondary role in the MC engine.
-        double[] rentalIncomeByYear = computeRentalIncomeDelta(
-                rentalAwareTaxableIncome, taxableIncomeByYear, years);
+        double[] rentalIncomeByYear = mainRegime.rentalIncomeByYear();
+        OrdinaryTaxTable[] ordinaryTaxTables = mainRegime.ordinaryTables();
+        LtcgTaxTable[] ltcgTaxTables = mainRegime.ltcgTables();
+        double[] dsBracketCeilingByYear = mainRegime.dsBracketCeilings();
 
         // Verify essential floor feasibility (constant real), then scale it by the survivor factor
         // from the transition year (household task 6) -- the single builder-side choke point every
@@ -144,18 +170,10 @@ final class OptimizationContextBuilder {
                 confidenceLevel, years, trialCount);
         HouseholdMcResolver.scaleFromTransition(adjustedFloors, transitionIdx, household.survivorFactor(), years);
 
-        // Household task 6: per-year exact tax tables are built MFJ (both-alive) before the transition
-        // and SINGLE from it -- a construction-time filing-status switch, zero hot-loop cost.
-        OrdinaryTaxTable[] ordinaryTaxTables = ordinaryTablesByYear(
-                retirementYear, years, filingStatus, household, input.birthYear());
         TaxContext taxCtx = (initTraditional > 0 || initRoth > 0)
                 ? new TaxContext(initTaxable, initTraditional, initRoth,
                         withdrawalOrder, ordinaryTaxTables, rentalAwareTaxableIncome, rentalIncomeByYear)
                 : null;
-
-        double[] dsBracketCeilingByYear = dsBracketCeilingsByYear(
-                withdrawalOrder, input.dynamicSequencingBracketRate(),
-                years, retirementYear, filingStatus, household);
 
         double portfolioFloor = input.portfolioFloor() != null
                 ? input.portfolioFloor().doubleValue() : 0.0;
@@ -168,8 +186,6 @@ final class OptimizationContextBuilder {
         //  - dividendYield comes from the scenario's params_json (same field the deterministic engine
         //    reads via ScenarioParamsParser.dividendYield), falling back to the same default when unset.
         double initTaxableBasis = sumBasisByType(input.accounts(), PoolStrategy.POOL_TAXABLE);
-        LtcgTaxTable[] ltcgTaxTables = ltcgTablesByYear(
-                retirementYear, years, filingStatus, inflationRate, household, input.birthYear());
         double dividendYield = resolveDividendYield(input);
         double returnMean = resolveReturnMean(input, inflationRate, feeRate, matrix);
         // Audit C1: splits the MC taxable pool's yield the same way PoolStrategy.MultiPool does --
@@ -184,9 +200,8 @@ final class OptimizationContextBuilder {
         // (both-alive) arrays + both survivor regimes for the SEPARATE evaluation pass. This is purely
         // additive: the recommendation flow above is untouched, so toggle-off / single-person / fixed-
         // death runs are byte-identical (stochasticEval stays null there).
-        StochasticEvalArrays stochasticEval = buildStochasticEvalArrays(input, mortalityDraws,
-                retirementYear, retirementAge, years, retirementYearOffsetFromBase, essentialFloor,
-                inflationRate, filingStatus, withdrawalOrder, portfolioPaths, confidenceLevel, trialCount);
+        StochasticEvalArrays stochasticEval = buildStochasticEvalArrays(input, mortalityDraws, frame,
+                filingStatus, withdrawalOrder, portfolioPaths, confidenceLevel, trialCount);
 
         return new OptimizationSetup(
                 new PortfolioSetup(initTaxable, initTraditional, initRoth,
@@ -287,49 +302,71 @@ final class OptimizationContextBuilder {
     }
 
     /**
-     * Household task 6: resolves the per-year income arrays — the both-alive pipeline (original
+     * Task 15: resolves the main (fixed-death) flow's regime -- the both-alive pipeline (original
      * sources, configured filing status), spliced with the survivor phase (keep-larger SS +
      * survivor_percent sources, SINGLE filing status) from an in-window first death. Single-person /
-     * no-in-window-transition runs return the both-alive pipeline unchanged (the byte-identical
-     * anchor). Extracted from {@link #build} to keep its NPath complexity under the PMD threshold.
+     * no-in-window-transition runs return the both-alive regime unchanged (the byte-identical
+     * anchor). Both phases share {@code household.context()} -- only {@code sources}/{@code status}
+     * differ pre vs. post. Extracted from {@link #build} to keep its NPath complexity under the PMD
+     * threshold.
      */
-    private IncomePipeline resolveIncomeArrays(GuardrailOptimizationInput input,
-            HouseholdMcResolver.Resolved household, FilingStatus filingStatus, int retirementAge,
-            int years, int retirementYearOffsetFromBase, double essentialFloor, int retirementYear,
-            double inflationRate) {
-        var income = computeIncomePipeline(input.incomeSources(), filingStatus, retirementAge, years,
-                retirementYearOffsetFromBase, essentialFloor, retirementYear, input.birthYear(), inflationRate,
-                household.context());
+    private RegimeArrays resolveMainRegime(GuardrailOptimizationInput input,
+            HouseholdMcResolver.Resolved household, FilingStatus filingStatus, RunFrame frame,
+            String withdrawalOrder) {
+        RegimeArrays pre = buildRegime(input.incomeSources(), filingStatus, household.context(), frame,
+                withdrawalOrder, input.dynamicSequencingBracketRate());
         int transitionIdx = household.inWindowTransitionIdx();
         if (transitionIdx < 0) {
-            return income;
+            return pre;
         }
-        var survivorIncome = computeIncomePipeline(household.survivorSources(), household.postStatus(),
-                retirementAge, years, retirementYearOffsetFromBase, essentialFloor, retirementYear,
-                input.birthYear(), inflationRate, household.context());
-        return spliceIncome(income, survivorIncome, transitionIdx);
+        RegimeArrays post = buildRegime(household.survivorSources(), household.postStatus(),
+                household.context(), frame, withdrawalOrder, input.dynamicSequencingBracketRate());
+        return spliceRegime(pre, post, transitionIdx);
+    }
+
+    /**
+     * Task 15: the shared factory for the audit-verified quintet {@code computeIncomePipeline} ->
+     * {@link OrdinaryTaxTable#computeAll} -> {@link LtcgTaxTable#computeAll} ->
+     * {@link #computeDsBracketCeilings} -> {@link #computeRentalIncomeDelta}. Every assembly site
+     * (main pre/post phase, the stochastic joint phase, each survivor regime) calls this with the
+     * SAME {@code frame} (the clock/floor clump never varies within one {@link #build} run) and the
+     * SAME {@code withdrawalOrder}/{@code dsBracketRate} (also run-invariant, widened onto this
+     * signature rather than approximated away -- {@link #computeDsBracketCeilings} needs them and no
+     * site's value ever differs from another's); only {@code sources}, {@code status}, and
+     * {@code household} vary per call.
+     */
+    private RegimeArrays buildRegime(List<ProjectionIncomeSourceInput> sources, FilingStatus status,
+            @Nullable HouseholdContext household, RunFrame frame, String withdrawalOrder,
+            @Nullable BigDecimal dsBracketRate) {
+        var pipeline = computeIncomePipeline(sources, status, frame, household);
+        OrdinaryTaxTable[] ordinary = OrdinaryTaxTable.computeAll(
+                taxCalculator, frame.retirementYear(), frame.years(), status, frame.birthYear(), household);
+        LtcgTaxTable[] ltcg = LtcgTaxTable.computeAll(capitalGainsTaxCalculator, taxCalculator,
+                frame.retirementYear(), frame.years(), status, frame.inflationRate(), frame.birthYear(), household);
+        double[] ds = computeDsBracketCeilings(
+                withdrawalOrder, dsBracketRate, frame.years(), frame.retirementYear(), status);
+        double[] rental = computeRentalIncomeDelta(
+                pipeline.rentalAwareTaxableIncome(), pipeline.taxableIncomeByYear(), frame.years());
+        return new RegimeArrays(pipeline, ordinary, ltcg, ds, rental);
     }
 
     /** Household task 6 + 8: the full per-year income pipeline (deterministic income → audit-B2
      * Social Security taxable share → income/taxable/surplus arrays → rental-aware taxable) for ONE
-     * phase (a source list + filing status). Called once for the both-alive phase and, for an
-     * in-window first death, again for the survivor phase; {@link #spliceIncome} joins them.
-     * {@code household} (task 8, T7 gap) threads the same owner-age income-window resolution the
-     * deterministic engine's {@code IncomeSourceProcessor} already applies into every {@link
-     * IncomeProjector} precompute call below, so a spouse-owned age-gated source activates at the
-     * SPOUSE's age in the MC engine too — {@code null} for a single-person run, byte-identical to the
-     * pre-task-8 uniform-age precompute. */
+     * phase (a source list + filing status). Called once per regime by {@link #buildRegime}; {@link
+     * #spliceRegime} joins a pre/post pair. {@code household} (task 8, T7 gap) threads the same
+     * owner-age income-window resolution the deterministic engine's {@code IncomeSourceProcessor}
+     * already applies into every {@link IncomeProjector} precompute call below, so a spouse-owned
+     * age-gated source activates at the SPOUSE's age in the MC engine too — {@code null} for a
+     * single-person run, byte-identical to the pre-task-8 uniform-age precompute. */
     private IncomePipeline computeIncomePipeline(List<ProjectionIncomeSourceInput> sources,
-            FilingStatus status, int retirementAge, int years, int retirementYearOffsetFromBase,
-            double essentialFloor, int retirementYear, int birthYear, double inflationRate,
-            @Nullable HouseholdContext household) {
+            FilingStatus status, RunFrame frame, @Nullable HouseholdContext household) {
         // ONE clock/household context for all three precomputes — their arrays are combined
         // below, so sharing the context is what keeps their activation windows in lockstep.
-        var ctx = new IncomeProjector.Context(retirementAge, years, retirementYearOffsetFromBase,
-                inflationRate, birthYear, household);
+        var ctx = new IncomeProjector.Context(frame.retirementAge(), frame.years(),
+                frame.retirementYearOffsetFromBase(), frame.inflationRate(), frame.birthYear(), household);
         IncomeYearData[] incomeData = IncomeProjector.computeDeterministic(sources, ctx);
-        incomeData = applySocialSecurityTaxableShare(incomeData, sources, essentialFloor, status, ctx);
-        var arrays = computeIncomeArrays(incomeData, years, retirementYear, status);
+        incomeData = applySocialSecurityTaxableShare(incomeData, sources, frame.essentialFloor(), status, ctx);
+        var arrays = computeIncomeArrays(incomeData, frame.years(), frame.retirementYear(), status);
         double[] rentalAware = IncomeProjector.computeRentalAwareTaxable(
                 arrays.taxableIncomeByYear(), sources, ctx);
         return new IncomePipeline(incomeData, arrays.incomeByYear(), arrays.taxableIncomeByYear(),
@@ -340,50 +377,34 @@ final class OptimizationContextBuilder {
     private record IncomePipeline(IncomeYearData[] incomeData, double[] incomeByYear,
             double[] taxableIncomeByYear, double[] surplusTaxByYear, double[] rentalAwareTaxableIncome) {}
 
-    /** Household task 6: splices the survivor-phase income arrays into the both-alive arrays from the
-     * transition year forward (each array year-indexed identically). */
-    private static IncomePipeline spliceIncome(IncomePipeline pre, IncomePipeline post, int fromIdx) {
-        return new IncomePipeline(
-                spliceObjects(pre.incomeData(), post.incomeData(), fromIdx),
-                spliceDoubles(pre.incomeByYear(), post.incomeByYear(), fromIdx),
-                spliceDoubles(pre.taxableIncomeByYear(), post.taxableIncomeByYear(), fromIdx),
-                spliceDoubles(pre.surplusTaxByYear(), post.surplusTaxByYear(), fromIdx),
-                spliceDoubles(pre.rentalAwareTaxableIncome(), post.rentalAwareTaxableIncome(), fromIdx));
-    }
-
-    /** Household task 6 + 7: per-year ordinary tax tables — the both-alive filing status before the
-     * transition, SINGLE from it (task 6), each built off the household's per-year filer age(s) so
-     * the age-65 deduction adder applies per qualifying person while both spouses are alive and
-     * filing jointly (task 7, spec §4 step 6 — see {@link OrdinaryTaxTable#computeAll(
-     * FederalTaxCalculator, int, int, FilingStatus, Integer, com.wealthview.core.projection.
-     * household.HouseholdContext)}). Single-person / no in-window transition returns the pre-status
-     * tables unchanged (byte-identical anchor). */
-    private OrdinaryTaxTable[] ordinaryTablesByYear(int retirementYear, int years,
-            FilingStatus preStatus, HouseholdMcResolver.Resolved household, int birthYear) {
-        OrdinaryTaxTable[] pre = OrdinaryTaxTable.computeAll(
-                taxCalculator, retirementYear, years, preStatus, birthYear, household.context());
-        int idx = household.inWindowTransitionIdx();
-        if (idx < 0) {
-            return pre;
-        }
-        OrdinaryTaxTable[] post = OrdinaryTaxTable.computeAll(
-                taxCalculator, retirementYear, years, household.postStatus(), birthYear, household.context());
-        return spliceObjects(pre, post, idx);
-    }
-
-    /** Household task 6 + 7: per-year LTCG tables spliced pre/post the transition, household-aware
-     * per-person deduction (see {@link #ordinaryTablesByYear}). */
-    private LtcgTaxTable[] ltcgTablesByYear(int retirementYear, int years, FilingStatus preStatus,
-            double inflationRate, HouseholdMcResolver.Resolved household, int birthYear) {
-        LtcgTaxTable[] pre = LtcgTaxTable.computeAll(capitalGainsTaxCalculator, taxCalculator, retirementYear,
-                years, preStatus, inflationRate, birthYear, household.context());
-        int idx = household.inWindowTransitionIdx();
-        if (idx < 0) {
-            return pre;
-        }
-        LtcgTaxTable[] post = LtcgTaxTable.computeAll(capitalGainsTaxCalculator, taxCalculator, retirementYear,
-                years, household.postStatus(), inflationRate, birthYear, household.context());
-        return spliceObjects(pre, post, idx);
+    /**
+     * Task 15: splices two regimes' worth of quintet output at {@code fromIdx}, field by field, via
+     * {@link #spliceByTransition}. Generalizes the household-task-6 income splice to the whole
+     * {@link RegimeArrays} bundle (income pipeline + ordinary/LTCG tables + DS ceilings + rental
+     * delta) so main-flow assembly goes through the same factory as every other regime. {@code
+     * dsBracketCeilings} null-ness is regime-invariant in practice (it depends only on run-constant
+     * inputs — see {@link #computeDsBracketCeilings} — so {@code pre} and {@code post} always agree),
+     * but both sides are still null-checked explicitly (not just {@code pre}) so the nullness is
+     * verifiable locally rather than relying on that cross-call invariant.
+     */
+    private static RegimeArrays spliceRegime(RegimeArrays pre, RegimeArrays post, int fromIdx) {
+        IncomePipeline prePipeline = pre.pipeline();
+        IncomePipeline postPipeline = post.pipeline();
+        IncomePipeline splicedPipeline = new IncomePipeline(
+                spliceByTransition(prePipeline.incomeData(), postPipeline.incomeData(), fromIdx),
+                spliceByTransition(prePipeline.incomeByYear(), postPipeline.incomeByYear(), fromIdx),
+                spliceByTransition(prePipeline.taxableIncomeByYear(), postPipeline.taxableIncomeByYear(), fromIdx),
+                spliceByTransition(prePipeline.surplusTaxByYear(), postPipeline.surplusTaxByYear(), fromIdx),
+                spliceByTransition(
+                        prePipeline.rentalAwareTaxableIncome(), postPipeline.rentalAwareTaxableIncome(), fromIdx));
+        double[] preDs = pre.dsBracketCeilings();
+        double[] postDs = post.dsBracketCeilings();
+        double[] splicedDs = preDs == null || postDs == null ? null : spliceByTransition(preDs, postDs, fromIdx);
+        return new RegimeArrays(splicedPipeline,
+                spliceByTransition(pre.ordinaryTables(), post.ordinaryTables(), fromIdx),
+                spliceByTransition(pre.ltcgTables(), post.ltcgTables(), fromIdx),
+                splicedDs,
+                spliceByTransition(pre.rentalIncomeByYear(), post.rentalIncomeByYear(), fromIdx));
     }
 
     /**
@@ -404,14 +425,12 @@ final class OptimizationContextBuilder {
      */
     @Nullable
     private StochasticEvalArrays buildStochasticEvalArrays(GuardrailOptimizationInput input,
-            @Nullable MortalityDraws mortalityDraws, int retirementYear, int retirementAge, int years,
-            int retirementYearOffsetFromBase, double essentialFloor, double inflationRate,
-            FilingStatus filingStatus, String withdrawalOrder, double[][] portfolioPaths,
-            double confidenceLevel, int trialCount) {
+            @Nullable MortalityDraws mortalityDraws, RunFrame frame, FilingStatus filingStatus,
+            String withdrawalOrder, double[][] portfolioPaths, double confidenceLevel, int trialCount) {
         if (mortalityDraws == null) {
             return null;
         }
-        int primaryBirthYear = input.birthYear();
+        int primaryBirthYear = frame.birthYear();
         // Non-null by the mortalityDraws gate in build() (stochastic mortality requires a spouse); the
         // requireNonNull makes that contract explicit for the unboxing here.
         int spouseBirthYear = Objects.requireNonNull(
@@ -419,65 +438,48 @@ final class OptimizationContextBuilder {
         int horizonEndYear = primaryBirthYear + input.endAge();
 
         HouseholdContext jointCtx = bothAliveContext(primaryBirthYear, spouseBirthYear, horizonEndYear);
-        var jointPipeline = computeIncomePipeline(input.incomeSources(), filingStatus, retirementAge, years,
-                retirementYearOffsetFromBase, essentialFloor, retirementYear, primaryBirthYear, inflationRate,
-                jointCtx);
-        OrdinaryTaxTable[] jointOrdinary = OrdinaryTaxTable.computeAll(
-                taxCalculator, retirementYear, years, filingStatus, primaryBirthYear, jointCtx);
-        LtcgTaxTable[] jointLtcg = LtcgTaxTable.computeAll(capitalGainsTaxCalculator, taxCalculator,
-                retirementYear, years, filingStatus, inflationRate, primaryBirthYear, jointCtx);
-        double[] jointDs = computeDsBracketCeilings(
-                withdrawalOrder, input.dynamicSequencingBracketRate(), years, retirementYear, filingStatus);
-        double[] jointRental = computeRentalIncomeDelta(
-                jointPipeline.rentalAwareTaxableIncome(), jointPipeline.taxableIncomeByYear(), years);
+        RegimeArrays joint = buildRegime(input.incomeSources(), filingStatus, jointCtx, frame,
+                withdrawalOrder, input.dynamicSequencingBracketRate());
         // Essential floor UNSCALED by the survivor factor -- the per-trial splice re-applies it.
         double[] jointFloors = SustainabilitySearch.verifyEssentialFloor(portfolioPaths,
-                jointPipeline.incomeByYear(), essentialFloor, confidenceLevel, years, trialCount);
+                joint.pipeline().incomeByYear(), frame.essentialFloor(), confidenceLevel, frame.years(), trialCount);
 
         var regimes = new TrialSimulator.SurvivorRegime[2];
         regimes[TrialSimulator.PRIMARY_SURVIVES] = buildSurvivorRegime(input, PersonId.PRIMARY,
-                primaryBirthYear, spouseBirthYear, retirementYear, retirementAge, years,
-                retirementYearOffsetFromBase, essentialFloor, inflationRate, withdrawalOrder, horizonEndYear);
+                spouseBirthYear, frame, withdrawalOrder, horizonEndYear);
         regimes[TrialSimulator.SPOUSE_SURVIVES] = buildSurvivorRegime(input, PersonId.SPOUSE,
-                primaryBirthYear, spouseBirthYear, retirementYear, retirementAge, years,
-                retirementYearOffsetFromBase, essentialFloor, inflationRate, withdrawalOrder, horizonEndYear);
+                spouseBirthYear, frame, withdrawalOrder, horizonEndYear);
 
-        return new StochasticEvalArrays(jointPipeline.incomeByYear(), jointPipeline.surplusTaxByYear(),
-                jointFloors, jointPipeline.rentalAwareTaxableIncome(), jointOrdinary, jointLtcg,
-                jointDs, jointRental, regimes);
+        return new StochasticEvalArrays(joint.pipeline().incomeByYear(), joint.pipeline().surplusTaxByYear(),
+                jointFloors, joint.pipeline().rentalAwareTaxableIncome(), joint.ordinaryTables(),
+                joint.ltcgTables(), joint.dsBracketCeilings(), joint.rentalIncomeByYear(), regimes);
     }
 
     /**
      * Sub-project B (stochastic mortality), task 6: one survivor regime, built SINGLE for the explicit
      * {@code survivor} identity — that survivor's keep-larger-SS + survivor-% income (via the
      * transition-year-invariant {@link SurvivorIncomeAdjuster#adjust(java.util.List, PersonId, int, int,
-     * java.math.BigDecimal)}, computed once at {@code retirementYear}) and SINGLE-filer tax tables at
-     * that survivor's own age (via {@link #survivorOnlyContext}, in which the OTHER member is dead
-     * before the modeled window, so {@code filerAgeIn}/{@code age65QualifyingCount} return the
-     * survivor's age for every year). {@code birthYear} stays the primary's — mirroring the fixed-death
-     * survivor pipeline's own convention — because the context supplies the per-owner ages.
+     * java.math.BigDecimal)}, computed once at {@code frame.retirementYear()}) and SINGLE-filer tax
+     * tables at that survivor's own age (via {@link #survivorOnlyContext}, in which the OTHER member is
+     * dead before the modeled window, so {@code filerAgeIn}/{@code age65QualifyingCount} return the
+     * survivor's age for every year). {@code frame.birthYear()} stays the primary's — mirroring the
+     * fixed-death survivor pipeline's own convention — because the context supplies the per-owner ages.
      */
     private TrialSimulator.SurvivorRegime buildSurvivorRegime(GuardrailOptimizationInput input,
-            PersonId survivor, int primaryBirthYear, int spouseBirthYear, int retirementYear,
-            int retirementAge, int years, int retirementYearOffsetFromBase, double essentialFloor,
-            double inflationRate, String withdrawalOrder, int horizonEndYear) {
+            PersonId survivor, int spouseBirthYear, RunFrame frame, String withdrawalOrder,
+            int horizonEndYear) {
+        int primaryBirthYear = frame.birthYear();
         HouseholdContext ctx = survivorOnlyContext(
-                survivor, primaryBirthYear, spouseBirthYear, retirementYear, horizonEndYear);
+                survivor, primaryBirthYear, spouseBirthYear, frame.retirementYear(), horizonEndYear);
         var sources = SurvivorIncomeAdjuster.adjust(
-                input.incomeSources(), survivor, retirementYear, input.baseYear(),
-                BigDecimal.valueOf(inflationRate));
-        var pipeline = computeIncomePipeline(sources, FilingStatus.SINGLE, retirementAge, years,
-                retirementYearOffsetFromBase, essentialFloor, retirementYear, primaryBirthYear, inflationRate, ctx);
-        OrdinaryTaxTable[] ordinary = OrdinaryTaxTable.computeAll(
-                taxCalculator, retirementYear, years, FilingStatus.SINGLE, primaryBirthYear, ctx);
-        LtcgTaxTable[] ltcg = LtcgTaxTable.computeAll(capitalGainsTaxCalculator, taxCalculator,
-                retirementYear, years, FilingStatus.SINGLE, inflationRate, primaryBirthYear, ctx);
-        double[] ds = computeDsBracketCeilings(
-                withdrawalOrder, input.dynamicSequencingBracketRate(), years, retirementYear, FilingStatus.SINGLE);
-        double[] rental = computeRentalIncomeDelta(
-                pipeline.rentalAwareTaxableIncome(), pipeline.taxableIncomeByYear(), years);
-        return new TrialSimulator.SurvivorRegime(pipeline.incomeByYear(), pipeline.surplusTaxByYear(),
-                pipeline.rentalAwareTaxableIncome(), ordinary, ltcg, ds, rental);
+                input.incomeSources(), survivor, frame.retirementYear(), input.baseYear(),
+                BigDecimal.valueOf(frame.inflationRate()));
+        RegimeArrays regime = buildRegime(sources, FilingStatus.SINGLE, ctx, frame, withdrawalOrder,
+                input.dynamicSequencingBracketRate());
+        return new TrialSimulator.SurvivorRegime(regime.pipeline().incomeByYear(),
+                regime.pipeline().surplusTaxByYear(), regime.pipeline().rentalAwareTaxableIncome(),
+                regime.ordinaryTables(), regime.ltcgTables(), regime.dsBracketCeilings(),
+                regime.rentalIncomeByYear());
     }
 
     /** Task 6: a context in which BOTH spouses outlive the horizon, so every modeled year is both-alive
@@ -505,30 +507,18 @@ final class OptimizationContextBuilder {
                 horizonEndYear);
     }
 
-    /** Household task 6: per-year dynamic-sequencing bracket ceilings spliced pre/post the transition.
-     * Returns null (no DS ceilings) exactly when the pre-status computation does — callers null-check it. */
-    private double[] dsBracketCeilingsByYear(String withdrawalOrder, BigDecimal dynamicSequencingBracketRate,
-            int years, int retirementYear, FilingStatus preStatus, HouseholdMcResolver.Resolved household) {
-        double[] pre = computeDsBracketCeilings(
-                withdrawalOrder, dynamicSequencingBracketRate, years, retirementYear, preStatus);
-        int idx = household.inWindowTransitionIdx();
-        if (idx < 0 || pre == null) {
-            return pre;
-        }
-        double[] post = computeDsBracketCeilings(
-                withdrawalOrder, dynamicSequencingBracketRate, years, retirementYear, household.postStatus());
-        return spliceDoubles(pre, post, idx);
-    }
-
-    /** Returns a copy of {@code pre} with {@code [fromIdx, len)} taken from {@code post}. */
-    private static <T> T[] spliceObjects(T[] pre, T[] post, int fromIdx) {
+    /** Returns a copy of {@code pre} with {@code [fromIdx, len)} taken from {@code post} -- the one
+     * splice primitive shared by every pre/post transition (income pipeline, tax tables,
+     * dynamic-sequencing ceilings, rental delta). Task 15: replaces the former {@code spliceObjects}. */
+    private static <T> T[] spliceByTransition(T[] pre, T[] post, int fromIdx) {
         T[] out = pre.clone();
         System.arraycopy(post, fromIdx, out, fromIdx, out.length - fromIdx);
         return out;
     }
 
-    /** Returns a copy of {@code pre} with {@code [fromIdx, len)} taken from {@code post}. */
-    private static double[] spliceDoubles(double[] pre, double[] post, int fromIdx) {
+    /** The primitive-array overload of {@link #spliceByTransition(Object[], Object[], int)}. Task 15:
+     * replaces the former {@code spliceDoubles}. */
+    private static double[] spliceByTransition(double[] pre, double[] post, int fromIdx) {
         double[] out = pre.clone();
         System.arraycopy(post, fromIdx, out, fromIdx, out.length - fromIdx);
         return out;

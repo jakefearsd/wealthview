@@ -62,9 +62,10 @@ final class HouseholdMcResolver {
      * @param postStatus the filing status from the transition year (SINGLE) — {@code preStatus} when
      *        there is no in-window transition
      * @param context household task 7 (spec §4 step 6): the resolved two-person
-     *        {@link HouseholdContext}, threaded into the per-year exact tax tables
-     *        ({@link OptimizationContextBuilder#ordinaryTablesByYear}/{@code ltcgTablesByYear}) for
-     *        the per-person age-65 deduction. {@code null} for a single-person input.
+     *        {@link HouseholdContext}, threaded into the per-year exact tax tables (task 15: via
+     *        {@code OptimizationContextBuilder#buildRegime}'s {@code OrdinaryTaxTable.computeAll}/
+     *        {@code LtcgTaxTable.computeAll} calls) for the per-person age-65 deduction. {@code null}
+     *        for a single-person input.
      */
     record Resolved(
             @Nullable TrialSimulator.HouseholdSim sim,
