@@ -6,6 +6,7 @@ import type { Scenario, GuardrailPhase, GuardrailProfileResponse, GuardrailOptim
 import { useApiMutation } from '../hooks/useApiMutation';
 import { cardStyle, inputStyle } from '../utils/styles';
 import { formatWholeCurrency } from '../utils/format';
+import { defaultOptimizerConfig, fromProfile, toRequest, type OptimizerConfig, type RiskTolerance } from '../utils/optimizerConfig';
 import LoadingState from '../components/LoadingState';
 import CurrencyInput from '../components/CurrencyInput';
 import FormField from '../components/FormField';
@@ -14,7 +15,6 @@ import OptimizerResultsView from '../components/OptimizerResultsView';
 import Button from '../components/Button';
 
 type OptimizerState = 'configure' | 'running' | 'results';
-type RiskTolerance = 'conservative' | 'moderate' | 'aggressive';
 
 export interface PhaseDiagnostic {
     phaseName: string;
@@ -166,45 +166,17 @@ export default function SpendingOptimizerPage() {
     const [state, setState] = useState<OptimizerState>('configure');
     const [result, setResult] = useState<GuardrailProfileResponse | null>(null);
 
-    // Main parameters
-    const [name, setName] = useState('Optimized Spending Plan');
-    const [essentialFloor, setEssentialFloor] = useState(30000);
-    const [terminalTarget, setTerminalTarget] = useState(0);
-    const [portfolioFloor, setPortfolioFloor] = useState(0);
-    const [riskTolerance, setRiskTolerance] = useState<RiskTolerance>('moderate');
-    const [spendingFlexibility, setSpendingFlexibility] = useState(5);
-    const [phaseBlendYears, setPhaseBlendYears] = useState(1);
-
-    // Cash buffer parameters
-    const [cashReserveYears, setCashReserveYears] = useState(2);
-    const [cashReturnRate, setCashReturnRate] = useState(4);
-
-    // Roth conversion parameters
-    const [optimizeConversions, setOptimizeConversions] = useState(false);
-    const [conversionBracketRate, setConversionBracketRate] = useState(0.22);
-    const [rmdTargetBracketRate, setRmdTargetBracketRate] = useState(0.12);
-    const [exhaustionBuffer, setExhaustionBuffer] = useState(5);
-    const [rmdBracketHeadroom, setRmdBracketHeadroom] = useState(10);
-
-    // T24: gates the sustainability search on the with-rules success metric instead of the
-    // no-adaptation one. Defaults to checked (recommended) when no profile exists yet. When an
-    // existing profile loads, this is hydrated from the derived `gated_on` (the response doesn't
-    // echo the raw toggle, but `gated_on` names the gate that actually certified the persisted
-    // numbers), so a deliberately-conservative profile isn't silently flipped to with-rules
-    // gating just because the checkbox reset to its default before a re-run.
-    const [gateOnAdaptiveRules, setGateOnAdaptiveRules] = useState(true);
-
-    // Advanced parameters (collapsed by default)
+    // Advanced parameters section is collapsed by default; not part of the wire config itself.
     const [showAdvanced, setShowAdvanced] = useState(false);
-    const [trialCount, setTrialCount] = useState(5000);
-    const [confidenceLevel, setConfidenceLevel] = useState<number | null>(null);
-    const [dynSeqBracketRate, setDynSeqBracketRate] = useState<number | null>(null);
 
-    const [phases, setPhases] = useState<GuardrailPhase[]>([
-        { name: 'Early retirement', start_age: 62, end_age: 72, priority_weight: 3, target_spending: 80000 },
-        { name: 'Mid retirement', start_age: 73, end_age: 82, priority_weight: 2, target_spending: 60000 },
-        { name: 'Late retirement', start_age: 83, end_age: null, priority_weight: 1, target_spending: 45000 },
-    ]);
+    // Every configure-form field that round-trips to/from the optimization API. See
+    // optimizerConfig.ts for the display-unit conventions and the fromProfile/toRequest
+    // conversions (including the T24 gate-on-adaptive-rules hydration from `gated_on`).
+    const [config, setConfig] = useState<OptimizerConfig>(defaultOptimizerConfig());
+
+    const updateConfig = <K extends keyof OptimizerConfig>(key: K, value: OptimizerConfig[K]) => {
+        setConfig(current => ({ ...current, [key]: value }));
+    };
 
     useEffect(() => {
         if (!id) return;
@@ -213,40 +185,7 @@ export default function SpendingOptimizerPage() {
             if (profile) {
                 setResult(profile);
                 setState('results');
-                setName(profile.name);
-                setEssentialFloor(profile.essential_floor);
-                setTerminalTarget(profile.terminal_balance_target);
-                setTrialCount(profile.trial_count);
-                setCashReserveYears(profile.cash_reserve_years ?? 2);
-                setCashReturnRate(
-                    profile.cash_return_rate != null
-                        ? profile.cash_return_rate * 100
-                        : 4
-                );
-                setPortfolioFloor(profile.portfolio_floor ?? 0);
-                setSpendingFlexibility(
-                    profile.max_annual_adjustment_rate != null
-                        ? profile.max_annual_adjustment_rate * 100
-                        : 5
-                );
-                setPhaseBlendYears(profile.phase_blend_years ?? 1);
-                if (profile.risk_tolerance) {
-                    setRiskTolerance(profile.risk_tolerance as RiskTolerance);
-                }
-                setGateOnAdaptiveRules(profile.gated_on === 'with_rules');
-                if (profile.phases.length > 0) {
-                    setPhases(profile.phases);
-                }
-                // Restore Roth conversion strategy inputs
-                if (profile.conversion_schedule) {
-                    setOptimizeConversions(true);
-                    setConversionBracketRate(profile.conversion_schedule.conversion_bracket_rate);
-                    setRmdTargetBracketRate(profile.conversion_schedule.rmd_target_bracket_rate);
-                    setExhaustionBuffer(profile.conversion_schedule.traditional_exhaustion_buffer);
-                    if (profile.conversion_schedule.rmd_bracket_headroom != null) {
-                        setRmdBracketHeadroom(Math.round(profile.conversion_schedule.rmd_bracket_headroom * 100));
-                    }
-                }
+                setConfig(fromProfile(profile));
             }
         });
     }, [id]);
@@ -280,31 +219,7 @@ export default function SpendingOptimizerPage() {
     const handleOptimize = async () => {
         if (!id) return;
         setState('running');
-        const request: GuardrailOptimizationRequest = {
-            scenario_id: id,
-            name,
-            essential_floor: essentialFloor,
-            terminal_balance_target: terminalTarget,
-            trial_count: trialCount,
-            cash_reserve_years: cashReserveYears,
-            cash_return_rate: cashReturnRate / 100,
-            phases,
-            portfolio_floor: portfolioFloor,
-            max_annual_adjustment_rate: spendingFlexibility / 100,
-            phase_blend_years: phaseBlendYears,
-            risk_tolerance: riskTolerance,
-            gate_on_adaptive_rules: gateOnAdaptiveRules,
-            ...(confidenceLevel != null ? { confidence_level: confidenceLevel / 100 } : {}),
-            ...(dynSeqBracketRate != null ? { dynamic_sequencing_bracket_rate: dynSeqBracketRate / 100 } : {}),
-            ...(optimizeConversions ? {
-                optimize_conversions: true,
-                conversion_bracket_rate: conversionBracketRate,
-                rmd_target_bracket_rate: rmdTargetBracketRate,
-                traditional_exhaustion_buffer: exhaustionBuffer,
-                rmd_bracket_headroom: rmdBracketHeadroom / 100,
-            } : {}),
-        };
-        await optimize.mutate(request);
+        await optimize.mutate(toRequest(config, id));
     };
 
     const handleReoptimize = async () => {
@@ -405,16 +320,16 @@ export default function SpendingOptimizerPage() {
                         <h3 style={{ marginBottom: '1rem' }}>Optimization Parameters</h3>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                             <FormField label="Profile Name">
-                                <input style={inputStyle} type="text" value={name}
-                                    onChange={e => setName(e.target.value)} />
+                                <input style={inputStyle} type="text" value={config.name}
+                                    onChange={e => updateConfig('name', e.target.value)} />
                             </FormField>
                             <FormField label="Essential Spending Floor (per year)">
                                 <div style={adornmentWrapStyle}>
                                     <span style={adornmentStyle}>$</span>
                                     <CurrencyInput
                                         style={adornedInputStyle}
-                                        value={essentialFloor || ''}
-                                        onChange={v => setEssentialFloor(v === '' ? 0 : Number(v))}
+                                        value={config.essentialFloor || ''}
+                                        onChange={v => updateConfig('essentialFloor', v === '' ? 0 : Number(v))}
                                     />
                                 </div>
                             </FormField>
@@ -423,8 +338,8 @@ export default function SpendingOptimizerPage() {
                                     <span style={adornmentStyle}>$</span>
                                     <CurrencyInput
                                         style={adornedInputStyle}
-                                        value={terminalTarget || ''}
-                                        onChange={v => setTerminalTarget(v === '' ? 0 : Number(v))}
+                                        value={config.terminalTarget || ''}
+                                        onChange={v => updateConfig('terminalTarget', v === '' ? 0 : Number(v))}
                                     />
                                 </div>
                             </FormField>
@@ -433,21 +348,21 @@ export default function SpendingOptimizerPage() {
                                     <span style={adornmentStyle}>$</span>
                                     <CurrencyInput
                                         style={adornedInputStyle}
-                                        value={portfolioFloor || ''}
-                                        onChange={v => setPortfolioFloor(v === '' ? 0 : Number(v))}
+                                        value={config.portfolioFloor || ''}
+                                        onChange={v => updateConfig('portfolioFloor', v === '' ? 0 : Number(v))}
                                     />
                                 </div>
                             </FormField>
                             <FormField label="Risk Tolerance" helpText={
-                                riskTolerance === 'conservative' ? '95% confidence \u2014 Very likely sustainable without adjustments'
-                                : riskTolerance === 'moderate' ? '90% confidence \u2014 Sustainable with occasional adjustments in bad markets'
+                                config.riskTolerance === 'conservative' ? '95% confidence \u2014 Very likely sustainable without adjustments'
+                                : config.riskTolerance === 'moderate' ? '90% confidence \u2014 Sustainable with occasional adjustments in bad markets'
                                 : '80% confidence \u2014 Expected spending, requires active management in downturns'
                             }>
                                 <div style={pillContainerStyle}>
                                     {(['conservative', 'moderate', 'aggressive'] as RiskTolerance[]).map(level => (
                                         <button key={level} type="button"
-                                            onClick={() => setRiskTolerance(level)}
-                                            style={pillStyle(riskTolerance === level)}>
+                                            onClick={() => updateConfig('riskTolerance', level)}
+                                            style={pillStyle(config.riskTolerance === level)}>
                                             {level}
                                         </button>
                                     ))}
@@ -456,8 +371,8 @@ export default function SpendingOptimizerPage() {
                             <FormField label="Spending Flexibility" helpText="Maximum annual spending change">
                                 <div style={adornmentWrapStyle}>
                                     <input style={adornedInputStyle} type="number" step="1" min="0" max="50"
-                                        value={spendingFlexibility || ''}
-                                        onChange={e => setSpendingFlexibility(Number(e.target.value))} />
+                                        value={config.spendingFlexibilityPct || ''}
+                                        onChange={e => updateConfig('spendingFlexibilityPct', Number(e.target.value))} />
                                     <span style={adornmentSuffixStyle}>%/yr</span>
                                 </div>
                             </FormField>
@@ -465,8 +380,8 @@ export default function SpendingOptimizerPage() {
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
                             <FormField label="Phase Blending" helpText="Smooth transitions between life phases">
-                                <select style={selectStyle} value={phaseBlendYears}
-                                    onChange={e => setPhaseBlendYears(Number(e.target.value))}>
+                                <select style={selectStyle} value={config.phaseBlendYears}
+                                    onChange={e => updateConfig('phaseBlendYears', Number(e.target.value))}>
                                     <option value={0}>Off</option>
                                     <option value={1}>1 year</option>
                                     <option value={2}>2 years</option>
@@ -479,8 +394,8 @@ export default function SpendingOptimizerPage() {
                                 <input
                                     type="checkbox"
                                     aria-label="Gate on adaptive spending rules"
-                                    checked={gateOnAdaptiveRules}
-                                    onChange={e => setGateOnAdaptiveRules(e.target.checked)}
+                                    checked={config.gateOnAdaptiveRules}
+                                    onChange={e => updateConfig('gateOnAdaptiveRules', e.target.checked)}
                                 />
                             </FormField>
                         </div>
@@ -495,8 +410,8 @@ export default function SpendingOptimizerPage() {
                             {showAdvanced && (
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', marginTop: '0.75rem' }}>
                                     <FormField label="Cash Reserve" helpText="Years of spending held in cash to avoid selling during downturns">
-                                        <select style={selectStyle} value={cashReserveYears}
-                                            onChange={e => setCashReserveYears(Number(e.target.value))}>
+                                        <select style={selectStyle} value={config.cashReserveYears}
+                                            onChange={e => updateConfig('cashReserveYears', Number(e.target.value))}>
                                             <option value={0}>0 years</option>
                                             <option value={1}>1 year</option>
                                             <option value={2}>2 years</option>
@@ -505,14 +420,14 @@ export default function SpendingOptimizerPage() {
                                     </FormField>
                                     <FormField label="Cash Rate" helpText="Expected annual return on cash reserves (money market rate)">
                                         <div style={adornmentWrapStyle}>
-                                            <input style={adornedInputStyle} type="number" step="0.1" value={cashReturnRate || ''}
-                                                onChange={e => setCashReturnRate(Number(e.target.value))} />
+                                            <input style={adornedInputStyle} type="number" step="0.1" value={config.cashReturnRatePct || ''}
+                                                onChange={e => updateConfig('cashReturnRatePct', Number(e.target.value))} />
                                             <span style={adornmentSuffixStyle}>%</span>
                                         </div>
                                     </FormField>
                                     <FormField label="Trial Count">
-                                        <select style={selectStyle} value={trialCount}
-                                            onChange={e => setTrialCount(Number(e.target.value))}>
+                                        <select style={selectStyle} value={config.trialCount}
+                                            onChange={e => updateConfig('trialCount', Number(e.target.value))}>
                                             <option value={1000}>1,000</option>
                                             <option value={2500}>2,500</option>
                                             <option value={5000}>5,000</option>
@@ -522,18 +437,18 @@ export default function SpendingOptimizerPage() {
                                     <FormField label="Confidence Level" helpText="Override for risk tolerance">
                                         <div style={adornmentWrapStyle}>
                                             <input style={adornedInputStyle} type="number" step="1" min="50" max="99"
-                                                value={confidenceLevel ?? ''}
+                                                value={config.confidenceLevelPct ?? ''}
                                                 placeholder="Uses risk tolerance"
-                                                onChange={e => setConfidenceLevel(e.target.value ? Number(e.target.value) : null)} />
+                                                onChange={e => updateConfig('confidenceLevelPct', e.target.value ? Number(e.target.value) : null)} />
                                             <span style={adornmentSuffixStyle}>%</span>
                                         </div>
                                     </FormField>
                                     <FormField label="Dynamic-Sequencing Bracket Rate (%)" helpText="Target tax bracket for dynamic withdrawal sequencing">
                                         <div style={adornmentWrapStyle}>
                                             <input style={adornedInputStyle} type="number" step="1" min="0" max="37"
-                                                value={dynSeqBracketRate ?? ''}
+                                                value={config.dynSeqBracketRatePct ?? ''}
                                                 placeholder="Off"
-                                                onChange={e => setDynSeqBracketRate(e.target.value ? Number(e.target.value) : null)} />
+                                                onChange={e => updateConfig('dynSeqBracketRatePct', e.target.value ? Number(e.target.value) : null)} />
                                             <span style={adornmentSuffixStyle}>%</span>
                                         </div>
                                     </FormField>
@@ -543,16 +458,16 @@ export default function SpendingOptimizerPage() {
                     </div>
 
                     <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
-                        <PhaseEditor phases={phases} onPhasesChange={setPhases} />
+                        <PhaseEditor phases={config.phases} onPhasesChange={phases => updateConfig('phases', phases)} />
                     </div>
 
                     <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginBottom: optimizeConversions ? '1rem' : 0 }}>
-                            <input type="checkbox" checked={optimizeConversions}
-                                onChange={e => setOptimizeConversions(e.target.checked)} />
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginBottom: config.optimizeConversions ? '1rem' : 0 }}>
+                            <input type="checkbox" checked={config.optimizeConversions}
+                                onChange={e => updateConfig('optimizeConversions', e.target.checked)} />
                             <h3 style={{ margin: 0 }}>Roth Conversion Strategy</h3>
                         </label>
-                        {optimizeConversions && (
+                        {config.optimizeConversions && (
                             <div>
                                 <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '1rem' }}>
                                     Optimize Roth conversions alongside spending to minimize lifetime taxes.
@@ -561,13 +476,16 @@ export default function SpendingOptimizerPage() {
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                                     <FormField label="Conversion Bracket" helpText="Maximum tax bracket to fill with conversions each year">
-                                        <select style={selectStyle} value={conversionBracketRate}
+                                        <select style={selectStyle} value={config.conversionBracketRate}
                                             onChange={e => {
                                                 const rate = Number(e.target.value);
-                                                setConversionBracketRate(rate);
-                                                if (rmdTargetBracketRate > rate) {
-                                                    setRmdTargetBracketRate(rate);
-                                                }
+                                                setConfig(current => ({
+                                                    ...current,
+                                                    conversionBracketRate: rate,
+                                                    rmdTargetBracketRate: current.rmdTargetBracketRate > rate
+                                                        ? rate
+                                                        : current.rmdTargetBracketRate,
+                                                }));
                                             }}>
                                             <option value={0.10}>10%</option>
                                             <option value={0.12}>12%</option>
@@ -579,10 +497,10 @@ export default function SpendingOptimizerPage() {
                                         </select>
                                     </FormField>
                                     <FormField label="RMD Target Bracket" helpText="Target bracket for RMDs after conversions are complete">
-                                        <select style={selectStyle} value={rmdTargetBracketRate}
-                                            onChange={e => setRmdTargetBracketRate(Number(e.target.value))}>
+                                        <select style={selectStyle} value={config.rmdTargetBracketRate}
+                                            onChange={e => updateConfig('rmdTargetBracketRate', Number(e.target.value))}>
                                             {[0.10, 0.12, 0.22, 0.24, 0.32, 0.35, 0.37]
-                                                .filter(r => r <= conversionBracketRate)
+                                                .filter(r => r <= config.conversionBracketRate)
                                                 .map(r => (
                                                     <option key={r} value={r}>{(r * 100).toFixed(0)}%</option>
                                                 ))}
@@ -591,8 +509,8 @@ export default function SpendingOptimizerPage() {
                                     <FormField label="RMD Bracket Headroom" helpText="Reserve headroom for market growth years. Higher = more conservative.">
                                         <div style={adornmentWrapStyle}>
                                             <input style={adornedInputStyle} type="number" step="1" min="5" max="25"
-                                                value={rmdBracketHeadroom || ''}
-                                                onChange={e => setRmdBracketHeadroom(Number(e.target.value))} />
+                                                value={config.rmdBracketHeadroomPct || ''}
+                                                onChange={e => updateConfig('rmdBracketHeadroomPct', Number(e.target.value))} />
                                             <span style={adornmentSuffixStyle}>%</span>
                                         </div>
                                     </FormField>
@@ -612,7 +530,7 @@ export default function SpendingOptimizerPage() {
                         animation: 'spin 1s linear infinite', marginBottom: '1rem',
                     }} />
                     <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                    <div style={{ color: '#666' }}>Running {trialCount.toLocaleString()} Monte Carlo trials...</div>
+                    <div style={{ color: '#666' }}>Running {config.trialCount.toLocaleString()} Monte Carlo trials...</div>
                 </div>
             )}
 
