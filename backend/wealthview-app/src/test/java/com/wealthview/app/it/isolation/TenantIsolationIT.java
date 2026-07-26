@@ -5,13 +5,10 @@ import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class TenantIsolationIT extends AbstractApiIntegrationTest {
@@ -32,8 +29,7 @@ class TenantIsolationIT extends AbstractApiIntegrationTest {
                 "current_value", 350000,
                 "mortgage_balance", 200000
         );
-        var propertyResponse = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(propertyBody, authHelper.adminToken()), MAP_TYPE);
+        var propertyResponse = api.postForEntity("/api/v1/properties", propertyBody);
         tenant1PropertyId = (String) propertyResponse.getBody().get("id");
 
         data.createAccount("Tenant 1 Account", "brokerage");
@@ -42,9 +38,7 @@ class TenantIsolationIT extends AbstractApiIntegrationTest {
 
     @Test
     void tenant2CannotSeeTenant1Properties() {
-        var response = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.GET, authHelper.authEntity(authHelper.tenant2Token()),
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+        var response = api.getListForEntityAs(authHelper.tenant2Token(), "/api/v1/properties");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isEmpty();
@@ -53,9 +47,7 @@ class TenantIsolationIT extends AbstractApiIntegrationTest {
     @Test
     @SuppressWarnings("unchecked")
     void tenant2CannotSeeTenant1Accounts() {
-        var response = restTemplate.exchange("/api/v1/accounts",
-                HttpMethod.GET, authHelper.authEntity(authHelper.tenant2Token()),
-                new ParameterizedTypeReference<Map<String, Object>>() {});
+        var response = api.getForEntityAs(authHelper.tenant2Token(), "/api/v1/accounts");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         var content = (List<Map<String, Object>>) response.getBody().get("data");
@@ -64,9 +56,7 @@ class TenantIsolationIT extends AbstractApiIntegrationTest {
 
     @Test
     void tenant2CannotSeeTenant1Scenarios() {
-        var response = restTemplate.exchange("/api/v1/projections",
-                HttpMethod.GET, authHelper.authEntity(authHelper.tenant2Token()),
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+        var response = api.getListForEntityAs(authHelper.tenant2Token(), "/api/v1/projections");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isEmpty();
@@ -82,16 +72,12 @@ class TenantIsolationIT extends AbstractApiIntegrationTest {
                 "category", "maintenance",
                 "description", "Tenant 1 plumbing fix"
         );
-        var createExpense = restTemplate.exchange(
-                "/api/v1/properties/" + tenant1PropertyId + "/expenses",
-                HttpMethod.POST, authHelper.authEntity(expenseBody, authHelper.adminToken()), MAP_TYPE);
+        var createExpense = api.postForEntity(
+                "/api/v1/properties/" + tenant1PropertyId + "/expenses", expenseBody);
         assertThat(createExpense.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         // Grab the expense ID via list endpoint (only tenant 1 can see it)
-        var listResponse = restTemplate.exchange(
-                "/api/v1/properties/" + tenant1PropertyId + "/expenses",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+        var listResponse = api.getListForEntity("/api/v1/properties/" + tenant1PropertyId + "/expenses");
         assertThat(listResponse.getBody()).hasSize(1);
         var tenant1ExpenseId = (String) listResponse.getBody().get(0).get("id");
 
@@ -103,25 +89,21 @@ class TenantIsolationIT extends AbstractApiIntegrationTest {
                 "current_value", 275000,
                 "mortgage_balance", 180000
         );
-        var tenant2PropResp = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(tenant2PropertyBody, authHelper.tenant2Token()), MAP_TYPE);
+        var tenant2PropResp = api.postForEntityAs(
+                authHelper.tenant2Token(), "/api/v1/properties", tenant2PropertyBody);
         assertThat(tenant2PropResp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         var tenant2PropertyId = (String) tenant2PropResp.getBody().get("id");
 
         // Tenant 2 attempts cross-tenant delete via their own property ID in the path
         // and tenant 1's expense ID. Current buggy behaviour: 204 (expense deleted).
         // Expected secure behaviour: 404 (expense not found for this tenant).
-        var attack = restTemplate.exchange(
-                "/api/v1/properties/" + tenant2PropertyId + "/expenses/" + tenant1ExpenseId,
-                HttpMethod.DELETE, authHelper.authEntity(authHelper.tenant2Token()), Void.class);
+        var attack = api.deleteForEntityAs(authHelper.tenant2Token(),
+                "/api/v1/properties/" + tenant2PropertyId + "/expenses/" + tenant1ExpenseId);
 
         assertThat(attack.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 
         // Tenant 1's expense must still exist
-        var afterAttackList = restTemplate.exchange(
-                "/api/v1/properties/" + tenant1PropertyId + "/expenses",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+        var afterAttackList = api.getListForEntity("/api/v1/properties/" + tenant1PropertyId + "/expenses");
         assertThat(afterAttackList.getBody()).hasSize(1);
     }
 }

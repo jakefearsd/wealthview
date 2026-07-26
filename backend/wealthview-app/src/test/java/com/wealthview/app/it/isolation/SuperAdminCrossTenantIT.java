@@ -1,18 +1,14 @@
 package com.wealthview.app.it.isolation;
 
-import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 import com.wealthview.app.it.AuthHelper;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -35,12 +31,9 @@ class SuperAdminCrossTenantIT extends AbstractApiIntegrationTest {
         authHelper.bootstrapSecondTenant(restTemplate);
 
         // Create accounts in both tenants
-        restTemplate.exchange("/api/v1/accounts", HttpMethod.POST,
-                authHelper.authEntity(Map.of("name", "T1 Acct", "type", "brokerage"),
-                        authHelper.adminToken()), MAP_TYPE);
-        restTemplate.exchange("/api/v1/accounts", HttpMethod.POST,
-                authHelper.authEntity(Map.of("name", "T2 Acct", "type", "brokerage"),
-                        authHelper.tenant2Token()), MAP_TYPE);
+        api.postForEntity("/api/v1/accounts", Map.of("name", "T1 Acct", "type", "brokerage"));
+        api.postForEntityAs(authHelper.tenant2Token(), "/api/v1/accounts",
+                Map.of("name", "T2 Acct", "type", "brokerage"));
 
         // Create a SUPER_ADMIN user (lives in tenant 1 but role grants cross-tenant)
         var saEmail = "super-admin@wealthview.test";
@@ -51,9 +44,7 @@ class SuperAdminCrossTenantIT extends AbstractApiIntegrationTest {
 
     @Test
     void superAdminListsTenantsAcrossSystem() {
-        var response = restTemplate.exchange("/api/v1/admin/tenants",
-                HttpMethod.GET, authHelper.authEntity(superAdminToken),
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+        var response = api.getListForEntityAs(superAdminToken, "/api/v1/admin/tenants");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody())
@@ -63,9 +54,7 @@ class SuperAdminCrossTenantIT extends AbstractApiIntegrationTest {
 
     @Test
     void superAdminListsAllUsersAcrossTenants() {
-        var response = restTemplate.exchange("/api/v1/admin/users",
-                HttpMethod.GET, authHelper.authEntity(superAdminToken),
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+        var response = api.getListForEntityAs(superAdminToken, "/api/v1/admin/users");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         // Both tenants' admin users + the super admin should all be visible
@@ -76,8 +65,7 @@ class SuperAdminCrossTenantIT extends AbstractApiIntegrationTest {
 
     @Test
     void regularAdmin_cannotAccessSuperAdminTenantsEndpoint() {
-        var response = restTemplate.exchange("/api/v1/admin/tenants",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), String.class);
+        var response = api.getForEntity("/api/v1/admin/tenants", String.class);
 
         assertThat(response.getStatusCode())
                 .as("non-SUPER_ADMIN must be forbidden from /api/v1/admin/tenants")
@@ -89,9 +77,7 @@ class SuperAdminCrossTenantIT extends AbstractApiIntegrationTest {
         // Add a second user to tenant 1
         authHelper.createUserDirectly("member1@wealthview.test", "memberpass1", "member");
 
-        var response = restTemplate.exchange("/api/v1/tenant/users",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+        var response = api.getListForEntity("/api/v1/tenant/users");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         // Tenant 1 admin should see tenant 1 users only (admin + member). The

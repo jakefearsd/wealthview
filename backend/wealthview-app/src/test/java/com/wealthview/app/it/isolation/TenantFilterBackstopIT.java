@@ -15,9 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 import com.wealthview.core.auth.TenantContext;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.http.HttpMethod.POST;
 
 /**
  * Proves that the {@code tenantFilter} Hibernate filter masks cross-tenant
@@ -45,14 +43,12 @@ class TenantFilterBackstopIT extends AbstractApiIntegrationTest {
         tenant1UserId = authHelper.adminUserId();
 
         // Create one account per tenant via the API
-        var account1 = restTemplate.exchange("/api/v1/accounts", POST,
-                authHelper.authEntity(java.util.Map.of("name", "T1 Acct", "type", "brokerage"),
-                        authHelper.adminToken()), MAP_TYPE);
+        var account1 = api.postForEntity("/api/v1/accounts",
+                java.util.Map.of("name", "T1 Acct", "type", "brokerage"));
         tenant1AccountId = UUID.fromString((String) account1.getBody().get("id"));
 
-        var account2 = restTemplate.exchange("/api/v1/accounts", POST,
-                authHelper.authEntity(java.util.Map.of("name", "T2 Acct", "type", "brokerage"),
-                        authHelper.tenant2Token()), MAP_TYPE);
+        var account2 = api.postForEntityAs(authHelper.tenant2Token(), "/api/v1/accounts",
+                java.util.Map.of("name", "T2 Acct", "type", "brokerage"));
         tenant2AccountId = UUID.fromString((String) account2.getBody().get("id"));
     }
 
