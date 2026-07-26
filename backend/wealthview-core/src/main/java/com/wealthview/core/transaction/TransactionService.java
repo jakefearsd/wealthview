@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,16 +49,10 @@ public class TransactionService {
     @CacheEvict(value = "accountBalances", key = "#tenantId")
     @Transactional
     public TransactionResponse create(UUID tenantId, UUID accountId, TransactionRequest request) {
-        var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
-                .orElseThrow(Entities.notFound("Account"));
-
-        var txn = new TransactionEntity(account, account.getTenant(), request.date(),
-                request.type(), request.symbol(), request.quantity(), request.amount());
-        txn = transactionRepository.save(txn);
-        splitAdjustmentApplier.adjustNewTransaction(txn);
+        var txn = persistTransaction(tenantId, accountId, request, null);
 
         holdingsComputationService.recomputeForAccountAndSymbol(
-                account, account.getTenant(), request.symbol());
+                txn.getAccount(), txn.getTenant(), request.symbol());
 
         log.info("Transaction {} created for account {}", txn.getId(), accountId);
         eventPublisher.publishEvent(new AuditEvent(tenantId, null, "CREATE", "transaction",
@@ -66,38 +61,34 @@ public class TransactionService {
     }
 
     @Transactional
-    public TransactionResponse createWithHash(UUID tenantId, UUID accountId,
-                                              TransactionRequest request, String importHash) {
-        var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
-                .orElseThrow(Entities.notFound("Account"));
-
-        var txn = new TransactionEntity(account, account.getTenant(), request.date(),
-                request.type(), request.symbol(), request.quantity(), request.amount());
-        txn.setImportHash(importHash);
-        txn = transactionRepository.save(txn);
-        splitAdjustmentApplier.adjustNewTransaction(txn);
-
-        holdingsComputationService.recomputeForAccountAndSymbol(
-                account, account.getTenant(), request.symbol());
-
-        log.info("Transaction {} created for account {} with import hash", txn.getId(), accountId);
-        return TransactionResponse.from(txn);
-    }
-
-    @Transactional
     public TransactionResponse createWithHashNoRecompute(UUID tenantId, UUID accountId,
                                                           TransactionRequest request, String importHash) {
-        var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
-                .orElseThrow(Entities.notFound("Account"));
-
-        var txn = new TransactionEntity(account, account.getTenant(), request.date(),
-                request.type(), request.symbol(), request.quantity(), request.amount());
-        txn.setImportHash(importHash);
-        txn = transactionRepository.save(txn);
-        splitAdjustmentApplier.adjustNewTransaction(txn);
+        var txn = persistTransaction(tenantId, accountId, request, importHash);
 
         log.info("Transaction {} created for account {} with import hash (no recompute)", txn.getId(), accountId);
         return TransactionResponse.from(txn);
+    }
+
+    /**
+     * Shared choreography for creating a transaction: tenant-scoped account lookup, entity
+     * construction, save, and split adjustment. Callers layer on the differences that
+     * distinguish user-initiated creates from import-path creates (audit eventing, holdings
+     * recompute timing).
+     */
+    private TransactionEntity persistTransaction(UUID tenantId, UUID accountId, TransactionRequest request,
+                                                  @Nullable String importHash) {
+        var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
+                .orElseThrow(Entities.notFound("Account"));
+
+        var txn = new TransactionEntity(account, account.getTenant(), request.date(),
+                request.type(), request.symbol(), request.quantity(), request.amount());
+        if (importHash != null) {
+            txn.setImportHash(importHash);
+        }
+        txn = transactionRepository.save(txn);
+        splitAdjustmentApplier.adjustNewTransaction(txn);
+
+        return txn;
     }
 
     @Transactional(readOnly = true)

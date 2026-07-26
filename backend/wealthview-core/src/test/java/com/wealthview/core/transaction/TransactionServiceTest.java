@@ -276,39 +276,6 @@ class TransactionServiceTest {
     }
 
     @Test
-    void createWithHash_persistsImportHashAndRecomputes() {
-        var request = new TransactionRequest(LocalDate.now(), BUY, "GOOG",
-                new BigDecimal("3"), new BigDecimal("900"));
-        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
-                .thenReturn(Optional.of(account));
-        when(transactionRepository.save(any(TransactionEntity.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
-
-        var result = transactionService.createWithHash(tenantId, accountId, request, "hash-abc");
-
-        assertThat(result.symbol()).isEqualTo("GOOG");
-        var captor = ArgumentCaptor.forClass(TransactionEntity.class);
-        verify(transactionRepository).save(captor.capture());
-        assertThat(captor.getValue().getImportHash()).isEqualTo("hash-abc");
-        verify(holdingsComputationService).recomputeForAccountAndSymbol(eq(account), any(), eq("GOOG"));
-        verifyNoInteractions(eventPublisher);
-    }
-
-    @Test
-    void createWithHash_accountNotFound_throws() {
-        var request = new TransactionRequest(LocalDate.now(), BUY, "AAPL",
-                new BigDecimal("1"), new BigDecimal("100"));
-        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
-                .thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> transactionService.createWithHash(tenantId, accountId, request, "h"))
-                .isInstanceOf(EntityNotFoundException.class);
-
-        verify(transactionRepository, never()).save(any());
-        verifyNoInteractions(holdingsComputationService);
-    }
-
-    @Test
     void createWithHashNoRecompute_persistsHashAndSkipsRecompute() {
         var request = new TransactionRequest(LocalDate.now(), BUY, "GOOG",
                 new BigDecimal("3"), new BigDecimal("900"));
