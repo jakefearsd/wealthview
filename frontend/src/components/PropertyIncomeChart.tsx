@@ -11,6 +11,7 @@ import { MONTH_ABBREVIATIONS } from '../utils/chartFormatters';
 import { cardStyle } from '../utils/styles';
 import StatTile from './StatTile';
 import ChartTooltip from './ChartTooltip';
+import SegmentedControl from './SegmentedControl';
 import type { MonthlyCashFlowDetailEntry, DepreciationScheduleResponse, Property } from '../types/property';
 import type { RechartsTooltipEntry } from '../types/recharts';
 
@@ -270,26 +271,7 @@ export default function PropertyIncomeChart({
                 <h4 style={{ margin: 0, fontSize: '0.95rem' }}>
                     {showTrailing ? 'Rent vs Expenses' : 'Projected Cash Flow & Depreciation'} — {propertyAddress}
                 </h4>
-                <div style={{ display: 'flex', gap: 0, borderRadius: 6, overflow: 'hidden', border: '1px solid #ddd' }}>
-                    {HORIZON_OPTIONS.map(opt => (
-                        <button
-                            key={opt.value}
-                            onClick={() => setHorizon(opt.value)}
-                            style={{
-                                padding: '0.3rem 0.6rem',
-                                fontSize: '0.75rem',
-                                border: 'none',
-                                borderRight: '1px solid #ddd',
-                                background: horizon === opt.value ? '#1976d2' : '#fff',
-                                color: horizon === opt.value ? '#fff' : '#555',
-                                cursor: 'pointer',
-                                fontWeight: horizon === opt.value ? 600 : 400,
-                            }}
-                        >
-                            {opt.label}
-                        </button>
-                    ))}
-                </div>
+                <SegmentedControl options={HORIZON_OPTIONS} value={horizon} onChange={setHorizon} />
             </div>
 
             {showTrailing ? (

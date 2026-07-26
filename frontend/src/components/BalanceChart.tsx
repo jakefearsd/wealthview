@@ -9,6 +9,7 @@ import { findDepletionYear, findCrossoverYear } from '../utils/projectionCalcs';
 import { interpolateMonthly } from '../utils/monthlyInterpolation';
 import type { ProjectionYear } from '../types/projection';
 import ChartTooltip from './ChartTooltip';
+import SegmentedControl from './SegmentedControl';
 
 interface BalanceChartProps {
     data: ProjectionYear[];
@@ -128,26 +129,7 @@ export default function BalanceChart({ data, retirementYear }: BalanceChartProps
         <div>
             {rangeOptions.length > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
-                    <div style={{ display: 'flex', gap: 0, borderRadius: 6, overflow: 'hidden', border: '1px solid #ddd' }}>
-                        {rangeOptions.map(opt => (
-                            <button
-                                key={opt.value}
-                                onClick={() => setRange(opt.value)}
-                                style={{
-                                    padding: '0.3rem 0.65rem',
-                                    fontSize: '0.75rem',
-                                    border: 'none',
-                                    borderRight: '1px solid #ddd',
-                                    background: range === opt.value ? '#1976d2' : '#fff',
-                                    color: range === opt.value ? '#fff' : '#555',
-                                    cursor: 'pointer',
-                                    fontWeight: range === opt.value ? 600 : 400,
-                                }}
-                            >
-                                {opt.label}
-                            </button>
-                        ))}
-                    </div>
+                    <SegmentedControl options={rangeOptions} value={range} onChange={setRange} />
                 </div>
             )}
             <ResponsiveContainer width="100%" height={450}>

@@ -13,6 +13,7 @@ import FormField from '../components/FormField';
 import PhaseEditor from '../components/PhaseEditor';
 import OptimizerResultsView from '../components/OptimizerResultsView';
 import Button from '../components/Button';
+import SegmentedControl, { type SegmentedControlOption } from '../components/SegmentedControl';
 
 type OptimizerState = 'configure' | 'running' | 'results';
 
@@ -137,27 +138,11 @@ const adornedInputStyle: React.CSSProperties = {
     flex: 1,
 };
 
-const pillContainerStyle: React.CSSProperties = {
-    display: 'flex',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-    overflow: 'hidden',
-};
-
-function pillStyle(active: boolean): React.CSSProperties {
-    return {
-        flex: 1,
-        padding: '0.5rem 0.75rem',
-        border: 'none',
-        background: active ? '#1976d2' : '#fff',
-        color: active ? '#fff' : '#333',
-        cursor: 'pointer',
-        fontWeight: active ? 600 : 400,
-        fontSize: '0.85rem',
-        textTransform: 'capitalize',
-        transition: 'background 0.15s, color 0.15s',
-    };
-}
+const RISK_TOLERANCE_OPTIONS: SegmentedControlOption<RiskTolerance>[] = [
+    { value: 'conservative', label: 'conservative' },
+    { value: 'moderate', label: 'moderate' },
+    { value: 'aggressive', label: 'aggressive' },
+];
 
 export default function SpendingOptimizerPage() {
     const { id } = useParams<{ id: string }>();
@@ -358,15 +343,12 @@ export default function SpendingOptimizerPage() {
                                 : config.riskTolerance === 'moderate' ? '90% confidence \u2014 Sustainable with occasional adjustments in bad markets'
                                 : '80% confidence \u2014 Expected spending, requires active management in downturns'
                             }>
-                                <div style={pillContainerStyle}>
-                                    {(['conservative', 'moderate', 'aggressive'] as RiskTolerance[]).map(level => (
-                                        <button key={level} type="button"
-                                            onClick={() => updateConfig('riskTolerance', level)}
-                                            style={pillStyle(config.riskTolerance === level)}>
-                                            {level}
-                                        </button>
-                                    ))}
-                                </div>
+                                <SegmentedControl
+                                    options={RISK_TOLERANCE_OPTIONS}
+                                    value={config.riskTolerance}
+                                    onChange={level => updateConfig('riskTolerance', level)}
+                                    variant="wide"
+                                />
                             </FormField>
                             <FormField label="Spending Flexibility" helpText="Maximum annual spending change">
                                 <div style={adornmentWrapStyle}>
