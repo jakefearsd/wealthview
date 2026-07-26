@@ -1,13 +1,9 @@
 package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 /**
@@ -18,11 +14,7 @@ import jakarta.persistence.Table;
  */
 @Entity
 @Table(name = "irmaa_tiers")
-public class IrmaaTierEntity extends CreatedAtEntity {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+public class IrmaaTierEntity extends UuidCreatedAtEntity {
 
     @Column(name = "tax_year", nullable = false)
     private int taxYear;
@@ -54,10 +46,6 @@ public class IrmaaTierEntity extends CreatedAtEntity {
         this.magiCeiling = magiCeiling;
         this.partBSurcharge = partBSurcharge;
         this.partDSurcharge = partDSurcharge;
-    }
-
-    public UUID getId() {
-        return id;
     }
 
     public int getTaxYear() {

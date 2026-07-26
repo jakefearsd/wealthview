@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.wealthview.core.auth.CrossTenant;
 import com.wealthview.core.holding.HoldingsComputationService;
+import com.wealthview.core.testutil.TestEntityHelper;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
 import com.wealthview.persistence.entity.PriceEntity;
@@ -77,18 +78,8 @@ class StockSplitServiceTest {
                 priceRepository, holdingRepository, holdingsComputationService, meterRegistry, true);
         tenant = new TenantEntity("Test");
         tenantId = UUID.randomUUID();
-        setId(tenant, tenantId);
+        TestEntityHelper.setId(tenant, tenantId);
         account = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
-    }
-
-    private static void setId(Object entity, UUID id) {
-        try {
-            var f = entity.getClass().getDeclaredField("id");
-            f.setAccessible(true);
-            f.set(entity, id);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException(e);
-        }
     }
 
     @Test
@@ -511,15 +502,8 @@ class StockSplitServiceTest {
     private TransactionEntity txn(UUID id, LocalDate date, TransactionType type, String symbol,
                                   BigDecimal qty, BigDecimal amount) {
         var t = new TransactionEntity(account, tenant, date, type, symbol, qty, amount);
-        // tests need a stable id; entity uses field-level @GeneratedValue so we
-        // assign via reflection
-        try {
-            var f = TransactionEntity.class.getDeclaredField("id");
-            f.setAccessible(true);
-            f.set(t, id);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException(e);
-        }
+        // tests need a stable id; entity uses inherited @GeneratedValue so we assign via reflection
+        TestEntityHelper.setId(t, id);
         return t;
     }
 

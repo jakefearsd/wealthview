@@ -16,6 +16,12 @@ import jakarta.persistence.Table;
  * exact age -- see migration V080 and {@code R__seed_mortality_rates.sql}.
  *
  * <p>Read-only reference data: no setters, seeded exclusively via Flyway.
+ *
+ * <p>Deliberately standalone rather than extending {@code UuidCreatedAtEntity}: although
+ * {@code mortality_rates} has {@code created_at}/{@code updated_at} columns (V080), this entity
+ * has never mapped either one. Adopting the ladder would newly map {@code createdAt} onto an
+ * entity that's read-only in application code -- out of scope for a pure id-boilerplate
+ * refactor. Left with its own {@code id} field intact.
  */
 @Entity
 @Table(name = "mortality_rates")

@@ -10,9 +10,6 @@ import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
@@ -35,11 +32,7 @@ import org.hibernate.type.SqlTypes;
 @Entity
 @Table(name = "projection_scenarios")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class ProjectionScenarioEntity extends Auditable {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+public class ProjectionScenarioEntity extends UuidAuditable {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tenant_id", nullable = false)
@@ -88,10 +81,6 @@ public class ProjectionScenarioEntity extends Auditable {
         this.endAge = endAge;
         this.inflationRate = inflationRate;
         this.paramsJson = paramsJson;
-    }
-
-    public UUID getId() {
-        return id;
     }
 
     public TenantEntity getTenant() {

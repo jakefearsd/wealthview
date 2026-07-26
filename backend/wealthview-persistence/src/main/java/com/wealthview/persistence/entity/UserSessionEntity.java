@@ -5,20 +5,13 @@ import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "user_sessions")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class UserSessionEntity extends CreatedAtEntity {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+public class UserSessionEntity extends UuidCreatedAtEntity {
 
     @Column(name = "tenant_id", nullable = false)
     private UUID tenantId;
@@ -55,10 +48,6 @@ public class UserSessionEntity extends CreatedAtEntity {
         this.transport = transport;
         this.ipAddress = ipAddress;
         this.userAgent = userAgent;
-    }
-
-    public UUID getId() {
-        return id;
     }
 
     public UUID getTenantId() {

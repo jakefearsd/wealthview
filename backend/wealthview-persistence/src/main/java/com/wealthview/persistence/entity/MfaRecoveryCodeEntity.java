@@ -5,20 +5,13 @@ import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "mfa_recovery_codes")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class MfaRecoveryCodeEntity extends Auditable {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+public class MfaRecoveryCodeEntity extends UuidAuditable {
 
     @Column(name = "tenant_id", nullable = false)
     private UUID tenantId;
@@ -39,10 +32,6 @@ public class MfaRecoveryCodeEntity extends Auditable {
         this.tenantId = tenantId;
         this.userId = userId;
         this.codeHash = codeHash;
-    }
-
-    public UUID getId() {
-        return id;
     }
 
     public UUID getTenantId() {

@@ -2,13 +2,9 @@ package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MappedSuperclass;
@@ -16,11 +12,7 @@ import org.hibernate.annotations.Filter;
 
 @MappedSuperclass
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public abstract class AbstractPropertyCashFlowEntity extends Auditable {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+public abstract class AbstractPropertyCashFlowEntity extends UuidAuditable {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "property_id", nullable = false)
@@ -57,10 +49,6 @@ public abstract class AbstractPropertyCashFlowEntity extends Auditable {
         this.category = category;
         this.description = description;
         this.frequency = frequency;
-    }
-
-    public UUID getId() {
-        return id;
     }
 
     public PropertyEntity getProperty() {

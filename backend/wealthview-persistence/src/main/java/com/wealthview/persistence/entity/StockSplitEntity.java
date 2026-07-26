@@ -2,13 +2,9 @@ package com.wealthview.persistence.entity;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 /**
@@ -19,11 +15,7 @@ import jakarta.persistence.Table;
  */
 @Entity
 @Table(name = "stock_splits")
-public class StockSplitEntity extends Auditable {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+public class StockSplitEntity extends UuidAuditable {
 
     @Column(nullable = false)
     private String symbol;
@@ -55,10 +47,6 @@ public class StockSplitEntity extends Auditable {
         this.numerator = numerator;
         this.denominator = denominator;
         this.source = source;
-    }
-
-    public UUID getId() {
-        return id;
     }
 
     public String getSymbol() {

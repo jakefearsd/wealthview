@@ -24,6 +24,7 @@ import com.wealthview.core.holding.HoldingsComputationService;
 import com.wealthview.core.importservice.dto.CsvRowError;
 import com.wealthview.core.importservice.dto.ImportParseResult;
 import com.wealthview.core.importservice.dto.ParsedTransaction;
+import com.wealthview.core.testutil.TestEntityHelper;
 import com.wealthview.core.transaction.TransactionService;
 import com.wealthview.core.transaction.dto.TransactionRequest;
 import com.wealthview.persistence.entity.AccountEntity;
@@ -86,9 +87,9 @@ class ImportServiceTest {
 
     private void setupAccountAndJobMocks() {
         var tenant = new TenantEntity("Test Tenant");
-        setField(tenant, "id", tenantId);
+        TestEntityHelper.setId(tenant, tenantId);
         var account = new AccountEntity(tenant, "Test Account", "brokerage", "Test Bank");
-        setField(account, "id", accountId);
+        TestEntityHelper.setId(account, accountId);
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(account));
         when(importJobRepository.save(any(ImportJobEntity.class)))
@@ -332,9 +333,9 @@ class ImportServiceTest {
     @Test
     void listJobs_returnsMappedResponses() {
         var tenant = new TenantEntity("Test");
-        setField(tenant, "id", tenantId);
+        TestEntityHelper.setId(tenant, tenantId);
         var account = new AccountEntity(tenant, "Test", "brokerage", "Bank");
-        setField(account, "id", accountId);
+        TestEntityHelper.setId(account, accountId);
         var job = new ImportJobEntity(tenant, account, "csv");
         job.setStatus("completed");
         job.setTotalRows(10);
@@ -407,13 +408,4 @@ class ImportServiceTest {
         assertThat(counter.count()).isEqualTo(1.0);
     }
 
-    private static void setField(Object target, String fieldName, Object value) {
-        try {
-            var field = target.getClass().getDeclaredField(fieldName);
-            field.setAccessible(true);
-            field.set(target, value);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
 }

@@ -1,22 +1,14 @@
 package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "state_standard_deductions")
-public class StateStandardDeductionEntity extends CreatedAtEntity {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+public class StateStandardDeductionEntity extends UuidCreatedAtEntity {
 
     @Column(name = "state_code", nullable = false)
     private String stateCode;
@@ -38,10 +30,6 @@ public class StateStandardDeductionEntity extends CreatedAtEntity {
         this.taxYear = taxYear;
         this.filingStatus = filingStatus;
         this.amount = amount;
-    }
-
-    public UUID getId() {
-        return id;
     }
 
     public String getStateCode() {

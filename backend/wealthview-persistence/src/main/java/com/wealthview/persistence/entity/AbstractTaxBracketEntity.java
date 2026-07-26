@@ -1,20 +1,12 @@
 package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 
 @MappedSuperclass
-public abstract class AbstractTaxBracketEntity extends CreatedAtEntity {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+public abstract class AbstractTaxBracketEntity extends UuidCreatedAtEntity {
 
     @Column(name = "tax_year", nullable = false)
     private int taxYear;
@@ -41,10 +33,6 @@ public abstract class AbstractTaxBracketEntity extends CreatedAtEntity {
         this.bracketFloor = bracketFloor;
         this.bracketCeiling = bracketCeiling;
         this.rate = rate;
-    }
-
-    public UUID getId() {
-        return id;
     }
 
     public int getTaxYear() {

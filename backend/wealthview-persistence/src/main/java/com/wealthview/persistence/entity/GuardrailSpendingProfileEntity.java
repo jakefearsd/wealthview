@@ -1,14 +1,10 @@
 package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -23,11 +19,7 @@ import org.hibernate.type.SqlTypes;
 @Entity
 @Table(name = "guardrail_spending_profiles")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class GuardrailSpendingProfileEntity extends Auditable {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+public class GuardrailSpendingProfileEntity extends UuidAuditable {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tenant_id", nullable = false)
@@ -124,10 +116,6 @@ public class GuardrailSpendingProfileEntity extends Auditable {
         this.scenario = scenario;
         this.name = name;
         this.essentialFloor = essentialFloor;
-    }
-
-    public UUID getId() {
-        return id;
     }
 
     public TenantEntity getTenant() {

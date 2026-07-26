@@ -4,19 +4,13 @@ import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "login_activity")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class LoginActivityEntity extends CreatedAtEntity {
-
-    @Id
-    @GeneratedValue
-    private UUID id;
+public class LoginActivityEntity extends UuidCreatedAtEntity {
 
     @Column(name = "user_email", nullable = false)
     private String userEmail;
@@ -38,10 +32,6 @@ public class LoginActivityEntity extends CreatedAtEntity {
         this.tenantId = tenantId;
         this.success = success;
         this.ipAddress = ipAddress;
-    }
-
-    public UUID getId() {
-        return id;
     }
 
     public String getUserEmail() {

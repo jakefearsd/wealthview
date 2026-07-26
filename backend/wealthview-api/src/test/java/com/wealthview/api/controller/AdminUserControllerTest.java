@@ -1,6 +1,5 @@
 package com.wealthview.api.controller;
 
-import java.lang.reflect.Field;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.wealthview.api.exception.GlobalExceptionHandler;
 import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
+import com.wealthview.api.testutil.TestEntityHelper;
 import com.wealthview.api.testutil.TestMetricsConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
 import com.wealthview.core.auth.SessionStateValidator;
@@ -50,19 +50,15 @@ class AdminUserControllerTest {
     @MockitoBean
     private SessionStateValidator sessionStateValidator;
 
-    private TenantEntity createTenantEntity() throws Exception {
+    private TenantEntity createTenantEntity() {
         var tenant = new TenantEntity("Test Tenant");
-        Field idField = TenantEntity.class.getDeclaredField("id");
-        idField.setAccessible(true);
-        idField.set(tenant, UUID.randomUUID());
+        TestEntityHelper.setId(tenant, UUID.randomUUID());
         return tenant;
     }
 
-    private UserEntity createUserEntity(TenantEntity tenant) throws Exception {
+    private UserEntity createUserEntity(TenantEntity tenant) {
         var user = new UserEntity(tenant, "user@example.com", "hash", "member");
-        Field idField = UserEntity.class.getDeclaredField("id");
-        idField.setAccessible(true);
-        idField.set(user, UUID.randomUUID());
+        TestEntityHelper.setId(user, UUID.randomUUID());
         return user;
     }
 

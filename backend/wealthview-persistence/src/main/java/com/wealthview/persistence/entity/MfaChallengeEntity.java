@@ -5,20 +5,13 @@ import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "mfa_challenges")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class MfaChallengeEntity extends CreatedAtEntity {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+public class MfaChallengeEntity extends UuidCreatedAtEntity {
 
     @Column(name = "tenant_id", nullable = false)
     private UUID tenantId;
@@ -48,10 +41,6 @@ public class MfaChallengeEntity extends CreatedAtEntity {
         this.jti = jti;
         this.transport = transport;
         this.expiresAt = expiresAt;
-    }
-
-    public UUID getId() {
-        return id;
     }
 
     public UUID getTenantId() {

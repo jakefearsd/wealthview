@@ -1,4 +1,4 @@
-package com.wealthview.core.testutil;
+package com.wealthview.api.testutil;
 
 import java.lang.reflect.Field;
 import java.util.UUID;
@@ -9,8 +9,8 @@ public final class TestEntityHelper {
     }
 
     /**
-     * Sets the {@code id} field on a JPA entity via reflection, for tests that need a
-     * stable id on an entity built through its non-persisting constructor.
+     * Sets the {@code id} field on a JPA entity via reflection, for controller tests that
+     * need a stable id on an entity built through its non-persisting constructor.
      *
      * <p>Walks up the class hierarchy because {@code id} is declared on a
      * {@code @MappedSuperclass} ({@code UuidAuditable} / {@code UuidCreatedAtEntity}) for

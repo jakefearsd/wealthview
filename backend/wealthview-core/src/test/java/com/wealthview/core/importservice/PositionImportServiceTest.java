@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.wealthview.core.importservice.dto.ImportJobResponse;
 import com.wealthview.core.importservice.dto.ImportParseResult;
 import com.wealthview.core.importservice.dto.ParsedTransaction;
+import com.wealthview.core.testutil.TestEntityHelper;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.ImportJobEntity;
 import com.wealthview.persistence.entity.TenantEntity;
@@ -63,9 +64,9 @@ class PositionImportServiceTest {
 
     private void setupAccountMock() {
         var tenant = new TenantEntity("Test Tenant");
-        setField(tenant, "id", tenantId);
+        TestEntityHelper.setId(tenant, tenantId);
         var account = new AccountEntity(tenant, "Test Account", "brokerage", "Test Bank");
-        setField(account, "id", accountId);
+        TestEntityHelper.setId(account, accountId);
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(account));
     }
@@ -116,15 +117,5 @@ class PositionImportServiceTest {
         assertThat(result.successfulRows()).isEqualTo(2);
         assertThat(result.source()).isEqualTo("positions");
         verify(importService).processImport(tenantId, accountId, parseResult, "positions");
-    }
-
-    private static void setField(Object target, String fieldName, Object value) {
-        try {
-            var field = target.getClass().getDeclaredField(fieldName);
-            field.setAccessible(true);
-            field.set(target, value);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 }

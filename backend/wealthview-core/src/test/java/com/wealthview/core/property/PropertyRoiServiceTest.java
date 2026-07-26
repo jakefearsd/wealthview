@@ -12,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.testutil.TestEntityHelper;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.TenantEntity;
@@ -237,13 +238,7 @@ class PropertyRoiServiceTest {
                 LocalDate.of(2020, 1, 15), currentValue, BigDecimal.ZERO);
         property.setPropertyType("investment");
         property.setDepreciationMethod(depreciationMethod);
-        try {
-            var idField = PropertyEntity.class.getDeclaredField("id");
-            idField.setAccessible(true);
-            idField.set(property, UUID.randomUUID());
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        TestEntityHelper.setId(property, UUID.randomUUID());
         return property;
     }
 
@@ -266,13 +261,7 @@ class PropertyRoiServiceTest {
         var source = new IncomeSourceEntity(tenant, name, "rental", annualAmount,
                 30, null, BigDecimal.ZERO, false, "taxable");
         source.setProperty(property);
-        try {
-            var idField = IncomeSourceEntity.class.getDeclaredField("id");
-            idField.setAccessible(true);
-            idField.set(source, UUID.randomUUID());
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        TestEntityHelper.setId(source, UUID.randomUUID());
         return source;
     }
 }

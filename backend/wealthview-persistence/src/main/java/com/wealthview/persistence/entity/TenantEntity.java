@@ -1,21 +1,12 @@
 package com.wealthview.persistence.entity;
 
-import java.util.UUID;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "tenants")
-public class TenantEntity extends Auditable {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+public class TenantEntity extends UuidAuditable {
 
     @Column(nullable = false)
     private String name;
@@ -28,10 +19,6 @@ public class TenantEntity extends Auditable {
 
     public TenantEntity(String name) {
         this.name = name;
-    }
-
-    public UUID getId() {
-        return id;
     }
 
     public String getName() {
