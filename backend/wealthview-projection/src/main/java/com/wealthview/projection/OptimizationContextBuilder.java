@@ -10,6 +10,7 @@ import org.springframework.lang.Nullable;
 import com.wealthview.core.projection.CapitalMarketAssumptionsProvider;
 import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealReturnMatrix;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
+import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.household.HouseholdContext;
@@ -85,9 +86,9 @@ final class OptimizationContextBuilder {
 
         int trialCount = input.trialCount();
         double initialPortfolio = totalPortfolio(input.accounts());
-        double initTaxable = sumByType(input.accounts(), PoolStrategy.POOL_TAXABLE);
-        double initTraditional = sumByType(input.accounts(), PoolStrategy.POOL_TRADITIONAL);
-        double initRoth = sumByType(input.accounts(), PoolStrategy.POOL_ROTH);
+        double initTaxable = sumByType(input.accounts(), PoolType.TAXABLE);
+        double initTraditional = sumByType(input.accounts(), PoolType.TRADITIONAL);
+        double initRoth = sumByType(input.accounts(), PoolType.ROTH);
         String withdrawalOrder = input.withdrawalOrder() != null ? input.withdrawalOrder() : "taxable_first";
         double essentialFloor = input.essentialFloor().doubleValue();
         double terminalTarget = input.terminalBalanceTarget().doubleValue();
@@ -185,7 +186,7 @@ final class OptimizationContextBuilder {
         //    conversion/draws/RMD excess) rather than a fixed probe rate;
         //  - dividendYield comes from the scenario's params_json (same field the deterministic engine
         //    reads via ScenarioParamsParser.dividendYield), falling back to the same default when unset.
-        double initTaxableBasis = sumBasisByType(input.accounts(), PoolStrategy.POOL_TAXABLE);
+        double initTaxableBasis = sumBasisByType(input.accounts(), PoolType.TAXABLE);
         double dividendYield = resolveDividendYield(input);
         double returnMean = resolveReturnMean(input, inflationRate, feeRate, matrix);
         // Audit C1: splits the MC taxable pool's yield the same way PoolStrategy.MultiPool does --
@@ -221,7 +222,7 @@ final class OptimizationContextBuilder {
 
     private static List<ProjectionAccountInput> taxableAccounts(List<ProjectionAccountInput> accounts) {
         return accounts.stream()
-                .filter(a -> PoolStrategy.POOL_TAXABLE.equals(a.accountType()))
+                .filter(a -> a.poolType() == PoolType.TAXABLE)
                 .toList();
     }
 
@@ -640,16 +641,16 @@ final class OptimizationContextBuilder {
         return MortalityDrawGenerator.generate(input, retirementYear, years, mortRng, trialCount);
     }
 
-    private static double sumByType(List<? extends ProjectionAccountInput> accounts, String type) {
+    private static double sumByType(List<? extends ProjectionAccountInput> accounts, PoolType type) {
         return accounts.stream()
-                .filter(a -> type.equals(a.accountType()))
+                .filter(a -> type == a.poolType())
                 .mapToDouble(a -> a.initialBalance().doubleValue())
                 .sum();
     }
 
-    private static double sumBasisByType(List<? extends ProjectionAccountInput> accounts, String type) {
+    private static double sumBasisByType(List<? extends ProjectionAccountInput> accounts, PoolType type) {
         return accounts.stream()
-                .filter(a -> type.equals(a.accountType()))
+                .filter(a -> type == a.poolType())
                 .mapToDouble(a -> a.costBasis().doubleValue())
                 .sum();
     }

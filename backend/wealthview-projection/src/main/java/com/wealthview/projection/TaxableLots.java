@@ -3,6 +3,8 @@ package com.wealthview.projection;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
+import com.wealthview.core.projection.dto.LotOwner;
+
 /**
  * FIFO cost-basis lots for a taxable pool. Each lot is {@code [basis, value, ownerCode]}, oldest
  * first — {@code ownerCode} is the {@link LotOwner#ordinal()} of the lot's owner tag (HP1),

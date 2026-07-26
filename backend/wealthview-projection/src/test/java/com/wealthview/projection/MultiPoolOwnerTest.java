@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import com.wealthview.core.projection.dto.AssetAllocation;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
+import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.household.PersonId;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
@@ -42,11 +43,11 @@ class MultiPoolOwnerTest {
                 FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
                 WithdrawalOrder.TAXABLE_FIRST, null, null);
         return new PoolStrategy.MultiPool(
-                Map.of(PoolStrategy.POOL_TRADITIONAL, traditionalAccounts), ZERO, config);
+                Map.of(PoolType.TRADITIONAL, traditionalAccounts), ZERO, config);
     }
 
     /** A MultiPool over the given type-grouped accounts, MFJ, zero growth, no tax calculator. */
-    private static PoolStrategy.MultiPool pool(Map<String, List<ProjectionAccountInput>> grouped) {
+    private static PoolStrategy.MultiPool pool(Map<PoolType, List<ProjectionAccountInput>> grouped) {
         var config = new PoolStrategy.PoolConfig(
                 FilingStatus.MARRIED_FILING_JOINTLY, ZERO, ZERO, "fixed", null, null,
                 WithdrawalOrder.TAXABLE_FIRST, null, null);
@@ -58,10 +59,10 @@ class MultiPoolOwnerTest {
     @Test
     void applyFirstDeathTransition_rollsDeceasedTraditionalIntoSurvivor_conservingTotal() {
         var pool = pool(Map.of(
-                PoolStrategy.POOL_TRADITIONAL, List.of(
+                PoolType.TRADITIONAL, List.of(
                         owned("300000", "0", "traditional", "primary"),
                         owned("500000", "0", "traditional", "spouse")),
-                PoolStrategy.POOL_ROTH, List.of(
+                PoolType.ROTH, List.of(
                         owned("100000", "0", "roth", "primary"),
                         owned("200000", "0", "roth", "spouse"))));
         BigDecimal totalBefore = pool.getTotal();
@@ -80,7 +81,7 @@ class MultiPoolOwnerTest {
 
     @Test
     void applyFirstDeathTransition_flipsFilingStatusToSingle() {
-        var pool = pool(Map.of(PoolStrategy.POOL_TRADITIONAL,
+        var pool = pool(Map.of(PoolType.TRADITIONAL,
                 List.of(owned("300000", "0", "traditional", "primary"))));
         assertThat(pool.getFilingStatus()).isEqualTo(FilingStatus.MARRIED_FILING_JOINTLY);
 
@@ -91,7 +92,7 @@ class MultiPoolOwnerTest {
 
     @Test
     void applyFirstDeathTransition_survivorIsSpouse_rollsPrimaryPoolsIntoSpouse() {
-        var pool = pool(Map.of(PoolStrategy.POOL_TRADITIONAL, List.of(
+        var pool = pool(Map.of(PoolType.TRADITIONAL, List.of(
                 owned("400000", "0", "traditional", "primary"),
                 owned("100000", "0", "traditional", "spouse"))));
 
@@ -107,7 +108,7 @@ class MultiPoolOwnerTest {
         // Mirrors the Social Security convergence interaction: the transition fires, THEN the pool is
         // snapshotted, mutated by a convergence pass, and restored. The restore must return to the
         // POST-transition state (rollover + filing flip intact) and never re-apply or revert it.
-        var pool = pool(Map.of(PoolStrategy.POOL_TRADITIONAL, List.of(
+        var pool = pool(Map.of(PoolType.TRADITIONAL, List.of(
                 owned("300000", "0", "traditional", "primary"),
                 owned("500000", "0", "traditional", "spouse"))));
 
@@ -125,7 +126,7 @@ class MultiPoolOwnerTest {
     @Test
     void applyFirstDeathTransition_stepUpConservesTotalValue_jointTaxable() {
         // Joint taxable with embedded gain: basis 300k, value 500k.
-        var pool = pool(Map.of(PoolStrategy.POOL_TAXABLE,
+        var pool = pool(Map.of(PoolType.TAXABLE,
                 List.of(owned("500000", "300000", "taxable", "joint"))));
         BigDecimal totalBefore = pool.getTotal();
 
@@ -144,7 +145,7 @@ class MultiPoolOwnerTest {
         //   basis. Selling the whole 200k pool realizes 200k-160k = 40k of gain.
         //   The retired T5 BLENDED factor (deceased 100k + joint 100k*0.5)/200k = 0.75 applied
         //   uniformly would leave basis 177.5k and realize only 22.5k -- provably different.
-        var pool = pool(Map.of(PoolStrategy.POOL_TAXABLE, List.of(
+        var pool = pool(Map.of(PoolType.TAXABLE, List.of(
                 owned("100000", "20000", "taxable", "joint"),
                 owned("100000", "90000", "taxable", "spouse"))));
 

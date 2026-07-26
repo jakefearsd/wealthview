@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 class ProjectionAccountInputTest {
 
@@ -87,5 +88,65 @@ class ProjectionAccountInputTest {
                 new BigDecimal("1000"), new BigDecimal("100"), new BigDecimal("0.06"), "taxable");
 
         assertThat(acct.costBasis()).isEqualByComparingTo("1000");
+    }
+
+    @Test
+    void poolType_taxableAccountType_returnsTaxable() {
+        var alloc = AssetAllocation.fromDoubles(Map.of(AssetClass.US_STOCK, 1.0));
+        ProjectionAccountInput acct = new HypotheticalAccountInput(
+                new BigDecimal("1000"), new BigDecimal("100"),
+                alloc, Optional.empty(), "taxable");
+
+        assertThat(acct.poolType()).isEqualTo(PoolType.TAXABLE);
+    }
+
+    @Test
+    void poolType_traditionalAccountType_returnsTraditional() {
+        var alloc = AssetAllocation.fromDoubles(Map.of(AssetClass.BOND, 1.0));
+        ProjectionAccountInput acct = new LinkedAccountInput(
+                UUID.randomUUID(), new BigDecimal("1000"), new BigDecimal("0"),
+                alloc, Optional.empty(), "traditional");
+
+        assertThat(acct.poolType()).isEqualTo(PoolType.TRADITIONAL);
+    }
+
+    @Test
+    void poolType_unrecognizedAccountType_throws() {
+        var alloc = AssetAllocation.fromDoubles(Map.of(AssetClass.US_STOCK, 1.0));
+        ProjectionAccountInput acct = new HypotheticalAccountInput(
+                new BigDecimal("1000"), new BigDecimal("100"),
+                alloc, Optional.empty(), new BigDecimal("1000"), "bogus", "primary");
+
+        assertThatIllegalArgumentException().isThrownBy(acct::poolType);
+    }
+
+    @Test
+    void ownerType_defaultPrimary_returnsPrimary() {
+        var alloc = AssetAllocation.fromDoubles(Map.of(AssetClass.US_STOCK, 1.0));
+        ProjectionAccountInput acct = new HypotheticalAccountInput(
+                new BigDecimal("1000"), new BigDecimal("100"),
+                alloc, Optional.empty(), "taxable");
+
+        assertThat(acct.ownerType()).isEqualTo(LotOwner.PRIMARY);
+    }
+
+    @Test
+    void ownerType_spouseOwner_returnsSpouse() {
+        var alloc = AssetAllocation.fromDoubles(Map.of(AssetClass.US_STOCK, 1.0));
+        ProjectionAccountInput acct = new HypotheticalAccountInput(
+                new BigDecimal("1000"), new BigDecimal("100"),
+                alloc, Optional.empty(), new BigDecimal("1000"), "taxable", "spouse");
+
+        assertThat(acct.ownerType()).isEqualTo(LotOwner.SPOUSE);
+    }
+
+    @Test
+    void ownerType_unrecognizedOwner_throws() {
+        var alloc = AssetAllocation.fromDoubles(Map.of(AssetClass.US_STOCK, 1.0));
+        ProjectionAccountInput acct = new HypotheticalAccountInput(
+                new BigDecimal("1000"), new BigDecimal("100"),
+                alloc, Optional.empty(), new BigDecimal("1000"), "taxable", "bogus");
+
+        assertThatIllegalArgumentException().isThrownBy(acct::ownerType);
     }
 }

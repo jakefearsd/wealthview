@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import com.wealthview.core.projection.dto.AssetAllocation;
 import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
+import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
@@ -71,13 +72,13 @@ class MultiPoolInterestYieldTest {
         return new HypotheticalAccountInput(bd(balance), ZERO, ZERO, type);
     }
 
-    private static Map<String, List<ProjectionAccountInput>> grouped(
+    private static Map<PoolType, List<ProjectionAccountInput>> grouped(
             HypotheticalAccountInput taxable, HypotheticalAccountInput traditional,
             HypotheticalAccountInput roth) {
         return Map.of(
-                PoolStrategy.POOL_TAXABLE, List.of(taxable),
-                PoolStrategy.POOL_TRADITIONAL, List.of(traditional),
-                PoolStrategy.POOL_ROTH, List.of(roth));
+                PoolType.TAXABLE, List.of(taxable),
+                PoolType.TRADITIONAL, List.of(traditional),
+                PoolType.ROTH, List.of(roth));
     }
 
     private static PoolStrategy.PoolConfig config(String dividendYield, String interestYield,

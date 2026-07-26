@@ -7,6 +7,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
+import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.tax.FilingStatus;
@@ -41,10 +42,10 @@ class PoolStrategyTest {
         List<ProjectionAccountInput> rothAccounts = List.of(
                 new HypotheticalAccountInput(bd(roth), ZERO, ZERO, "roth"));
 
-        Map<String, List<ProjectionAccountInput>> grouped = Map.of(
-                PoolStrategy.POOL_TAXABLE, taxableAccounts,
-                PoolStrategy.POOL_TRADITIONAL, traditionalAccounts,
-                PoolStrategy.POOL_ROTH, rothAccounts);
+        Map<PoolType, List<ProjectionAccountInput>> grouped = Map.of(
+                PoolType.TAXABLE, taxableAccounts,
+                PoolType.TRADITIONAL, traditionalAccounts,
+                PoolType.ROTH, rothAccounts);
 
         var config = new PoolStrategy.PoolConfig(
                 FilingStatus.SINGLE,

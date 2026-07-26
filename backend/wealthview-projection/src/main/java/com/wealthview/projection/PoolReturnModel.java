@@ -32,6 +32,10 @@ record PoolReturnModel(
     record AccountReturnSource(double balance, boolean overrideBased, double overrideReal,
                                AssetAllocation allocation) {}
 
+    // ExhaustiveSwitchHasDefault: the switch below is exhaustive over PoolType, but Checkstyle's
+    // MissingSwitchDefault rule (also an enforced gate) requires the default anyway on a switch
+    // STATEMENT -- this suppression resolves that conflict between the two gates.
+    @SuppressWarnings("PMD.ExhaustiveSwitchHasDefault")
     static PoolReturnModel from(List<? extends ProjectionAccountInput> accounts, double inflationRate) {
         List<AccountReturnSource> taxable = new ArrayList<>();
         List<AccountReturnSource> traditional = new ArrayList<>();
@@ -47,19 +51,24 @@ record PoolReturnModel(
             var source = sourceFor(account, inflationRate, balance);
             all.add(source);
             totalBalance += balance;
-            switch (account.accountType()) {
-                case PoolStrategy.POOL_TRADITIONAL -> {
+            switch (account.poolType()) {
+                case TRADITIONAL -> {
                     traditional.add(source);
                     traditionalBalance += balance;
                 }
-                case PoolStrategy.POOL_ROTH -> {
+                case ROTH -> {
                     roth.add(source);
                     rothBalance += balance;
                 }
-                default -> {
+                case TAXABLE -> {
                     taxable.add(source);
                     taxableBalance += balance;
                 }
+                // Unreachable: PoolType is a closed 3-value enum and every value is handled above;
+                // this branch exists only to satisfy Checkstyle's MissingSwitchDefault rule. It is
+                // deliberately NOT "case TAXABLE" folded into a silent default anymore (task 16) --
+                // that used to mask any unrecognized account type as taxable.
+                default -> throw new IllegalStateException("Unexpected pool type: " + account.poolType());
             }
         }
         return new PoolReturnModel(taxable, traditional, roth, all,

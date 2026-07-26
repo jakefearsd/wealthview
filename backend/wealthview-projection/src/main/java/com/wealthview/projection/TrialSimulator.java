@@ -2,6 +2,7 @@ package com.wealthview.projection;
 
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.dto.LotOwner;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 
 /**

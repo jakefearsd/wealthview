@@ -5,6 +5,8 @@ import java.math.RoundingMode;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
+import com.wealthview.core.projection.dto.LotOwner;
+
 /**
  * BigDecimal FIFO cost-basis lots for the deterministic engine's taxable pool. Each lot is
  * {@code [basis, value]}, oldest first.

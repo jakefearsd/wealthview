@@ -2,6 +2,7 @@ package com.wealthview.projection;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -10,6 +11,8 @@ import java.util.stream.Collectors;
 import org.springframework.lang.Nullable;
 
 import com.wealthview.core.projection.dto.AssetClass;
+import com.wealthview.core.projection.dto.LotOwner;
+import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.household.PersonId;
@@ -30,15 +33,6 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
 
     static final int SCALE = 4;
     static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
-
-    /**
-     * Account type keys used for grouping and pool map lookups. Aliased to the pool tokens
-     * {@link WithdrawalOrder#drawSequence()} yields so the spelling is defined exactly once: a
-     * divergence between the two would silently break every greedy draw that walks a sequence.
-     */
-    static final String POOL_TAXABLE = WithdrawalOrder.POOL_TAXABLE;
-    static final String POOL_TRADITIONAL = WithdrawalOrder.POOL_TRADITIONAL;
-    static final String POOL_ROTH = WithdrawalOrder.POOL_ROTH;
 
     /** Withdrawal order string for the dynamic sequencing strategy. */
     static final String WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING = "dynamic_sequencing";
@@ -709,19 +703,20 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
         Map<AssetClass, Double> geoMeans = config.geoMeans();
         BigDecimal inflationRate = config.inflationRate();
         BigDecimal feeRate = config.feeRate();
-        Map<String, List<ProjectionAccountInput>> grouped = accounts.stream()
-                .collect(Collectors.groupingBy(ProjectionAccountInput::accountType));
+        Map<PoolType, List<ProjectionAccountInput>> grouped = accounts.stream()
+                .collect(Collectors.groupingBy(ProjectionAccountInput::poolType,
+                        () -> new EnumMap<>(PoolType.class), Collectors.toList()));
 
-        BigDecimal totalBalance = sumInitialBalances(grouped.getOrDefault(POOL_TAXABLE, List.of()))
-                .add(sumInitialBalances(grouped.getOrDefault(POOL_TRADITIONAL, List.of())))
-                .add(sumInitialBalances(grouped.getOrDefault(POOL_ROTH, List.of())));
+        BigDecimal totalBalance = sumInitialBalances(grouped.getOrDefault(PoolType.TAXABLE, List.of()))
+                .add(sumInitialBalances(grouped.getOrDefault(PoolType.TRADITIONAL, List.of())))
+                .add(sumInitialBalances(grouped.getOrDefault(PoolType.ROTH, List.of())));
 
         return new MultiPool(grouped,
-                poolWeightedReturn(grouped.getOrDefault(POOL_TAXABLE, List.of()), geoMeans, inflationRate,
+                poolWeightedReturn(grouped.getOrDefault(PoolType.TAXABLE, List.of()), geoMeans, inflationRate,
                         feeRate),
-                poolWeightedReturn(grouped.getOrDefault(POOL_TRADITIONAL, List.of()), geoMeans, inflationRate,
+                poolWeightedReturn(grouped.getOrDefault(PoolType.TRADITIONAL, List.of()), geoMeans, inflationRate,
                         feeRate),
-                poolWeightedReturn(grouped.getOrDefault(POOL_ROTH, List.of()), geoMeans, inflationRate,
+                poolWeightedReturn(grouped.getOrDefault(PoolType.ROTH, List.of()), geoMeans, inflationRate,
                         feeRate),
                 computeWeightedReturn(accounts, totalBalance, geoMeans, inflationRate, feeRate),
                 config);
@@ -733,29 +728,15 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    /** HP1: annual taxable contribution summed over the accounts in one owner category
-     * ({@code joint}/{@code primary}/{@code spouse}), so each year's contribution enters the
-     * commingled lots tagged by its owner. Lives on the interface (like {@link #sumInitialBalances})
-     * to keep {@link MultiPool}'s own complexity down. */
-    private static BigDecimal sumContribsByOwner(List<ProjectionAccountInput> accounts, String category) {
+    /** HP1: annual taxable contribution summed over the accounts owned by one {@link LotOwner}
+     * category, so each year's contribution enters the commingled lots tagged by its owner. Lives
+     * on the interface (like {@link #sumInitialBalances}) to keep {@link MultiPool}'s own
+     * complexity down. */
+    private static BigDecimal sumContribsByOwner(List<ProjectionAccountInput> accounts, LotOwner owner) {
         return accounts.stream()
-                .filter(account -> ownerCategory(account.owner()).equals(category))
+                .filter(account -> account.ownerType() == owner)
                 .map(ProjectionAccountInput::annualContribution)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    /** Normalizes an account owner string to one of {@code "primary"}/{@code "spouse"}/{@code
-     * "joint"}: {@code "spouse"} -> {@code "spouse"}, {@code "joint"} -> {@code "joint"}, anything
-     * else (including {@code null}) -> {@code "primary"}, the default-owner convention. Package-visible
-     * (not {@code private}) so {@link HouseholdMcResolver} shares this single categorization rule
-     * instead of re-deriving it (household task 8 dedup — kept package-visible rather than adding a
-     * second public sum-by-type-and-owner method to this already near-{@code ExcessivePublicCount}
-     * sealed interface). */
-    static String ownerCategory(String owner) {
-        if ("spouse".equals(owner)) {
-            return "spouse";
-        }
-        return "joint".equals(owner) ? "joint" : "primary";
     }
 
     /**
@@ -916,13 +897,13 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
          * Legacy uniform-return constructor: all three pools grow at the same {@code weightedReturn}.
          * Retained so existing direct-construction callers (and tests) keep their behavior.
          */
-        MultiPool(Map<String, List<ProjectionAccountInput>> grouped,
+        MultiPool(Map<PoolType, List<ProjectionAccountInput>> grouped,
                   BigDecimal weightedReturn,
                   PoolConfig config) {
             this(grouped, weightedReturn, weightedReturn, weightedReturn, weightedReturn, config);
         }
 
-        MultiPool(Map<String, List<ProjectionAccountInput>> grouped,
+        MultiPool(Map<PoolType, List<ProjectionAccountInput>> grouped,
                   BigDecimal taxableReturn, BigDecimal traditionalReturn, BigDecimal rothReturn,
                   BigDecimal weightedReturn,
                   PoolConfig config) {
@@ -931,23 +912,22 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             // tagged with its source account's owner so the first-death step-up applies the EXACT
             // per-owner statutory rate (no more single blended factor over the commingled pool).
             this.lots = new TaxableLotsBd();
-            var taxableAccounts = grouped.getOrDefault(POOL_TAXABLE, List.of());
+            var taxableAccounts = grouped.getOrDefault(PoolType.TAXABLE, List.of());
             for (var acct : taxableAccounts) {
-                lots.addLot(acct.costBasis(), acct.initialBalance(),
-                        LotOwner.fromCategory(ownerCategory(acct.owner())));
+                lots.addLot(acct.costBasis(), acct.initialBalance(), acct.ownerType());
             }
             // Audit C1: the taxable pool's own allocation-derived equity share, computed once from
             // the same account list the lots above were seeded from.
             this.taxableEquityShare = taxableEquityShare(taxableAccounts);
-            this.traditional = OwnerPool.ofBalances(grouped.getOrDefault(POOL_TRADITIONAL, List.of()));
-            this.roth = OwnerPool.ofBalances(grouped.getOrDefault(POOL_ROTH, List.of()));
+            this.traditional = OwnerPool.ofBalances(grouped.getOrDefault(PoolType.TRADITIONAL, List.of()));
+            this.roth = OwnerPool.ofBalances(grouped.getOrDefault(PoolType.ROTH, List.of()));
 
-            this.tradContrib = OwnerPool.ofContributions(grouped.getOrDefault(POOL_TRADITIONAL, List.of()));
-            this.rothContrib = OwnerPool.ofContributions(grouped.getOrDefault(POOL_ROTH, List.of()));
+            this.tradContrib = OwnerPool.ofContributions(grouped.getOrDefault(PoolType.TRADITIONAL, List.of()));
+            this.rothContrib = OwnerPool.ofContributions(grouped.getOrDefault(PoolType.ROTH, List.of()));
             // HP1: taxable contributions split by owner so each year's contribution lot is tagged.
-            this.taxableContribJoint = sumContribsByOwner(taxableAccounts, "joint");
-            this.taxableContribPrimary = sumContribsByOwner(taxableAccounts, "primary");
-            this.taxableContribSpouse = sumContribsByOwner(taxableAccounts, "spouse");
+            this.taxableContribJoint = sumContribsByOwner(taxableAccounts, LotOwner.JOINT);
+            this.taxableContribPrimary = sumContribsByOwner(taxableAccounts, LotOwner.PRIMARY);
+            this.taxableContribSpouse = sumContribsByOwner(taxableAccounts, LotOwner.SPOUSE);
 
             this.taxableReturn = taxableReturn;
             this.traditionalReturn = traditionalReturn;

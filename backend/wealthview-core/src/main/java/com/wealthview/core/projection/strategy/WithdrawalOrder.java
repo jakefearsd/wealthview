@@ -3,6 +3,8 @@ package com.wealthview.core.projection.strategy;
 import java.util.List;
 import java.util.Locale;
 
+import com.wealthview.core.projection.dto.PoolType;
+
 /**
  * The order in which retirement withdrawals draw down the taxable / traditional / roth pools.
  *
@@ -18,19 +20,12 @@ public enum WithdrawalOrder {
     PRO_RATA,
     DYNAMIC_SEQUENCING;
 
-    /** Pool token for the taxable pool; matches the persisted {@code accounts.account_type} value. */
-    public static final String POOL_TAXABLE = "taxable";
-    /** Pool token for the tax-deferred pool; matches the persisted {@code accounts.account_type} value. */
-    public static final String POOL_TRADITIONAL = "traditional";
-    /** Pool token for the Roth pool; matches the persisted {@code accounts.account_type} value. */
-    public static final String POOL_ROTH = "roth";
-
-    private static final List<String> TAXABLE_FIRST_SEQUENCE =
-            List.of(POOL_TAXABLE, POOL_TRADITIONAL, POOL_ROTH);
-    private static final List<String> TRADITIONAL_FIRST_SEQUENCE =
-            List.of(POOL_TRADITIONAL, POOL_TAXABLE, POOL_ROTH);
-    private static final List<String> ROTH_FIRST_SEQUENCE =
-            List.of(POOL_ROTH, POOL_TAXABLE, POOL_TRADITIONAL);
+    private static final List<PoolType> TAXABLE_FIRST_SEQUENCE =
+            List.of(PoolType.TAXABLE, PoolType.TRADITIONAL, PoolType.ROTH);
+    private static final List<PoolType> TRADITIONAL_FIRST_SEQUENCE =
+            List.of(PoolType.TRADITIONAL, PoolType.TAXABLE, PoolType.ROTH);
+    private static final List<PoolType> ROTH_FIRST_SEQUENCE =
+            List.of(PoolType.ROTH, PoolType.TAXABLE, PoolType.TRADITIONAL);
 
     public static WithdrawalOrder fromString(String value) {
         if (value == null) {
@@ -48,8 +43,7 @@ public enum WithdrawalOrder {
 
     /**
      * The pools in the priority order this withdrawal order draws them, as an immutable list of
-     * the pool tokens ({@link #POOL_TAXABLE} / {@link #POOL_TRADITIONAL} / {@link #POOL_ROTH}).
-     * Always a permutation of all three pools.
+     * {@link PoolType}. Always a permutation of all three pools.
      *
      * <p>{@link #PRO_RATA} and {@link #DYNAMIC_SEQUENCING} are not priority sequences — they
      * allocate proportionally and by bracket space respectively, and every consumer dispatches
@@ -58,7 +52,7 @@ public enum WithdrawalOrder {
      * the Monte Carlo trial path, which has no proportional mode) keep their documented
      * taxable-first fallback rather than drawing nothing.
      */
-    public List<String> drawSequence() {
+    public List<PoolType> drawSequence() {
         return switch (this) {
             case TRADITIONAL_FIRST -> TRADITIONAL_FIRST_SEQUENCE;
             case ROTH_FIRST -> ROTH_FIRST_SEQUENCE;

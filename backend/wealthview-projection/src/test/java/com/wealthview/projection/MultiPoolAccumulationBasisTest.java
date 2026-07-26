@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import com.wealthview.core.projection.dto.AssetAllocation;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
+import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
@@ -55,11 +56,11 @@ class MultiPoolAccumulationBasisTest {
                 Optional.empty(), bd(basis), "taxable");
     }
 
-    private static Map<String, List<ProjectionAccountInput>> grouped(HypotheticalAccountInput taxable) {
+    private static Map<PoolType, List<ProjectionAccountInput>> grouped(HypotheticalAccountInput taxable) {
         return Map.of(
-                PoolStrategy.POOL_TAXABLE, List.of(taxable),
-                PoolStrategy.POOL_TRADITIONAL, List.of(),
-                PoolStrategy.POOL_ROTH, List.of());
+                PoolType.TAXABLE, List.of(taxable),
+                PoolType.TRADITIONAL, List.of(),
+                PoolType.ROTH, List.of());
     }
 
     /**
@@ -187,9 +188,9 @@ class MultiPoolAccumulationBasisTest {
                 BASE_YEAR, null);
         var pool = new PoolStrategy.MultiPool(
                 Map.of(
-                        PoolStrategy.POOL_TAXABLE, List.of(taxableAcct("100000", "100000")),
-                        PoolStrategy.POOL_TRADITIONAL, List.of(),
-                        PoolStrategy.POOL_ROTH, List.of(
+                        PoolType.TAXABLE, List.of(taxableAcct("100000", "100000")),
+                        PoolType.TRADITIONAL, List.of(),
+                        PoolType.ROTH, List.of(
                                 new HypotheticalAccountInput(bd("200000"), ZERO, ZERO, "roth"))),
                 bd("0.06"), ZERO, ZERO, bd("0.06"),
                 rothOnlyOrderConfig);

@@ -37,4 +37,28 @@ public sealed interface ProjectionAccountInput
      * owner-aware pool generalization (a later task) consumes it.
      */
     String owner();
+
+    /**
+     * Task 16: typed view of {@link #accountType()}. The record component stays a {@code String}
+     * for wire compatibility (JSON, JPA columns); consumers that dispatch on account type should
+     * use this accessor instead of comparing the raw string. Throws via {@link PoolType#fromString}
+     * if {@link #accountType()} is outside the closed set — every production construction path
+     * (persisted rows behind {@code chk_projection_accounts_account_type}) already guarantees this
+     * never happens; see {@code ProjectionInputBuilder}.
+     */
+    default PoolType poolType() {
+        return PoolType.fromString(accountType());
+    }
+
+    /**
+     * Task 16: typed view of {@link #owner()}. The record component stays a {@code String} for wire
+     * compatibility; consumers that dispatch on owner category should use this accessor instead of
+     * comparing the raw string. Throws via {@link LotOwner#fromString} if {@link #owner()} is
+     * outside the closed set — every production construction path (persisted rows behind {@code
+     * chk_projection_accounts_owner}, plus {@code ScenarioCrudService#validateAccountOwner}) already
+     * guarantees this never happens.
+     */
+    default LotOwner ownerType() {
+        return LotOwner.fromString(owner());
+    }
 }

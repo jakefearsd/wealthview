@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 
 import org.junit.jupiter.api.Test;
 
+import com.wealthview.core.projection.dto.LotOwner;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**

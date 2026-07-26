@@ -1,6 +1,9 @@
 package com.wealthview.projection;
 
 import org.junit.jupiter.api.Test;
+
+import com.wealthview.core.projection.dto.LotOwner;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.wealthview.core.common.CompoundGrowth;
+import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
@@ -318,12 +319,16 @@ final class ConversionSimulator {
      * {@link WithdrawalOrder} defines. Traditional draws incur incremental tax.
      */
     private final class OrderedWithdrawalStrategy implements SpendingWithdrawalStrategy {
-        private final List<String> pools;
+        private final List<PoolType> pools;
 
-        OrderedWithdrawalStrategy(List<String> pools) {
+        OrderedWithdrawalStrategy(List<PoolType> pools) {
             this.pools = pools;
         }
 
+        // ExhaustiveSwitchHasDefault: the switch below is exhaustive over PoolType, but
+        // Checkstyle's MissingSwitchDefault rule (also an enforced gate) requires the default
+        // anyway on a switch STATEMENT -- this suppression resolves that conflict between gates.
+        @SuppressWarnings("PMD.ExhaustiveSwitchHasDefault")
         @Override
         public WithdrawalResult withdraw(double taxable, double traditional, double roth,
                                          double need, double effectiveOtherIncome,
@@ -337,12 +342,12 @@ final class ConversionSimulator {
                     break;
                 }
                 switch (pool) {
-                    case PoolStrategy.POOL_TAXABLE -> {
+                    case TAXABLE -> {
                         double draw = Math.min(remaining, taxable);
                         taxable -= draw;
                         remaining -= draw;
                     }
-                    case PoolStrategy.POOL_TRADITIONAL -> {
+                    case TRADITIONAL -> {
                         double draw = Math.min(remaining, traditional);
                         traditional -= draw;
                         remaining -= draw;
@@ -350,12 +355,14 @@ final class ConversionSimulator {
                                 effectiveOtherIncome + rmdAmount + conversionAmount,
                                 calendarYear);
                     }
-                    case PoolStrategy.POOL_ROTH -> {
+                    case ROTH -> {
                         double draw = Math.min(remaining, roth);
                         roth -= draw;
                         remaining -= draw;
                     }
-                    default -> throw new IllegalStateException("Unknown pool token: " + pool);
+                    // Unreachable: PoolType is a closed 3-value enum and every value is handled
+                    // above; this branch exists only to satisfy Checkstyle's MissingSwitchDefault.
+                    default -> throw new IllegalStateException("Unexpected pool type: " + pool);
                 }
             }
 

@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
+import com.wealthview.core.projection.dto.LotOwner;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.household.PersonId;
 
@@ -35,10 +36,10 @@ final class OwnerPool {
         this.balances = balances;
     }
 
-    /** Owner an account belongs to: {@code "spouse"} -> SPOUSE, everything else (incl. the
-     * taxable-only {@code "joint"} default) -> PRIMARY. */
+    /** Owner an account belongs to: {@link LotOwner#SPOUSE} -> SPOUSE, everything else (incl. the
+     * taxable-only {@link LotOwner#JOINT} default) -> PRIMARY. */
     private static PersonId ownerOf(ProjectionAccountInput account) {
-        return "spouse".equals(account.owner()) ? PersonId.SPOUSE : PersonId.PRIMARY;
+        return account.ownerType() == LotOwner.SPOUSE ? PersonId.SPOUSE : PersonId.PRIMARY;
     }
 
     /** Seeds a pool from accounts' initial balances, guaranteeing a PRIMARY entry (zero if empty). */

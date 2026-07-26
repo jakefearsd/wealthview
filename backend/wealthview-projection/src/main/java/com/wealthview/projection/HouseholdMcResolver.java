@@ -6,6 +6,8 @@ import java.util.List;
 import org.springframework.lang.Nullable;
 
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
+import com.wealthview.core.projection.dto.LotOwner;
+import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.household.HouseholdContext;
@@ -134,8 +136,8 @@ final class HouseholdMcResolver {
         // (first death beyond the window). truncateYearIndex ends the trial at the second death.
         int truncateYearIdx = HouseholdIndexMath.truncateIndex(household, retirementYear, years);
         var sim = new TrialSimulator.HouseholdSim(
-                sumTraditional(input.accounts(), "spouse"),
-                sumRoth(input.accounts(), "spouse"),
+                sumTraditional(input.accounts(), LotOwner.SPOUSE),
+                sumRoth(input.accounts(), LotOwner.SPOUSE),
                 primaryBirthYear - spouseBirthYear,
                 RmdCalculator.rmdStartAge(spouseBirthYear),
                 simTransitionIdx,
@@ -158,29 +160,28 @@ final class HouseholdMcResolver {
      */
     private static TrialSimulator.TaxableSeed taxableSeed(List<ProjectionAccountInput> accounts) {
         return new TrialSimulator.TaxableSeed(
-                sumTaxableBasis(accounts, "joint"), sumTaxable(accounts, "joint"),
-                sumTaxableBasis(accounts, "primary"), sumTaxable(accounts, "primary"),
-                sumTaxableBasis(accounts, "spouse"), sumTaxable(accounts, "spouse"));
+                sumTaxableBasis(accounts, LotOwner.JOINT), sumTaxable(accounts, LotOwner.JOINT),
+                sumTaxableBasis(accounts, LotOwner.PRIMARY), sumTaxable(accounts, LotOwner.PRIMARY),
+                sumTaxableBasis(accounts, LotOwner.SPOUSE), sumTaxable(accounts, LotOwner.SPOUSE));
     }
 
-    private static double sumTraditional(List<ProjectionAccountInput> accounts, String owner) {
-        return sumByTypeAndOwner(accounts, PoolStrategy.POOL_TRADITIONAL, owner).doubleValue();
+    private static double sumTraditional(List<ProjectionAccountInput> accounts, LotOwner owner) {
+        return sumByTypeAndOwner(accounts, PoolType.TRADITIONAL, owner).doubleValue();
     }
 
-    private static double sumRoth(List<ProjectionAccountInput> accounts, String owner) {
-        return sumByTypeAndOwner(accounts, PoolStrategy.POOL_ROTH, owner).doubleValue();
+    private static double sumRoth(List<ProjectionAccountInput> accounts, LotOwner owner) {
+        return sumByTypeAndOwner(accounts, PoolType.ROTH, owner).doubleValue();
     }
 
-    private static double sumTaxable(List<ProjectionAccountInput> accounts, String owner) {
-        return sumByTypeAndOwner(accounts, PoolStrategy.POOL_TAXABLE, owner).doubleValue();
+    private static double sumTaxable(List<ProjectionAccountInput> accounts, LotOwner owner) {
+        return sumByTypeAndOwner(accounts, PoolType.TAXABLE, owner).doubleValue();
     }
 
-    /** HP1: cost-basis sum of the taxable accounts in one owner category. */
-    private static double sumTaxableBasis(List<ProjectionAccountInput> accounts, String owner) {
+    /** HP1: cost-basis sum of the taxable accounts owned by one {@link LotOwner}. */
+    private static double sumTaxableBasis(List<ProjectionAccountInput> accounts, LotOwner owner) {
         double sum = 0.0;
         for (var account : accounts) {
-            if (PoolStrategy.POOL_TAXABLE.equals(account.accountType())
-                    && owner.equals(PoolStrategy.ownerCategory(account.owner()))) {
+            if (account.poolType() == PoolType.TAXABLE && account.ownerType() == owner) {
                 sum += account.costBasis().doubleValue();
             }
         }
@@ -188,17 +189,18 @@ final class HouseholdMcResolver {
     }
 
     /**
-     * Household task 8 (dedup): type-AND-owner-filtered sum, sharing {@link PoolStrategy#ownerCategory}
-     * for the owner-partition rule instead of re-deriving it (the pre-task-8 {@code ownerOrPrimary}
-     * duplicate this replaces). Not lifted onto {@link PoolStrategy} itself as a public sum-by-owner
-     * method — that interface is already near PMD's {@code ExcessivePublicCount} threshold, and this
-     * type-filtered shape is MC-local (the deterministic side seeds its lots per account directly).
+     * Household task 8 (dedup): type-AND-owner-filtered sum over the typed {@link
+     * ProjectionAccountInput#poolType()}/{@link ProjectionAccountInput#ownerType()} accessors (task
+     * 16 — replaces the former {@code PoolStrategy.ownerCategory} string-normalization bridge). Not
+     * lifted onto {@link PoolStrategy} itself as a public sum-by-owner method — that interface is
+     * already near PMD's {@code ExcessivePublicCount} threshold, and this type-filtered shape is
+     * MC-local (the deterministic side seeds its lots per account directly).
      */
     private static BigDecimal sumByTypeAndOwner(List<ProjectionAccountInput> accounts,
-                                                String type, String owner) {
+                                                PoolType type, LotOwner owner) {
         BigDecimal sum = BigDecimal.ZERO;
         for (var account : accounts) {
-            if (type.equals(account.accountType()) && owner.equals(PoolStrategy.ownerCategory(account.owner()))) {
+            if (type == account.poolType() && owner == account.ownerType()) {
                 sum = sum.add(account.initialBalance());
             }
         }

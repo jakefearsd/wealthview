@@ -3,6 +3,7 @@ package com.wealthview.projection;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
+import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.TaxCalculationStrategy;
@@ -125,6 +126,10 @@ sealed interface WithdrawalOrderStrategy
             this.order = order;
         }
 
+        // ExhaustiveSwitchHasDefault: the switch below is exhaustive over PoolType, but
+        // Checkstyle's MissingSwitchDefault rule (also an enforced gate) requires the default
+        // anyway on a switch STATEMENT -- this suppression resolves that conflict between gates.
+        @SuppressWarnings("PMD.ExhaustiveSwitchHasDefault")
         @Override
         public Result execute(BigDecimal need, BigDecimal taxable, BigDecimal traditional, BigDecimal roth) {
             BigDecimal remaining = need;
@@ -132,21 +137,23 @@ sealed interface WithdrawalOrderStrategy
             BigDecimal fromTraditional = BigDecimal.ZERO;
             BigDecimal fromRoth = BigDecimal.ZERO;
 
-            for (String pool : order.drawSequence()) {
+            for (PoolType pool : order.drawSequence()) {
                 switch (pool) {
-                    case PoolStrategy.POOL_TAXABLE -> {
+                    case TAXABLE -> {
                         fromTaxable = remaining.min(taxable);
                         remaining = remaining.subtract(fromTaxable);
                     }
-                    case PoolStrategy.POOL_TRADITIONAL -> {
+                    case TRADITIONAL -> {
                         fromTraditional = remaining.min(traditional);
                         remaining = remaining.subtract(fromTraditional);
                     }
-                    case PoolStrategy.POOL_ROTH -> {
+                    case ROTH -> {
                         fromRoth = remaining.min(roth);
                         remaining = remaining.subtract(fromRoth);
                     }
-                    default -> throw new IllegalStateException("Unknown pool token: " + pool);
+                    // Unreachable: PoolType is a closed 3-value enum and every value is handled
+                    // above; this branch exists only to satisfy Checkstyle's MissingSwitchDefault.
+                    default -> throw new IllegalStateException("Unexpected pool type: " + pool);
                 }
             }
 

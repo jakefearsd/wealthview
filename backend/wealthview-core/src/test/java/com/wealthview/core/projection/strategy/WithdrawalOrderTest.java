@@ -2,6 +2,8 @@ package com.wealthview.core.projection.strategy;
 
 import org.junit.jupiter.api.Test;
 
+import com.wealthview.core.projection.dto.PoolType;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class WithdrawalOrderTest {
@@ -45,22 +47,19 @@ class WithdrawalOrderTest {
     @Test
     void drawSequence_taxableFirst_drawsTaxableThenTraditionalThenRoth() {
         assertThat(WithdrawalOrder.TAXABLE_FIRST.drawSequence())
-                .containsExactly(WithdrawalOrder.POOL_TAXABLE, WithdrawalOrder.POOL_TRADITIONAL,
-                        WithdrawalOrder.POOL_ROTH);
+                .containsExactly(PoolType.TAXABLE, PoolType.TRADITIONAL, PoolType.ROTH);
     }
 
     @Test
     void drawSequence_traditionalFirst_drawsTraditionalThenTaxableThenRoth() {
         assertThat(WithdrawalOrder.TRADITIONAL_FIRST.drawSequence())
-                .containsExactly(WithdrawalOrder.POOL_TRADITIONAL, WithdrawalOrder.POOL_TAXABLE,
-                        WithdrawalOrder.POOL_ROTH);
+                .containsExactly(PoolType.TRADITIONAL, PoolType.TAXABLE, PoolType.ROTH);
     }
 
     @Test
     void drawSequence_rothFirst_drawsRothThenTaxableThenTraditional() {
         assertThat(WithdrawalOrder.ROTH_FIRST.drawSequence())
-                .containsExactly(WithdrawalOrder.POOL_ROTH, WithdrawalOrder.POOL_TAXABLE,
-                        WithdrawalOrder.POOL_TRADITIONAL);
+                .containsExactly(PoolType.ROTH, PoolType.TAXABLE, PoolType.TRADITIONAL);
     }
 
     @Test
@@ -68,8 +67,7 @@ class WithdrawalOrderTest {
         // Pro-rata has no strict priority sequence: consumers that support proportional allocation
         // dispatch it before asking for a sequence, and the Monte Carlo path draws it taxable-first.
         assertThat(WithdrawalOrder.PRO_RATA.drawSequence())
-                .containsExactly(WithdrawalOrder.POOL_TAXABLE, WithdrawalOrder.POOL_TRADITIONAL,
-                        WithdrawalOrder.POOL_ROTH);
+                .containsExactly(PoolType.TAXABLE, PoolType.TRADITIONAL, PoolType.ROTH);
     }
 
     @Test
@@ -77,8 +75,7 @@ class WithdrawalOrderTest {
         // Dynamic sequencing is bracket-driven and dispatched ahead of the ordered strategies; the
         // sequence is only reached as the documented "no bracket rate configured" fallback.
         assertThat(WithdrawalOrder.DYNAMIC_SEQUENCING.drawSequence())
-                .containsExactly(WithdrawalOrder.POOL_TAXABLE, WithdrawalOrder.POOL_TRADITIONAL,
-                        WithdrawalOrder.POOL_ROTH);
+                .containsExactly(PoolType.TAXABLE, PoolType.TRADITIONAL, PoolType.ROTH);
     }
 
     @Test
@@ -86,8 +83,7 @@ class WithdrawalOrderTest {
         for (WithdrawalOrder order : WithdrawalOrder.values()) {
             assertThat(order.drawSequence())
                     .as("draw sequence for %s", order)
-                    .containsExactlyInAnyOrder(WithdrawalOrder.POOL_TAXABLE,
-                            WithdrawalOrder.POOL_TRADITIONAL, WithdrawalOrder.POOL_ROTH);
+                    .containsExactlyInAnyOrder(PoolType.TAXABLE, PoolType.TRADITIONAL, PoolType.ROTH);
         }
     }
 }

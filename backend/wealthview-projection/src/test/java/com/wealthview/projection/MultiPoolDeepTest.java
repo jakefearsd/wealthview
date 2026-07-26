@@ -7,6 +7,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
+import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.tax.CombinedTaxResult;
@@ -35,15 +36,15 @@ class MultiPoolDeepTest {
 
     // ---- helpers ----
 
-    private static Map<String, List<ProjectionAccountInput>> grouped(
+    private static Map<PoolType, List<ProjectionAccountInput>> grouped(
             String taxable, String traditional, String roth,
             String taxableContrib, String traditionalContrib, String rothContrib) {
         return Map.of(
-                PoolStrategy.POOL_TAXABLE,
+                PoolType.TAXABLE,
                 List.of(new HypotheticalAccountInput(bd(taxable), bd(taxableContrib), ZERO, "taxable")),
-                PoolStrategy.POOL_TRADITIONAL,
+                PoolType.TRADITIONAL,
                 List.of(new HypotheticalAccountInput(bd(traditional), bd(traditionalContrib), ZERO, "traditional")),
-                PoolStrategy.POOL_ROTH,
+                PoolType.ROTH,
                 List.of(new HypotheticalAccountInput(bd(roth), bd(rothContrib), ZERO, "roth")));
     }
 
