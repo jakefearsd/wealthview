@@ -78,6 +78,7 @@ describe('defaultOptimizerConfig', () => {
         expect(config.rmdTargetBracketRate).toBe(0.12);
         expect(config.exhaustionBuffer).toBe(5);
         expect(config.rmdBracketHeadroomPct).toBe(10);
+        expect(config.dynSeqBracketRatePct).toBeNull();
         expect(config.phases).toHaveLength(3);
     });
 });
@@ -162,6 +163,12 @@ describe('fromProfile', () => {
 
         expect(config.gateOnAdaptiveRules).toBe(true);
     });
+
+    it('does not restore a dynamic-sequencing bracket rate (the profile does not carry one)', () => {
+        const config = fromProfile(makeProfile());
+
+        expect(config.dynSeqBracketRatePct).toBeNull();
+    });
 });
 
 describe('toRequest', () => {
@@ -185,6 +192,18 @@ describe('toRequest', () => {
         const request = toRequest({ ...defaultOptimizerConfig(), confidenceLevelPct: 85 }, 's1');
 
         expect(request.confidence_level).toBeCloseTo(0.85);
+    });
+
+    it('omits the dynamic-sequencing bracket rate when unset', () => {
+        const request = toRequest(defaultOptimizerConfig(), 's1');
+
+        expect('dynamic_sequencing_bracket_rate' in request).toBe(false);
+    });
+
+    it('sends the dynamic-sequencing bracket rate as a fraction when set', () => {
+        const request = toRequest({ ...defaultOptimizerConfig(), dynSeqBracketRatePct: 22 }, 's1');
+
+        expect(request.dynamic_sequencing_bracket_rate).toBeCloseTo(0.22);
     });
 
     it('omits conversion fields when conversion optimization is off', () => {

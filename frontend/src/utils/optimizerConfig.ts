@@ -32,6 +32,8 @@ export interface OptimizerConfig {
     exhaustionBuffer: number;
     /** RMD bracket headroom, percent (10 = 10%). API: fraction. */
     rmdBracketHeadroomPct: number;
+    /** Target tax bracket for dynamic withdrawal sequencing, percent — null means "off". API: fraction. */
+    dynSeqBracketRatePct: number | null;
     phases: GuardrailPhase[];
     /**
      * T24: per-profile toggle for the sustainability search gate. Always sent explicitly to the
@@ -62,6 +64,7 @@ export function defaultOptimizerConfig(): OptimizerConfig {
         rmdTargetBracketRate: 0.12,
         exhaustionBuffer: 5,
         rmdBracketHeadroomPct: 10,
+        dynSeqBracketRatePct: null,
         gateOnAdaptiveRules: true,
         phases: [
             { name: 'Early retirement', start_age: 62, end_age: 72, priority_weight: 3, target_spending: 80000 },
@@ -138,6 +141,9 @@ export function toRequest(config: OptimizerConfig, scenarioId: string): Guardrai
         risk_tolerance: config.riskTolerance,
         gate_on_adaptive_rules: config.gateOnAdaptiveRules,
         ...(config.confidenceLevelPct != null ? { confidence_level: config.confidenceLevelPct / 100 } : {}),
+        ...(config.dynSeqBracketRatePct != null
+            ? { dynamic_sequencing_bracket_rate: config.dynSeqBracketRatePct / 100 }
+            : {}),
         ...(config.optimizeConversions ? {
             optimize_conversions: true,
             conversion_bracket_rate: config.conversionBracketRate,
