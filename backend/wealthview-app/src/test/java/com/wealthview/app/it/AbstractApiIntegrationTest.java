@@ -74,6 +74,17 @@ public abstract class AbstractApiIntegrationTest {
         var connectionManager = org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder.create()
                 .setDefaultConnectionConfig(org.apache.hc.client5.http.config.ConnectionConfig.custom()
                         .setConnectTimeout(org.apache.hc.core5.util.Timeout.ofSeconds(15))
+                        // Without this, a pooled connection that the embedded Tomcat has already
+                        // closed (e.g. after a preceding request in the same test) can be handed
+                        // back out and written to before the client notices it's dead: the write
+                        // succeeds at the TCP layer, the server responds with a bare status line
+                        // and no body (Content-Length: 0, Connection: close), and HttpClient5's
+                        // transparent single retry sometimes masks it and sometimes doesn't —
+                        // producing an assertion failure on the response body maybe 1 run in 3.
+                        // Forcing validation before every reuse (ZERO_MILLISECONDS = always check)
+                        // trades a cheap non-blocking peek for eliminating that race; this suite is
+                        // not latency-sensitive. Root-caused while adding StockSplitSyncUnavailableIT.
+                        .setValidateAfterInactivity(org.apache.hc.core5.util.TimeValue.ZERO_MILLISECONDS)
                         .build())
                 .build();
         var httpClient = org.apache.hc.client5.http.impl.classic.HttpClientBuilder.create()
