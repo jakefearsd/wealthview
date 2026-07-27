@@ -8,6 +8,69 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 Nothing yet.
 
+## [1.2.4] — 2026-07-27
+
+Consolidates 74 commits since v1.2.3 — a pattern-focused refactoring pass over
+the projection engine, the whole backend test suite, and the frontend, executed
+and independently reviewed task-by-task. One real engine bug and three
+dead-plumbing defects fixed; the fixture and scaffolding duplication across
+roughly two hundred test files collapsed into shared builders. No schema
+changes (still V080).
+
+### Fixed
+- Roth-conversion arm scoring now actually funds spending withdrawals. The
+  conversion simulator parsed the withdrawal order as a comma-separated pool
+  list while production supplies enum tokens ("taxable_first"), so for ages
+  59½+ without dynamic sequencing the spending step silently drew nothing and
+  accrued no withdrawal tax — understating pool depletion and lifetime tax on
+  every scored conversion arm. Withdrawal-order semantics are now defined once
+  on the `WithdrawalOrder` enum and consumed by all three engines.
+- Generic CSV import accepts `opening_balance`. The parser's hand-rolled type
+  list had drifted from the API, the DB constraint, and the Fidelity positions
+  parser; all four now share one `TransactionType` enum, making this class of
+  drift impossible.
+- Latest-price lookups are now cached as intended. The `latestPrices` cache
+  was evicted at eight write paths but had no reader, so every read hit
+  PostgreSQL; reads now go through a cached resolver (10-minute TTL). All
+  in-app writes evict, so only out-of-band DB edits can be briefly stale.
+- `POST /api/v1/admin/stock-splits/sync` returns the standard
+  `{error, message, status}` envelope with 503 when split detection is not
+  configured, instead of an empty body.
+
+### Changed
+- Transaction types are case-tolerant on input (`"BUY"` is accepted) and
+  always normalized to the lowercase wire token.
+- Web error toasts show the backend's actual message wherever a handler
+  previously hard-coded a generic string; mobile login failures likewise
+  surface the server's message instead of a fixed sentence.
+- Inside conversion scoring, `pro_rata` draws taxable-first, matching the
+  Monte Carlo trial path; the deterministic engine's truly proportional
+  behavior is unchanged.
+- Chart tooltips and the three pill-style range selectors now share one
+  component each, with minor visual convergence on the two nonstandard sites.
+
+### Notes for existing data
+- Guardrail profiles optimized before this release were scored under the
+  fixed no-op; re-optimizing a scenario will legitimately shift its schedule.
+- Re-optimizing a dynamic-sequencing scenario does not carry the DS bracket
+  rate over (pre-existing limitation, now material) — run a fresh optimize
+  after changing DS settings.
+
+### Internal
+- Pattern consolidation: `TransactionType`, `PoolType`/`LotOwner` and
+  `WithdrawalOrder.drawSequence()` end the stringly-typed dispatch; builders
+  on the two 20/40-component guardrail records; the Monte Carlo trial-pass
+  assembly, `SearchContext`, withdrawal signatures, and regime building moved
+  behind factories and parameter objects with byte-identical outputs; UUID
+  primary-key mapped superclasses cover 35 entities; the broker CSV parser
+  Template Method is complete (new brokers are constants-only).
+- Test infrastructure: shared fixture builders, object mothers, and stubs
+  replace per-file duplication across backend and frontend suites (fixture
+  builders for the guardrail/scenario records, one flat-tax stub, an API
+  client facade adopted across 40+ integration-test classes, shared vi.mock
+  scaffolding); 267 Testcontainers integration tests and all five build gates
+  green.
+
 ## [1.2.3] — 2026-07-25
 
 Consolidates 17 commits since v1.2.2 — one memory-leak fix, a repaired mobile
