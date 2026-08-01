@@ -5,13 +5,14 @@ import { useApiQuery } from '../hooks/useApiQuery';
 import { useCrudForm } from '../hooks/useCrudForm';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency, toPercent } from '../utils/format';
-import PropertyForm, { type PropertyFormValues, type CostSegAllocations } from '../components/PropertyForm';
+import PropertyForm, { type PropertyFormValues } from '../components/PropertyForm';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import Button from '../components/Button';
 import StatTile from '../components/StatTile';
 import type { Property } from '../types/property';
+import { buildRequest, allocationsToState } from '../utils/propertyRequest';
 
 const initialFormData: PropertyFormValues = {
     address: '',
@@ -40,47 +41,6 @@ const initialFormData: PropertyFormValues = {
     bonusDepreciationRate: '100',
     costSegStudyYear: '',
 };
-
-function buildCostSegAllocations(allocs: CostSegAllocations) {
-    const result = [];
-    if (allocs.fiveYr && parseFloat(allocs.fiveYr) > 0) result.push({ asset_class: '5yr', allocation: parseFloat(allocs.fiveYr) });
-    if (allocs.sevenYr && parseFloat(allocs.sevenYr) > 0) result.push({ asset_class: '7yr', allocation: parseFloat(allocs.sevenYr) });
-    if (allocs.fifteenYr && parseFloat(allocs.fifteenYr) > 0) result.push({ asset_class: '15yr', allocation: parseFloat(allocs.fifteenYr) });
-    if (allocs.twentySevenYr && parseFloat(allocs.twentySevenYr) > 0) result.push({ asset_class: '27_5yr', allocation: parseFloat(allocs.twentySevenYr) });
-    return result;
-}
-
-function buildRequest(data: PropertyFormValues) {
-    const isCostSeg = data.depreciationMethod === 'cost_segregation';
-    return {
-        address: data.address,
-        purchase_price: parseFloat(data.purchasePrice),
-        purchase_date: data.purchaseDate,
-        current_value: parseFloat(data.currentValue),
-        mortgage_balance: data.mortgageBalance ? parseFloat(data.mortgageBalance) : undefined,
-        property_type: data.propertyType,
-        ...(data.showLoanDetails && data.loanAmount ? {
-            loan_amount: parseFloat(data.loanAmount),
-            annual_interest_rate: parseFloat(data.annualInterestRate) / 100,
-            loan_term_months: parseInt(data.loanTermMonths),
-            loan_start_date: data.loanStartDate,
-            use_computed_balance: data.useComputedBalance,
-        } : {}),
-        annual_appreciation_rate: data.annualAppreciationRate ? parseFloat(data.annualAppreciationRate) / 100 : undefined,
-        annual_property_tax: data.annualPropertyTax ? parseFloat(data.annualPropertyTax) : undefined,
-        annual_insurance_cost: data.annualInsuranceCost ? parseFloat(data.annualInsuranceCost) : undefined,
-        annual_maintenance_cost: data.annualMaintenanceCost ? parseFloat(data.annualMaintenanceCost) : undefined,
-        depreciation_method: data.depreciationMethod,
-        in_service_date: data.depreciationMethod !== 'none' ? (data.inServiceDate || data.purchaseDate || undefined) : undefined,
-        land_value: data.landValue ? parseFloat(data.landValue) : undefined,
-        useful_life_years: data.usefulLifeYears ? parseFloat(data.usefulLifeYears) : undefined,
-        ...(isCostSeg ? {
-            cost_seg_allocations: buildCostSegAllocations(data.costSegAllocations),
-            bonus_depreciation_rate: parseFloat(data.bonusDepreciationRate) / 100,
-            cost_seg_study_year: data.costSegStudyYear ? parseInt(data.costSegStudyYear) : undefined,
-        } : {}),
-    };
-}
 
 export default function PropertiesListPage() {
     const { role } = useAuth();
@@ -121,16 +81,6 @@ export default function PropertiesListPage() {
         setShowForm(false);
     }, [crudReset]);
 
-    function allocationsToState(allocs: Property['cost_seg_allocations']): CostSegAllocations {
-        const state: CostSegAllocations = { fiveYr: '', sevenYr: '', fifteenYr: '', twentySevenYr: '' };
-        for (const a of allocs ?? []) {
-            if (a.asset_class === '5yr') state.fiveYr = String(a.allocation);
-            else if (a.asset_class === '7yr') state.sevenYr = String(a.allocation);
-            else if (a.asset_class === '15yr') state.fifteenYr = String(a.allocation);
-            else if (a.asset_class === '27_5yr') state.twentySevenYr = String(a.allocation);
-        }
-        return state;
-    }
 
     function startEdit(property: Property) {
         const hasFinancialFields = property.annual_appreciation_rate != null
