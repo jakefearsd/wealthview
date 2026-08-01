@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithRoute } from '../test-utils';
 
@@ -33,12 +33,16 @@ vi.mock('../utils/styles', () => ({
     trHoverStyle: {},
 }));
 
+const { toastSuccess, toastError } = vi.hoisted(() => ({
+    toastSuccess: vi.fn(), toastError: vi.fn(),
+}));
 vi.mock('react-hot-toast', () => ({
-    default: { success: vi.fn(), error: vi.fn() },
+    default: { success: toastSuccess, error: toastError },
 }));
 
 import { useApiQuery } from '../hooks/useApiQuery';
 import { listTransactions } from '../api/transactions';
+import { updateHolding } from '../api/holdings';
 import HoldingDetailPage from './HoldingDetailPage';
 
 const mockUseApiQuery = vi.mocked(useApiQuery);
@@ -83,5 +87,100 @@ describe('HoldingDetailPage', () => {
         });
         // "10" appears somewhere — quantity is 10
         expect(screen.getAllByText(/\b10\b/).length).toBeGreaterThan(0);
+    });
+
+    // === manual override editing ===
+    //
+    // This page is the manual-override surface: whatever is saved here replaces the quantity and
+    // cost basis that holdings recomputation would otherwise derive from transactions. The save
+    // must carry the holding's OWN account and symbol — it is the only page where those are read
+    // back off the loaded holding rather than supplied by the caller.
+
+    const openEditor = async () => {
+        renderPage();
+        await waitFor(() => expect(screen.getAllByText('AAPL').length).toBeGreaterThan(0));
+        fireEvent.click(screen.getByRole('button', { name: /Edit Override/i }));
+    };
+
+    it('seeds the override editor from the loaded holding', async () => {
+        await openEditor();
+
+        expect(screen.getByDisplayValue('10')).toBeInTheDocument();
+        expect(screen.getByDisplayValue('1500')).toBeInTheDocument();
+    });
+
+    it('saves the override against the holding\'s own account and symbol', async () => {
+        vi.mocked(updateHolding).mockResolvedValue({} as never);
+        await openEditor();
+
+        fireEvent.change(screen.getByDisplayValue('10'), { target: { value: '14' } });
+        fireEvent.change(screen.getByDisplayValue('1500'), { target: { value: '2100' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => expect(updateHolding).toHaveBeenCalledWith('h-1', {
+            account_id: 'acc-1',
+            symbol: 'AAPL',
+            quantity: 14,
+            cost_basis: 2100,
+        }));
+    });
+
+    it('closes the editor and confirms once the override is saved', async () => {
+        vi.mocked(updateHolding).mockResolvedValue({} as never);
+        await openEditor();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Holding updated'));
+        await waitFor(() =>
+            expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument());
+    });
+
+    it('leaves the holding untouched when the edit is cancelled', async () => {
+        await openEditor();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+        expect(updateHolding).not.toHaveBeenCalled();
+        expect(screen.getByRole('button', { name: /Edit Override/i })).toBeInTheDocument();
+    });
+
+    it('keeps the editor open when the save fails', async () => {
+        vi.mocked(updateHolding).mockRejectedValue(new Error('stale holding'));
+        await openEditor();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => expect(toastError).toHaveBeenCalled());
+        expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+    });
+
+    // === states ===
+
+    it('reports a holding that does not exist', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockUseApiQuery.mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() } as any);
+        renderPage();
+
+        expect(await screen.findByText('Holding not found')).toBeInTheDocument();
+    });
+
+    it('shows a loading state while the holding is in flight', () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockUseApiQuery.mockReturnValue({ data: null, loading: true, error: null, refetch: vi.fn() } as any);
+        renderPage();
+
+        expect(screen.getByText(/Loading holding/i)).toBeInTheDocument();
+    });
+
+    it('reports whether the holding is a manual override', async () => {
+        mockUseApiQuery.mockReturnValue({
+            data: { ...holding, is_manual_override: true }, loading: false, error: null, refetch: vi.fn(),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+        renderPage();
+
+        await waitFor(() => expect(screen.getByText('Manual Override')).toBeInTheDocument());
+        expect(screen.getByText('Yes')).toBeInTheDocument();
     });
 });
