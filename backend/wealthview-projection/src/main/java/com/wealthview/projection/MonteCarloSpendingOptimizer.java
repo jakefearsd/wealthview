@@ -19,7 +19,6 @@ import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.GuardrailProfileResponse;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
-import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.annotation.Observed;
 
@@ -108,7 +107,13 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 .matrix(includeDepressionYears);
     }
 
-    @Timed(value = "wealthview.mc.optimize", histogram = true)
+    // No @Timed here: @Observed already registers a Timer under this exact name (Spring Boot wires
+    // a DefaultMeterObservationHandler whenever a MeterRegistry exists, so an observation is never
+    // meter-free). Carrying both annotations registered the SAME name twice — and because @Timed
+    // asked for percentile buckets while the observation timer did not, one Prometheus family held
+    // both Histogram and Summary data points. The text writer casts every data point to the first
+    // one's type, so a single ClassCastException took out the WHOLE /actuator/prometheus response
+    // once any optimization had run. The histogram is preserved by a MeterFilter in MetricsConfig.
     @Observed(name = "wealthview.mc.optimize",
               contextualName = "monte-carlo-optimize",
               lowCardinalityKeyValues = {"component", "projection"})

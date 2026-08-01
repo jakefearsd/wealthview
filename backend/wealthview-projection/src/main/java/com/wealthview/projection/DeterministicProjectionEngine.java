@@ -35,7 +35,6 @@ import com.wealthview.core.projection.tax.SelfEmploymentTaxCalculator;
 import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
 import com.wealthview.core.projection.tax.StateTaxCalculatorFactory;
 import com.wealthview.core.projection.tax.TaxCalculationStrategy;
-import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.annotation.Observed;
 
@@ -156,7 +155,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 new RetirementWithdrawalProcessor());
     }
 
-    @Timed("wealthview.projection.run")
+    // No @Timed here — see the note in MonteCarloSpendingOptimizer#optimize. This name did not
+    // crash the scrape (neither timer asked for buckets, so both rendered as Summary), but the two
+    // annotations still recorded every run TWICE into one metric, doubling its count and sum.
     @Observed(name = "wealthview.projection.run",
               contextualName = "deterministic-projection",
               lowCardinalityKeyValues = {"component", "projection"})

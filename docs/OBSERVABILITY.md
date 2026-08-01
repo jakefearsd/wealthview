@@ -142,10 +142,21 @@ HTTP requests are traced automatically by Spring Boot's
 - `MonteCarloSpendingOptimizer.optimize` (`wealthview.mc.optimize`)
 - `ImportService.processImport` (`wealthview.import.process`)
 
-These are the same hot spots already carrying `@Timed`. The two annotations
-coexist by design: `@Timed` always feeds the meter registry; `@Observed`
-becomes a span only when tracing is on, and contributes a no-op observation
-when it's off.
+`@Observed` supplies BOTH the span and the timer for these methods — they
+deliberately carry no `@Timed`.
+
+> **Do not add `@Timed` next to an `@Observed` with the same name.** The
+> earlier claim that `@Observed` "contributes a no-op observation when tracing
+> is off" is wrong: Spring Boot registers a `DefaultMeterObservationHandler`
+> whenever a `MeterRegistry` is present, so an observation ALWAYS registers a
+> timer under its `name`. With both annotations the name is registered twice.
+> That double-counts the metric — and if the two disagree about buckets (one
+> asked for `histogram = true`, the observation timer cannot), the family ends
+> up holding Histogram and Summary data points at once and the Prometheus text
+> writer throws `ClassCastException`, failing the **entire** `/actuator/prometheus`
+> scrape rather than just that metric. Configure buckets with a `MeterFilter`
+> in `MetricsConfig` instead — see `monteCarloOptimizeHistogram()`.
+> `PrometheusEndpointIT` pins this.
 
 ### Safety notes
 

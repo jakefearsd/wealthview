@@ -6,8 +6,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import io.micrometer.core.aop.TimedAspect;
+import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.config.MeterFilter;
+import io.micrometer.core.instrument.distribution.DistributionStatisticConfig;
 import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.observation.aop.ObservedAspect;
 
@@ -34,6 +36,33 @@ public class MetricsConfig {
     @Bean
     public ObservedAspect observedAspect(ObservationRegistry observationRegistry) {
         return new ObservedAspect(observationRegistry);
+    }
+
+    /**
+     * Publishes percentile-histogram buckets for the Monte Carlo optimizer timer.
+     *
+     * <p>That timer is registered by {@code @Observed} on
+     * {@code MonteCarloSpendingOptimizer#optimize}, which cannot express bucket configuration the
+     * way {@code @Timed(histogram = true)} could — and the two annotations cannot both be present,
+     * because each registers the same meter name and a name carrying both Histogram and Summary
+     * data points makes the Prometheus text writer throw, failing the entire scrape. Configuring
+     * the buckets here keeps {@code wealthview_mc_optimize_seconds_bucket} available for the
+     * Grafana p95 panel with a single registration.
+     */
+    @Bean
+    public MeterFilter monteCarloOptimizeHistogram() {
+        return new MeterFilter() {
+            @Override
+            public DistributionStatisticConfig configure(Meter.Id id, DistributionStatisticConfig config) {
+                if ("wealthview.mc.optimize".equals(id.getName())) {
+                    return DistributionStatisticConfig.builder()
+                            .percentilesHistogram(true)
+                            .build()
+                            .merge(config);
+                }
+                return config;
+            }
+        };
     }
 
     @Bean

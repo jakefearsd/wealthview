@@ -80,6 +80,30 @@ class PrometheusEndpointIT extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void prometheusEndpoint_afterAMonteCarloOptimization_stillRendersAndExposesItsBuckets() {
+        // Regression guard. MonteCarloSpendingOptimizer#optimize used to carry BOTH
+        // @Timed(histogram = true) and @Observed under the same meter name. Both register a timer,
+        // so one Prometheus family ended up holding Histogram data points and Summary data points;
+        // the text writer casts every point to the first one's type and threw ClassCastException,
+        // which failed the ENTIRE scrape — every metric, not just this one. Nothing caught it
+        // because no integration test ran an optimization before scraping.
+        var scenarioId = (String) data.createScenario("Prometheus regression").get("id");
+        var optimize = api.postForEntity("/api/v1/projections/" + scenarioId + "/optimize",
+                java.util.Map.of("name", "Guardrail", "trial_count", 100, "confidence_level", 0.90));
+        assertThat(optimize.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        var response = api.getForEntityAs(superAdminToken, "/actuator/prometheus", String.class);
+
+        assertThat(response.getStatusCode())
+                .as("a scrape after an optimization must not 500")
+                .isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody())
+                .as("the Grafana p95 panel queries wealthview_mc_optimize_seconds_bucket, so the "
+                        + "percentile histogram must survive the move from @Timed to a MeterFilter")
+                .contains("wealthview_mc_optimize_seconds_bucket");
+    }
+
+    @Test
     void healthEndpoint_noAuth_returns200() {
         var response = api.getAnonForEntity("/actuator/health", String.class);
 
