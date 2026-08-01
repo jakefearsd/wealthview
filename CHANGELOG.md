@@ -6,7 +6,31 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- `GET /actuator/prometheus` no longer returns 500 after a guardrail
+  optimization. `MonteCarloSpendingOptimizer.optimize` carried both `@Timed`
+  and `@Observed` under one meter name; both register a timer, and because only
+  one asked for histogram buckets the metric family held Histogram and Summary
+  data points at once, which made the Prometheus text writer throw and fail the
+  **entire** scrape — every metric, not just that one. In practice monitoring
+  went dark after the first optimization and stayed dark until restart. The
+  redundant `@Timed` is gone and the histogram is configured via a `MeterFilter`,
+  so the Grafana p95 panel is unaffected. `DeterministicProjectionEngine.run`
+  had the same double registration; it did not crash but was recording every
+  projection run twice into one metric.
+- `PUT /api/v1/notifications/preferences` returns 400 instead of 500 when an
+  item omits `enabled` or `notification_type`. The request declared the list
+  `@NotNull` but not `@Valid`, so Bean Validation never cascaded into the
+  elements and a null reached the service, where it auto-unboxed into a
+  primitive `boolean`.
+
 ### Changed
+- Test coverage pass across the financial math, the HTTP surface, and the
+  import parsers: +145 backend tests (household capital-gains taxation, bracket
+  inflation-indexing, six previously untested controllers, and importer error
+  paths). Import branch coverage 78.2% → 82.7%; `wealthview-app` integration
+  tests 265 → 340. Frontend coverage is now measured and gated
+  (`npm run test:coverage`), which it previously was not.
 - Dependency refresh across the backend and all three npm workspaces. Backend:
   jsoup 1.22.2 → 1.23.1 and Checkstyle core 13.8.0 → 13.9.0. Two Spring Boot
   BOM-managed versions are now overridden ahead of the 4.1.0 BOM — PostgreSQL
