@@ -75,12 +75,26 @@
         <jjwt.version>0.13.0</jjwt.version>
         <commons-csv.version>1.14.1</commons-csv.version>
         <ofx4j.version>1.39</ofx4j.version>
-        <jsoup.version>1.22.2</jsoup.version>
+        <jsoup.version>1.23.1</jsoup.version>
         <caffeine.version>3.2.4</caffeine.version>
         <samstevens-totp.version>1.7.1</samstevens-totp.version>
         <guava.version>33.6.0-jre</guava.version>
         <jsonassert.version>1.5.3</jsonassert.version>
         <logstash-logback-encoder.version>9.0</logstash-logback-encoder.version>
+        <!-- Spring Boot BOM overrides. These two artifacts are declared without a <version>
+             in the module poms, so they normally resolve from spring-boot-dependencies.
+             Redeclaring the BOM's own property name here overrides it globally (Boot's
+             documented mechanism). Both are PATCH bumps ahead of the 4.1.0 BOM and both
+             are exercised by the test suite, so the compatibility risk we take on from
+             Boot is covered: postgresql by the @DataJpaTest/Testcontainers slices, and
+             httpclient5 only by the wealthview-app HTTP ITs (it is test-scope there).
+             Drop these back to BOM defaults once a Boot release catches up.
+             Deliberately NOT overridden: opentelemetry (micrometer-tracing-bridge-otel is
+             compiled against a BOM-pinned OTel API, and a mismatch shows up at prod runtime
+             rather than in tests) and flyway (12 -> 13 is a major affecting every migration;
+             it needs its own change validated against the full IT suite). -->
+        <httpclient5.version>5.6.3</httpclient5.version>
+        <postgresql.version>42.7.13</postgresql.version>
         <!-- Quality tool versions -->
         <spotbugs-maven-plugin.version>4.10.3.0</spotbugs-maven-plugin.version>
         <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
@@ -97,7 +111,7 @@
              ignored - but forcing PMD core 7.26.0 surfaced 4 new rule violations
              that 7.17.0 doesn't flag, so the override was reverted rather than
              fixing unrelated findings as a side effect of a build-tooling commit.) -->
-        <checkstyle.core.version>13.8.0</checkstyle.core.version>
+        <checkstyle.core.version>13.9.0</checkstyle.core.version>
         <!-- Site tool versions -->
         <maven-site-plugin.version>4.0.0-M16</maven-site-plugin.version>
         <project-info-reports-plugin.version>3.9.0</project-info-reports-plugin.version>
