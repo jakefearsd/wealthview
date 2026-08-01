@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithRouter } from '../test-utils';
@@ -76,7 +76,7 @@ vi.mock('../hooks/useApiQuery', () => ({
 }));
 
 import { useApiQuery } from '../hooks/useApiQuery';
-import { listScenarios, getGuardrailProfile } from '../api/projections';
+import { listScenarios, getGuardrailProfile, deleteGuardrailProfile, reoptimize } from '../api/projections';
 
 const mockUseApiQuery = vi.mocked(useApiQuery);
 const mockListScenarios = vi.mocked(listScenarios);
@@ -174,5 +174,95 @@ describe('SpendingProfilesPage', () => {
         });
         expect(screen.getByText('Optimized Plan')).toBeInTheDocument();
         expect(screen.getByText(/Test Scenario/)).toBeInTheDocument();
+    });
+
+    // === guardrail profile actions ===
+    //
+    // A guardrail profile IS the scenario's spending plan (see the spending-plan hierarchy in
+    // CLAUDE.md). Re-optimising re-runs a Monte Carlo and replaces the yearly spending; deleting
+    // reverts the scenario to its tier-based profile. Both mutate a plan the projection depends
+    // on, and neither path was covered — including the confirmation guarding the delete.
+
+    async function renderWithGuardrail() {
+        mockUseApiQuery.mockReturnValue({ data: mockProfiles, loading: false, error: null, refetch: vi.fn() });
+        mockListScenarios.mockResolvedValue([makeScenario({ id: 'sc-1', name: 'Base Case' })] as never);
+        mockGetGuardrailProfile.mockResolvedValue(mockGuardrailProfile as never);
+        renderWithRouter(<SpendingProfilesPage />);
+        return screen.findByText('Optimized Plan');
+    }
+
+
+    /** The Delete beside Re-optimize — profile cards carry their own Delete buttons too. */
+    const guardrailDelete = () =>
+        within(screen.getByRole('button', { name: /Re-?optimize/i }).parentElement!)
+            .getByRole('button', { name: /^Delete$/i });
+
+    it('lists a guardrail profile against the scenario that owns it', async () => {
+        await renderWithGuardrail();
+
+        expect(screen.getByText('Optimized Plan')).toBeInTheDocument();
+        expect(screen.getByText(/Base Case/)).toBeInTheDocument();
+    });
+
+    it('re-optimises the owning scenario and reloads the list', async () => {
+        await renderWithGuardrail();
+        vi.mocked(reoptimize).mockResolvedValue({} as never);
+        mockListScenarios.mockClear();
+
+        fireEvent.click(screen.getByRole('button', { name: /Re-?optimize/i }));
+
+        await waitFor(() => expect(reoptimize).toHaveBeenCalledWith('sc-1'));
+        await waitFor(() => expect(mockListScenarios).toHaveBeenCalled());
+    });
+
+    it('reports a failed re-optimisation without dropping the profile from the list', async () => {
+        await renderWithGuardrail();
+        vi.mocked(reoptimize).mockRejectedValue(new Error('optimizer unavailable'));
+
+        fireEvent.click(screen.getByRole('button', { name: /Re-?optimize/i }));
+
+        await waitFor(() => expect(reoptimize).toHaveBeenCalled());
+        expect(screen.getByText('Optimized Plan')).toBeInTheDocument();
+    });
+
+    it('deletes a guardrail profile once the revert is confirmed', async () => {
+        await renderWithGuardrail();
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+        vi.mocked(deleteGuardrailProfile).mockResolvedValue(undefined as never);
+
+        fireEvent.click(guardrailDelete());
+
+        expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('revert to its spending profile'));
+        await waitFor(() => expect(deleteGuardrailProfile).toHaveBeenCalledWith('sc-1'));
+        confirmSpy.mockRestore();
+    });
+
+    it('leaves the guardrail profile alone when the confirmation is dismissed', async () => {
+        await renderWithGuardrail();
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+        fireEvent.click(guardrailDelete());
+
+        expect(deleteGuardrailProfile).not.toHaveBeenCalled();
+        confirmSpy.mockRestore();
+    });
+
+    it('shows no guardrail section when no scenario has one', async () => {
+        mockUseApiQuery.mockReturnValue({ data: mockProfiles, loading: false, error: null, refetch: vi.fn() });
+        mockListScenarios.mockResolvedValue([makeScenario({ id: 'sc-1', name: 'Base Case' })] as never);
+        mockGetGuardrailProfile.mockResolvedValue(null);
+        renderWithRouter(<SpendingProfilesPage />);
+
+        await waitFor(() => expect(mockGetGuardrailProfile).toHaveBeenCalled());
+        expect(screen.queryByText('Optimized Plan')).not.toBeInTheDocument();
+    });
+
+    it('survives the scenario lookup failing entirely', async () => {
+        mockUseApiQuery.mockReturnValue({ data: mockProfiles, loading: false, error: null, refetch: vi.fn() });
+        mockListScenarios.mockRejectedValue(new Error('network'));
+        renderWithRouter(<SpendingProfilesPage />);
+
+        // The tier-based profiles must still render even when the guardrail lookup blows up.
+        expect(await screen.findByText('Conservative')).toBeInTheDocument();
     });
 });

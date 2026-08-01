@@ -27,7 +27,7 @@ function authAs(role: string | null): AuthValue {
     } as unknown as AuthValue;
 }
 
-function renderLayout(role: string | null, entry = '/') {
+function renderLayout(entry = '/') {
     return render(
         <MemoryRouter initialEntries={[entry]}>
             <Routes>
@@ -52,21 +52,21 @@ describe('Layout', () => {
     });
 
     it('renders the routed page inside the shell', () => {
-        renderLayout('member');
+        renderLayout();
 
         expect(screen.getByText('Dashboard body')).toBeInTheDocument();
         expect(screen.getByText('WealthView')).toBeInTheDocument();
     });
 
     it('shows the signed-in identity and role', () => {
-        renderLayout('member');
+        renderLayout();
 
         expect(screen.getByText('demo@wealthview.local')).toBeInTheDocument();
         expect(screen.getByText('member')).toBeInTheDocument();
     });
 
     it('shows every unrestricted nav item to a member', () => {
-        renderLayout('member');
+        renderLayout();
 
         for (const label of ['Dashboard', 'Accounts', 'Projections', 'Spending Profiles',
             'Income Sources', 'Properties', 'Prices', 'Export']) {
@@ -77,28 +77,28 @@ describe('Layout', () => {
     // === role gating ===
 
     it('hides the Admin link from a member', () => {
-        renderLayout('member');
+        renderLayout();
 
         expect(screen.queryByRole('link', { name: 'Admin' })).not.toBeInTheDocument();
     });
 
     it('shows the Admin link to an admin', () => {
         mockUseAuth.mockReturnValue(authAs('admin'));
-        renderLayout('admin');
+        renderLayout();
 
         expect(screen.getByRole('link', { name: 'Admin' })).toBeInTheDocument();
     });
 
     it('shows the Admin link to a super_admin', () => {
         mockUseAuth.mockReturnValue(authAs('super_admin'));
-        renderLayout('super_admin');
+        renderLayout();
 
         expect(screen.getByRole('link', { name: 'Admin' })).toBeInTheDocument();
     });
 
     it('hides the Admin link when the role is not yet known', () => {
         mockUseAuth.mockReturnValue(authAs(null));
-        renderLayout(null);
+        renderLayout();
 
         expect(screen.queryByRole('link', { name: 'Admin' })).not.toBeInTheDocument();
     });
@@ -106,14 +106,14 @@ describe('Layout', () => {
     // === active-link styling and logout ===
 
     it('marks the current route as the active nav link', () => {
-        renderLayout('member', '/accounts');
+        renderLayout('/accounts');
 
         const active = screen.getByRole('link', { name: 'Accounts' });
         expect(active).toHaveStyle({ borderLeft: '3px solid #4a9eff' });
     });
 
     it('does not mark a non-current route as active', () => {
-        renderLayout('member', '/accounts');
+        renderLayout('/accounts');
 
         // Asserted via colour rather than the border shorthand: jsdom normalises `transparent`
         // to rgba(0,0,0,0), so the shorthand never matches as written in the component.
@@ -122,7 +122,7 @@ describe('Layout', () => {
     });
 
     it('logs out when the logout button is pressed', () => {
-        renderLayout('member');
+        renderLayout();
 
         fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
 
