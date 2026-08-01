@@ -75,7 +75,7 @@ export default defineConfig({
                 // without being reduced to a tautology.
                 'src/main.tsx',
             ],
-            reporter: ['text-summary', 'html'],
+            reporter: ['text-summary', 'html', 'json-summary'],
             // Ratchet floors, mirroring the backend JaCoCo convention: set just below the level
             // reached so the gate locks in progress without flaking. RAISE these when you raise
             // coverage; never lower one to make a build pass.
