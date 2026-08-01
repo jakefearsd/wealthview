@@ -25,6 +25,8 @@ vi.mock('../utils/format', () => ({
 
 vi.mock('../utils/styles', () => ({
     cardStyle: {},
+    // Needed since the shared recharts mock now renders Tooltip content, which reaches ChartTooltip.
+    tooltipStyle: {},
 }));
 
 vi.mock('recharts');

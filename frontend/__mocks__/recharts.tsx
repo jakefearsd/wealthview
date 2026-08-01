@@ -22,7 +22,15 @@
  * — and still render `name` as text content (respecting `hide`) so
  * `screen.getByText(name)` keeps working for the tests that rely on that.
  */
-import type { ReactNode } from 'react';
+import { createContext, useContext, cloneElement, isValidElement } from 'react';
+import type { ReactNode, ReactElement } from 'react';
+
+/**
+ * The rows the enclosing chart container was handed. Tooltip needs them to synthesise a realistic
+ * `label`/`payload` so that render callbacks (`content`, `formatter`, `labelFormatter`) actually
+ * execute — with the stub Tooltip they never ran, leaving every chart's tooltip logic uncovered.
+ */
+const ChartDataContext = createContext<Array<Record<string, unknown>> | null>(null);
 
 interface ChartContainerProps {
     children?: ReactNode;
@@ -31,9 +39,10 @@ interface ChartContainerProps {
 
 function chartContainer(testId: string) {
     return function ChartContainer({ children, data }: ChartContainerProps) {
+        const rows = Array.isArray(data) ? (data as Array<Record<string, unknown>>) : null;
         return (
             <div data-testid={testId} data-chart-data={data === undefined ? undefined : JSON.stringify(data)}>
-                {children}
+                <ChartDataContext.Provider value={rows}>{children}</ChartDataContext.Provider>
             </div>
         );
     };
@@ -75,7 +84,62 @@ export const Cell = seriesElement('cell');
 export const XAxis = () => <div data-testid="x-axis" />;
 export const YAxis = () => <div data-testid="y-axis" />;
 export const CartesianGrid = () => <div data-testid="cartesian-grid" />;
-export const Tooltip = () => <div data-testid="tooltip" />;
+interface TooltipEntry {
+    dataKey: string;
+    name: string;
+    value: unknown;
+    color: undefined;
+    payload: Record<string, unknown>;
+}
+
+interface TooltipProps {
+    content?: ReactElement | ((props: unknown) => ReactNode);
+    formatter?: (value: unknown, name: unknown, entry: TooltipEntry) => unknown;
+    labelFormatter?: (label: unknown) => ReactNode;
+}
+
+/**
+ * Drives the tooltip off the FIRST row of the enclosing chart's data: `label` is that row's
+ * `year`/`label` field and `payload` is one entry per numeric field. That is enough for the render
+ * callbacks these charts use — they map over `payload` and look the row back up by `label`.
+ *
+ * The rendered output is scoped under `data-testid="tooltip"`, so a test that needs to assert on
+ * tooltip text can query `within(screen.getByTestId('tooltip'))` rather than the whole document.
+ */
+export const Tooltip = ({ content, formatter, labelFormatter }: TooltipProps) => {
+    const rows = useContext(ChartDataContext);
+    const row = rows && rows.length > 0 ? rows[0] : null;
+    if (!row) return <div data-testid="tooltip" />;
+
+    const label = (row.year ?? row.label) as string | number | undefined;
+    const payload: TooltipEntry[] = Object.entries(row)
+        .filter(([, v]) => typeof v === 'number')
+        .map(([k, v]) => ({ dataKey: k, name: k, value: v, color: undefined, payload: row }));
+
+    if (isValidElement(content)) {
+        return (
+            <div data-testid="tooltip">
+                {cloneElement(content as ReactElement<Record<string, unknown>>, { active: true, payload, label })}
+            </div>
+        );
+    }
+    if (typeof content === 'function') {
+        return <div data-testid="tooltip">{content({ active: true, payload, label }) as ReactNode}</div>;
+    }
+
+    // formatter / labelFormatter style (no custom content element).
+    const formatted = formatter
+        ? payload.map((entry) => formatter(entry.value, entry.name, entry))
+        : [];
+    return (
+        <div data-testid="tooltip">
+            {labelFormatter ? <span data-testid="tooltip-label">{labelFormatter(label)}</span> : null}
+            {formatted.map((f, i) => (
+                <span key={i} data-testid="tooltip-entry">{Array.isArray(f) ? String(f[1]) : String(f)}</span>
+            ))}
+        </div>
+    );
+};
 export const Legend = () => <div data-testid="legend" />;
 
 interface ReferenceLineLabel {
