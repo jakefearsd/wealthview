@@ -6,6 +6,13 @@ import type { GuardrailPhase, GuardrailProfileResponse, GuardrailYearlySpending 
 import { computePlanDiagnostics } from './SpendingOptimizerPage';
 import { makeAccount, makeProfile, makeScenario } from '../testutil/builders';
 
+const { toastSuccess, toastError } = vi.hoisted(() => ({
+    toastSuccess: vi.fn(), toastError: vi.fn(),
+}));
+vi.mock('react-hot-toast', () => ({
+    default: { success: toastSuccess, error: toastError },
+}));
+
 vi.mock('../api/projections', () => ({
     getScenario: vi.fn(),
     optimizeSpending: vi.fn(),
@@ -27,7 +34,7 @@ vi.mock('../components/PortfolioFanChart', () => ({
     ),
 }));
 
-import { getScenario, getGuardrailProfile, optimizeSpending } from '../api/projections';
+import { getScenario, getGuardrailProfile, optimizeSpending, reoptimize } from '../api/projections';
 
 const mockGetScenario = vi.mocked(getScenario);
 const mockGetProfile = vi.mocked(getGuardrailProfile);
@@ -548,5 +555,80 @@ describe('computePlanDiagnostics', () => {
 
         expect(result.failureRateSeverity).toBe('danger');
         expect(result.warnings).toContain('Failure rate exceeds 20%');
+    });
+});
+
+
+/**
+ * The page is a three-state machine (configure -> running -> results) driven entirely by mutation
+ * callbacks, and the failure paths matter more than the happy one: a failed OPTIMISATION must
+ * return the user to the form so their inputs are still there to correct, while a failed
+ * RE-optimisation must return to the results they already had rather than dumping them back to a
+ * blank form. Neither onError branch had been executed.
+ */
+describe('SpendingOptimizerPage state machine', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('reports a scenario that fails to load rather than hanging on the spinner', async () => {
+        mockGetScenario.mockRejectedValue(new Error('gone'));
+        mockGetProfile.mockResolvedValue(null);
+        renderPage();
+
+        await waitFor(() => expect(toastError).toHaveBeenCalledWith('Failed to load scenario'));
+    });
+
+    it('shows the trial count while an optimisation is running', async () => {
+        mockGetScenario.mockResolvedValue(mockScenario);
+        mockGetProfile.mockResolvedValue(null);
+        let resolveRun: (v: unknown) => void = () => {};
+        mockOptimizeSpending.mockReturnValue(new Promise((res) => { resolveRun = res; }) as never);
+        renderPage();
+        await screen.findByText('Optimization Parameters');
+
+        await userEvent.click(screen.getByRole('button', { name: /Run Optimization/i }));
+
+        expect(await screen.findByText(/Monte Carlo trials/)).toBeInTheDocument();
+        resolveRun(mockProfile);
+    });
+
+    it('returns to the configuration form when an optimisation fails', async () => {
+        mockGetScenario.mockResolvedValue(mockScenario);
+        mockGetProfile.mockResolvedValue(null);
+        mockOptimizeSpending.mockRejectedValue(new Error('optimizer down'));
+        renderPage();
+        await screen.findByText('Optimization Parameters');
+
+        await userEvent.click(screen.getByRole('button', { name: /Run Optimization/i }));
+
+        await waitFor(() => expect(toastError).toHaveBeenCalledWith('Optimization failed'));
+        expect(await screen.findByText('Optimization Parameters')).toBeInTheDocument();
+    });
+
+    it('keeps the existing results when a re-optimisation fails', async () => {
+        mockGetScenario.mockResolvedValue(mockScenario);
+        // The Re-optimize control only appears on a STALE profile — that is its entire purpose.
+        mockGetProfile.mockResolvedValue({ ...mockProfile, stale: true } as never);
+        vi.mocked(reoptimize).mockRejectedValue(new Error('optimizer down'));
+        renderPage();
+        await screen.findByTestId('corridor-chart');
+
+        await userEvent.click(screen.getByRole('button', { name: /^Re-optimize$/i }));
+
+        await waitFor(() => expect(toastError).toHaveBeenCalledWith('Re-optimization failed'));
+        expect(screen.getByTestId('corridor-chart')).toBeInTheDocument();
+    });
+
+    it('replaces the results after a successful re-optimisation', async () => {
+        mockGetScenario.mockResolvedValue(mockScenario);
+        mockGetProfile.mockResolvedValue({ ...mockProfile, stale: true } as never);
+        vi.mocked(reoptimize).mockResolvedValue(mockProfile as never);
+        renderPage();
+        await screen.findByTestId('corridor-chart');
+
+        await userEvent.click(screen.getByRole('button', { name: /^Re-optimize$/i }));
+
+        await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Re-optimization complete'));
     });
 });
