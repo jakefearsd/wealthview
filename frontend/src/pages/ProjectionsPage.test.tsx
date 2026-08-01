@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithRouter } from '../test-utils';
@@ -18,6 +18,13 @@ const mockScenarios = [
     }),
 ];
 
+const { toastSuccess, toastError } = vi.hoisted(() => ({
+    toastSuccess: vi.fn(), toastError: vi.fn(),
+}));
+vi.mock('react-hot-toast', () => ({
+    default: { success: toastSuccess, error: toastError },
+}));
+
 vi.mock('../api/projections', () => ({
     listScenarios: vi.fn(),
     createScenario: vi.fn(),
@@ -33,6 +40,7 @@ vi.mock('../hooks/useApiQuery', () => ({
 }));
 
 import { useApiQuery } from '../hooks/useApiQuery';
+import { deleteScenario } from '../api/projections';
 const mockUseApiQuery = vi.mocked(useApiQuery);
 
 describe('ProjectionsPage', () => {
@@ -65,5 +73,77 @@ describe('ProjectionsPage', () => {
 
         await userEvent.click(screen.getByRole('button', { name: /new scenario/i }));
         expect(screen.getByRole('heading', { name: 'Create Scenario' })).toBeInTheDocument();
+    });
+
+    // === delete, and the form toggle ===
+    //
+    // Deleting a scenario takes its guardrail profile and projection history with it, and — unlike
+    // every other destructive action in the app — this one has NO confirmation dialog. That is
+    // worth pinning explicitly so a later refactor cannot quietly remove a guard that was never
+    // there, and so the absence is visible to anyone reading the tests.
+
+    const renderList = (scenarios = mockScenarios) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockUseApiQuery.mockReturnValue({ data: scenarios, loading: false, error: null, refetch: vi.fn() } as any);
+        renderWithRouter(<ProjectionsPage />);
+    };
+
+    const cardFor = (name: string) => screen.getByText(name).closest('div')!.parentElement!;
+
+    it('deletes the scenario whose row the control belongs to', async () => {
+        vi.mocked(deleteScenario).mockResolvedValue(undefined as never);
+        renderList();
+
+        await userEvent.click(within(cardFor('Conservative Plan')).getByRole('button', { name: 'Delete' }));
+
+        await waitFor(() => expect(deleteScenario).toHaveBeenCalledWith('2'));
+        await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Scenario deleted'));
+    });
+
+    it('deletes without asking for confirmation', async () => {
+        // Documents current behaviour: unlike accounts, properties and guardrail profiles, a
+        // scenario delete is immediate. If a confirm is ever added, this test should be the one
+        // that fails and gets updated deliberately.
+        const confirmSpy = vi.spyOn(window, 'confirm');
+        vi.mocked(deleteScenario).mockResolvedValue(undefined as never);
+        renderList();
+
+        await userEvent.click(within(cardFor('Early Retirement')).getByRole('button', { name: 'Delete' }));
+
+        await waitFor(() => expect(deleteScenario).toHaveBeenCalled());
+        expect(confirmSpy).not.toHaveBeenCalled();
+        confirmSpy.mockRestore();
+    });
+
+    it('keeps the scenario listed when the delete fails', async () => {
+        vi.mocked(deleteScenario).mockRejectedValue(new Error('referenced by a projection'));
+        renderList();
+
+        await userEvent.click(within(cardFor('Early Retirement')).getByRole('button', { name: 'Delete' }));
+
+        await waitFor(() => expect(toastError).toHaveBeenCalled());
+        expect(screen.getByText('Early Retirement')).toBeInTheDocument();
+    });
+
+    it('toggles the create form closed again from the same control', async () => {
+        // Rendered with no scenarios on purpose: a single mockReturnValue answers EVERY
+        // useApiQuery call, including the ones ScenarioForm's nested sections make, so a non-empty
+        // list would be handed to the income-sources section as if it were income sources.
+        renderList([]);
+
+        await userEvent.click(screen.getByRole('button', { name: 'New Scenario' }));
+        expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+
+        await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+        expect(screen.getByRole('button', { name: 'New Scenario' })).toBeInTheDocument();
+    });
+
+    it('shows a loading state while scenarios are in flight', () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockUseApiQuery.mockReturnValue({ data: null, loading: true, error: null, refetch: vi.fn() } as any);
+        renderWithRouter(<ProjectionsPage />);
+
+        expect(screen.getByText(/Loading scenarios/i)).toBeInTheDocument();
     });
 });

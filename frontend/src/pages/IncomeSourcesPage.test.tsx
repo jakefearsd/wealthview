@@ -123,11 +123,45 @@ function annualAmountInput(): HTMLInputElement {
     return input as HTMLInputElement;
 }
 
+
+function startAgeInput(): HTMLInputElement {
+    const label = screen.getByText('Start Age');
+    const input = label.parentElement?.querySelector('input');
+    if (!input) {
+        throw new Error('Start Age input not found');
+    }
+    return input as HTMLInputElement;
+}
+
+function inflationRateInput(): HTMLInputElement {
+    const label = screen.getByText(/Inflation Rate/);
+    const input = label.parentElement?.querySelector('input');
+    if (!input) {
+        throw new Error('Inflation Rate input not found');
+    }
+    return input as HTMLInputElement;
+}
+
+/**
+ * Tax treatment is not a <select> — it is a grid of clickable cards where the chosen one is
+ * highlighted. Returns the label of whichever card is currently selected.
+ */
+function selectedTaxTreatment(): string {
+    const grid = screen.getByText('Tax Treatment').nextElementSibling;
+    const cards = Array.from(grid?.children ?? []) as HTMLElement[];
+    const chosen = cards.find(c => c.style.background === 'rgb(227, 242, 253)');
+    return chosen?.querySelector('div')?.textContent ?? '';
+}
+
 function setupMocks({ sources, properties }: { sources?: IncomeSource[]; properties?: unknown[] } = {}) {
     let call = 0;
+    // Two queries per render, always sources then properties. Cycling with modulo (rather than a
+    // monotonic counter) keeps the mapping correct across RE-renders — otherwise the first
+    // interaction serves the properties array as the income-source list.
     mockUseApiQuery.mockImplementation(() => {
+        const idx = call % 2;
         call++;
-        if (call === 1) {
+        if (idx === 0) {
             return { data: sources ?? [], loading: false, error: null, refetch: vi.fn() };
         }
         return { data: properties ?? [], loading: false, error: null, refetch: vi.fn() };
@@ -247,6 +281,95 @@ describe('IncomeSourcesPage', () => {
             const [, request] = mockUpdateIncomeSource.mock.calls[0];
             expect(request.owner).toBe('spouse');
             expect(request.survivor_percent).toBeCloseTo(0.6);
+        });
+    });
+
+    // === changing the income type rewrites dependent fields ===
+    //
+    // handleTypeChange is the page's one piece of real branching: switching type resets the tax
+    // treatment to that type's first legal option and, for two types, seeds age and inflation
+    // defaults. Leaving a stale tax treatment behind is not a cosmetic bug — it changes how the
+    // projection engine taxes that stream (e.g. a pension left on 'partially_taxable' would be run
+    // through the Social Security provisional-income formula).
+
+    describe('income type changes', () => {
+        const openForm = () => {
+            setupMocks();
+            renderWithRouter(<IncomeSourcesPage />);
+            fireEvent.click(screen.getByText('New Income Source'));
+        };
+
+        it('resets the tax treatment to the new type\'s first legal option', () => {
+            openForm();
+            expect(selectedTaxTreatment()).toBe('Partially Taxable');   // social_security default
+
+            fireEvent.change(incomeTypeSelect(), { target: { value: 'pension' } });
+
+            expect(selectedTaxTreatment()).toBe('Fully Taxable');
+        });
+
+        it('picks the passive option when switching to rental property', () => {
+            openForm();
+
+            fireEvent.change(incomeTypeSelect(), { target: { value: 'rental_property' } });
+
+            expect(selectedTaxTreatment()).toBe('Passive');
+        });
+
+        it('picks the self-employment treatment for part-time work', () => {
+            openForm();
+
+            fireEvent.change(incomeTypeSelect(), { target: { value: 'part_time_work' } });
+
+            expect(selectedTaxTreatment()).toBe('Self-Employment');
+        });
+
+        it('seeds age 67 and 2% inflation when switching to social security', () => {
+            openForm();
+            fireEvent.change(incomeTypeSelect(), { target: { value: 'pension' } });
+            fireEvent.change(startAgeInput(), { target: { value: '55' } });
+
+            fireEvent.change(incomeTypeSelect(), { target: { value: 'social_security' } });
+
+            expect(startAgeInput().value).toBe('67');
+            expect(inflationRateInput().value).toBe('2');
+        });
+
+        it('seeds 2% inflation for rental property but leaves the start age alone', () => {
+            openForm();
+            fireEvent.change(incomeTypeSelect(), { target: { value: 'pension' } });
+            fireEvent.change(startAgeInput(), { target: { value: '55' } });
+
+            fireEvent.change(incomeTypeSelect(), { target: { value: 'rental_property' } });
+
+            expect(inflationRateInput().value).toBe('2');
+            expect(startAgeInput().value).toBe('55');
+        });
+
+        it('leaves age and inflation untouched for every other type', () => {
+            openForm();
+            fireEvent.change(incomeTypeSelect(), { target: { value: 'pension' } });
+            fireEvent.change(startAgeInput(), { target: { value: '58' } });
+            fireEvent.change(inflationRateInput(), { target: { value: '3.5' } });
+
+            fireEvent.change(incomeTypeSelect(), { target: { value: 'annuity' } });
+
+            expect(startAgeInput().value).toBe('58');
+            expect(inflationRateInput().value).toBe('3.5');
+        });
+
+        it('drops any linked property when the type is no longer rental', () => {
+            setupMocks({ properties: [{ id: 'prop-1', address: '123 Main St', current_value: 450000 }] });
+            renderWithRouter(<IncomeSourcesPage />);
+            fireEvent.click(screen.getByText('New Income Source'));
+            fireEvent.change(incomeTypeSelect(), { target: { value: 'rental_property' } });
+
+            // The property picker is only offered for rental income.
+            expect(screen.getByText(/Link to Property/i)).toBeInTheDocument();
+
+            fireEvent.change(incomeTypeSelect(), { target: { value: 'pension' } });
+
+            expect(screen.queryByText(/Link to Property/i)).not.toBeInTheDocument();
         });
     });
 });
