@@ -111,7 +111,9 @@ export const Tooltip = ({ content, formatter, labelFormatter }: TooltipProps) =>
     const row = rows && rows.length > 0 ? rows[0] : null;
     if (!row) return <div data-testid="tooltip" />;
 
-    const label = (row.year ?? row.label) as string | number | undefined;
+    // The x-axis key varies by chart; these are the three used in this codebase. Derived from the
+    // row rather than from XAxis, whose mock is a stub and would make the label depend on JSX order.
+    const label = (row.year ?? row.label ?? row.age) as string | number | undefined;
     const payload: TooltipEntry[] = Object.entries(row)
         .filter(([, v]) => typeof v === 'number')
         .map(([k, v]) => ({ dataKey: k, name: k, value: v, color: undefined, payload: row }));
