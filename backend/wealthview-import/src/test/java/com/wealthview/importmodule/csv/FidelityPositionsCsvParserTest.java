@@ -1,5 +1,6 @@
 package com.wealthview.importmodule.csv;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.StringReader;
@@ -212,6 +213,115 @@ class FidelityPositionsCsvParserTest {
         var result = parser.parse(new StringReader(""));
 
         assertThat(result.transactions()).isEmpty();
+        assertThat(result.errors()).isEmpty();
+    }
+
+    // === Real-export quirks and the error path ===
+
+    private static final String POSITIONS_HEADER =
+            "Account Number,Account Name,Symbol,Description,Quantity,Last Price,Last Price Change,"
+            + "Current Value,Today's Gain/Loss Dollar,Today's Gain/Loss Percent,Total Gain/Loss Dollar,"
+            + "Total Gain/Loss Percent,Percent Of Account,Cost Basis Total,Average Cost Basis,Type";
+
+    private static String positionsCsv(String... rows) {
+        return POSITIONS_HEADER + "\n" + String.join("\n", rows) + "\n";
+    }
+
+    @Test
+    void parse_inputStreamOverload_matchesTheReaderOverload() throws IOException {
+        // parse(InputStream) is the CsvParser interface method ImportService actually calls in
+        // production; every other test here goes through the Reader overload, so the UTF-8
+        // decoding step this one adds was never executed.
+        var csv = positionsCsv(
+                "X12345678,INDIVIDUAL,AMZN,AMAZON.COM INC,50,$185.50,+$1.25,\"$9,275.00\","
+                + "+$62.50,+0.68%,+$1275.00,+15.93%,25.00%,\"$8,000.00\",$160.00,Cash");
+
+        var viaStream = parser.parse(new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8)));
+        var viaReader = parser.parse(new StringReader(csv));
+
+        assertThat(viaStream.errors()).isEmpty();
+        assertThat(viaStream.transactions()).hasSize(1);
+        assertThat(viaStream.transactions().get(0).symbol()).isEqualTo("AMZN");
+        assertThat(viaStream.transactions().get(0).amount())
+                .isEqualByComparingTo(viaReader.transactions().get(0).amount());
+    }
+
+    @Test
+    void parse_fileStartingWithAByteOrderMark_stillFindsTheHeader() throws IOException {
+        // Fidelity's exports are UTF-8 with a BOM; if it is not stripped the header line no
+        // longer starts with "Account Number" and the whole file parses as zero rows.
+        var csv = '﻿' + positionsCsv(
+                "X12345678,INDIVIDUAL,VOO,VANGUARD S&P 500 ETF,20,$520.00,+$3.50,\"$10,400.00\","
+                + "+$70.00,+0.68%,\"+$1,400.00\",+15.56%,10.00%,\"$9,000.00\",$450.00,Cash");
+
+        var result = parser.parse(new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8)));
+
+        assertThat(result.transactions()).singleElement()
+                .satisfies(txn -> assertThat(txn.symbol()).isEqualTo("VOO"));
+    }
+
+    @Test
+    void parse_rowWithBlankSymbol_isSkippedWithoutError() throws IOException {
+        var csv = positionsCsv(
+                "X12345678,INDIVIDUAL,,SOME UNLABELLED ROW,10,$1.00,,\"$10.00\",,,,,,\"$10.00\",$1.00,Cash",
+                "X12345678,INDIVIDUAL,VTI,VANGUARD TOTAL MARKET,5,$250.00,,\"$1,250.00\",,,,,,"
+                + "\"$1,000.00\",$200.00,Cash");
+
+        var result = parser.parse(new StringReader(csv));
+
+        assertThat(result.transactions()).singleElement()
+                .satisfies(txn -> assertThat(txn.symbol()).isEqualTo("VTI"));
+        assertThat(result.errors())
+                .as("a symbol-less row is a known filler row, not a parse failure")
+                .isEmpty();
+    }
+
+    @Test
+    void parse_rowWithNonNumericAmount_recordsARowErrorAndKeepsTheGoodRows() throws IOException {
+        // "N/A" is not one of the values isMissing() recognises ("--", blank), so it reaches
+        // BigDecimal and throws. The row must be reported and the rest of the file still imported.
+        var csv = positionsCsv(
+                "X12345678,INDIVIDUAL,BAD,BROKEN ROW,10,$1.00,,\"$10.00\",,,,,,N/A,$1.00,Cash",
+                "X12345678,INDIVIDUAL,VTI,VANGUARD TOTAL MARKET,5,$250.00,,\"$1,250.00\",,,,,,"
+                + "\"$1,000.00\",$200.00,Cash");
+
+        var result = parser.parse(new StringReader(csv));
+
+        assertThat(result.transactions()).singleElement()
+                .satisfies(txn -> assertThat(txn.symbol()).isEqualTo("VTI"));
+        assertThat(result.errors()).singleElement()
+                .satisfies(error -> assertThat(error.message()).startsWith("Error parsing row:"));
+    }
+
+    @Test
+    void parse_footerDateInAnUnexpectedFormat_fallsBackToToday() throws IOException {
+        // The footer matches the "Date downloaded ..." pattern but the value does not fit
+        // MMM-dd-yyyy, so parsing throws and the snapshot date falls back rather than failing.
+        var csv = positionsCsv(
+                "X12345678,INDIVIDUAL,VTI,VANGUARD TOTAL MARKET,5,$250.00,,\"$1,250.00\",,,,,,"
+                + "\"$1,000.00\",$200.00,Cash")
+                + "\nDate downloaded Xxx-99-2026 10:30:15 ET\n";
+
+        var result = parser.parse(new StringReader(csv));
+
+        assertThat(result.transactions()).singleElement()
+                .satisfies(txn -> assertThat(txn.date()).isEqualTo(LocalDate.now()));
+        assertThat(result.errors()).isEmpty();
+    }
+
+    @Test
+    void parse_fcashRowWithNoCurrentValue_producesNoDeposit() throws IOException {
+        var csv = positionsCsv(
+                "X12345678,INDIVIDUAL,FCASH,HELD IN FCASH,,,,,,,,,,,,Cash",
+                "X12345678,INDIVIDUAL,VTI,VANGUARD TOTAL MARKET,5,$250.00,,\"$1,250.00\",,,,,,"
+                + "\"$1,000.00\",$200.00,Cash");
+
+        var result = parser.parse(new StringReader(csv));
+
+        assertThat(result.transactions())
+                .as("a cash row with no value is nothing to deposit")
+                .singleElement()
+                .satisfies(txn -> assertThat(txn.type()).isEqualTo(OPENING_BALANCE));
         assertThat(result.errors()).isEmpty();
     }
 }

@@ -15,6 +15,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class YahooFinanceClientTest {
@@ -282,6 +283,93 @@ class YahooFinanceClientTest {
 
         assertThat(result.failed()).isTrue();
         assertThat(result.errorReason()).contains("no price data");
+        mockServer.verify();
+    }
+
+    // === Failure modes of a free, unauthenticated third-party API ===
+    //
+    // Yahoo's endpoint is not a contract we control: delisted or mistyped symbols come back 404,
+    // heavy use gets rate-limited, and an outage can return an HTML error page where JSON is
+    // expected. Each maps to a DIFFERENT branch and a different user-visible reason, and only the
+    // 5xx one was covered — so a regression that turned a 404 into an unhandled exception, or
+    // collapsed the distinct reasons into one, would not have been caught.
+
+    @Test
+    void fetchHistory_notFound_reportsTheClientErrorStatus() {
+        mockServer.expect(method(HttpMethod.GET))
+                .andRespond(withStatus(org.springframework.http.HttpStatus.NOT_FOUND));
+
+        var result = client.fetchHistory("NOSUCHTICKER",
+                LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 5));
+
+        assertThat(result.failed()).isTrue();
+        assertThat(result.points()).isEmpty();
+        assertThat(result.errorReason())
+                .as("a 4xx must be distinguishable from a 5xx — one is the caller's symbol, the "
+                        + "other is Yahoo being down")
+                .isEqualTo("HTTP 404 from Yahoo Finance");
+        mockServer.verify();
+    }
+
+    @Test
+    void fetchHistory_rateLimited_reportsTheClientErrorStatus() {
+        mockServer.expect(method(HttpMethod.GET))
+                .andRespond(withStatus(org.springframework.http.HttpStatus.TOO_MANY_REQUESTS));
+
+        var result = client.fetchHistory("AAPL",
+                LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 5));
+
+        assertThat(result.failed()).isTrue();
+        assertThat(result.errorReason()).isEqualTo("HTTP 429 from Yahoo Finance");
+        mockServer.verify();
+    }
+
+    @Test
+    void fetchHistory_connectionFailure_reportsANetworkError() {
+        mockServer.expect(method(HttpMethod.GET))
+                .andRespond(request -> {
+                    throw new java.io.IOException("connection refused");
+                });
+
+        var result = client.fetchHistory("AAPL",
+                LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 5));
+
+        assertThat(result.failed()).isTrue();
+        assertThat(result.errorReason()).startsWith("network error:");
+        mockServer.verify();
+    }
+
+    @Test
+    void fetchHistory_htmlErrorPageInsteadOfJson_reportsAFormatProblemRatherThanThrowing() {
+        mockServer.expect(method(HttpMethod.GET))
+                .andRespond(withSuccess("<html><body>Service Unavailable</body></html>",
+                        MediaType.APPLICATION_JSON));
+
+        var result = client.fetchHistory("AAPL",
+                LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 5));
+
+        assertThat(result.failed()).isTrue();
+        assertThat(result.errorReason()).isEqualTo("unexpected response format from Yahoo Finance");
+        mockServer.verify();
+    }
+
+    @Test
+    void fetchCurrentPrice_htmlErrorPageInsteadOfJson_returnsEmptyRatherThanThrowing() {
+        mockServer.expect(method(HttpMethod.GET))
+                .andRespond(withSuccess("<html><body>nope</body></html>", MediaType.APPLICATION_JSON));
+
+        assertThat(client.fetchCurrentPrice("AAPL")).isEmpty();
+        mockServer.verify();
+    }
+
+    @Test
+    void fetchCurrentPrice_connectionFailure_returnsEmpty() {
+        mockServer.expect(method(HttpMethod.GET))
+                .andRespond(request -> {
+                    throw new java.io.IOException("connection refused");
+                });
+
+        assertThat(client.fetchCurrentPrice("AAPL")).isEmpty();
         mockServer.verify();
     }
 }

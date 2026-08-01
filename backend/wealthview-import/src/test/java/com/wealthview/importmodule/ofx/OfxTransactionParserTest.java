@@ -362,6 +362,241 @@ class OfxTransactionParserTest {
                 .isFalse();
     }
 
+    // === Degenerate-but-legal documents ===
+    //
+    // Real institutional exports are not always the tidy shape the fixtures above use: a
+    // positions-only statement carries no transaction list, money-market and some fixed-income
+    // holdings ship without a ticker, and a pending bank line can arrive without an amount. Each
+    // of these lands on a defensive guard in the parser, and each must degrade quietly (skip the
+    // unusable part, keep the rest) rather than throw or record a spurious row error — an import
+    // that half-fails on a real file is worse than one that fails outright.
+
+    /** A security with no {@code <TICKER>} — the shape Fidelity exports for e.g. SPAXX. */
+    private static final String TICKERLESS_SECLIST = """
+            <STOCKINFO>
+            <SECINFO>
+            <SECID><UNIQUEID>037833100<UNIQUEIDTYPE>CUSIP</SECID>
+            <SECNAME>APPLE INC
+            </SECINFO>
+            </STOCKINFO>
+            """;
+
+    private static final String BLANK_TICKER_SECLIST = """
+            <STOCKINFO>
+            <SECINFO>
+            <SECID><UNIQUEID>037833100<UNIQUEIDTYPE>CUSIP</SECID>
+            <SECNAME>APPLE INC
+            <TICKER>
+            </SECINFO>
+            </STOCKINFO>
+            """;
+
+    @Test
+    void parse_securityWithoutTicker_fallsBackToTheSecurityIdRatherThanDroppingTheTransaction()
+            throws IOException {
+        var ofx = ofxEnvelope(investmentTranList(BUYSTOCK_XML), TICKERLESS_SECLIST);
+
+        var result = parser.parse(toStream(ofx));
+
+        assertThat(result.errors()).isEmpty();
+        assertThat(result.transactions()).singleElement().satisfies(txn -> {
+            assertThat(txn.type()).isEqualTo(BUY);
+            assertThat(txn.symbol())
+                    .as("with no ticker to map, the CUSIP is the only identifier left — the "
+                            + "transaction must still import rather than be silently discarded")
+                    .isEqualTo("037833100");
+        });
+    }
+
+    @Test
+    void parse_securityWithBlankTicker_isTreatedAsHavingNoTicker() throws IOException {
+        var ofx = ofxEnvelope(investmentTranList(BUYSTOCK_XML), BLANK_TICKER_SECLIST);
+
+        var result = parser.parse(toStream(ofx));
+
+        assertThat(result.errors()).isEmpty();
+        assertThat(result.transactions()).singleElement()
+                .satisfies(txn -> assertThat(txn.symbol()).isEqualTo("037833100"));
+    }
+
+    @Test
+    void parse_investmentStatementWithoutATransactionList_yieldsNothingAndNoErrors() throws IOException {
+        // A positions-only statement: valid OFX, simply nothing to import.
+        var ofx = OFX_HEADER + """
+                <INVSTMTMSGSRSV1>
+                <INVSTMTTRNRS>
+                <TRNUID>0
+                <STATUS><CODE>0<SEVERITY>INFO</STATUS>
+                <INVSTMTRS>
+                <DTASOF>20250115
+                <CURDEF>USD
+                </INVSTMTRS>
+                </INVSTMTTRNRS>
+                </INVSTMTMSGSRSV1>
+                </OFX>
+                """;
+
+        var result = parser.parse(toStream(ofx));
+
+        assertThat(result.transactions()).isEmpty();
+        assertThat(result.errors())
+                .as("an empty statement is not a malformed one")
+                .isEmpty();
+    }
+
+    @Test
+    void parse_bankStatementWithoutATransactionList_yieldsNothingAndNoErrors() throws IOException {
+        var ofx = OFX_HEADER + """
+                <BANKMSGSRSV1>
+                <STMTTRNRS>
+                <TRNUID>0
+                <STATUS><CODE>0<SEVERITY>INFO</STATUS>
+                <STMTRS>
+                <CURDEF>USD
+                <BANKACCTFROM>
+                <BANKID>123456789
+                <ACCTID>1234567890
+                <ACCTTYPE>CHECKING
+                </BANKACCTFROM>
+                </STMTRS>
+                </STMTTRNRS>
+                </BANKMSGSRSV1>
+                </OFX>
+                """;
+
+        var result = parser.parse(toStream(ofx));
+
+        assertThat(result.transactions()).isEmpty();
+        assertThat(result.errors()).isEmpty();
+    }
+
+    @Test
+    void parse_bankTransactionWithoutAnAmount_isSkippedWithoutFailingTheWholeImport()
+            throws IOException {
+        // The first STMTTRN has no TRNAMT and cannot be mapped; the second is well-formed. The
+        // unusable row must not take the usable one down with it.
+        var ofx = OFX_HEADER + """
+                <BANKMSGSRSV1>
+                <STMTTRNRS>
+                <TRNUID>0
+                <STATUS><CODE>0<SEVERITY>INFO</STATUS>
+                <STMTRS>
+                <CURDEF>USD
+                <BANKACCTFROM>
+                <BANKID>123456789
+                <ACCTID>1234567890
+                <ACCTTYPE>CHECKING
+                </BANKACCTFROM>
+                <BANKTRANLIST>
+                <DTSTART>20240101
+                <DTEND>20250115
+                <STMTTRN>
+                <TRNTYPE>CREDIT
+                <DTPOSTED>20250105
+                <FITID>2025010501
+                <MEMO>Pending, no amount yet
+                </STMTTRN>
+                <STMTTRN>
+                <TRNTYPE>CREDIT
+                <DTPOSTED>20250106
+                <TRNAMT>250.00
+                <FITID>2025010601
+                <MEMO>Settled deposit
+                </STMTTRN>
+                </BANKTRANLIST>
+                </STMTRS>
+                </STMTTRNRS>
+                </BANKMSGSRSV1>
+                </OFX>
+                """;
+
+        var result = parser.parse(toStream(ofx));
+
+        assertThat(result.transactions()).singleElement().satisfies(txn -> {
+            assertThat(txn.type()).isEqualTo(DEPOSIT);
+            assertThat(txn.amount()).isEqualByComparingTo(new BigDecimal("250.00"));
+        });
+        assertThat(result.errors())
+                .as("an unmappable row is skipped, not reported as a parse error")
+                .isEmpty();
+    }
+
+    @Test
+    void parse_investmentStatementWithNoSecurityList_stillImportsUsingTheSecurityId()
+            throws IOException {
+        var ofx = ofxEnvelope(investmentTranList(BUYSTOCK_XML), "");
+
+        var result = parser.parse(toStream(ofx));
+
+        assertThat(result.errors()).isEmpty();
+        assertThat(result.transactions()).singleElement()
+                .satisfies(txn -> assertThat(txn.symbol()).isEqualTo("037833100"));
+    }
+
+    private static final String REINVEST_XML = """
+            <REINVEST>
+            <INVTRAN>
+            <FITID>22222
+            <DTTRADE>20250125
+            </INVTRAN>
+            <SECID><UNIQUEID>037833100<UNIQUEIDTYPE>CUSIP</SECID>
+            <INCOMETYPE>DIV
+            <TOTAL>-96.00
+            <SUBACCTSEC>CASH
+            <UNITS>0.5
+            <UNITPRICE>192.00
+            </REINVEST>
+            """;
+
+    private static final String TRANSFER_XML = """
+            <TRANSFER>
+            <INVTRAN>
+            <FITID>33333
+            <DTTRADE>20250126
+            </INVTRAN>
+            <SECID><UNIQUEID>037833100<UNIQUEIDTYPE>CUSIP</SECID>
+            <SUBACCTSEC>CASH
+            <UNITS>10
+            <TFERACTION>IN
+            <POSTYPE>LONG
+            </TRANSFER>
+            """;
+
+    @Test
+    void parse_reinvestedDividend_isImportedAsABuy() throws IOException {
+        // A DRIP line: the cash never lands in the account, it buys more shares. Treating it as a
+        // dividend (or dropping it) would leave the holding's share count short.
+        var ofx = ofxEnvelope(investmentTranList(REINVEST_XML), STOCK_SECLIST);
+
+        var result = parser.parse(toStream(ofx));
+
+        assertThat(result.errors()).isEmpty();
+        assertThat(result.transactions()).singleElement().satisfies(txn -> {
+            assertThat(txn.type()).isEqualTo(BUY);
+            assertThat(txn.symbol()).isEqualTo("AAPL");
+            assertThat(txn.date()).isEqualTo(LocalDate.of(2025, 1, 25));
+            assertThat(txn.quantity()).isEqualByComparingTo(new BigDecimal("0.5"));
+            assertThat(txn.amount())
+                    .as("OFX signs a reinvestment total negative; the imported amount is absolute")
+                    .isEqualByComparingTo(new BigDecimal("96.00"));
+        });
+    }
+
+    @Test
+    void parse_unsupportedInvestmentTransactionType_isSkippedWithoutError() throws IOException {
+        // A position TRANSFER moves shares between accounts; it has no cash effect this importer
+        // models, so the mapper returns null. That must skip the row, not fail the file.
+        var ofx = ofxEnvelope(investmentTranList(TRANSFER_XML + BUYSTOCK_XML), STOCK_SECLIST);
+
+        var result = parser.parse(toStream(ofx));
+
+        assertThat(result.transactions()).singleElement()
+                .satisfies(txn -> assertThat(txn.type()).isEqualTo(BUY));
+        assertThat(result.errors())
+                .as("an unmodelled transaction type is skipped silently, not reported as an error")
+                .isEmpty();
+    }
+
     private static ByteArrayInputStream toStream(String content) {
         return new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
     }
