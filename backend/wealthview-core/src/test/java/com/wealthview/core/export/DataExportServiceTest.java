@@ -24,6 +24,7 @@ import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 
 import static com.wealthview.persistence.entity.TransactionType.BUY;
+import static com.wealthview.persistence.entity.TransactionType.DEPOSIT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
@@ -177,5 +178,115 @@ class DataExportServiceTest {
 
         assertThat(csv).contains("\"'-2+3\"");
         assertThat(csv).contains("\"'+1\"");
+    }
+
+    // === RFC-4180 quoting ===
+    //
+    // The formula-injection tests above only ever supply values that get quoted as a SIDE EFFECT
+    // of being neutralized. The quoting rule has three other triggers — an embedded comma, quote,
+    // or newline — and none were exercised. These are ordinary values, not attacks: an account
+    // named "Smith, John" or a note containing a line break silently shifts every later column of
+    // that row if the quoting is wrong, corrupting the export without any error.
+
+    @Test
+    void exportAccountsCsv_valueContainingAComma_isQuotedSoColumnsDoNotShift() {
+        var withComma = new AccountEntity(tenant, "Smith, John Joint", "taxable", "Fidelity");
+        when(accountRepository.findByTenant_Id(tenantId)).thenReturn(List.of(withComma));
+
+        String csv = dataExportService.exportAccountsCsv(tenantId);
+
+        assertThat(csv).contains("\"Smith, John Joint\"");
+        assertThat(csv.strip().lines().skip(1).findFirst().orElseThrow().split("\",?"))
+                .as("the embedded comma must not be read as a field separator")
+                .isNotEmpty();
+    }
+
+    @Test
+    void exportAccountsCsv_valueContainingADoubleQuote_isQuotedAndTheQuoteDoubled() {
+        var withQuote = new AccountEntity(tenant, "The \"Growth\" Account", "taxable", "Fidelity");
+        when(accountRepository.findByTenant_Id(tenantId)).thenReturn(List.of(withQuote));
+
+        String csv = dataExportService.exportAccountsCsv(tenantId);
+
+        assertThat(csv)
+                .as("RFC 4180 escapes an embedded quote by doubling it inside a quoted field")
+                .contains("\"The \"\"Growth\"\" Account\"");
+    }
+
+    @Test
+    void exportAccountsCsv_valueContainingANewline_isQuoted() {
+        var withNewline = new AccountEntity(tenant, "Line one\nLine two", "taxable", "Fidelity");
+        when(accountRepository.findByTenant_Id(tenantId)).thenReturn(List.of(withNewline));
+
+        String csv = dataExportService.exportAccountsCsv(tenantId);
+
+        assertThat(csv).contains("\"Line one\nLine two\"");
+    }
+
+    @Test
+    void exportAccountsCsv_plainValue_isNotQuotedUnnecessarily() {
+        var plain = new AccountEntity(tenant, "Brokerage", "taxable", "Fidelity");
+        when(accountRepository.findByTenant_Id(tenantId)).thenReturn(List.of(plain));
+
+        String csv = dataExportService.exportAccountsCsv(tenantId);
+
+        assertThat(csv).contains(",Brokerage,").doesNotContain("\"Brokerage\"");
+    }
+
+    // === Injection vectors beyond the four leading symbols ===
+
+    @Test
+    void exportAccountsCsv_leadingTabOrCarriageReturn_isAlsoNeutralized() {
+        // Excel treats a leading tab or CR the same as '=' once the cell is parsed, so both are in
+        // the neutralization set — but neither was covered by a test.
+        var tabbed = new AccountEntity(tenant, "\t=1+1", "taxable", "\r=2+2");
+        when(accountRepository.findByTenant_Id(tenantId)).thenReturn(List.of(tabbed));
+
+        String csv = dataExportService.exportAccountsCsv(tenantId);
+
+        assertThat(csv).contains("'\t=1+1");
+        assertThat(csv).contains("'\r=2+2");
+    }
+
+    @Test
+    void exportAccountsCsv_emptyStringValue_isLeftAloneRatherThanPrefixed() {
+        var blank = new AccountEntity(tenant, "", "taxable", "Fidelity");
+        when(accountRepository.findByTenant_Id(tenantId)).thenReturn(List.of(blank));
+
+        String csv = dataExportService.exportAccountsCsv(tenantId);
+
+        assertThat(csv)
+                .as("an empty cell has no leading character to neutralize")
+                .doesNotContain("'");
+    }
+
+    @Test
+    void exportAccountsCsv_nullValue_becomesAnEmptyFieldNotTheStringNull() {
+        var nullInstitution = new AccountEntity(tenant, "Brokerage", "taxable", null);
+        when(accountRepository.findByTenant_Id(tenantId)).thenReturn(List.of(nullInstitution));
+
+        String csv = dataExportService.exportAccountsCsv(tenantId);
+
+        assertThat(csv.lines().skip(1).findFirst().orElseThrow())
+                .as("a null institution must collapse to an empty field between type and created_at")
+                .contains(",Brokerage,taxable,,");
+    }
+
+    // === Transactions with no symbol or quantity ===
+
+    @Test
+    void exportTransactionsCsv_transactionWithoutSymbolOrQuantity_emitsEmptyFields() {
+        // Cash movements (deposits, withdrawals, interest) carry neither a symbol nor a quantity.
+        // Both ternaries guarding that were uncovered, so a "null" string leaking into the export
+        // would not have been caught.
+        var deposit = new TransactionEntity(account, tenant, LocalDate.of(2024, 2, 1),
+                DEPOSIT, null, null, new BigDecimal("2500"));
+        when(transactionRepository.findByTenant_Id(tenantId)).thenReturn(List.of(deposit));
+
+        String csv = dataExportService.exportTransactionsCsv(tenantId);
+
+        assertThat(csv)
+                .as("symbol and quantity collapse to empty fields rather than the string \"null\"")
+                .contains("2024-02-01,deposit,,,2500");
     }
 }

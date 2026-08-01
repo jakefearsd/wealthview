@@ -182,4 +182,47 @@ class FinnhubClientTest {
         assertThat(result).isEmpty();
         mockServer.verify();
     }
+
+    // === Remaining failure modes ===
+
+    @Test
+    void getQuote_connectionFailure_reportsANetworkErrorRatherThanAnHttpStatus() {
+        // The only getQuote catch arm with no coverage. A network error has no status code, so it
+        // must not be reported as "HTTP 0" or collapse into the generic Finnhub-status message.
+        mockServer.expect(method(HttpMethod.GET))
+                .andRespond(request -> {
+                    throw new java.io.IOException("connection refused");
+                });
+
+        var result = client.getQuote("AAPL");
+
+        assertThat(result).isInstanceOf(QuoteResult.Failure.class);
+        assertThat(((QuoteResult.Failure) result).reason()).startsWith("network error:");
+        mockServer.verify();
+    }
+
+    @Test
+    void getQuote_responseWithNoCurrentPriceField_returnsFailureWithReason() {
+        // Finnhub answers 200 with a body whose "c" is absent for symbols it does not cover.
+        mockServer.expect(method(HttpMethod.GET))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        var result = client.getQuote("NOSUCHTICKER");
+
+        assertThat(result).isInstanceOf(QuoteResult.Failure.class);
+        assertThat(((QuoteResult.Failure) result).reason()).contains("no quote data");
+        mockServer.verify();
+    }
+
+    @Test
+    void getCandles_connectionFailure_returnsEmpty() {
+        mockServer.expect(method(HttpMethod.GET))
+                .andRespond(request -> {
+                    throw new java.io.IOException("connection refused");
+                });
+
+        assertThat(client.getCandles("AAPL", LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 5)))
+                .isEmpty();
+        mockServer.verify();
+    }
 }
