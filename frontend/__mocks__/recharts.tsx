@@ -86,3 +86,22 @@ export const ReferenceLine = ({ label }: { label?: ReferenceLineLabel | string }
     const value = typeof label === 'string' ? label : label?.value;
     return <div data-testid="reference-line" data-label={value} />;
 };
+
+interface ReferenceAreaProps {
+    x1?: unknown;
+    x2?: unknown;
+    label?: ReferenceLineLabel | string;
+}
+
+/** Shaded band (e.g. BalanceChart's retirement span); exposes its bounds for assertions. */
+export const ReferenceArea = ({ x1, x2, label }: ReferenceAreaProps) => {
+    const value = typeof label === 'string' ? label : label?.value;
+    return (
+        <div
+            data-testid="reference-area"
+            data-x1={x1 === undefined ? undefined : String(x1)}
+            data-x2={x2 === undefined ? undefined : String(x2)}
+            data-label={value}
+        />
+    );
+};

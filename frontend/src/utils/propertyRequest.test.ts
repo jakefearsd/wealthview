@@ -203,12 +203,23 @@ describe('allocationsToState', () => {
         });
     });
 
-    it('returns all-empty fields for null or empty allocations', () => {
-        const empty = { fiveYr: '', sevenYr: '', fifteenYr: '', twentySevenYr: '' };
+    it('returns all-empty fields for an empty allocation list', () => {
+        expect(allocationsToState([])).toEqual({
+            fiveYr: '', sevenYr: '', fifteenYr: '', twentySevenYr: '',
+        });
+    });
 
-        expect(allocationsToState(null)).toEqual(empty);
-        expect(allocationsToState(undefined)).toEqual(empty);
-        expect(allocationsToState([])).toEqual(empty);
+    it('tolerates a null or absent list even though the API never sends one', () => {
+        // PropertyResponse always emits a list — PropertyDepreciationService.parseCostSegAllocations
+        // returns List.of() for null/blank input and its caller catches parse failures into
+        // List.of() too — so Property['cost_seg_allocations'] is correctly typed non-nullable. The
+        // `?? []` guard is defence against a malformed payload rather than a reachable API state,
+        // which is why these two calls need a cast to reach it at all.
+        const empty = { fiveYr: '', sevenYr: '', fifteenYr: '', twentySevenYr: '' };
+        const asAllocs = (v: unknown) => v as Parameters<typeof allocationsToState>[0];
+
+        expect(allocationsToState(asAllocs(null))).toEqual(empty);
+        expect(allocationsToState(asAllocs(undefined))).toEqual(empty);
     });
 
     it('ignores an unrecognised asset class rather than throwing', () => {
