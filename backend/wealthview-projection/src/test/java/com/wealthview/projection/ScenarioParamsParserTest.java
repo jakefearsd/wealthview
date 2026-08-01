@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 
 import com.wealthview.core.projection.dto.ScenarioParams;
+import com.wealthview.core.projection.dto.SpendingProfileInput;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -139,5 +140,127 @@ class ScenarioParamsParserTest {
         assertThat(params.primarySex()).isNull();
         assertThat(params.spouseSex()).isNull();
         assertThat(params.longevityConditionalAge()).isNull();
+    }
+
+    // === Spending-tier parsing ===
+    //
+    // parseTierBasedPlan had no test at all. It accepts BOTH camelCase and snake_case keys for
+    // every tier field, and the API serialises snake_case globally — so the snake_case arm is the
+    // production path and it was the untested one. A key that silently misses its branch falls
+    // through to the default (zero expenses, start age 0), which does not fail: it quietly plans a
+    // retirement that spends nothing in that tier.
+
+    private static SpendingProfileInput profile(String tiersJson) {
+        return new SpendingProfileInput(new BigDecimal("40000"), new BigDecimal("20000"), tiersJson);
+    }
+
+    @Test
+    void parseTierBasedPlan_camelCaseKeys_populateEveryTierField() {
+        var plan = parser.parseTierBasedPlan(profile("""
+                [{"name":"Go-go","startAge":65,"endAge":75,
+                  "essentialExpenses":45000,"discretionaryExpenses":25000}]
+                """));
+
+        assertThat(plan).isNotNull();
+        assertThat(plan.spendingTiers()).singleElement().satisfies(tier -> {
+            assertThat(tier.name()).isEqualTo("Go-go");
+            assertThat(tier.startAge()).isEqualTo(65);
+            assertThat(tier.endAge()).isEqualTo(75);
+            assertThat(tier.essentialExpenses()).isEqualByComparingTo("45000");
+            assertThat(tier.discretionaryExpenses()).isEqualByComparingTo("25000");
+        });
+    }
+
+    @Test
+    void parseTierBasedPlan_snakeCaseKeys_produceTheIdenticalTier() {
+        var camel = parser.parseTierBasedPlan(profile("""
+                [{"name":"Go-go","startAge":65,"endAge":75,
+                  "essentialExpenses":45000,"discretionaryExpenses":25000}]
+                """));
+        var snake = parser.parseTierBasedPlan(profile("""
+                [{"name":"Go-go","start_age":65,"end_age":75,
+                  "essential_expenses":45000,"discretionary_expenses":25000}]
+                """));
+
+        assertThat(snake).isNotNull();
+        assertThat(snake.spendingTiers())
+                .as("the two key styles must be interchangeable, not one silently defaulting")
+                .usingRecursiveComparison()
+                .isEqualTo(camel.spendingTiers());
+    }
+
+    @Test
+    void parseTierBasedPlan_tierMissingEveryOptionalField_fallsBackToZeroesAndNoEndAge() {
+        var plan = parser.parseTierBasedPlan(profile("[{}]"));
+
+        assertThat(plan.spendingTiers()).singleElement().satisfies(tier -> {
+            assertThat(tier.name()).isEmpty();
+            assertThat(tier.startAge()).isZero();
+            assertThat(tier.endAge()).as("an open-ended tier carries a null end age").isNull();
+            assertThat(tier.essentialExpenses()).isEqualByComparingTo("0");
+            assertThat(tier.discretionaryExpenses()).isEqualByComparingTo("0");
+        });
+    }
+
+    @Test
+    void parseTierBasedPlan_explicitJsonNulls_areTreatedAsAbsentRatherThanParsed() {
+        var plan = parser.parseTierBasedPlan(profile("""
+                [{"name":null,"startAge":null,"endAge":null,
+                  "essentialExpenses":null,"discretionaryExpenses":null}]
+                """));
+
+        assertThat(plan.spendingTiers()).singleElement().satisfies(tier -> {
+            assertThat(tier.startAge()).isZero();
+            assertThat(tier.endAge()).isNull();
+            assertThat(tier.essentialExpenses()).isEqualByComparingTo("0");
+        });
+    }
+
+    @Test
+    void parseTierBasedPlan_nullProfile_returnsNoPlanAtAll() {
+        assertThat(parser.parseTierBasedPlan(null)).isNull();
+    }
+
+    @Test
+    void parseTierBasedPlan_absentBlankOrEmptyArrayTiers_yieldAPlanWithNoTiers() {
+        for (String tiers : new String[]{null, "", "   ", "[]", " [] "}) {
+            var plan = parser.parseTierBasedPlan(profile(tiers));
+
+            assertThat(plan).as("tiers=%s", tiers).isNotNull();
+            assertThat(plan.spendingTiers()).as("tiers=%s", tiers).isEmpty();
+            assertThat(plan.essentialExpenses()).isEqualByComparingTo("40000");
+        }
+    }
+
+    @Test
+    void parseTierBasedPlan_malformedTierJson_fallsBackToTheBaseProfileInsteadOfThrowing() {
+        // A corrupt spending_tiers column must not take down the whole projection; the profile's
+        // base essential/discretionary figures still apply.
+        var plan = parser.parseTierBasedPlan(profile("{not valid json"));
+
+        assertThat(plan).isNotNull();
+        assertThat(plan.spendingTiers()).isEmpty();
+        assertThat(plan.essentialExpenses()).isEqualByComparingTo("40000");
+        assertThat(plan.discretionaryExpenses()).isEqualByComparingTo("20000");
+    }
+
+    @Test
+    void parseTierBasedPlan_multipleTiers_arePreservedInOrder() {
+        var plan = parser.parseTierBasedPlan(profile("""
+                [{"name":"Go-go","start_age":65,"end_age":74,"essential_expenses":45000},
+                 {"name":"Slow-go","start_age":75,"end_age":84,"essential_expenses":40000},
+                 {"name":"No-go","start_age":85,"essential_expenses":38000}]
+                """));
+
+        assertThat(plan.spendingTiers()).hasSize(3)
+                .extracting(t -> t.name()).containsExactly("Go-go", "Slow-go", "No-go");
+        assertThat(plan.spendingTiers().get(2).endAge())
+                .as("the final open-ended tier keeps a null end age")
+                .isNull();
+    }
+
+    @Test
+    void defaultParams_isTheEmptyParams() {
+        assertThat(parser.defaultParams()).isSameAs(ScenarioParams.EMPTY);
     }
 }
