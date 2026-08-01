@@ -6,7 +6,23 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+- Dependency refresh across the backend and all three npm workspaces. Backend:
+  jsoup 1.22.2 → 1.23.1 and Checkstyle core 13.8.0 → 13.9.0. Two Spring Boot
+  BOM-managed versions are now overridden ahead of the 4.1.0 BOM — PostgreSQL
+  JDBC 42.7.11 → 42.7.13 and HttpClient5 5.6.1 → 5.6.3 — both patch-level and
+  both covered by the existing test suite. OpenTelemetry and Flyway were left
+  on the BOM deliberately (see the comment in `backend/pom.xml`). Frontend:
+  Vite 8.1.5 → 8.2.0, `@vitejs/plugin-react` 6.0.4 → 6.0.5, Recharts
+  3.10.0 → 3.10.1, Playwright 1.62.0 → 1.62.1, plus React type packages.
+  Axios 1.18.1 → 1.19.0 in all three workspaces. Mobile: React Native
+  0.86.0 → 0.86.2 with every `@react-native/*` package moved in lockstep.
+
+### Security
+- Cleared the last outstanding npm advisory (`brace-expansion` unbounded-expansion
+  DoS, GHSA-mh99-v99m-4gvg, dev-tooling only). `npm dedupe` after the React Native
+  bump collapsed the vulnerable 1.x paths; `npm audit` now reports 0 vulnerabilities,
+  down from 1 high.
 
 ## [1.2.4] — 2026-07-27
 
