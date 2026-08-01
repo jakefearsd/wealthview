@@ -56,5 +56,35 @@ export default defineConfig({
         environment: 'jsdom',
         setupFiles: './src/test-setup.ts',
         exclude: ['e2e/**', 'node_modules/**'],
+        coverage: {
+            provider: 'v8',
+            // `include` is what makes the denominator honest. Without it v8 only reports files a
+            // test happened to import, so an entirely untested component is not "0% covered" —
+            // it is invisible, and the headline percentage silently rises as coverage worsens.
+            include: ['src/**/*.{ts,tsx}'],
+            exclude: [
+                'src/**/*.test.{ts,tsx}',
+                // Test scaffolding, not product code.
+                'src/test-setup.ts',
+                'src/test-utils.tsx',
+                'src/testutil/**',
+                // Type-only modules: erased at compile time, so there is nothing to execute.
+                'src/types/**',
+                'src/vite-env.d.ts',
+                // Application bootstrap — mounts React onto the DOM and cannot run under jsdom
+                // without being reduced to a tautology.
+                'src/main.tsx',
+            ],
+            reporter: ['text-summary', 'html'],
+            // Ratchet floors, mirroring the backend JaCoCo convention: set just below the level
+            // reached so the gate locks in progress without flaking. RAISE these when you raise
+            // coverage; never lower one to make a build pass.
+            thresholds: {
+                statements: 69,
+                branches: 62,
+                functions: 59,
+                lines: 72,
+            },
+        },
     },
 });
