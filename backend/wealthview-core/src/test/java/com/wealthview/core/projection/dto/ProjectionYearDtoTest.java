@@ -28,6 +28,79 @@ class ProjectionYearDtoTest {
         );
     }
 
+    /** Canonical constructor with every {@code @JsonUnwrapped} group left null. */
+    private ProjectionYearDto allGroupsNull() {
+        return new ProjectionYearDto(2035, 65, true,
+                null, null, null, null, null, null, null, null, null);
+    }
+
+    // === never-null-group invariant (compact constructor) ===
+
+    @Test
+    void constructor_withEveryGroupNull_substitutesEmptyGroupsInsteadOfStoringNull() {
+        var dto = allGroupsNull();
+
+        assertThat(dto.flow()).isNotNull();
+        assertThat(dto.pools()).isNotNull();
+        assertThat(dto.poolGrowth()).isNotNull();
+        assertThat(dto.poolTaxPaid()).isNotNull();
+        assertThat(dto.poolWithdrawals()).isNotNull();
+        assertThat(dto.viability()).isNotNull();
+        assertThat(dto.income()).isNotNull();
+        assertThat(dto.tax()).isNotNull();
+        assertThat(dto.netWorth()).isNotNull();
+    }
+
+    @Test
+    void constructor_withEveryGroupNull_flatAccessorsReturnNullRatherThanThrowing() {
+        // The flat accessors delegate into the groups, so a null group would surface here as an
+        // NPE on an ordinary read — and, worse, would make Jackson omit that group's keys
+        // entirely (see ProjectionYearDtoSerializationTest).
+        var dto = allGroupsNull();
+
+        assertThat(dto.startBalance()).isNull();
+        assertThat(dto.traditionalBalance()).isNull();
+        assertThat(dto.traditionalGrowth()).isNull();
+        assertThat(dto.taxPaidFromRoth()).isNull();
+        assertThat(dto.withdrawalFromRoth()).isNull();
+        assertThat(dto.netSpendingNeed()).isNull();
+        assertThat(dto.selfEmploymentTax()).isNull();
+        assertThat(dto.federalTax()).isNull();
+        assertThat(dto.totalNetWorth()).isNull();
+    }
+
+    @Test
+    void constructor_withEveryGroupNull_stillCarriesTheNonGroupScalars() {
+        var dto = allGroupsNull();
+
+        assertThat(dto.year()).isEqualTo(2035);
+        assertThat(dto.age()).isEqualTo(65);
+        assertThat(dto.retired()).isTrue();
+    }
+
+    @Test
+    void constructor_withGroupsSupplied_storesThemUnchanged() {
+        // The other side of all nine ternaries: a supplied group must pass straight through
+        // rather than being replaced by empty().
+        var source = minimalDto();
+
+        var rebuilt = new ProjectionYearDto(source.year(), source.age(), source.retired(),
+                source.flow(), source.pools(), source.poolGrowth(), source.poolTaxPaid(),
+                source.poolWithdrawals(), source.viability(), source.income(), source.tax(),
+                source.netWorth());
+
+        assertThat(rebuilt).isEqualTo(source);
+        assertThat(rebuilt.flow()).isSameAs(source.flow());
+        assertThat(rebuilt.pools()).isSameAs(source.pools());
+        assertThat(rebuilt.poolGrowth()).isSameAs(source.poolGrowth());
+        assertThat(rebuilt.poolTaxPaid()).isSameAs(source.poolTaxPaid());
+        assertThat(rebuilt.poolWithdrawals()).isSameAs(source.poolWithdrawals());
+        assertThat(rebuilt.viability()).isSameAs(source.viability());
+        assertThat(rebuilt.income()).isSameAs(source.income());
+        assertThat(rebuilt.tax()).isSameAs(source.tax());
+        assertThat(rebuilt.netWorth()).isSameAs(source.netWorth());
+    }
+
     @Test
     void simple_populatesPrimaryFieldsAndDefaultsOthersToNull() {
         var dto = minimalDto();

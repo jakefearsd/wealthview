@@ -84,6 +84,18 @@ public final class TaxBracketFixtures {
         return new StandardDeductionEntity(2022, "single", bd("12950"));
     }
 
+    /**
+     * 2025 MFJ deduction carrying the REAL per-qualifying-person age-65 adder ($1,600, from
+     * R__seed_standard_deductions.sql). {@link #mfjDeduction2025()} leaves the adder at zero, so a
+     * test using it cannot tell one qualifying filer from two — use this fixture whenever the
+     * behaviour under test is the per-person multiplier itself (household both-65+ deduction,
+     * IRMAA-style per-person rules). The 30,000 base is kept identical to
+     * {@link #mfjDeduction2025()} so expectations differ only by the adder.
+     */
+    public static StandardDeductionEntity mfjDeduction2025WithAge65Adder() {
+        return new StandardDeductionEntity(2025, "married_filing_jointly", bd("30000"), bd("1600"));
+    }
+
     public static void stubSingle2025(TaxBracketRepository taxBracketRepo,
                                        StandardDeductionRepository deductionRepo) {
         lenient().when(taxBracketRepo.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(anyInt(), eq("single")))
@@ -98,6 +110,32 @@ public final class TaxBracketFixtures {
                 .thenReturn(mfj2025Brackets());
         lenient().when(deductionRepo.findByTaxYearAndFilingStatus(anyInt(), eq("married_filing_jointly")))
                 .thenReturn(Optional.of(mfjDeduction2025()));
+    }
+
+    /** Single-filer counterpart to {@link #mfjDeduction2025WithAge65Adder()} — real $2,000 adder,
+     * base kept identical to {@link #singleDeduction2025()}. */
+    public static StandardDeductionEntity singleDeduction2025WithAge65Adder() {
+        return new StandardDeductionEntity(2025, "single", bd("15000"), bd("2000"));
+    }
+
+    /** As {@link #stubSingle2025} but with the real age-65 adder seeded. */
+    public static void stubSingle2025WithAge65Adder(TaxBracketRepository taxBracketRepo,
+                                                     StandardDeductionRepository deductionRepo) {
+        lenient().when(taxBracketRepo.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(anyInt(), eq("single")))
+                .thenReturn(single2025Brackets());
+        lenient().when(deductionRepo.findByTaxYearAndFilingStatus(anyInt(), eq("single")))
+                .thenReturn(Optional.of(singleDeduction2025WithAge65Adder()));
+    }
+
+    /** As {@link #stubMfj2025} but with the real age-65 adder seeded — see
+     * {@link #mfjDeduction2025WithAge65Adder()}. */
+    public static void stubMfj2025WithAge65Adder(TaxBracketRepository taxBracketRepo,
+                                                  StandardDeductionRepository deductionRepo) {
+        lenient().when(taxBracketRepo.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(anyInt(),
+                        eq("married_filing_jointly")))
+                .thenReturn(mfj2025Brackets());
+        lenient().when(deductionRepo.findByTaxYearAndFilingStatus(anyInt(), eq("married_filing_jointly")))
+                .thenReturn(Optional.of(mfjDeduction2025WithAge65Adder()));
     }
 
     public static void stubSingle2025Ltcg(LtcgBracketRepository ltcgBracketRepo) {

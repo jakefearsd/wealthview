@@ -164,4 +164,23 @@ class ProjectionYearDtoSerializationTest {
         assertThat(t.get("federal_tax").isNull()).isTrue();
         assertThat(t.get("income_by_source").isNull()).isTrue();
     }
+
+    @Test
+    void serialize_nullGroupsPassedToConstructor_stillEmitEveryKey() throws Exception {
+        // The case above goes through simple(), which supplies real groups holding null
+        // COMPONENTS. This one passes null GROUPS to the canonical constructor — the situation
+        // the compact constructor's never-null-group invariant exists to prevent. Without that
+        // substitution Jackson would omit every key each null group contributes (roughly 40 of
+        // the 49), silently truncating the flat wire contract instead of failing loudly.
+        var nullGroups = new ProjectionYearDto(2025, 35, false,
+                null, null, null, null, null, null, null, null, null);
+
+        JsonNode t = SNAKE.readTree(SNAKE.writeValueAsString(nullGroups));
+
+        assertThat(t.properties()).extracting(Map.Entry::getKey)
+                .containsExactlyInAnyOrderElementsOf(SNAKE_KEYS);
+        assertThat(t.get("start_balance").isNull()).isTrue();
+        assertThat(t.get("total_net_worth").isNull()).isTrue();
+        assertThat(t.get("year").intValue()).isEqualTo(2025);
+    }
 }
