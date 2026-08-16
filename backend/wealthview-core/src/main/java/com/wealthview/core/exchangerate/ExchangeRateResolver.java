@@ -41,7 +41,7 @@ public class ExchangeRateResolver {
         return exchangeRateRepository.findByTenant_IdAndCurrencyCode(tenantId, currency)
                 .orElseThrow(() -> new EntityNotFoundException(
                         "No exchange rate found for " + currency
-                                + " — add one in Settings before using this currency"))
+                                + " — add one under Admin → Exchange Rates before using this currency"))
                 .getRateToUsd();
     }
 }
