@@ -81,20 +81,29 @@
         <guava.version>33.6.0-jre</guava.version>
         <jsonassert.version>1.5.3</jsonassert.version>
         <logstash-logback-encoder.version>9.0</logstash-logback-encoder.version>
-        <!-- Spring Boot BOM overrides. These two artifacts are declared without a <version>
+        <!-- Spring Boot BOM overrides. These artifacts are declared without a <version>
              in the module poms, so they normally resolve from spring-boot-dependencies.
              Redeclaring the BOM's own property name here overrides it globally (Boot's
-             documented mechanism). Both are PATCH bumps ahead of the 4.1.0 BOM and both
-             are exercised by the test suite, so the compatibility risk we take on from
-             Boot is covered: postgresql by the @DataJpaTest/Testcontainers slices, and
-             httpclient5 only by the wealthview-app HTTP ITs (it is test-scope there).
-             Drop these back to BOM defaults once a Boot release catches up.
+             documented mechanism). postgresql and httpclient5 are PATCH bumps ahead of the
+             4.1.0 BOM and both are exercised by the test suite, so the compatibility risk we
+             take on from Boot is covered: postgresql by the @DataJpaTest/Testcontainers
+             slices, and httpclient5 only by the wealthview-app HTTP ITs (it is test-scope
+             there). Drop these back to BOM defaults once a Boot release catches up.
+
+             flyway 12.4.0 -> 13.3.0 is a MAJOR. Its two documented breaking changes do not
+             reach us: the createSchema -> beforeCreateSchema callback rename (we ship no
+             callbacks at all, only V__/R__ migrations) and initSQL -> afterConnect.sql (we
+             set no init-sqls in any profile). v13's new Java 21 floor is satisfied by our
+             Java 25 toolchain. It is validated end-to-end by FlywayMigrationIntegrationTest
+             plus every Testcontainers slice, all of which replay the full 89-migration
+             history against a real PostgreSQL 16 on each run.
+
              Deliberately NOT overridden: opentelemetry (micrometer-tracing-bridge-otel is
              compiled against a BOM-pinned OTel API, and a mismatch shows up at prod runtime
-             rather than in tests) and flyway (12 -> 13 is a major affecting every migration;
-             it needs its own change validated against the full IT suite). -->
+             rather than in tests, which is exactly why green tests are not reassurance). -->
         <httpclient5.version>5.6.3</httpclient5.version>
         <postgresql.version>42.7.13</postgresql.version>
+        <flyway.version>13.3.0</flyway.version>
         <!-- Quality tool versions -->
         <spotbugs-maven-plugin.version>4.10.3.0</spotbugs-maven-plugin.version>
         <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
