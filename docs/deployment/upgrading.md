@@ -116,9 +116,10 @@ the upstream default.
    `./wv rollback` has a target. If it cannot determine the image, it warns and
    continues — rollback will be unavailable.
 5. **Step 3/5** — `docker compose pull app`, fetching the image the compose file
-   resolves for the pinned `WEALTHVIEW_VERSION`. See
-   [Image acquisition flags](#image-acquisition-flags) for `--build` and
-   `--no-pull`.
+   resolves for the pinned `WEALTHVIEW_VERSION`. This is the default **in prod
+   mode**; in dev mode `update` builds instead, because the dev compose file
+   builds from source and has no image to pull. See
+   [Image acquisition flags](#image-acquisition-flags) to override it.
 6. **Step 4/5** — `docker compose up -d --no-deps app`. Only the app container
    is recreated; the database keeps running and its volume is untouched.
 7. **Step 5/5** — polls `/actuator/health` for up to 180 seconds. Flyway
@@ -143,7 +144,7 @@ Step 3/5 is the only part of the sequence you can change:
 
 | Flag | Effect |
 |---|---|
-| *(none)* | `docker compose pull app` — the normal path. |
+| *(none)* | Follows the deployment mode: **prod pulls**, dev builds. Prod is image-only and must pull; the dev compose file's `app` service has no `image:` key at all and cannot be pulled. |
 | `--no-pull` | Skip the fetch entirely and reuse whatever image is already on the host for the resolved tag. Use it after a `docker load`, or on a box with no registry access. |
 | `--no-build` | **Deprecated alias for `--no-pull`.** Still works and does the same thing — under a pull-based flow, "don't build" means "don't fetch" — but it prints a deprecation warning. Update your runbooks. |
 | `--build` | Build the image locally instead of pulling. |
@@ -152,9 +153,10 @@ Step 3/5 is the only part of the sequence you can change:
 `docker-compose.prod.yml` deliberately has none.** `wv update` checks first and
 refuses loudly, because `docker compose build` on a service with no build
 section exits 0 having done nothing — it would deploy a stale image while
-reporting success. `--build` is therefore for the dev stack, or for a host that
-genuinely must build locally against a compose file that supports it (an
-air-gapped box, or bisecting an unreleased commit).
+reporting success. Since building is already the dev default, passing `--build`
+explicitly only matters on a host that must build locally against a
+build-capable compose file (an air-gapped box, or bisecting an unreleased
+commit).
 
 Check that the upgrade succeeded:
 

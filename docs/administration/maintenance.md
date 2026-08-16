@@ -37,7 +37,9 @@ source tree nor a JDK, only Docker and read access to the registry.
 3. Takes a pre-update backup labelled `pre-update` into the backups directory.
 4. Records the currently-running app image reference — repository **and** tag — to
    `.wv-previous-image` (path overridable with `WV_PREVIOUS_IMAGE_FILE`).
-5. Pulls the app image (`docker compose pull app`), unless `--no-pull` was passed.
+5. Pulls the app image (`docker compose pull app`) in prod mode, or builds it in dev mode
+   — the dev compose file builds from source and has nothing to pull. Unless `--no-pull`
+   was passed.
 6. Recreates the app container (`docker compose up -d --no-deps app`).
 7. Polls `/actuator/health` for up to 180 seconds.
 8. On health failure, automatically rolls back to the recorded image and re-checks health,

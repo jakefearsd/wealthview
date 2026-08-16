@@ -119,7 +119,7 @@ for a public repo — this host needs `docker login ghcr.io` with a
 | `backups` (`list-backups`) | List backups with size + age |
 | `restore <file>` | `pg_restore --clean --if-exists`. `--dry-run` |
 | `verify <file>` | Round-trip a dump through a throwaway `postgres:16` |
-| `update` | Backup → pull → swap → health-check → auto-rollback. `--no-pull` `--build` `--no-rollback` (`--no-build` is a deprecated alias for `--no-pull`) |
+| `update` | Backup → pull (dev: build) → swap → health-check → auto-rollback. `--no-pull` `--build` `--no-rollback` (`--no-build` is a deprecated alias for `--no-pull`) |
 | `rollback` | Revert the app to the image recorded by the last `update`; re-pins `WEALTHVIEW_IMAGE` and `WEALTHVIEW_VERSION` |
 | `migrate-out` | Build a portable bundle. `--dest DIR` `--no-encrypt` |
 | `migrate-in <bundle>` | Restore from a bundle on a fresh host |
@@ -229,7 +229,8 @@ take its pre-update backup against a stopped database. Then, in order:
    **and** tag) to `.wv-previous-image` so `./wv rollback` has a target. If it
    can't determine the image it warns and continues; rollback will then be
    unavailable.
-3. **Step 3/5** — `docker compose pull app`.
+3. **Step 3/5** — `docker compose pull app` in prod mode. In dev mode it builds
+   instead: the dev compose file builds from source and has no image to pull.
 4. **Step 4/5** — `docker compose up -d --no-deps app`. Only the app container
    is recreated; the db keeps running and its volume is untouched.
 5. **Step 5/5** — waits up to 180s for the health endpoint.
