@@ -357,3 +357,89 @@ EOF
     age -d -i "$key" -o "$BATS_TEST_TMPDIR/decrypted.dump" "$out_path"
     [ -s "$BATS_TEST_TMPDIR/decrypted.dump" ]
 }
+
+# --- Release image handling ---------------------------------------------------
+#
+# The prod compose file resolves the app image from a registry
+# (ghcr.io/<owner>/wealthview:<version>) rather than building locally. Rollback
+# recovers by re-pinning the tag of the previously running image, so it has to
+# parse a fully-qualified registry reference — not just `wealthview:<tag>`.
+
+_load_update_lib() {
+    # shellcheck disable=SC1090
+    WV_LIB_DIR="$SANDBOX/bin/wv-lib"
+    . "$SANDBOX/bin/wv-lib/update.sh"
+}
+
+@test "image tag: extracts the tag from a GHCR-qualified reference" {
+    _load_update_lib
+    run _wv_image_tag "ghcr.io/jakefearsd/wealthview:1.2.5"
+    [ "$status" -eq 0 ]
+    [ "$output" = "1.2.5" ]
+}
+
+@test "image tag: extracts the tag from a bare name:tag reference" {
+    _load_update_lib
+    run _wv_image_tag "wealthview:1.2.4"
+    [ "$status" -eq 0 ]
+    [ "$output" = "1.2.4" ]
+}
+
+@test "image tag: handles a registry host that carries a port" {
+    _load_update_lib
+    run _wv_image_tag "registry.internal:5000/wealthview:1.2.5"
+    [ "$status" -eq 0 ]
+    [ "$output" = "1.2.5" ]
+}
+
+@test "image tag: rejects an untagged reference rather than guessing" {
+    _load_update_lib
+    # A host:port with no tag must not be mistaken for name:tag — otherwise
+    # rollback would re-pin the app to a version literally named "5000".
+    run _wv_image_tag "registry.internal:5000/wealthview"
+    [ "$status" -ne 0 ]
+}
+
+@test "image repo: strips the tag to leave the repository reference" {
+    _load_update_lib
+    run _wv_image_repo "ghcr.io/jakefearsd/wealthview:1.2.5"
+    [ "$status" -eq 0 ]
+    [ "$output" = "ghcr.io/jakefearsd/wealthview" ]
+}
+
+@test "update: defaults to pulling in prod mode" {
+    cat > .env <<'EOF'
+DB_PASSWORD=x
+JWT_SECRET=y
+SUPER_ADMIN_PASSWORD=z
+WEALTHVIEW_VERSION=1.2.5
+EOF
+    # common.sh derives its paths from WV_ROOT / WV_LIB_DIR, which the bin/wv
+    # dispatcher normally sets before sourcing it.
+    export WV_ROOT="$SANDBOX" WV_LIB_DIR="$SANDBOX/bin/wv-lib"
+    # shellcheck disable=SC1090
+    . "$SANDBOX/bin/wv-lib/common.sh"
+    . "$SANDBOX/bin/wv-lib/update.sh"
+    run _wv_update_default_acquire
+    [ "$status" -eq 0 ]
+    [ "$output" = "pull" ]
+}
+
+@test "update: defaults to building in dev mode" {
+    # No WEALTHVIEW_VERSION -> dev mode -> the dev compose file builds from
+    # source and has no image to pull.
+    cat > .env <<'EOF'
+DB_PASSWORD=x
+JWT_SECRET=y
+SUPER_ADMIN_PASSWORD=z
+EOF
+    # common.sh derives its paths from WV_ROOT / WV_LIB_DIR, which the bin/wv
+    # dispatcher normally sets before sourcing it.
+    export WV_ROOT="$SANDBOX" WV_LIB_DIR="$SANDBOX/bin/wv-lib"
+    # shellcheck disable=SC1090
+    . "$SANDBOX/bin/wv-lib/common.sh"
+    . "$SANDBOX/bin/wv-lib/update.sh"
+    run _wv_update_default_acquire
+    [ "$status" -eq 0 ]
+    [ "$output" = "build" ]
+}

@@ -75,6 +75,13 @@ echo "  Loading Docker image..."
 docker load < /tmp/wealthview-image.tar.gz
 rm -f /tmp/wealthview-image.tar.gz
 cd "$DEPLOY_DIR"
+# The compose file resolves the app image as
+# ${WEALTHVIEW_IMAGE:-ghcr.io/jakefearsd/wealthview}:${WEALTHVIEW_VERSION}.
+# This script deliberately ships a locally-built tarball instead of pulling
+# from a registry, so point WEALTHVIEW_IMAGE at the bare repository name the
+# tarball was tagged with — otherwise compose ignores the image we just loaded
+# and tries to pull from GHCR.
+export WEALTHVIEW_IMAGE="wealthview"
 echo "  Stopping existing services..."
 WEALTHVIEW_VERSION="$VERSION" docker compose down
 echo "  Starting services (wealthview:${VERSION})..."

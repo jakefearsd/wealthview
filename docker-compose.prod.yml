@@ -16,8 +16,17 @@ services:
     restart: unless-stopped
 
   app:
-    image: wealthview:${WEALTHVIEW_VERSION:?WEALTHVIEW_VERSION must be set in .env (use a version like 1.0.0 or a digest like sha256-... — never deploy :latest)}
-    build: .
+    # Pulled from GHCR — released by .github/workflows/backend-verify.yml on a
+    # v* tag. There is deliberately no `build:` key here: the production host is
+    # not expected to have the source tree or a JDK (see `wv help`), and building
+    # on the server meant deploying an artifact no CI job had ever verified.
+    #
+    # WEALTHVIEW_IMAGE exists so a fork, a private mirror, or an air-gapped host
+    # can point at a different registry without editing this file.
+    #
+    # Pin a real version. `latest` is published too, but deploying it defeats
+    # `wv rollback`, which recovers by re-pinning the previously running tag.
+    image: ${WEALTHVIEW_IMAGE:-ghcr.io/jakefearsd/wealthview}:${WEALTHVIEW_VERSION:?WEALTHVIEW_VERSION must be set in .env (use a version like 1.2.5 or a digest like sha256-... — never deploy :latest)}
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/wealthview
       SPRING_DATASOURCE_USERNAME: wv_app

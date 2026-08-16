@@ -104,8 +104,18 @@ CONTAINER DEPLOYMENT FLOW
     WealthView runs as a small Docker Compose stack: one app container
     (Spring Boot), one db container (PostgreSQL), and optionally a backup
     container for nightly off-host dumps. The compose file pins the app
-    image via ${WEALTHVIEW_VERSION} — that variable lives in the env file
-    and drives both `wv update` and `wv rollback`.
+    image as ${WEALTHVIEW_IMAGE}:${WEALTHVIEW_VERSION} — both live in the
+    env file and drive `wv update` and `wv rollback`.
+
+    In production the app image is PULLED, not built here. CI publishes it
+    to ghcr.io/<owner>/wealthview on every v* tag, after the unit tests,
+    quality gates and full integration suite pass, so what reaches the
+    server is an artifact that was actually verified. The host needs
+    neither the source tree nor a JDK. WEALTHVIEW_IMAGE only needs setting
+    to point at a fork or a private mirror.
+
+    If the GHCR package is private, this host must `docker login ghcr.io`
+    with a read:packages token before `wv update` can pull.
 
     Upgrade lifecycle:
       1. Set WEALTHVIEW_VERSION=<new tag> in $WV_ENV_FILE.
@@ -113,7 +123,7 @@ CONTAINER DEPLOYMENT FLOW
            a. Validate the env file.
            b. Take a pre-update backup (labelled `pre-update`).
            c. Record the currently-running image tag for rollback.
-           d. (Unless --no-build) docker compose build the app.
+           d. (Unless --no-pull) pull the app image.
            e. Recreate the app container with the new image.
            f. Poll the health endpoint for up to 3 minutes.
            g. On health failure: auto-rollback to the recorded tag.
@@ -188,9 +198,9 @@ SUBCOMMANDS
                           container — proves it can actually be restored.
 
     Updates
-      update              Pre-update backup -> rebuild -> swap -> health
+      update              Pre-update backup -> pull -> swap -> health
                           check -> auto-rollback on failure.
-                          --no-rollback / --no-build
+                          --no-rollback / --no-pull / --build
       rollback            Revert app to the image tag saved by the last
                           successful `wv update`.
 

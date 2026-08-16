@@ -19,11 +19,22 @@ name: Backend Release Verify
 #                            suite here instead of requiring a manual local
 #                            `mvn verify` before tagging.
 #   3. docker-image        - needs: [verify, integration-tests]. Builds the
-#                            release image only after both test jobs pass, to
-#                            confirm the release image assembles from verified
-#                            code. No deploy — deployment happens on the
-#                            server via `./wv update` (a GitHub-hosted runner
-#                            cannot reach the host box).
+#                            release image only after both test jobs pass, then
+#                            pushes it to GHCR as
+#                            ghcr.io/<owner>/wealthview:<version> and :latest,
+#                            and cuts a GitHub Release whose notes are lifted
+#                            from the matching CHANGELOG section.
+#                            Publishing happens ONLY for refs/tags/v*; a manual
+#                            workflow_dispatch still builds (proving the image
+#                            assembles) but never pushes, so it cannot move
+#                            :latest or invent an untagged version.
+#                            Still no deploy: a GitHub-hosted runner cannot
+#                            reach the host box. The server pulls the published
+#                            image via `wv update`.
+#
+# GHCR VISIBILITY: the first push creates the package as PRIVATE even for a
+# public repo. Make it public once under the repo's Packages settings, or the
+# server needs a read:packages PAT to pull. See docs/deployment/upgrading.md.
 on:
   push:
     tags:
@@ -109,12 +120,97 @@ jobs:
         run: mvn -f backend/pom.xml verify -pl wealthview-app -B -Dfailsafe.rerunFailingTestsCount=2
 
   docker-image:
-    name: Build release image
+    name: Build and publish release image
     needs: [verify, integration-tests]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    permissions:
+      contents: write   # create the GitHub Release
+      packages: write   # push to ghcr.io
     steps:
       - uses: actions/checkout@v7
 
-      - name: Build release Docker image
-        run: docker build -t "wealthview:${{ github.ref_name }}" .
+      - name: Derive version and publish decision
+        id: meta
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            # refs/tags/v1.2.5 -> 1.2.5
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            # workflow_dispatch on a branch: still prove the image assembles,
+            # but never publish — a manual run must not move :latest or claim
+            # a version number that was never tagged.
+            echo "version=0.0.0-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # amd64 only, deliberately. The Dockerfile compiles the entire Maven
+      # backend inside the build stage, so an emulated arm64 build runs the
+      # whole reactor under QEMU and takes 30-60+ minutes. If an arm64 target
+      # is ever needed, add linux/arm64 here AND raise timeout-minutes — and
+      # re-check the digest-pinned base images resolve on that platform.
+      - name: Log in to GHCR
+        if: steps.meta.outputs.publish == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push release image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: ${{ steps.meta.outputs.publish == 'true' }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/wealthview:${{ steps.meta.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/wealthview:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=WealthView
+            org.opencontainers.image.description=Self-hosted multi-tenant personal finance platform
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract release notes from CHANGELOG
+        if: steps.meta.outputs.publish == 'true'
+        run: |
+          set -euo pipefail
+          version="${{ steps.meta.outputs.version }}"
+          # Lines from "## [VERSION]" up to the next "## [" header.
+          awk -v v="${version}" '
+              $0 ~ "^## \\[" v "\\]" { capture = 1; next }
+              capture && /^## \[/     { exit }
+              capture                 { print }
+          ' CHANGELOG.md > release-notes.md
+          if [[ ! -s release-notes.md ]]; then
+            echo "No CHANGELOG section for ${version}; falling back." >&2
+            printf 'See [CHANGELOG.md](CHANGELOG.md) for details.\n' > release-notes.md
+          fi
+          {
+            printf '\n---\n\n## Deploying this release\n\n'
+            printf 'On the server, set the version in the env file and update:\n\n'
+            printf '```bash\n'
+            printf 'sed -i "s/^WEALTHVIEW_VERSION=.*/WEALTHVIEW_VERSION=%s/" /etc/wealthview/.env\n' "${version}"
+            printf 'wv update\n'
+            printf '```\n\n'
+            printf 'Image: `ghcr.io/%s/wealthview:%s`\n' "${{ github.repository_owner }}" "${version}"
+          } >> release-notes.md
+
+      - name: Create GitHub Release
+        if: steps.meta.outputs.publish == 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          name: WealthView ${{ steps.meta.outputs.version }}
+          body_path: release-notes.md
+          # Tags below 1.0.0 are marked as pre-releases automatically.
+          prerelease: ${{ startsWith(steps.meta.outputs.version, '0.') }}
