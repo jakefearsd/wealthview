@@ -120,7 +120,7 @@
              ignored - but forcing PMD core 7.26.0 surfaced 4 new rule violations
              that 7.17.0 doesn't flag, so the override was reverted rather than
              fixing unrelated findings as a side effect of a build-tooling commit.) -->
-        <checkstyle.core.version>13.9.0</checkstyle.core.version>
+        <checkstyle.core.version>13.10.0</checkstyle.core.version>
         <!-- Site tool versions -->
         <maven-site-plugin.version>4.0.0-M16</maven-site-plugin.version>
         <project-info-reports-plugin.version>3.9.0</project-info-reports-plugin.version>
@@ -382,7 +382,7 @@
                 <plugin>
                     <groupId>org.pitest</groupId>
                     <artifactId>pitest-maven</artifactId>
-                    <version>1.25.8</version>
+                    <version>1.25.9</version>
                     <dependencies>
                         <dependency>
                             <groupId>org.pitest</groupId>
