@@ -5,8 +5,6 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.env.Environment;
-import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -31,7 +29,6 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final Environment environment;
 
     @Value("${app.cors.allowed-origins:http://localhost:5173}")
     private List<String> allowedOrigins;
@@ -39,9 +36,16 @@ public class SecurityConfig {
     @Value("${app.cookie.secure:true}")
     private boolean cookieSecure;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, Environment environment) {
+    /**
+     * When true, {@code /actuator/prometheus} and {@code /actuator/metrics} are served without
+     * authentication so an in-network Prometheus can scrape them. Default false — see the
+     * comment on the matcher in {@link #securityFilterChain(HttpSecurity)} for the tradeoff.
+     */
+    @Value("${app.observability.anonymous-metrics:false}")
+    private boolean anonymousMetrics;
+
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
-        this.environment = environment;
     }
 
     @Bean
@@ -83,15 +87,27 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> {
-                    // Loadtest-only exception: under the isolated, throwaway,
-                    // synthetic-data loadtest stack (which is local and not
-                    // internet-facing), permit Prometheus to scrape the app's
-                    // metrics endpoints anonymously. In-network scraping is the
-                    // standard pattern there. Under EVERY other profile
-                    // (prod/dev/docker/it/default) the posture is UNCHANGED:
-                    // /actuator/** stays SUPER_ADMIN-only (PrometheusEndpointIT,
-                    // which runs under the `it` profile, still asserts 401/403/200).
-                    if (environment.acceptsProfiles(Profiles.of("loadtest"))) {
+                    // Opt-in anonymous metrics scraping, DEFAULT OFF.
+                    //
+                    // Prometheus cannot authenticate here: the filter chain accepts a JWT
+                    // (bearer or cookie) and nothing else — there is no UserDetailsService and
+                    // HTTP Basic is not enabled — so a scraper has no way to present
+                    // SUPER_ADMIN credentials. The bundled observability stack was therefore
+                    // getting 401 on every scrape and collecting nothing.
+                    //
+                    // Rather than introduce a second authentication mechanism just for metrics,
+                    // the endpoints can be opened to in-network scraping explicitly. This is the
+                    // standard pattern, but it means the metrics endpoints are UNAUTHENTICATED
+                    // wherever it is switched on: only enable it when the app's port is not
+                    // reachable from the internet, and keep /actuator blocked at the reverse
+                    // proxy. See docs/OBSERVABILITY.md.
+                    //
+                    // Default (prod/dev/docker/it/default) is unchanged: /actuator/** stays
+                    // SUPER_ADMIN-only, which PrometheusEndpointIT still asserts as 401/403/200.
+                    // The loadtest profile sets this property in application-loadtest.yml; it
+                    // used to be a hardcoded profile check here, and collapsing the two into one
+                    // property keeps a single mechanism to reason about.
+                    if (anonymousMetrics) {
                         auth.requestMatchers("/actuator/prometheus", "/actuator/metrics").permitAll();
                     }
                     auth

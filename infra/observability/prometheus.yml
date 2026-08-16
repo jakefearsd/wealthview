@@ -1,14 +1,23 @@
 # Prometheus scrape config for WealthView.
 #
-# Scrapes the wealthview app's /actuator/prometheus endpoint every 15s. The
-# endpoint requires SUPER_ADMIN auth (see SecurityConfig); we use the
-# admin's basic-auth credential supplied via env vars.
+# Scrapes the wealthview app's /actuator/prometheus endpoint every 15s over the
+# user-defined Docker network.
 #
-# Notes:
-# - Use Prometheus 3.x environment-variable expansion ($${VAR}) so
-#   docker-compose passes the secret in without committing it to disk.
-# - When the app is run outside compose, change `targets` below to the
-#   reachable host:port of the Spring Boot process.
+# There is deliberately NO basic_auth here. This config used to send basic-auth
+# credentials, but the app's filter chain only ever accepted a JWT (bearer or
+# cookie) — HTTP Basic was never enabled and there is no UserDetailsService — so
+# every scrape returned 401 and the whole stack silently collected nothing. The
+# app now opts the metrics endpoints out of auth explicitly via
+# `app.observability.anonymous-metrics=true`, which docker-compose.observability.yml
+# sets on the app service.
+#
+# That means /actuator/prometheus and /actuator/metrics are UNAUTHENTICATED on any
+# deployment running this overlay. They are only reachable on the compose network,
+# never published to the host — do not publish the app's port straight to the
+# internet, and block /actuator at the reverse proxy. See docs/OBSERVABILITY.md.
+#
+# Note: when the app runs outside compose, change `targets` below to the reachable
+# host:port of the Spring Boot process.
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
@@ -19,9 +28,6 @@ scrape_configs:
   - job_name: wealthview-app
     metrics_path: /actuator/prometheus
     scheme: http
-    basic_auth:
-      username: ${WEALTHVIEW_PROMETHEUS_USERNAME}
-      password: ${WEALTHVIEW_PROMETHEUS_PASSWORD}
     static_configs:
       - targets:
           - app:8080

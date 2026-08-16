@@ -64,6 +64,21 @@ management:
     metrics:
       export:
         enabled: true
+  metrics:
+    distribution:
+      # Emit latency histogram buckets for HTTP requests. The shipped Grafana
+      # dashboard's latency panel and the WealthViewHttpP99Latency alert both run
+      # histogram_quantile over http_server_requests_seconds_bucket; without these
+      # buckets that series does not exist, so the panel rendered empty and the
+      # alert could never fire — it looked like health rather than blindness.
+      #
+      # This does cost cardinality: http.server.requests is tagged by uri, so each
+      # distinct URI actually exercised adds a full bucket set. That is a real cost
+      # on a large multi-tenant deployment, but WealthView is self-hosted for a
+      # household and only URIs that are hit produce series. A latency alert that
+      # works is worth more here than the series we save by leaving it off.
+      percentiles-histogram:
+        http.server.requests: true
   # Common tags (application, env) are added programmatically by
   # MetricsConfig.CommonTagsCustomizer so they apply uniformly across all
   # registries (including SimpleMeterRegistry used in tests).

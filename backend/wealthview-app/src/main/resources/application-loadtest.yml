@@ -18,6 +18,14 @@ spring:
   flyway:
     enabled: true
 
+app:
+  observability:
+    # The loadtest stack is local, throwaway and not internet-facing, so Prometheus
+    # scrapes the metrics endpoints anonymously. This used to be a hardcoded
+    # `loadtest` profile check inside SecurityConfig; it is now the same property
+    # any deployment uses to opt in, so there is one mechanism rather than two.
+    anonymous-metrics: true
+
 # Knobs the seeder reads (LoadTestDataSeeder, added in a later task).
 loadtest:
   seed:
@@ -30,9 +38,7 @@ management:
   metrics:
     tags:
       application: wealthview-loadtest
-    distribution:
-      # Emit per-URI latency histogram buckets so the Grafana "HTTP server p95
-      # by URI" panel can run histogram_quantile. Loadtest profile only —
-      # histogram buckets add cardinality we don't want enabled in prod.
-      percentiles-histogram:
-        http.server.requests: true
+    # HTTP latency histogram buckets are now enabled for every profile in
+    # application.yml — the shipped dashboard and p99 alert need them, and having
+    # them only here was why both read empty in prod. Nothing profile-specific
+    # left to say about distribution; it is inherited.

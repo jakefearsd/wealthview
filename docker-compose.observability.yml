@@ -5,13 +5,29 @@
 #
 # Required env vars:
 #   GRAFANA_ADMIN_PASSWORD  — Grafana admin login (no fallback; Grafana refuses to start without it)
-#   SUPER_ADMIN_PASSWORD    — already required by the prod compose; Prometheus uses it
-#                             with basic auth to scrape /actuator/prometheus
+#
+# SECURITY NOTE — read before enabling this overlay.
+# This overlay sets app.observability.anonymous-metrics=true, which serves
+# /actuator/prometheus and /actuator/metrics WITHOUT authentication. It has to:
+# the app authenticates with a JWT only (no HTTP Basic, no UserDetailsService), so a
+# scraper has no credential it can present. Previously this file passed basic-auth
+# credentials that the app could not accept, so every scrape 401'd and the stack
+# collected nothing at all.
+#
+# Those endpoints are reachable only on the compose network — they are NOT published
+# to the host here. Keep it that way: do not publish the app's port directly to the
+# internet, and block /actuator at your reverse proxy. Metrics carry no tenant or user
+# identity (see MetricsConfig), but they do expose request URIs and volumes.
 #
 # Prometheus scrapes the app on the user-defined Docker network. Grafana ships with a
 # pre-provisioned datasource pointing at Prometheus and one dashboard at
 # infra/observability/grafana/dashboards/wealthview.json.
 services:
+  # Merged into the app service defined by the base compose file.
+  app:
+    environment:
+      APP_OBSERVABILITY_ANONYMOUS_METRICS: "true"
+
   prometheus:
     image: prom/prometheus:v3.13.2
     volumes:
@@ -22,11 +38,6 @@ services:
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=30d
       - --web.enable-lifecycle
-    environment:
-      # Plumbed into the basic-auth scrape config via env_file substitution
-      # (Prometheus reads $${VAR} from the YAML; we expand them here).
-      WEALTHVIEW_PROMETHEUS_USERNAME: super-admin@wealthview.local
-      WEALTHVIEW_PROMETHEUS_PASSWORD: ${SUPER_ADMIN_PASSWORD:?SUPER_ADMIN_PASSWORD must be set}
     ports:
       - "${PROMETHEUS_PORT:-9090}:9090"
     depends_on:
