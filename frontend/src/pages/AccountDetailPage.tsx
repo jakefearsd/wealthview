@@ -6,6 +6,7 @@ import { listHoldings, updateHolding } from '../api/holdings';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useApiMutation } from '../hooks/useApiMutation';
 import { useAuth } from '../context/AuthContext';
+import { hasWriteAccess } from '../utils/permissions';
 import { formatCurrency } from '../utils/format';
 import CurrencyInput from '../components/CurrencyInput';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
@@ -18,7 +19,7 @@ import Button from '../components/Button';
 export default function AccountDetailPage() {
     const { id } = useParams<{ id: string }>();
     const { role } = useAuth();
-    const canWrite = role === 'admin' || role === 'member';
+    const canWrite = hasWriteAccess(role);
 
     const { data: account, loading: acctLoading } = useApiQuery(() => getAccount(id!));
     const { data: holdings, loading: holdLoading, refetch: refetchHoldings } = useApiQuery(() => listHoldings(id!));

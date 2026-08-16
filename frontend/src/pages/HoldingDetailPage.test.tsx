@@ -7,7 +7,7 @@ vi.mock('../hooks/useApiQuery', () => ({
 }));
 
 vi.mock('../context/AuthContext', () => ({
-    useAuth: () => ({ role: 'admin' }),
+    useAuth: vi.fn(),
 }));
 
 vi.mock('../api/holdings', () => ({
@@ -41,11 +41,14 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 import { useApiQuery } from '../hooks/useApiQuery';
+import { useAuth } from '../context/AuthContext';
 import { listTransactions } from '../api/transactions';
 import { updateHolding } from '../api/holdings';
 import HoldingDetailPage from './HoldingDetailPage';
+import { authAs } from '../testutil/auth';
 
 const mockUseApiQuery = vi.mocked(useApiQuery);
+const mockUseAuth = vi.mocked(useAuth);
 
 const holding = {
     id: 'h-1',
@@ -71,6 +74,30 @@ describe('HoldingDetailPage', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         mockUseApiQuery.mockReturnValue({ data: holding, loading: false, error: null, refetch: vi.fn() } as any);
         vi.mocked(listTransactions).mockResolvedValue({ data: [], total: 0, page: 0, size: 100 });
+        mockUseAuth.mockReturnValue(authAs('admin'));
+    });
+
+    // === write gating ===
+    //
+    // PUT /api/v1/holdings/** is open to ADMIN, MEMBER and SUPER_ADMIN (SecurityConfig), so the
+    // override editor must be offered to exactly those roles.
+
+    it('shows the override editor to a super_admin', async () => {
+        mockUseAuth.mockReturnValue(authAs('super_admin'));
+
+        renderPage();
+        await waitFor(() => expect(screen.getAllByText('AAPL').length).toBeGreaterThan(0));
+
+        expect(screen.getByRole('button', { name: /Edit Override/i })).toBeInTheDocument();
+    });
+
+    it('hides the override editor from a viewer', async () => {
+        mockUseAuth.mockReturnValue(authAs('viewer'));
+
+        renderPage();
+        await waitFor(() => expect(screen.getAllByText('AAPL').length).toBeGreaterThan(0));
+
+        expect(screen.queryByRole('button', { name: /Edit Override/i })).not.toBeInTheDocument();
     });
 
     it('renders symbol and current value', async () => {

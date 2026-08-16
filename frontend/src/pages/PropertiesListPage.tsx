@@ -4,6 +4,7 @@ import { listProperties, createProperty, updateProperty, deleteProperty } from '
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useCrudForm } from '../hooks/useCrudForm';
 import { useAuth } from '../context/AuthContext';
+import { hasWriteAccess } from '../utils/permissions';
 import { formatCurrency, toPercent } from '../utils/format';
 import PropertyForm, { type PropertyFormValues } from '../components/PropertyForm';
 import LoadingState from '../components/LoadingState';
@@ -44,7 +45,7 @@ const initialFormData: PropertyFormValues = {
 
 export default function PropertiesListPage() {
     const { role } = useAuth();
-    const canWrite = role === 'admin' || role === 'member' || role === 'super_admin';
+    const canWrite = hasWriteAccess(role);
     const { data: properties, loading, error, refetch } = useApiQuery(listProperties);
     const [showForm, setShowForm] = useState(false);
 

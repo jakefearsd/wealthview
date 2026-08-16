@@ -3,6 +3,7 @@ import { createPrice, listLatestPrices } from '../api/prices';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useApiMutation } from '../hooks/useApiMutation';
 import { useAuth } from '../context/AuthContext';
+import { hasAdminAccess } from '../utils/permissions';
 import { formatCurrency } from '../utils/format';
 import CurrencyInput from '../components/CurrencyInput';
 import LoadingState from '../components/LoadingState';
@@ -14,7 +15,10 @@ import type { Price } from '../types/price';
 
 export default function PricesPage() {
     const { role } = useAuth();
-    const canWrite = role === 'admin' || role === 'member';
+    // Prices are shared reference data aggregated across every tenant, so writes are
+    // admin-only server-side (SecurityConfig: POST/PUT/DELETE /api/v1/prices/** requires
+    // ADMIN or SUPER_ADMIN). Keep this gate identical or members get a 403 on save.
+    const canWrite = hasAdminAccess(role);
 
     const [symbol, setSymbol] = useState('');
     const [date, setDate] = useState('');

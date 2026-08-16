@@ -5,6 +5,7 @@ import { listTransactions } from '../api/transactions';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useApiMutation } from '../hooks/useApiMutation';
 import { useAuth } from '../context/AuthContext';
+import { hasWriteAccess } from '../utils/permissions';
 import { formatCurrency } from '../utils/format';
 import CurrencyInput from '../components/CurrencyInput';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
@@ -17,7 +18,7 @@ import type { Transaction } from '../types/transaction';
 export default function HoldingDetailPage() {
     const { id } = useParams<{ id: string }>();
     const { role } = useAuth();
-    const canWrite = role === 'admin' || role === 'member';
+    const canWrite = hasWriteAccess(role);
 
     const { data: holding, loading: holdingLoading, refetch: refetchHolding } = useApiQuery(() => getHolding(id!));
 

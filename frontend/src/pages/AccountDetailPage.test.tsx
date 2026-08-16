@@ -7,7 +7,7 @@ vi.mock('../hooks/useApiQuery', () => ({
 }));
 
 vi.mock('../context/AuthContext', () => ({
-    useAuth: () => ({ role: 'admin' }),
+    useAuth: vi.fn(),
 }));
 
 vi.mock('../api/accounts', () => ({ getAccount: vi.fn() }));
@@ -44,11 +44,14 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 import { useApiQuery } from '../hooks/useApiQuery';
+import { useAuth } from '../context/AuthContext';
 import { updateHolding } from '../api/holdings';
 import { deleteTransaction } from '../api/transactions';
 import AccountDetailPage from './AccountDetailPage';
+import { authAs } from '../testutil/auth';
 
 const mockUseApiQuery = vi.mocked(useApiQuery);
+const mockUseAuth = vi.mocked(useAuth);
 
 const account = {
     id: 'acc-1',
@@ -110,6 +113,30 @@ function renderPage() {
 describe('AccountDetailPage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockUseAuth.mockReturnValue(authAs('admin'));
+    });
+
+    // === write gating ===
+    //
+    // The server allows POST/PUT/DELETE /api/v1/** to ADMIN, MEMBER and SUPER_ADMIN
+    // (SecurityConfig), so the client gate has to match that set exactly.
+
+    it('shows the add-transaction control to a super_admin', () => {
+        mockUseAuth.mockReturnValue(authAs('super_admin'));
+        setupMocks();
+
+        renderPage();
+
+        expect(screen.getByRole('button', { name: 'Add Transaction' })).toBeInTheDocument();
+    });
+
+    it('hides the add-transaction control from a viewer', () => {
+        mockUseAuth.mockReturnValue(authAs('viewer'));
+        setupMocks();
+
+        renderPage();
+
+        expect(screen.queryByRole('button', { name: 'Add Transaction' })).not.toBeInTheDocument();
     });
 
     it('renders the account header', () => {

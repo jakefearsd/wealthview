@@ -7,7 +7,7 @@ vi.mock('../api/prices', () => ({
 }));
 
 vi.mock('../context/AuthContext', () => ({
-    useAuth: () => ({ role: 'admin' }),
+    useAuth: vi.fn(),
 }));
 
 vi.mock('../utils/format', () => ({
@@ -28,13 +28,18 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 import { listLatestPrices, createPrice } from '../api/prices';
+import { useAuth } from '../context/AuthContext';
 import PricesPage from './PricesPage';
+import { authAs } from '../testutil/auth';
 
 const aapl = { symbol: 'AAPL', date: '2026-04-10', close_price: 185.50, source: 'finnhub' };
+
+const mockUseAuth = vi.mocked(useAuth);
 
 describe('PricesPage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockUseAuth.mockReturnValue(authAs('admin'));
         vi.mocked(listLatestPrices).mockResolvedValue([aapl]);
     });
 
@@ -47,6 +52,29 @@ describe('PricesPage', () => {
     it('shows add-price form for admins', async () => {
         render(<PricesPage />);
         await screen.findByText('AAPL');
+        expect(screen.getByText('Add Manual Price')).toBeInTheDocument();
+    });
+
+    /**
+     * Prices are shared reference data aggregated across tenants, so the server restricts
+     * POST /api/v1/prices to ADMIN/SUPER_ADMIN (SecurityConfig). Showing the form to a member
+     * only leads to a 403 on save, so the client gate has to match the server rule exactly.
+     */
+    it('hides the add-price form from a member', async () => {
+        mockUseAuth.mockReturnValue(authAs('member'));
+
+        render(<PricesPage />);
+        await screen.findByText('AAPL');
+
+        expect(screen.queryByText('Add Manual Price')).not.toBeInTheDocument();
+    });
+
+    it('shows the add-price form to a super_admin', async () => {
+        mockUseAuth.mockReturnValue(authAs('super_admin'));
+
+        render(<PricesPage />);
+        await screen.findByText('AAPL');
+
         expect(screen.getByText('Add Manual Price')).toBeInTheDocument();
     });
 

@@ -8,7 +8,7 @@ vi.mock('../hooks/useApiQuery', () => ({
 }));
 
 vi.mock('../context/AuthContext', () => ({
-    useAuth: () => ({ role: 'admin' }),
+    useAuth: vi.fn(),
 }));
 
 vi.mock('recharts');
@@ -72,10 +72,13 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 import { useApiQuery } from '../hooks/useApiQuery';
+import { useAuth } from '../context/AuthContext';
 import { refreshValuation, selectZpid, getDepreciationSchedule } from '../api/properties';
 import PropertyDetailPage from './PropertyDetailPage';
+import { authAs } from '../testutil/auth';
 
 const mockUseApiQuery = vi.mocked(useApiQuery);
+const mockUseAuth = vi.mocked(useAuth);
 
 const defaultReturn = { data: null, loading: false, error: null, refetch: vi.fn() };
 
@@ -154,6 +157,30 @@ describe('PropertyDetailPage', () => {
             schedule: [], bonus_depreciation_rate: null,
             cost_seg_allocations: null, class_breakdowns: null,
         } as never);
+        mockUseAuth.mockReturnValue(authAs('admin'));
+    });
+
+    // === write gating ===
+    //
+    // PUT /api/v1/properties/** is open to ADMIN, MEMBER and SUPER_ADMIN (SecurityConfig), so the
+    // edit control must follow that same set.
+
+    it('shows the edit control to a super_admin', () => {
+        mockUseAuth.mockReturnValue(authAs('super_admin'));
+        setupMocks({ property: mockProperty, analytics: investmentAnalytics });
+
+        renderPage();
+
+        expect(screen.getByRole('button', { name: /^Edit$/i })).toBeInTheDocument();
+    });
+
+    it('hides the edit control from a viewer', () => {
+        mockUseAuth.mockReturnValue(authAs('viewer'));
+        setupMocks({ property: mockProperty, analytics: investmentAnalytics });
+
+        renderPage();
+
+        expect(screen.queryByRole('button', { name: /^Edit$/i })).not.toBeInTheDocument();
     });
 
     it('renders investment metrics for investment property', () => {

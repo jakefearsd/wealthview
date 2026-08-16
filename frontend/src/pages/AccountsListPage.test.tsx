@@ -8,7 +8,7 @@ vi.mock('../hooks/useApiQuery', () => ({
 }));
 
 vi.mock('../context/AuthContext', () => ({
-    useAuth: () => ({ role: 'admin' }),
+    useAuth: vi.fn(),
 }));
 
 vi.mock('../api/accounts', () => ({
@@ -36,10 +36,13 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 import { useApiQuery } from '../hooks/useApiQuery';
+import { useAuth } from '../context/AuthContext';
 import { createAccount, updateAccount, deleteAccount } from '../api/accounts';
 import AccountsListPage from './AccountsListPage';
+import { authAs } from '../testutil/auth';
 
 const mockUseApiQuery = vi.mocked(useApiQuery);
+const mockUseAuth = vi.mocked(useAuth);
 const mockCreateAccount = vi.mocked(createAccount);
 
 const sampleAccount: Account = {
@@ -66,6 +69,31 @@ function mockReturn(overrides: Partial<ReturnType<typeof useApiQuery>> = {}) {
 describe('AccountsListPage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockUseAuth.mockReturnValue(authAs('admin'));
+    });
+
+    // === write gating ===
+    //
+    // The server allows POST/PUT/DELETE /api/v1/** to ADMIN, MEMBER and SUPER_ADMIN
+    // (SecurityConfig). A gate that omits super_admin hides controls the user is authorised
+    // to use; one that includes viewer offers controls the server answers with a 403.
+
+    it('shows the create control to a super_admin', () => {
+        mockUseAuth.mockReturnValue(authAs('super_admin'));
+        mockReturn();
+
+        renderWithRouter(<AccountsListPage />);
+
+        expect(screen.getByRole('button', { name: 'New Account' })).toBeInTheDocument();
+    });
+
+    it('hides the create control from a viewer', () => {
+        mockUseAuth.mockReturnValue(authAs('viewer'));
+        mockReturn();
+
+        renderWithRouter(<AccountsListPage />);
+
+        expect(screen.queryByRole('button', { name: 'New Account' })).not.toBeInTheDocument();
     });
 
     it('renders the list of accounts', () => {

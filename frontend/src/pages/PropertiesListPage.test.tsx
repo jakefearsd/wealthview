@@ -7,9 +7,8 @@ vi.mock('../hooks/useApiQuery', () => ({
     useApiQuery: vi.fn(),
 }));
 
-const mockRole = { value: 'admin' };
 vi.mock('../context/AuthContext', () => ({
-    useAuth: () => ({ role: mockRole.value }),
+    useAuth: vi.fn(),
 }));
 
 vi.mock('../api/properties', () => ({
@@ -43,10 +42,13 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 import { useApiQuery } from '../hooks/useApiQuery';
+import { useAuth } from '../context/AuthContext';
 import { deleteProperty } from '../api/properties';
 import PropertiesListPage from './PropertiesListPage';
+import { authAs } from '../testutil/auth';
 
 const mockUseApiQuery = vi.mocked(useApiQuery);
+const mockUseAuth = vi.mocked(useAuth);
 const mockDeleteProperty = vi.mocked(deleteProperty);
 
 const sampleProperty: Property = {
@@ -91,7 +93,7 @@ function mockReturn(overrides: Partial<ReturnType<typeof useApiQuery>> = {}) {
 describe('PropertiesListPage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mockRole.value = 'admin';
+        mockUseAuth.mockReturnValue(authAs('admin'));
     });
 
     it('renders the list of properties', () => {
@@ -170,8 +172,16 @@ describe('PropertiesListPage', () => {
         expect(screen.getByText('No properties')).toBeInTheDocument();
     });
 
+    it('shows write actions to a super_admin', () => {
+        mockUseAuth.mockReturnValue(authAs('super_admin'));
+        mockReturn();
+        renderWithRouter(<PropertiesListPage />);
+
+        expect(screen.getByText('New Property')).toBeInTheDocument();
+    });
+
     it('hides write actions for a viewer role', () => {
-        mockRole.value = 'viewer';
+        mockUseAuth.mockReturnValue(authAs('viewer'));
         mockReturn();
         renderWithRouter(<PropertiesListPage />);
 

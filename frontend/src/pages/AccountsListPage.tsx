@@ -4,6 +4,7 @@ import { listAccounts, createAccount, updateAccount, deleteAccount } from '../ap
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useApiMutation } from '../hooks/useApiMutation';
 import { useAuth } from '../context/AuthContext';
+import { hasWriteAccess } from '../utils/permissions';
 import type { Account, AccountRequest } from '../types/account';
 import { cardStyle, inputFieldStyle, selectStyle } from '../utils/styles';
 import { formatCurrency } from '../utils/format';
@@ -15,7 +16,7 @@ import StatTile from '../components/StatTile';
 
 export default function AccountsListPage() {
     const { role } = useAuth();
-    const canWrite = role === 'admin' || role === 'member';
+    const canWrite = hasWriteAccess(role);
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [name, setName] = useState('');

@@ -7,6 +7,7 @@ import { useApiQuery } from '../hooks/useApiQuery';
 import { useApiMutation } from '../hooks/useApiMutation';
 import { useCrudForm } from '../hooks/useCrudForm';
 import { useAuth } from '../context/AuthContext';
+import { hasWriteAccess } from '../utils/permissions';
 import { trailingTwelveMonthRange } from '../utils/dateRange';
 import { formatCurrency, toPercent } from '../utils/format';
 import { cardStyle } from '../utils/styles';
@@ -61,7 +62,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 export default function PropertyDetailPage() {
     const { id } = useParams<{ id: string }>();
     const { role } = useAuth();
-    const canWrite = role === 'admin' || role === 'member';
+    const canWrite = hasWriteAccess(role);
     const range = useMemo(() => trailingTwelveMonthRange(), []);
     const [zillowCandidates, setZillowCandidates] = useState<ZillowSearchResult[] | null>(null);
     const [analyticsYear, setAnalyticsYear] = useState<number | undefined>(undefined);

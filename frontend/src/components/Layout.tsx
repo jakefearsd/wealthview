@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router';
 import { useAuth } from '../context/AuthContext';
+import { hasAdminAccess } from '../utils/permissions';
 import ErrorBoundary from './ErrorBoundary';
 
 const navItems: { to: string; label: string; requiredRole?: string }[] = [
@@ -43,7 +44,7 @@ export default function Layout() {
                     .filter((item) => {
                         if (!item.requiredRole) return true;
                         if (item.requiredRole === 'super_admin') return role === 'super_admin';
-                        return role === 'admin' || role === 'super_admin';
+                        return hasAdminAccess(role);
                     })
                     .map((item) => (
                         <NavLink key={item.to} to={item.to} style={navLinkStyle}>
