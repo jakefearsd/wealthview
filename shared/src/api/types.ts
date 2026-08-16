@@ -18,7 +18,6 @@ export interface RegisterRequest {
     email: string;
     password: string;
     invite_code: string;
-    device_label?: string;
 }
 
 export interface RefreshRequest {
