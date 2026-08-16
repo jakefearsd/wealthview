@@ -16,8 +16,10 @@ Cloudflare Tunnel gives you:
   pointing at your local box — even if it is behind NAT, CG-NAT, or a
   consumer ISP that blocks port 80 / 443.
 
-It is ideal for a home lab, a Raspberry Pi, a spare laptop, or anywhere the
-server does not have a clean public IP.
+It is ideal for a home lab, a spare desktop, a small VPS, or anywhere the
+server does not have a clean public IP. (Note the WealthView image itself is
+published for `linux/amd64` only, so the box running it has to be x86-64 —
+`cloudflared` is happy on ARM, but the app it fronts is not.)
 
 **Before you start:** make sure WealthView itself is already running (see
 [production-setup.md](production-setup.md) Steps 1–6). You should be able to
