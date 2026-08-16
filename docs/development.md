@@ -256,9 +256,17 @@ hatch — they do **not** run on every push or pull request.
 1. **verify** — `mvn clean verify -DskipITs` (unit tests, `@DataJpaTest` slices, and the five
    quality gates)
 2. **integration-tests** — the full `wealthview-app` Failsafe/HTTP Testcontainers suite
-3. **docker-image** — builds the release image only after both test jobs pass
+3. **docker-image** — builds the release image only after both test jobs pass, then
+   pushes it to GHCR as `ghcr.io/<owner>/wealthview:<version>` and `:latest` and cuts a
+   GitHub Release whose notes come from the matching `## [<version>]` section of
+   `CHANGELOG.md`. Publishing happens **only** for `refs/tags/v*` — a manual
+   `workflow_dispatch` still builds, proving the image assembles, but never pushes.
+   Platform is `linux/amd64` only, because the Dockerfile compiles the whole Maven
+   backend in-stage and an emulated arm64 build would take 30-60+ minutes.
 
-There is no auto-deploy. Deployment happens on the server via `./wv update`.
+There is no auto-deploy. Deployment happens on the server via `./wv update`, which pulls
+the published image. Local development is unaffected: `docker-compose.yml` still declares
+`build: .` and `./wv up` builds from source as before.
 
 ---
 

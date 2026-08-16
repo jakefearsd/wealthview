@@ -18,8 +18,12 @@ drop the `./`. `wv help` is the full operator man page, and
 `./wv update` is the supported in-place upgrade. It refuses to start if the env file is
 incomplete, and it takes a backup before it touches anything.
 
+In production it **pulls** the release image CI published to
+`ghcr.io/<owner>/wealthview:<version>` — it does not build. The host needs neither the
+source tree nor a JDK, only Docker and read access to the registry.
+
 ```bash
-# 1. Pin the new version in the env file (production only)
+# 1. Pin the release you want in the env file (production only)
 #    WEALTHVIEW_VERSION=1.3.0
 # 2. Run the update
 ./wv update
@@ -31,13 +35,20 @@ incomplete, and it takes a backup before it touches anything.
    `MFA_ENCRYPTION_KEY` present and not `CHANGE_ME`).
 2. Refuses to continue unless the `db` container is running.
 3. Takes a pre-update backup labelled `pre-update` into the backups directory.
-4. Records the currently-running app image tag to `.wv-previous-image` (path overridable
-   with `WV_PREVIOUS_IMAGE_FILE`).
-5. Rebuilds the app image, unless `--no-build` was passed.
+4. Records the currently-running app image reference — repository **and** tag — to
+   `.wv-previous-image` (path overridable with `WV_PREVIOUS_IMAGE_FILE`).
+5. Pulls the app image (`docker compose pull app`), unless `--no-pull` was passed.
 6. Recreates the app container (`docker compose up -d --no-deps app`).
 7. Polls `/actuator/health` for up to 180 seconds.
 8. On health failure, automatically rolls back to the recorded image and re-checks health,
    unless `--no-rollback` was passed.
+
+If step 5 fails, nothing has been swapped — the old container is still serving. The two
+usual causes are a `WEALTHVIEW_VERSION` that names no published release, and a host that
+cannot read the registry (the GHCR package starts out **private**, even for a public repo,
+so it needs `docker login ghcr.io` with a `read:packages` token until someone makes it
+public). See
+[Upgrading](../deployment/upgrading.md#before-your-first-pull-registry-access).
 
 **Exit codes:**
 
@@ -47,8 +58,14 @@ incomplete, and it takes a backup before it touches anything.
 | `1` | Update failed; rollback succeeded (when enabled) |
 | `2` | Update failed **and** rollback failed — manual intervention needed |
 
-**Options:** `--no-build` (reuse whatever image the compose file resolves) and
-`--no-rollback` (leave the failing container in place for inspection).
+**Options:**
+
+| Flag | Effect |
+|---|---|
+| `--no-pull` | Skip the fetch; reuse whatever image is already on the host for the resolved tag. |
+| `--no-build` | Deprecated alias for `--no-pull`. Still works, prints a warning. |
+| `--build` | Build locally instead of pulling. Requires a compose file whose `app` service has a `build:` key — `docker-compose.prod.yml` has none, and `update` rejects the flag rather than letting `docker compose build` no-op into a stale deploy. |
+| `--no-rollback` | Leave the failing container in place for inspection. |
 
 Whatever the outcome, the pre-update backup stays on disk. If the new version applied
 schema changes and you need to rewind data as well as code, restore it — see
@@ -63,9 +80,16 @@ schema changes and you need to rewind data as well as code, restore it — see
 ```
 
 Reads `.wv-previous-image` (written by the last `./wv update`) and restarts the app
-container pinned to that tag. In prod mode it re-runs compose with
-`WEALTHVIEW_VERSION=<previous tag>`; in dev mode it simply recreates the app service. It
-then waits up to 120 seconds for the health endpoint.
+container pinned to that reference. In prod mode it re-runs compose with **both**
+`WEALTHVIEW_IMAGE=<previous repository>` and `WEALTHVIEW_VERSION=<previous tag>`; in dev
+mode it simply recreates the app service. It then waits up to 120 seconds for the health
+endpoint.
+
+Both halves are restored because the reference is registry-qualified now
+(`ghcr.io/<owner>/wealthview:1.2.5`). Re-pinning only the tag would silently move a
+mirrored or forked deployment back onto the default upstream repository. This is also why
+`WEALTHVIEW_VERSION` must be a real version and never `latest` — a moving tag gives
+rollback nothing to recover to.
 
 **Rollback reverts the app image only. The database is not rewound.** If the failed
 version ran migrations, restore the matching `pre-update` backup first:
@@ -372,24 +396,31 @@ echo | openssl s_client -connect yourdomain.com:443 2>/dev/null | openssl x509 -
 
 ## Docker Image Updates
 
-`./wv update` rebuilds the app image from the current source and swaps it in with a health
-check and auto-rollback — that is the normal path for shipping a new WealthView version.
+`./wv update` pulls the CI-published app image and swaps it in with a health check and
+auto-rollback — that is the normal path for shipping a new WealthView version.
 
 Base images are **pinned by digest** (node 24-alpine, maven eclipse-temurin 25,
 eclipse-temurin 25-jre-alpine in `Dockerfile`; postgres 16 in both compose files;
 alpine 3.20 in `infra/backup/Dockerfile`). A rebuild therefore does *not* silently pick up
 newer base images — that is deliberate, and it means base-image security updates are an
-explicit, reviewable change:
+explicit, reviewable change. Because the app image now comes from the registry, that
+change has to go through a release: update the digest, cut a `v*` tag so CI builds and
+publishes, then pin the new version on the server.
 
 ```bash
-# Example for the runtime base image
+# Example for the runtime base image, on a development machine
 docker pull eclipse-temurin:25-jre-alpine
 docker inspect --format='{{index .RepoDigests 0}}' eclipse-temurin:25-jre-alpine
-# Paste the new digest into the FROM line, then:
+# Paste the new digest into the FROM line, commit, and tag the release. Then on the server:
+#   WEALTHVIEW_VERSION=<new version>
 ./wv update
 ```
 
 Each pinned `FROM` line in `Dockerfile` carries this recipe as a comment.
+
+The `db` and `backup` images are separate: `db` is digest-pinned directly in the compose
+files (edit the digest and `./wv up` to adopt it), and `backup` is still built on the host
+from `infra/backup/`.
 
 ---
 

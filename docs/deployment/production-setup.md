@@ -55,25 +55,40 @@ You will add a proxy (or a Cloudflare Tunnel) in a separate, later step.
 | Container | Role |
 |-----------|------|
 | **db** | PostgreSQL 16, image pinned by digest. Data lives in the named Docker volume `pgdata`. **No host port published** (unlike the dev compose file, which publishes 5433). |
-| **app** | Spring Boot application serving the API and the React SPA at `/`. Image is `wealthview:${WEALTHVIEW_VERSION}` — the variable is mandatory, and the compose file rejects an empty value with an explicit error. Publishes `${APP_PORT:-80}:8080` on the host — this is what your edge proxy or Cloudflare Tunnel points at. Runs as the non-root user `wv` with a container-level HEALTHCHECK against `/actuator/health`. |
+| **app** | Spring Boot application serving the API and the React SPA at `/`. Image is `${WEALTHVIEW_IMAGE:-ghcr.io/jakefearsd/wealthview}:${WEALTHVIEW_VERSION}` — `WEALTHVIEW_VERSION` is mandatory, and the compose file rejects an empty value with an explicit error. Publishes `${APP_PORT:-80}:8080` on the host — this is what your edge proxy or Cloudflare Tunnel points at. Runs as the non-root user `wv` with a container-level HEALTHCHECK against `/actuator/health`. |
 | **backup** | Alpine 3.20 container with `postgresql16-client`, running `crond`. Executes `pg_dump -Fc` at **03:00 daily** (container timezone, UTC by default) into a `backups/` directory bind-mounted next to the compose file. Prunes dumps older than `BACKUP_RETENTION_DAYS` (default 14). |
 
 Nothing listens on the public internet directly — you only expose the edge
 proxy, never the container port. See [Step 8](#step-8-choose-and-configure-an-edge-proxy-tls).
 
-### The app image is built, not pulled
+### The app image is pulled, not built
 
-There is no public registry for WealthView images. CI (`backend-verify.yml`)
-builds `wealthview:<tag>` on a tag push to confirm the release image assembles,
-but it does **not** push it anywhere. You get an image on the server one of two
-ways:
+CI (`backend-verify.yml`) publishes the release image to GitHub Container
+Registry on every `v*` tag, after the unit tests, quality gates and the full
+integration suite pass, and cuts a GitHub Release alongside it. The server
+pulls that artifact:
 
-1. **Build on the server** — keep a source checkout on the host and let
-   `./wv up` / `./wv update` run `docker compose build`. This is the default
-   path in this guide.
-2. **Build elsewhere and ship it** — `deploy.sh` builds locally, `docker save`s
-   a tarball, `scp`s it, and `docker load`s it on the remote. See
-   [Appendix B](#appendix-b--deploysh-build-here-run-there).
+```
+ghcr.io/<owner>/wealthview:<version>
+```
+
+`docker-compose.prod.yml` deliberately has **no `build:` key** for the `app`
+service. The production host therefore needs neither the source tree nor a JDK
+— building on the server meant deploying something no CI job had ever verified.
+`WEALTHVIEW_IMAGE` exists only so a fork, a private mirror, or an air-gapped
+registry can be pointed at without editing the compose file.
+
+> **The first CI push creates the GHCR package as private, even for a public
+> repository.** Until you change that, every host pulling it must
+> `docker login ghcr.io` with a `read:packages` Personal Access Token. Making
+> the package public once (repo → **Packages** → the package → **Package
+> settings** → **Change visibility**) is the simpler answer for a public repo.
+> See [upgrading.md](upgrading.md#before-your-first-pull-registry-access).
+
+`deploy.sh` still exists for the build-here-ship-there case, but it predates
+this flow and takes no pre-deploy backup and does no health-checked rollback.
+For a host you can SSH into, prefer `wv update`. See
+[Appendix B](#appendix-b--deploysh-build-here-run-there).
 
 ---
 
@@ -81,19 +96,27 @@ ways:
 
 | Requirement | Minimum | Recommended |
 |-------------|---------|-------------|
-| OS | Any Linux (x86-64 or ARM64) with a recent kernel | Ubuntu 24.04 LTS, Debian 12 |
+| OS | Linux **x86-64** with a recent kernel | Ubuntu 24.04 LTS, Debian 12 |
 | CPU | 1 vCPU | 2+ vCPU |
-| RAM | 1 GB | 2 GB (the Maven + npm build stages are the memory peak) |
-| Disk | 10 GB | 20+ GB (room for backups + Docker images + build cache) |
-| Network | Outbound HTTPS for Maven/npm builds; inbound depends on edge proxy choice | Static IPv4 address if exposing directly |
+| RAM | 1 GB | 2 GB |
+| Disk | 10 GB | 20+ GB (room for backups and Docker images) |
+| Network | Outbound HTTPS to `ghcr.io` to pull the image; inbound depends on edge proxy choice | Static IPv4 address if exposing directly |
 
-For a home-lab install (no public IP), a Raspberry Pi 4 with 4 GB RAM behind a
-Cloudflare Tunnel is a perfectly good target. See
-[cloudflared.md](cloudflared.md).
+**The published image is `linux/amd64` only.** The `Dockerfile` compiles the
+whole Maven backend inside the build stage, so an emulated `arm64` build would
+run the entire reactor under QEMU and take 30–60+ minutes; CI does not pay
+that. An ARM host — a Raspberry Pi, an Ampere VPS, Apple silicon — cannot pull
+and run the release image. Running WealthView there means building your own
+image on that machine and deploying it with `wv update --no-pull`, which is a
+path you maintain yourself.
+
+For a home-lab install with no public IP, an x86-64 mini-PC behind a Cloudflare
+Tunnel is a good target. See [cloudflared.md](cloudflared.md).
 
 Command-line tools `wv` expects on the host: `docker` (with the Compose
 plugin), `curl`, `python3`, `openssl`. Optional: `age` (encrypted backups and
 host migration), `rsync` or the `aws` CLI (off-host backup copies), `gitleaks`.
+No JDK, Maven, Node or npm is needed — those live only in the image build.
 `./wv config-check` tells you exactly which are missing.
 
 ---
@@ -143,10 +166,21 @@ docker ps
 
 ---
 
-## Step 2: Clone the repository
+## Step 2: Get the deployment files
 
-Pick where the app will live. `/opt/wealthview` is a common choice on Linux
-servers; anywhere writable by your user works.
+The server does **not** run from the source tree — it runs the published image.
+What it actually needs is a small set of files:
+
+```
+docker-compose.prod.yml    # the stack definition
+.env                       # secrets and the version pin (you create this in Step 3)
+infra/backup/              # Dockerfile + scripts for the nightly-backup sidecar
+bin/wv, bin/wv-lib/        # the admin tool (Step 4)
+```
+
+Cloning the repo is simply the easiest way to obtain them, and it keeps
+`CHANGELOG.md` and the docs on the box. Pick where the app will live;
+`/opt/wealthview` is a common choice on Linux servers.
 
 ```bash
 sudo mkdir -p /opt/wealthview
@@ -159,12 +193,20 @@ git clone https://github.com/<your-org>/wealthview.git .
 Replace `<your-org>` with the GitHub user or organization hosting the fork you
 are deploying.
 
-Check out the release you intend to run rather than a moving branch tip:
+The checkout does not decide which version runs — `WEALTHVIEW_VERSION` in
+`.env` does. Checking out the matching release tag simply keeps the compose
+file and the docs on the host in step with the image you are deploying:
 
 ```bash
 git tag -l | sort -V | tail -5
-git checkout v1.2.4          # latest release at the time of writing
+git checkout v1.2.5
 ```
+
+If you would rather not keep a checkout at all, download
+`docker-compose.prod.yml`, `.env.example`, `infra/`, and `bin/` from the release
+and place them under `/etc/wealthview` as described in
+[Step 4](#step-4-install-the-wv-admin-tool). Nothing in the update path needs
+git afterwards.
 
 ---
 
@@ -200,16 +242,25 @@ MFA_ENCRYPTION_KEY=<generate with: openssl rand -base64 32>
 ### Required for production specifically
 
 ```dotenv
-# Pin the app image tag. docker-compose.prod.yml aborts if this is empty.
+# The release to pull. docker-compose.prod.yml aborts if this is empty.
 # Setting it also flips ./wv into prod mode (it starts using
 # docker-compose.prod.yml instead of docker-compose.yml).
-# NEVER use :latest — a cached :latest silently pins you to whatever the
-# daemon last built.
-WEALTHVIEW_VERSION=1.2.4
+# NEVER use `latest` — CI publishes that tag as a convenience pointer, but
+# deploying it defeats `wv rollback`, which recovers by re-pinning the tag that
+# was running before the update.
+WEALTHVIEW_VERSION=1.2.5
 
 # Allowed origin for /api/* requests. REQUIRED on the prod profile — the app
 # refuses to start with an empty or non-https:// value. Set to your public URL.
 CORS_ORIGIN=https://wealthview.example.com
+```
+
+Optionally, point at a different registry. Leave it unset to use the upstream
+GHCR package:
+
+```dotenv
+# Only for a fork, a private mirror, or an air-gapped registry.
+# WEALTHVIEW_IMAGE=ghcr.io/jakefearsd/wealthview
 ```
 
 ### Optional
@@ -358,24 +409,17 @@ The config file is resolved in this order, first match wins: `--config FILE` →
 `$XDG_CONFIG_HOME/wealthview/wv.conf` → `~/.config/wealthview/wv.conf` →
 source-tree fallback.
 
-> **Two caveats when `/etc/wealthview` is the compose directory.**
+> **Two things to know when `/etc/wealthview` is the compose directory.**
 >
-> 1. `docker-compose.prod.yml` declares `build: .` for `app` and
->    `build: ./infra/backup` for `backup`, both relative to the compose file.
->    `wv up` builds by default. If `/etc/wealthview` has no `Dockerfile`, use
->    `wv up --no-build` and make sure the `wealthview:${WEALTHVIEW_VERSION}`
->    image is already loaded on the host (see
->    [Appendix B](#appendix-b--deploysh-build-here-run-there)). Copying
->    `infra/` across, as in step 2 above, is what lets the `backup` service
->    build.
+> 1. The `app` service is image-only — it has no `build:` key, so nothing about
+>    it needs a `Dockerfile` on the host. The `backup` sidecar still declares
+>    `build: ./infra/backup`, relative to the compose file, which is why step 2
+>    above copies `infra/` across. `wv up` passes `--build`, and in prod that
+>    builds the `backup` image and nothing else.
 > 2. The `backup` container bind-mounts `./backups` — that resolves to
 >    `/etc/wealthview/backups`, **not** the `WV_BACKUPS_DIR` you set in
 >    `wv.conf`. Either point `WV_BACKUPS_DIR` at `/etc/wealthview/backups` so
 >    on-demand and cron'd dumps share a directory, or symlink one to the other.
->
-> Keeping a source checkout on the host (Step 2) and pointing `wv.conf` at it
-> sidesteps both. That is the simplest production layout and the one
-> `./wv update` is designed around.
 
 ---
 
@@ -681,7 +725,7 @@ is up and running:
 
 ```bash
 # Lifecycle
-./wv up                     # build (unless --no-build), start, wait for health
+./wv up                     # start, wait for health (prod: builds only the backup sidecar)
 ./wv down                   # stop; preserve the pgdata volume
 ./wv restart                # down then up
 ./wv status                 # compose ps + one-shot health probe
@@ -693,9 +737,9 @@ is up and running:
 ./wv verify <file>          # round-trip through a throwaway postgres
 ./wv restore <file>         # confirm, stop app, pg_restore, restart, health-check
 
-# Upgrades
-./wv update                 # pre-update backup -> build -> swap -> auto-rollback
-./wv rollback               # revert to the tag recorded by the last update
+# Upgrades — set WEALTHVIEW_VERSION in .env first
+./wv update                 # pre-update backup -> pull -> swap -> auto-rollback
+./wv rollback               # revert to the image recorded by the last update
 
 # Other
 ./wv psql                   # interactive psql as wv_app
@@ -717,7 +761,7 @@ is up and running:
 | `./backups/` | `pg_dump` output. Bind-mounted into the `backup` container; also where `wv backup` writes by default. Gitignored. |
 | `./infra/backup/` | `Dockerfile` + `backup.sh` + `restore.sh` + `crontab` for the backup container. Tracked in the repo. |
 | `./infra/observability/` | Prometheus config + rules and Grafana provisioning/dashboards. |
-| `./.wv-previous-image` | Image tag recorded by `wv update` for `wv rollback`. Path overridable via `WV_PREVIOUS_IMAGE_FILE`. |
+| `./.wv-previous-image` | Full image reference (`repository:tag`) recorded by `wv update` for `wv rollback`. Path overridable via `WV_PREVIOUS_IMAGE_FILE`. |
 | `pgdata` (named volume) | PostgreSQL data directory. Survives `./wv down`; destroyed by `./wv down --with-volumes`. |
 | Container `8080` | Spring Boot HTTP listener. Mapped to host `${APP_PORT}` (default 80) by the prod compose file, and to host 80 unconditionally by the dev one. |
 | Container `5432` | PostgreSQL. **Not published** by `docker-compose.prod.yml`; published as host 5433 by `docker-compose.yml`. |
@@ -727,7 +771,16 @@ is up and running:
 ## Appendix B — `deploy.sh` (build here, run there)
 
 `deploy.sh` at the repo root handles the case where you build the image on a
-workstation and ship it to a server that has no source tree.
+workstation and ship it to a server that has no source tree. It **predates the
+registry flow** and is not the recommended path: for any host you can SSH into,
+`wv update` is better in every way (pre-deploy backup, health check,
+auto-rollback).
+
+> **It needs one extra variable now.** `deploy.sh` builds and loads the image as
+> `wealthview:<version>`, while `docker-compose.prod.yml` resolves
+> `${WEALTHVIEW_IMAGE:-ghcr.io/jakefearsd/wealthview}:${WEALTHVIEW_VERSION}`.
+> Unless the remote `.env` also sets `WEALTHVIEW_IMAGE=wealthview`, compose
+> will not find the loaded image and will try to pull from GHCR instead.
 
 ```bash
 DEPLOY_HOST=you@192.168.1.50 ./deploy.sh
@@ -753,6 +806,10 @@ that host should point `WV_COMPOSE_FILE` at `$DEPLOY_DIR/docker-compose.yml`.
 `deploy.sh` does not take a pre-deploy backup and does not health-check with
 rollback — for routine upgrades on a host you can SSH into, prefer
 [`./wv update`](upgrading.md).
+
+A closer equivalent that keeps the safety rails is to move the *published*
+image by hand and skip the fetch — see
+[Upgrading a host with no source tree](upgrading.md#upgrading-a-host-with-no-source-tree).
 
 ---
 

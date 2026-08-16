@@ -83,20 +83,25 @@ Recognised `wv.conf` keys — all optional, defaults in brackets:
 `WV_APP_PORT` [`80`], `WV_HEALTH_URL`, `WV_PREVIOUS_IMAGE_FILE`
 [`$WV_ROOT/.wv-previous-image`], `WV_HOST`. See `bin/wv.conf.example`.
 
-**Two things to know about the source-less layout.** Both paths inside
+**Two things to know about the source-less layout.** Paths inside
 `docker-compose.prod.yml` are relative to the compose file, not to `wv.conf`:
 
-- `app` declares `build: .` and `backup` declares `build: ./infra/backup`.
-  `wv up` builds by default, so on a host where `/etc/wealthview` has no
-  `Dockerfile` you need `wv up --no-build` plus a `wealthview:<version>` image
-  already loaded on the box. Copying `infra/` across (above) is what lets the
-  `backup` service build.
+- The `app` service is image-only — no `build:` key, nothing to compile on the
+  host. It resolves
+  `${WEALTHVIEW_IMAGE:-ghcr.io/jakefearsd/wealthview}:${WEALTHVIEW_VERSION}`
+  and pulls it. The `backup` sidecar does still declare
+  `build: ./infra/backup`, which is why the install copies `infra/` across.
+  `wv up` passes `--build`, and in prod that builds the `backup` image and
+  nothing else.
 - The `backup` container bind-mounts `./backups`, i.e.
   `/etc/wealthview/backups` — **not** the `WV_BACKUPS_DIR` from `wv.conf`.
   Point `WV_BACKUPS_DIR` at the same directory, or symlink one to the other,
   so `wv backups` sees the cron'd dumps too.
 
-Keeping a source checkout on the host and pointing `wv.conf` at it avoids both.
+If the GHCR package is private — which is how the first CI push leaves it, even
+for a public repo — this host needs `docker login ghcr.io` with a
+`read:packages` token before `wv update` can pull. See
+[upgrading.md](upgrading.md#before-your-first-pull-registry-access).
 
 ---
 
@@ -104,7 +109,7 @@ Keeping a source checkout on the host and pointing `wv.conf` at it avoids both.
 
 | Subcommand | What it does |
 |---|---|
-| `up` | Start the stack. `--no-build` `--no-detach` `--no-wait` |
+| `up` | Start the stack. `--no-build` `--no-detach` `--no-wait`. Passes `--build` by default; in prod that only rebuilds the `backup` sidecar, since `app` has no build section |
 | `down` | Stop the stack. `--with-volumes` destroys data (prompts) |
 | `restart` | `down` then `up`; extra args are forwarded to `up` |
 | `status` | `compose ps` + one-shot health probe |
@@ -114,8 +119,8 @@ Keeping a source checkout on the host and pointing `wv.conf` at it avoids both.
 | `backups` (`list-backups`) | List backups with size + age |
 | `restore <file>` | `pg_restore --clean --if-exists`. `--dry-run` |
 | `verify <file>` | Round-trip a dump through a throwaway `postgres:16` |
-| `update` | Backup → build → swap → health-check → auto-rollback. `--no-build` `--no-rollback` |
-| `rollback` | Revert the app to the image recorded by the last `update` |
+| `update` | Backup → pull → swap → health-check → auto-rollback. `--no-pull` `--build` `--no-rollback` (`--no-build` is a deprecated alias for `--no-pull`) |
+| `rollback` | Revert the app to the image recorded by the last `update`; re-pins `WEALTHVIEW_IMAGE` and `WEALTHVIEW_VERSION` |
 | `migrate-out` | Build a portable bundle. `--dest DIR` `--no-encrypt` |
 | `migrate-in <bundle>` | Restore from a bundle on a fresh host |
 | `rotate-secret <NAME>` | Regenerate a secret. `--dry-run` |
@@ -138,7 +143,7 @@ and the second as optional.
 |---|---|---|---|
 | `docker` + `docker compose` plugin | required | everything | https://docs.docker.com/engine/install/ |
 | `curl` | required | health probes, `status` | preinstalled |
-| `python3` | required | parsing `compose images` JSON in `update` | preinstalled |
+| `python3` | required | parsing `compose images` / `compose config` JSON in `update` | preinstalled |
 | `openssl` | required | secret generation in `rotate-secret` | preinstalled |
 | `bash` 4+ | required | everything | preinstalled on Linux |
 | `age` / `age-keygen` | optional | `--encrypt` backups, `migrate-out`, encrypted restore/verify | https://github.com/FiloSottile/age/releases (download `age-v*-linux-amd64.tar.gz`, `install -m755 age/age age/age-keygen ~/.local/bin/`) |
@@ -168,15 +173,16 @@ nano .env    # DB_PASSWORD, JWT_SECRET (32+ chars), SUPER_ADMIN_PASSWORD,
              # MFA_ENCRYPTION_KEY (openssl rand -base64 32)
 chmod 600 .env
 
-# 3. (Production only) pin a version and set the CORS origin.
+# 3. (Production only) pin the release to pull and set the CORS origin.
 #    Setting WEALTHVIEW_VERSION is what flips wv into prod mode.
-echo 'WEALTHVIEW_VERSION=1.2.4' >> .env
+echo 'WEALTHVIEW_VERSION=1.2.5' >> .env
 echo 'CORS_ORIGIN=https://wealthview.example.com' >> .env
 
 # 4. Validate everything.
 ./wv config-check
 
-# 5. Bring it up. The first build is 2-5 minutes; subsequent builds are <60s.
+# 5. Bring it up. In prod this pulls the published app image; in dev it builds
+#    locally (first build 2-5 minutes, subsequent builds <60s).
 ./wv up
 
 # 6. Verify.
@@ -185,9 +191,14 @@ echo 'CORS_ORIGIN=https://wealthview.example.com' >> .env
 
 `./wv up` runs `docker compose up --build -d`, then waits up to 120s for
 `/actuator/health` to return UP. If the wait times out, the script reports the
-failure and points you at `./wv logs app`. Flags: `--no-build` skips the
-rebuild, `--no-detach` runs in the foreground, `--no-wait` skips the health
-poll.
+failure and points you at `./wv logs app`. Flags: `--no-build` skips the build
+step, `--no-detach` runs in the foreground, `--no-wait` skips the health poll.
+
+**`--build` means less in prod than it looks.** `docker-compose.prod.yml` gives
+the `app` service no `build:` key, so compose builds only the `backup` sidecar
+and pulls `app` from the registry. In dev, where `docker-compose.yml` still
+declares `build: .`, `--build` rebuilds the app image from source as it always
+did.
 
 The health URL is `$WV_HEALTH_URL` when set, otherwise
 `http://<host>:<port>/actuator/health`, where the port comes from `APP_PORT` in
@@ -199,11 +210,14 @@ the env file (falling back to `WV_APP_PORT`, default 80) and the host is
 ## Update an existing deployment
 
 ```bash
-git fetch origin --tags
-git checkout v1.2.4
-nano .env            # WEALTHVIEW_VERSION=1.2.4
+nano .env            # WEALTHVIEW_VERSION=1.2.5
 ./wv update
 ```
+
+The image is **pulled**, not built: CI publishes
+`ghcr.io/<owner>/wealthview:<version>` on every `v*` tag once the unit tests,
+quality gates and full integration suite pass. There is nothing to `git pull`
+on the host, and no JDK is required there.
 
 `./wv update` first validates `.env` and confirms the `db` container is
 running — it aborts with "run './wv up' first" otherwise, because it cannot
@@ -211,10 +225,11 @@ take its pre-update backup against a stopped database. Then, in order:
 
 1. **Step 1/5** — takes a labelled pre-update backup
    (`wealthview_<ts>_pre-update.dump` in the backups directory).
-2. **Step 2/5** — records the currently-running app image to
-   `.wv-previous-image` so `./wv rollback` has a target. If it can't determine
-   the image it warns and continues; rollback will then be unavailable.
-3. **Step 3/5** — `docker compose build app` (`--no-build` to skip).
+2. **Step 2/5** — records the currently-running app image reference (repository
+   **and** tag) to `.wv-previous-image` so `./wv rollback` has a target. If it
+   can't determine the image it warns and continues; rollback will then be
+   unavailable.
+3. **Step 3/5** — `docker compose pull app`.
 4. **Step 4/5** — `docker compose up -d --no-deps app`. Only the app container
    is recreated; the db keeps running and its volume is untouched.
 5. **Step 5/5** — waits up to 180s for the health endpoint.
@@ -223,10 +238,23 @@ If step 5 fails, `update` automatically rolls the app container back to the
 previously recorded image (waiting a further 120s for that to come healthy).
 Pass `--no-rollback` to leave the failing container in place for inspection.
 
+Flags on step 3:
+
+| Flag | Effect |
+|---|---|
+| `--no-pull` | Skip the fetch; reuse the local image for the resolved tag. |
+| `--no-build` | Deprecated alias for `--no-pull`. Still works, prints a warning. |
+| `--build` | Build locally instead of pulling. **Rejected on `docker-compose.prod.yml`**, whose `app` service has no `build:` key — `docker compose build` on such a service exits 0 having done nothing, which would deploy a stale image while reporting success, so `wv update` checks first and fails loudly. |
+
 Exit codes:
 - **0** — update healthy
 - **1** — update failed; rollback succeeded
 - **2** — update failed; rollback also failed (manual intervention required)
+
+If the pull fails, the error names the two usual causes: `WEALTHVIEW_VERSION`
+does not name a published release, or this host cannot read the registry
+(a private GHCR package needs `docker login ghcr.io` with a `read:packages`
+token). Nothing has been swapped at that point.
 
 ---
 
@@ -235,9 +263,13 @@ Exit codes:
 `./wv rollback` reverts the app to the image recorded in `.wv-previous-image`
 by the last successful `./wv update` (path overridable with
 `WV_PREVIOUS_IMAGE_FILE`). It fails with a clear error if no previous image was
-ever recorded. In prod mode it strips the `wealthview:` prefix and re-ups the
-app with `WEALTHVIEW_VERSION` set to that tag, then waits up to 120s for
-health.
+ever recorded. In prod mode it splits the recorded reference and re-ups the app
+with **both** `WEALTHVIEW_IMAGE` and `WEALTHVIEW_VERSION` set, then waits up to
+120s for health. Restoring both halves matters: the reference is now
+registry-qualified, so re-pinning only the tag would move a mirrored or forked
+deployment back onto the default upstream repository. A reference with no
+parseable tag stops the rollback with instructions rather than a guess — and a
+registry `host:port` is correctly read as untagged, not as a tag named `5000`.
 
 The database is **not** rewound; if the new version applied schema changes you
 cannot live with, restore the matching pre-update backup first:
@@ -492,10 +524,13 @@ the remote host itself, run `wv` from a shell on that host.
 | `./wv verify` reports "only N public tables; backup may be truncated" | Dump file truncated mid-write | Take a fresh backup; investigate disk space at backup time |
 | `./wv rotate-secret DB_PASSWORD` succeeded but app won't start | `.env` and DB role got out of sync (rare; only if `ALTER USER` failed silently) | Run `./wv psql` and `ALTER USER wv_app WITH PASSWORD '<value-from-env>'` |
 | `./wv update` aborts: "db container is not running" | `update` needs a live database to take its pre-update backup | `./wv up` first, then re-run `./wv update` |
-| `./wv rollback` errors "No previous image recorded" | `update` never ran, or it could not read the running image tag at Step 2/5 | Pin a known-good `WEALTHVIEW_VERSION` in `.env` and run `./wv up --no-build` |
+| `./wv rollback` errors "No previous image recorded" | `update` never ran, or it could not read the running image tag at Step 2/5 | Pin a known-good `WEALTHVIEW_VERSION` in `.env` and run `./wv up` |
+| `./wv update` stops at Step 3/5: "Image pull failed" | GHCR package is private and this host has no credential; or `WEALTHVIEW_VERSION` names a tag that was never published | `docker login ghcr.io` with a `read:packages` PAT (or make the package public); check the tag exists on the repo's Releases/Packages page |
+| `./wv update --build` refuses: "has no 'build:' key" | `docker-compose.prod.yml` is image-only by design | Drop `--build` and pull; use `--no-pull` if the image is already loaded locally |
+| `docker compose pull` says "no matching manifest for linux/arm64" | The published image is `linux/amd64` only | Deploy on x86-64, or build your own image on the ARM host and use `wv update --no-pull` |
 | `wv` exits: "No wv.conf found ... and \<dir\> is not a source tree" | Running the system-wide `wv` with no config file | Create `/etc/wealthview/wv.conf` or pass `--config /path/to/wv.conf` |
 | `wv` exits: "Refusing to source ...: unexpected line" | `wv.conf` contains something other than `KEY=VALUE` / comments | Strip the logic; `wv.conf` is declarative only |
-| `./wv up` fails building the `app` image on a source-less host | `build: .` has no `Dockerfile` at the compose file's directory | `./wv up --no-build` with the image already `docker load`ed |
+| `./wv up` fails building the `backup` image on a source-less host | `build: ./infra/backup` has no `infra/` directory beside the compose file | Copy `infra/` next to the compose file (see the install above), or `./wv up --no-build` |
 | `./wv status` says health endpoint not reachable, but the app is fine | Probe targets `http://localhost:$APP_PORT`, which is wrong behind a proxy or on a remote host | Set `WV_APP_PORT` or `WV_HEALTH_URL` in `wv.conf` |
 
 ---
@@ -540,11 +575,15 @@ discussion.
   "show me what I have" ergonomic).
 - `deploy.sh` still handles its specialised build-here-ship-there flow: build
   the image on a workstation, `docker save`, `scp`, `docker load`, then
-  `docker compose up -d` over SSH. It is a different shape of operation than
-  `./wv update`, which assumes you have shell access on the deployment host and
-  adds the pre-update backup, health check, and auto-rollback that `deploy.sh`
-  has none of. Note it copies `docker-compose.prod.yml` to the remote **as
-  `docker-compose.yml`**, so point `WV_COMPOSE_FILE` at that path afterwards.
+  `docker compose up -d` over SSH. It predates the registry flow and is no
+  longer the recommended path — `./wv update` assumes shell access on the
+  deployment host and adds the pre-update backup, health check, and
+  auto-rollback that `deploy.sh` has none of. Two things to watch: it copies
+  `docker-compose.prod.yml` to the remote **as `docker-compose.yml`** (point
+  `WV_COMPOSE_FILE` at that path afterwards), and it builds and loads the image
+  as `wealthview:<version>`, so the remote `.env` must also set
+  `WEALTHVIEW_IMAGE=wealthview` or compose will look for the GHCR reference
+  instead.
 - `infra/backup/restore.sh` is the backup container's own restore helper. It
   hardcodes `docker compose -f docker-compose.prod.yml` and does no
   decryption; prefer `./wv restore`, which also stops the app, terminates

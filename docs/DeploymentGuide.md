@@ -23,15 +23,20 @@ All three base images are pinned by digest. PostgreSQL 16 (also digest-pinned)
 holds all state; Flyway runs schema migrations at app start, so there is never
 a manual SQL step.
 
+**Dev builds that image locally; production pulls it.** CI publishes
+`ghcr.io/<owner>/wealthview:<version>` (linux/amd64) on every `v*` tag, so a
+production host needs Docker, the compose file, the env file and registry
+access — no source tree and no JDK.
+
 Stack: Java 25, Spring Boot 4.1, Hibernate 7, PostgreSQL 16, React 19, Vite,
-PostgreSQL JDBC + Flyway 13. Latest released version: **v1.2.4**.
+PostgreSQL JDBC + Flyway 13. Latest released version: **v1.2.6**.
 
 Three Compose files live at the repo root:
 
 | File | Services | Profile | Notes |
 |---|---|---|---|
 | `docker-compose.yml` | `db`, `app` | `docker` | Local evaluation. Seeds a demo tenant. DB published on host **5433**, app on host **80** (both hardcoded — `APP_PORT` is ignored here). |
-| `docker-compose.prod.yml` | `db`, `app`, `backup` | `prod` | Production. No seed data, strict startup validation, `restart: unless-stopped`. App on `${APP_PORT:-80}`; DB port **not** published. Requires `WEALTHVIEW_VERSION`. |
+| `docker-compose.prod.yml` | `db`, `app`, `backup` | `prod` | Production. No seed data, strict startup validation, `restart: unless-stopped`. App on `${APP_PORT:-80}`; DB port **not** published. Requires `WEALTHVIEW_VERSION`. The `app` service has **no `build:` key** — it pulls the CI-published image. |
 | `docker-compose.observability.yml` | `prometheus`, `grafana` | — | Optional overlay for the prod file. Needs `GRAFANA_ADMIN_PASSWORD`. |
 
 All secrets come from a `.env` file next to the compose file. `.env.example` is
@@ -97,10 +102,13 @@ literally `CHANGE_ME`.
 | `SUPER_ADMIN_PASSWORD` | `openssl rand -base64 18` |
 | `MFA_ENCRYPTION_KEY` (base64 32 bytes) | `openssl rand -base64 32` |
 
-Production adds two more: `WEALTHVIEW_VERSION` (the image tag — **never**
-`:latest`) and `CORS_ORIGIN` (must be a non-empty `https://` value).
+Production adds two more: `WEALTHVIEW_VERSION` (the release to pull — **never**
+`latest`, which defeats `wv rollback`) and `CORS_ORIGIN` (must be a non-empty
+`https://` value).
 
-Optional: `FINNHUB_API_KEY`, `ZILLOW_ENABLED`, `APP_PORT`,
+Optional: `WEALTHVIEW_IMAGE` (registry/repository holding the app image;
+defaults to the upstream GHCR package — set it only for a fork, a private
+mirror, or an air-gapped registry), `FINNHUB_API_KEY`, `ZILLOW_ENABLED`, `APP_PORT`,
 `BACKUP_RETENTION_DAYS`, `BACKUP_ENCRYPTION_RECIPIENT`,
 `BACKUP_ENCRYPTION_KEY_FILE`, `BACKUP_REMOTE_DEST`. Full table with YAML
 property names and defaults: [`reference/configuration.md`](reference/configuration.md).
@@ -126,18 +134,32 @@ or `docker`.
 | Container `5432` | PostgreSQL. Published as host **5433** by the dev compose file (so it doesn't collide with a native PostgreSQL on 5432); **not published at all** by the prod file. |
 | 9090 / 3000 | Prometheus / Grafana, only with the observability overlay. Overridable via `PROMETHEUS_PORT` / `GRAFANA_PORT`. Never expose these publicly. |
 
-### CI does not deploy
+### CI publishes; it does not deploy
 
 Every workflow in `.github/workflows/` (`backend-verify`, `web`, `shared`,
 `mobile`, `scripts`, `secret-scan`) triggers **only** on `push:` of a `v*` tag,
 plus a manual `workflow_dispatch`. Nothing runs on ordinary pushes or pull
 requests. `backend-verify.yml` is a three-job chain — unit tests and quality
-gates, then the full `wealthview-app` Testcontainers integration suite, then a
-release `docker build`.
+gates, then the full `wealthview-app` Testcontainers integration suite, then
+build-and-publish.
 
-**There is no auto-deploy and no registry push.** The image is built on the
-server by `./wv update`, or built on a workstation and shipped with
-`deploy.sh` (`docker save` → `scp` → `docker load`).
+The third job pushes the release image to GHCR as
+`ghcr.io/<owner>/wealthview:<version>` and `:latest`, then cuts a **GitHub
+Release** whose notes come from the matching `## [<version>]` section of
+`CHANGELOG.md`. Publishing happens only for `refs/tags/v*`; a manual
+`workflow_dispatch` builds the image to prove it assembles but never pushes.
+Platform is `linux/amd64` only — the Dockerfile compiles the whole Maven
+backend in-stage, so an emulated arm64 build would take 30-60+ minutes.
+
+**There is still no auto-deploy.** A GitHub-hosted runner cannot reach your
+server. You pin `WEALTHVIEW_VERSION` in the env file and run `./wv update`,
+which pulls the published image.
+
+> **The first CI push creates the GHCR package as private**, even for a public
+> repo. Make it public in the repo's Packages settings, or give the server a
+> `docker login ghcr.io` with a `read:packages` token — otherwise the first
+> deploy after this change fails on an unauthorized pull. Details in
+> [`deployment/upgrading.md`](deployment/upgrading.md#before-your-first-pull-registry-access).
 
 ### Health and metrics
 

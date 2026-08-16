@@ -30,7 +30,11 @@ cp .env.example .env                      # Fill in DB_PASSWORD, JWT_SECRET, SUP
 
 For a **production** deployment, also set `WEALTHVIEW_VERSION` in `.env` —
 that flips `./wv` into prod mode (uses `docker-compose.prod.yml`, with the
-nightly backup container and stricter config validation).
+nightly backup container and stricter config validation). Prod **pulls** the
+release image CI published to `ghcr.io/<owner>/wealthview:<version>` rather
+than building locally, so the host needs no source tree and no JDK. See
+[Upgrading](docs/deployment/upgrading.md) — including the registry-access step
+you need the first time, since the GHCR package starts out private.
 
 - **URL:** http://localhost
 - **Super admin:** `admin@wealthview.local` / `admin123`
@@ -107,8 +111,13 @@ GitHub Actions has six workflows (`backend-verify`, `web`, `shared`, `mobile`,
 `scripts`, `secret-scan`). They run **only on `v*` release tags** plus a manual
 `workflow_dispatch` — not on every push or PR. `backend-verify.yml` is a
 three-job pipeline: quality gates and unit tests, then the full `wealthview-app`
-Testcontainers integration suite, then the release Docker image. There is no
-auto-deploy; you deploy on the server with `./wv update`.
+Testcontainers integration suite, then build-and-publish — the release image is
+pushed to GHCR as `ghcr.io/<owner>/wealthview:<version>` (and `:latest`) and a
+GitHub Release is cut with notes taken from `CHANGELOG.md`. A manual
+`workflow_dispatch` builds the image but never publishes.
+
+There is still no auto-deploy: you pin `WEALTHVIEW_VERSION` on the server and
+run `./wv update`, which pulls the published image.
 
 ## Documentation
 

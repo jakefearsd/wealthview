@@ -19,7 +19,8 @@ Backend defaults live in `backend/wealthview-app/src/main/resources/application.
 | `CORS_ORIGIN` | `app.cors.allowed-origins` | Yes on `prod` | none on `prod`; `http://localhost` on `docker`; `http://localhost:5173` on `dev` | Comma-separated allowed origins. Under `prod` every entry must start with `https://` or startup aborts. |
 | `FINNHUB_API_KEY` | `app.finnhub.api-key` | No | *(empty)* | Finnhub API key. When empty, `PriceSyncService` and the stock-split sync beans are not created at all. |
 | `ZILLOW_ENABLED` | `app.zillow.enabled` (compose passes `APP_ZILLOW_ENABLED`) | No | `false` (`dev` profile sets `true`) | Enables Zillow valuation scraping and the weekly sync job |
-| `WEALTHVIEW_VERSION` | *(compose only)* | Yes for prod | none | Pins the app image tag in `docker-compose.prod.yml`. Setting it also flips `./wv` into prod mode. Never `:latest`. |
+| `WEALTHVIEW_VERSION` | *(compose only)* | Yes for prod | none | The release tag `docker-compose.prod.yml` **pulls** from the registry (production has no `build:` for `app`). Setting it also flips `./wv` into prod mode. Never `latest` — CI publishes that tag, but deploying it defeats `wv rollback`, which recovers by re-pinning the tag that was running before the update. |
+| `WEALTHVIEW_IMAGE` | *(compose only)* | No | `ghcr.io/jakefearsd/wealthview` | Registry/repository half of the app image reference in `docker-compose.prod.yml`. Set it only to use a fork, a private mirror, or an air-gapped registry. `wv rollback` re-pins this alongside `WEALTHVIEW_VERSION`, so a mirrored deployment rolls back to the mirror. |
 | `APP_PORT` | *(compose only)* | No | `80` | Host port bound to the container's 8080 in `docker-compose.prod.yml` |
 | `BACKUP_RETENTION_DAYS` | *(compose only)* | No | `14` | Retention for the `backup` sidecar in `docker-compose.prod.yml` |
 
@@ -162,7 +163,7 @@ On a production host `bin/wv` is installed to `/usr/local/bin/wv` and driven by 
 | `WV_COMPOSE_PROJECT` | No | `wealthview` | Compose project name |
 | `WV_APP_PORT` | No | `80` | Host port used to build the default health-check URL |
 | `WV_HEALTH_URL` | No | `http://<host>:<WV_APP_PORT>/actuator/health` | Explicit health-check URL |
-| `WV_PREVIOUS_IMAGE_FILE` | No | none | Where `wv update` records the prior image tag for `wv rollback` |
+| `WV_PREVIOUS_IMAGE_FILE` | No | none | Where `wv update` records the prior image reference (`repository:tag`) for `wv rollback` |
 | `WV_HOST` | No | none | Drives docker against a remote daemon over `ssh://` |
 
 ## Load-Test Profile

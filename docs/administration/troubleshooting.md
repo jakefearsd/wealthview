@@ -181,7 +181,8 @@ It reports missing and placeholder (`CHANGE_ME`) values for all four required va
 | `SUPER_ADMIN_PASSWORD` | Required. Password for the auto-created super-admin account |
 | `MFA_ENCRYPTION_KEY` | Required. Base64 32-byte AES key (`openssl rand -base64 32`) |
 | `CORS_ORIGIN` | Required on the prod profile; must be `https://` |
-| `WEALTHVIEW_VERSION` | Required by `docker-compose.prod.yml`; also flips `./wv` into prod mode |
+| `WEALTHVIEW_VERSION` | Required by `docker-compose.prod.yml` — the release tag to pull; also flips `./wv` into prod mode. Never `latest` |
+| `WEALTHVIEW_IMAGE` | Optional — registry/repository holding the app image. Defaults to `ghcr.io/jakefearsd/wealthview`; set only for a fork, mirror, or air-gapped registry |
 | `FINNHUB_API_KEY` | Optional — price and split sync disabled without it |
 | `ZILLOW_ENABLED` | Optional — defaults to `false` |
 | `BACKUP_RETENTION_DAYS` | Optional — defaults to 14 |
@@ -625,6 +626,50 @@ docker compose -f docker-compose.prod.yml ps
 
 ## Update and Rollback Issues
 
+### Image Pull Failed (Step 3/5)
+
+**Symptom:** `./wv update` stops at Step 3/5 with `Image pull failed` and a hint about
+`WEALTHVIEW_VERSION` and registry access. Nothing was swapped — the old container is still
+serving and the pre-update backup is on disk.
+
+Production pulls the image CI published to `ghcr.io/<owner>/wealthview:<version>`; it does
+not build one. Reproduce the raw error to see which cause it is:
+
+```bash
+docker compose -f docker-compose.prod.yml pull app
+```
+
+| Docker says | Cause | Fix |
+|---|---|---|
+| `denied` / `unauthorized` / `authentication required` | The GHCR package is private. **This is how the first CI push leaves it, even for a public repo.** | Make the package public (repo → Packages → the package → Package settings → Change visibility), or `docker login ghcr.io -u <username>` on this host with a `read:packages` Personal Access Token. |
+| `manifest unknown` / `not found` | `WEALTHVIEW_VERSION` names a tag that was never published — a typo, or a tag whose CI run failed before the publish step. | Check the repo's Releases and Packages pages for the tags that exist; correct the pin. |
+| `no matching manifest for linux/arm64` | The published image is `linux/amd64` only. | Run on x86-64, or build your own image on the ARM host and deploy it with `./wv update --no-pull`. |
+| DNS / TLS errors reaching `ghcr.io` | No outbound HTTPS, or a proxy in the way. | Fix egress, or transfer the image manually and use `--no-pull`. |
+
+Confirm which reference `wv` actually resolved — a stale `WEALTHVIEW_IMAGE` pointing at a
+mirror you no longer run gives the same symptoms:
+
+```bash
+./wv config-check
+docker compose -f docker-compose.prod.yml config | grep 'image:'
+```
+
+Credentials are stored per-user in `~/.docker/config.json`, so log in as the same user
+(or `root`) that runs `wv`. Nothing about the token belongs in `.env` or `wv.conf`.
+
+### `./wv update --build` Refuses to Run
+
+**Symptom:** `--build was requested, but the app service in <file> has no 'build:' key`.
+
+**Cause:** `docker-compose.prod.yml` is image-only by design — production runs the
+CI-verified artifact. `update` checks for the key first because `docker compose build` on
+a service with no build section exits 0 having done nothing, which would deploy a stale
+image while reporting success.
+
+**Fix:** drop `--build` and let it pull. If the image is already on the host (loaded from
+a tarball, or built locally against a compose file that supports it), use `--no-pull`
+instead. `--no-build` still works as a deprecated alias for `--no-pull`.
+
 ### Update Rolled Back Automatically
 
 **Symptom:** `./wv update` reports a failed health check and reverts to the previous image
@@ -658,9 +703,14 @@ the image back:
 ### `./wv rollback` Says There Is No Previous Image
 
 **Cause:** `.wv-previous-image` does not exist (no successful `./wv update` has run on this
-host) or the image tag could not be determined at update time.
+host) or the image reference could not be determined at update time.
 
 **Fix:** pin the known-good tag in `WEALTHVIEW_VERSION` and redeploy with `./wv update`.
+
+A related failure: rollback aborts with *"has no parseable tag, so it cannot be
+re-pinned"*. That means the recorded reference carries no tag at all — typically because
+the app was running an untagged or digest-only image. Set `WEALTHVIEW_VERSION` (and
+`WEALTHVIEW_IMAGE`, if you use a mirror) by hand and run `./wv up`.
 
 ---
 

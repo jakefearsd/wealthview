@@ -5,27 +5,55 @@
 This guide covers how to update your WealthView deployment, how database
 migrations work, and how to roll back if something goes wrong.
 
+**Production pulls a published image; it does not build one.** CI publishes
+`ghcr.io/<owner>/wealthview:<version>` on every `v*` tag, after the unit tests,
+quality gates and the full integration suite pass, and cuts a GitHub Release
+alongside it. The server needs neither the source tree nor a JDK — only Docker,
+the compose file, the env file, and read access to the registry.
+
 The whole upgrade is one command — `./wv update` — which takes a pre-update
-backup, swaps the image, health-checks the result, and automatically rolls back
-if the new version doesn't come up. The sections below explain what it does and
-what to do when it doesn't work.
+backup, pulls the new image, swaps the container, health-checks the result, and
+automatically rolls back if the new version doesn't come up. The sections below
+explain what it does and what to do when it doesn't work.
+
+## Before your first pull: registry access
+
+The first CI push **creates the GHCR package as private, even for a public
+repository.** Until that is changed, `./wv update` fails at the pull step with
+an `unauthorized` / `denied` error. Sort this out once, before you need it:
+
+**Option A — make the package public (simplest for a public repo).**
+On GitHub, go to the repository → **Packages** → the `wealthview` package →
+**Package settings** → **Change visibility** → *Public*. Anonymous pulls then
+work from any host with no login at all.
+
+**Option B — authenticate the host.** Keep the package private and give the
+server a Personal Access Token (classic) with the **`read:packages`** scope
+only:
+
+```bash
+# On the deployment host. Paste the token when prompted — do not put it on the
+# command line, where it lands in shell history.
+docker login ghcr.io -u <your-github-username>
+```
+
+Docker stores the credential in `~/.docker/config.json` for the user that ran
+it, so log in as the same user (or `root`) that runs `wv`. Nothing about the
+token belongs in `.env` or `wv.conf`.
 
 ## Pre-Upgrade Checklist
 
-1. **Check for breaking changes.** Read `CHANGELOG.md` for the range you are
-   crossing, then skim the commits:
-   ```bash
-   git fetch origin --tags
-   git log --oneline HEAD..v1.2.4
-   ```
-   Look for commits with `BREAKING CHANGE` in the message or `db(persistence)`
-   commits that alter existing tables.
+1. **Check for breaking changes.** Read the GitHub Release notes for the
+   version you are moving to — CI builds them from the matching
+   `## [<version>]` section of `CHANGELOG.md`, at
+   `https://github.com/<owner>/wealthview/releases` — or read `CHANGELOG.md`
+   directly for the whole range you are crossing. Look for `BREAKING CHANGE`
+   entries or schema changes to existing tables.
 
-2. **Note the version you are on.** `./wv update` records the running image tag
-   automatically, but write it down anyway:
+2. **Note the version you are on.** `./wv update` records the running image
+   reference automatically, but write it down anyway:
    ```bash
    grep '^WEALTHVIEW_VERSION=' .env
-   git describe --tags
    ```
 
 3. **Confirm the stack is up.** `./wv update` refuses to run if the `db`
@@ -44,20 +72,38 @@ what to do when it doesn't work.
 ## Standard Upgrade Procedure
 
 ```bash
-cd /opt/wealthview
+# 1. Pin the release you want in the env file. This is what
+#    docker-compose.prod.yml interpolates into
+#    image: ${WEALTHVIEW_IMAGE:-ghcr.io/jakefearsd/wealthview}:${WEALTHVIEW_VERSION}
+$EDITOR /etc/wealthview/.env        # WEALTHVIEW_VERSION=1.2.5
 
-# 1. Get the new code and check out the release tag.
-git fetch origin --tags
-git checkout v1.2.4
-
-# 2. Pin the matching image tag in .env.
-#    This is what docker-compose.prod.yml interpolates into
-#    image: wealthview:${WEALTHVIEW_VERSION}
-$EDITOR .env        # WEALTHVIEW_VERSION=1.2.4
-
-# 3. Upgrade.
-./wv update
+# 2. Upgrade.
+wv update
 ```
+
+That is the whole procedure. There is no `git pull` and no build step: the
+image referenced by the new tag already exists in the registry.
+
+> **Never pin `WEALTHVIEW_VERSION=latest`.** CI publishes a `:latest` tag as a
+> convenience pointer, but deploying it defeats `./wv rollback`, which recovers
+> by re-pinning the tag that was running before the update — and a moving tag
+> gives you no way to say which build that was. The compose file's error
+> message says the same thing when the variable is unset.
+
+### Using a fork or a private mirror
+
+`WEALTHVIEW_IMAGE` (optional) overrides the repository half of the image
+reference, so an air-gapped registry or a fork's package can be used without
+editing the compose file:
+
+```dotenv
+WEALTHVIEW_IMAGE=registry.internal:5000/wealthview
+WEALTHVIEW_VERSION=1.2.5
+```
+
+`./wv rollback` re-pins **both** halves from the recorded image reference, so a
+mirrored deployment rolls back to the mirror rather than silently reverting to
+the upstream default.
 
 ### What `./wv update` does
 
@@ -69,9 +115,10 @@ $EDITOR .env        # WEALTHVIEW_VERSION=1.2.4
    `.wv-previous-image` (path overridable via `WV_PREVIOUS_IMAGE_FILE`), so
    `./wv rollback` has a target. If it cannot determine the image, it warns and
    continues — rollback will be unavailable.
-5. **Step 3/5** — `docker compose build app`. Skipped with `--no-build`, in
-   which case compose uses whatever `wealthview:${WEALTHVIEW_VERSION}` resolves
-   to on the host (a locally loaded image, for example).
+5. **Step 3/5** — `docker compose pull app`, fetching the image the compose file
+   resolves for the pinned `WEALTHVIEW_VERSION`. See
+   [Image acquisition flags](#image-acquisition-flags) for `--build` and
+   `--no-pull`.
 6. **Step 4/5** — `docker compose up -d --no-deps app`. Only the app container
    is recreated; the database keeps running and its volume is untouched.
 7. **Step 5/5** — polls `/actuator/health` for up to 180 seconds. Flyway
@@ -90,6 +137,25 @@ Exit codes:
 | `1` | Update failed; rollback succeeded (or was disabled). |
 | `2` | Update failed **and** rollback also failed — manual intervention needed. |
 
+### Image acquisition flags
+
+Step 3/5 is the only part of the sequence you can change:
+
+| Flag | Effect |
+|---|---|
+| *(none)* | `docker compose pull app` — the normal path. |
+| `--no-pull` | Skip the fetch entirely and reuse whatever image is already on the host for the resolved tag. Use it after a `docker load`, or on a box with no registry access. |
+| `--no-build` | **Deprecated alias for `--no-pull`.** Still works and does the same thing — under a pull-based flow, "don't build" means "don't fetch" — but it prints a deprecation warning. Update your runbooks. |
+| `--build` | Build the image locally instead of pulling. |
+
+`--build` **requires a compose file whose `app` service has a `build:` key, and
+`docker-compose.prod.yml` deliberately has none.** `wv update` checks first and
+refuses loudly, because `docker compose build` on a service with no build
+section exits 0 having done nothing — it would deploy a stale image while
+reporting success. `--build` is therefore for the dev stack, or for a host that
+genuinely must build locally against a compose file that supports it (an
+air-gapped box, or bisecting an unreleased commit).
+
 Check that the upgrade succeeded:
 
 ```bash
@@ -103,14 +169,29 @@ prints `Started WealthviewApplication in <seconds>`.
 
 ### Upgrading a host with no source tree
 
-If the server has only the containers and a system-wide `wv` install, there is
-nothing to `git pull`. Load the new image onto the host first (see
-[production-setup.md Appendix B](production-setup.md#appendix-b--deploysh-build-here-run-there)),
-bump `WEALTHVIEW_VERSION` in the env file, and run:
+This is now the normal case, not a special one. A server with only the
+containers, the compose file, the env file and a system-wide `wv` install needs
+nothing extra: bump `WEALTHVIEW_VERSION` in the env file and run
+`sudo wv update`. The image comes from the registry.
+
+The only variant worth knowing is the offline one. If the host cannot reach
+GHCR, transfer the image yourself and skip the fetch:
 
 ```bash
-sudo wv update --no-build
+# On a machine that can reach the registry:
+docker pull ghcr.io/<owner>/wealthview:1.2.5
+docker save ghcr.io/<owner>/wealthview:1.2.5 | gzip > wealthview-1.2.5.tar.gz
+scp wealthview-1.2.5.tar.gz you@server:/tmp/
+
+# On the server:
+gunzip -c /tmp/wealthview-1.2.5.tar.gz | docker load
+sudo $EDITOR /etc/wealthview/.env      # WEALTHVIEW_VERSION=1.2.5
+sudo wv update --no-pull
 ```
+
+The loaded image must carry the same repository name the compose file resolves
+(`WEALTHVIEW_IMAGE`, default `ghcr.io/jakefearsd/wealthview`), or compose will
+not find it locally and will try to pull after all.
 
 ---
 
@@ -169,9 +250,18 @@ applied schema changes you cannot live with, restore the pre-update dump first.
 ```
 
 This reads `.wv-previous-image` (written by the last `./wv update`), recreates
-the app container pinned to that tag, and waits up to 120 seconds for the
+the app container pinned to that reference, and waits up to 120 seconds for the
 health check. It fails with a clear error if no previous image was ever
 recorded.
+
+In prod mode it re-pins **both** `WEALTHVIEW_IMAGE` and `WEALTHVIEW_VERSION`
+from the recorded reference. Both halves matter now that the reference is
+registry-qualified: restoring only the tag would move a mirrored or forked
+deployment back onto the default upstream repository. If the recorded reference
+has no parseable tag, rollback stops and tells you to set `WEALTHVIEW_VERSION`
+by hand and run `wv up` — it will not guess. (A registry host:port such as
+`registry.internal:5000/wealthview` is correctly treated as *untagged*, not as
+a tag named `5000`.)
 
 Afterwards, set `WEALTHVIEW_VERSION` in `.env` back to the old tag so a later
 `./wv up` doesn't silently pull you forward again.
@@ -190,8 +280,7 @@ Afterwards, set `WEALTHVIEW_VERSION` in `.env` back to the old tag so a later
 # 3. Put the old image back.
 ./wv rollback
 
-# 4. Revert the checkout and the pin so the next `./wv up` is consistent.
-git checkout <previous-tag>
+# 4. Revert the pin so the next `./wv up` is consistent.
 $EDITOR .env        # WEALTHVIEW_VERSION=<previous-version>
 ```
 
@@ -216,10 +305,12 @@ grep '^WEALTHVIEW_VERSION=' .env
 docker compose -f docker-compose.prod.yml images app
 ```
 
-On a source checkout you can also read the git tag:
+The running container also carries the OCI labels CI stamped on it, including
+the exact commit the image was built from:
 
 ```bash
-git describe --tags
+docker inspect --format '{{json .Config.Labels}}' \
+  "$(docker compose -f docker-compose.prod.yml ps -q app)"
 ```
 
 And the startup logs carry the Spring Boot version and the Flyway summary:
@@ -239,16 +330,28 @@ manual `workflow_dispatch`). It is a three-job pipeline:
    tests, and the enforced PMD / CPD / SpotBugs / Checkstyle / JaCoCo gates.
 2. The full `wealthview-app` Failsafe HTTP integration suite against a
    Testcontainers PostgreSQL.
-3. `docker build -t wealthview:<tag> .` — proves the release image assembles
-   from verified code.
+3. Builds the release image with Buildx and **publishes it**: pushed to GHCR as
+   `ghcr.io/<owner>/wealthview:<version>` and `:latest`, followed by a GitHub
+   Release whose notes are the matching `## [<version>]` section of
+   `CHANGELOG.md` plus a short "Deploying this release" footer. The job holds
+   `contents: write` and `packages: write` for exactly those two steps.
+
+Publishing happens **only for `refs/tags/v*`**. A manual `workflow_dispatch`
+still builds the image — proving it assembles — but never pushes, so it cannot
+move `:latest` or claim a version number that was never tagged.
+
+The published image is **`linux/amd64` only**. The `Dockerfile` compiles the
+whole Maven backend inside the build stage, so an emulated `arm64` build would
+run the entire reactor under QEMU and take 30–60+ minutes. An arm64 host cannot
+run the published image.
 
 The workflows for the web frontend, shared workspace, mobile app, admin scripts
 (shellcheck + bats), and the gitleaks secret scan use the same tag-only
 trigger.
 
-**There is no auto-deploy and no image registry push.** A green tag build tells
-you the release is sound; you still deploy it yourself on the server with
-`./wv update`.
+**There is still no auto-deploy.** CI publishes the artifact; a GitHub-hosted
+runner cannot reach your server. You deploy it yourself by pinning
+`WEALTHVIEW_VERSION` and running `./wv update`.
 
 ---
 
@@ -306,26 +409,40 @@ Common causes:
   `ALTER USER wv_app WITH PASSWORD '<value-from-env>';`.
 - **Out of memory.** Check `docker stats` and free memory on the host.
 
-### Container Build Fails
+### Image Pull Fails
 
-**Symptom:** `./wv update` fails at Step 3/5 with a build error.
+**Symptom:** `./wv update` stops at Step 3/5 with "Image pull failed" and a
+hint about `WEALTHVIEW_VERSION` and registry access. Nothing was swapped — the
+old container is still running and the pre-update backup is on disk.
+
+Reproduce the raw error to see which of the three causes it is:
+
+```bash
+docker compose -f docker-compose.prod.yml pull app
+```
+
+| Docker says | Cause | Fix |
+|---|---|---|
+| `denied`, `unauthorized`, or `authentication required` | The GHCR package is private (**the default for the first CI push, even on a public repo**) and this host has no credential. | Make the package public, or `docker login ghcr.io` with a `read:packages` PAT — see [Before your first pull](#before-your-first-pull-registry-access). |
+| `manifest unknown` / `not found` | `WEALTHVIEW_VERSION` names a tag that was never published — a typo, or a tag whose CI run failed before the publish step. | Check the repo's Releases and Packages pages for the tags that exist, then correct `WEALTHVIEW_VERSION`. |
+| `no matching manifest for linux/arm64` | The host is ARM; the published image is `linux/amd64` only. | Run WealthView on an x86-64 host, or build your own image on the ARM box and load it, then `wv update --no-pull`. |
+| DNS or TLS errors reaching `ghcr.io` | The host has no outbound HTTPS, or a proxy is in the way. | Fix egress, or use the offline transfer in [Upgrading a host with no source tree](#upgrading-a-host-with-no-source-tree). |
+
+Also confirm the reference `wv` actually resolved — a stale `WEALTHVIEW_IMAGE`
+pointing at a mirror you no longer run produces the same symptoms:
+
+```bash
+./wv config-check
+docker compose -f docker-compose.prod.yml config | grep 'image:'
+```
+
+Disk space is worth ruling out too; a pull needs room to unpack layers:
 
 ```bash
 docker system df
 df -h
+docker image prune -a -f       # removes all unused images
 ```
-
-**Fix:** Free up Docker disk space, then re-run:
-
-```bash
-docker system prune -f
-docker image prune -a -f       # more aggressive: removes all unused images
-```
-
-The build is three stages — a Node 24 Alpine frontend build, a
-`maven:3.9-eclipse-temurin-25` backend build, and an
-`eclipse-temurin:25-jre-alpine` runtime — so it needs network access for both
-npm and Maven and several GB of scratch space.
 
 ### Health Check Fails After a Successful Start
 
@@ -348,7 +465,7 @@ pre-update backup is still on disk. Recover manually:
 ./wv backups
 ./wv restore backups/wealthview_<ts>_pre-update.dump
 # then pin .env to a known-good WEALTHVIEW_VERSION and:
-./wv up --no-build
+./wv up
 ```
 
 ---

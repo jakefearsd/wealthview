@@ -5,7 +5,7 @@
 WealthView is a self-hosted, multi-tenant personal finance application focused on investment portfolio monitoring, rental property income/expense tracking, and retirement projection modeling. It is designed for financially literate users who want full ownership of their data and the flexibility to share the platform with family or trusted peers.
 
 **Current state:** Phases 1–8 in the [Feature Breakdown](#feature-breakdown) have
-shipped; the latest release is **v1.2.4** (2026-07-27). This document describes
+shipped; the latest release is **v1.2.6** (2026-08-16). This document describes
 what the code actually does — anything not yet built is confined to the
 [Roadmap](#roadmap--not-yet-built) subsection. For the release history see
 [CHANGELOG.md](CHANGELOG.md); for contributor conventions see `CLAUDE.md`.
@@ -530,16 +530,23 @@ REST API and the built SPA. All base images are pinned by digest. There is **no
 nginx service in the compose stack** — TLS termination is a host concern
 (nginx + Let's Encrypt, or a Cloudflare Tunnel; see the deployment docs).
 
+Dev builds that image locally; production pulls it. CI publishes
+`ghcr.io/<owner>/wealthview:<version>` (linux/amd64 only — the Dockerfile
+compiles the whole Maven reactor in-stage, so an emulated arm64 build is
+prohibitively slow) on every `v*` tag, so a production host needs only Docker,
+the compose file, the env file, and registry access.
+
 | File | Services | Notes |
 | ---- | -------- | ----- |
 | `docker-compose.yml` | `db`, `app` | Dev stack, `docker` profile. DB published on `5433:5432` to avoid clashing with a native PostgreSQL; app on `80:8080`. |
-| `docker-compose.prod.yml` | `db`, `app`, `backup` | Prod stack, `prod` profile. Uses the pinned image `wealthview:${WEALTHVIEW_VERSION}` — never `:latest`. Adds a nightly backup container with `BACKUP_RETENTION_DAYS`, plus `CORS_ORIGIN` and `APP_PORT`. `restart: unless-stopped` throughout. |
+| `docker-compose.prod.yml` | `db`, `app`, `backup` | Prod stack, `prod` profile. `app` has **no `build:` key** — it pulls `${WEALTHVIEW_IMAGE:-ghcr.io/jakefearsd/wealthview}:${WEALTHVIEW_VERSION}` from the registry; never `latest`. Adds a nightly backup container with `BACKUP_RETENTION_DAYS`, plus `CORS_ORIGIN` and `APP_PORT`. `restart: unless-stopped` throughout. |
 | `docker-compose.observability.yml` | optional | Metrics/tracing/profiling side stack. |
 
 Required environment (all from `.env`, never committed): `DB_PASSWORD`,
 `JWT_SECRET`, `SUPER_ADMIN_PASSWORD`, `MFA_ENCRYPTION_KEY`. Optional:
-`FINNHUB_API_KEY`, `ZILLOW_ENABLED`. Setting `WEALTHVIEW_VERSION` is what flips
-`./wv` from dev mode into prod mode.
+`FINNHUB_API_KEY`, `ZILLOW_ENABLED`, `WEALTHVIEW_IMAGE` (point at a fork,
+private mirror, or air-gapped registry). Setting `WEALTHVIEW_VERSION` is what
+flips `./wv` from dev mode into prod mode.
 
 ### Operations
 
@@ -584,6 +591,7 @@ and price seed data. Versioned migrations are immutable once committed.
 | 15 | Projections run in real (inflation-adjusted) terms | **Decided** | Returns resolve from per-account allocation against seeded asset-class assumptions, net of an investment fee drag; avoids the nominal/real mixing that biased earlier results |
 | 16 | Quality gates are build-failing, not advisory | **Decided** | PMD, CPD, SpotBugs, Checkstyle, and JaCoCo fail `mvn verify` with per-module coverage floors. PIT stays advisory — useful for finding weak tests, too noisy to gate on |
 | 17 | CI triggers on release tags only | **Decided** | Solo project with a strong local pre-commit gate; tag-triggered workflows keep signal high. No auto-deploy — deployment is an explicit `./wv update` on the server |
+| 18 | Production pulls a CI-published image rather than building on the server | **Decided** | A `v*` tag publishes `ghcr.io/<owner>/wealthview:<version>` and cuts a GitHub Release only after the unit tests, quality gates and full integration suite pass, so the artifact reaching production is one that was actually verified. The prod compose file drops `build:` entirely; the host needs no source tree and no JDK. Still no auto-deploy — a hosted runner cannot reach the box |
 
 ---
 
