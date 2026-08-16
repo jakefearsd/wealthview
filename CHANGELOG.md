@@ -6,6 +6,80 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.6] — 2026-08-16
+
+Turns the release pipeline into an actual release: tagged builds now publish a
+container image and cut a GitHub Release, and production deploys that image
+instead of rebuilding from source on the server. No schema changes (still V080).
+
+This is the first release whose image is published, so it is also the first one
+`wv update` can pull.
+
+### Upgrade notes
+- **1.2.6 is the earliest version a server can pull.** `docker-compose.prod.yml`
+  now resolves the app image from the registry, and nothing before this release
+  was ever published — v1.2.5 and earlier only ever existed as images built on
+  the server itself. Do not set `WEALTHVIEW_VERSION` below 1.2.6 on a host that
+  has taken these files; there is no such image to pull.
+- **The GHCR package is created PRIVATE on first push, even for a public repo.**
+  Make it public under the repository's Packages settings, or give the host a
+  `docker login ghcr.io` with a `read:packages` token. Otherwise the first pull
+  fails with an unauthorized error whose cause is not obvious.
+
+### Changed
+- Tagged releases now publish a container image instead of building one and
+  discarding it. The `docker-image` job ran a bare `docker build` whose output
+  never left the runner, so the artifact deployed to production was one that no
+  CI job had ever seen — the server rebuilt it independently from source. The
+  job now builds with Buildx and pushes
+  `ghcr.io/<owner>/wealthview:<version>` and `:latest`, gated behind the unit,
+  quality-gate and full integration suites exactly as before. Publishing is
+  restricted to `refs/tags/v*`; a manual `workflow_dispatch` still builds, to
+  prove the image assembles, but never pushes — so it cannot move `:latest` or
+  claim a version that was never tagged. Built for `linux/amd64` only: the
+  Dockerfile compiles the entire Maven backend inside the build stage, so an
+  emulated arm64 build would take 30-60+ minutes.
+- A tagged release now also creates a GitHub Release, with notes lifted from the
+  matching `CHANGELOG.md` section and a footer naming the image and the two
+  commands needed to deploy it.
+- **Production pulls the release image rather than building on the server.**
+  `docker-compose.prod.yml` drops its `build:` key and resolves
+  `${WEALTHVIEW_IMAGE:-ghcr.io/jakefearsd/wealthview}:${WEALTHVIEW_VERSION}`;
+  `wv update` pulls it. This settles a long-standing contradiction — `wv help`
+  has always said the production host does not need the source tree, while
+  `wv update` required it to run `docker compose build`. The host now needs
+  neither the source tree nor a JDK. The dev stack is unchanged and still builds
+  locally. `WEALTHVIEW_IMAGE` is new and only needs setting for a fork, a
+  private mirror, or an air-gapped registry.
+- `wv update` gains `--build` (build locally instead of pulling) and `--no-pull`
+  (reuse the local image). `--no-build` still works as a deprecated alias for
+  `--no-pull` and says so. `--build` refuses to run when the resolved compose
+  file's app service has no `build:` section: `docker compose build` on such a
+  service exits 0 having done nothing, which would have deployed a stale image
+  while reporting success.
+
+### Fixed
+- `wv rollback` would have produced a malformed image reference once the app
+  image became registry-qualified. It recovered the previous tag by stripping a
+  literal `wealthview:` prefix, which does not match
+  `ghcr.io/owner/wealthview:1.2.5`, so the whole reference was substituted as if
+  it were a version. Rollback now parses the reference properly and re-pins both
+  the repository and the tag — splitting on the last colon only when what
+  follows contains no slash, so a `registry:5000/wealthview` reference with no
+  tag is rejected rather than being read as version "5000". Covered by five new
+  bats cases.
+- `deploy.sh` — the build-locally-ship-a-tarball path for constrained hosts —
+  would have stopped working once the compose file resolved a registry
+  reference. It `docker load`s an image tagged `wealthview:<version>`, which no
+  longer matches what compose asks for, so compose would have ignored the loaded
+  image and tried to pull from GHCR. It now exports
+  `WEALTHVIEW_IMAGE=wealthview` on the remote so the loaded tarball is what
+  actually runs.
+- `docs/deployment/production-setup.md` advertised ARM64 support and recommended
+  a Raspberry Pi 4. The release image is published for `linux/amd64` only, so
+  the host requirement is now stated as x86-64, with a note on what an ARM user
+  would need to do.
+
 ## [1.2.5] — 2026-08-16
 
 A documentation-truth pass over the whole repository, and the twelve code
@@ -447,7 +521,8 @@ First tagged release. Consolidates all development prior to the 1.0 cut.
 - Test-first workflow mandated by `CLAUDE.md`; no production code without a
   failing test.
 
-[Unreleased]: https://github.com/jakefearsd/wealthview/compare/v1.2.5...HEAD
+[Unreleased]: https://github.com/jakefearsd/wealthview/compare/v1.2.6...HEAD
+[1.2.6]: https://github.com/jakefearsd/wealthview/compare/v1.2.5...v1.2.6
 [1.2.5]: https://github.com/jakefearsd/wealthview/compare/v1.2.4...v1.2.5
 [1.2.4]: https://github.com/jakefearsd/wealthview/compare/v1.2.3...v1.2.4
 [1.2.3]: https://github.com/jakefearsd/wealthview/compare/v1.2.2...v1.2.3
