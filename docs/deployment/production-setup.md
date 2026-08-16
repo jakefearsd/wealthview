@@ -78,12 +78,12 @@ service. The production host therefore needs neither the source tree nor a JDK
 `WEALTHVIEW_IMAGE` exists only so a fork, a private mirror, or an air-gapped
 registry can be pointed at without editing the compose file.
 
-> **The first CI push creates the GHCR package as private, even for a public
-> repository.** Until you change that, every host pulling it must
-> `docker login ghcr.io` with a `read:packages` Personal Access Token. Making
-> the package public once (repo → **Packages** → the package → **Package
-> settings** → **Change visibility**) is the simpler answer for a public repo.
-> See [upgrading.md](upgrading.md#before-your-first-pull-registry-access).
+> **The GHCR package is public**, inheriting the visibility of the repository
+> that publishes it, so the host pulls it anonymously — there is no registry
+> step to do before your first deploy. Only a private fork, a private mirror,
+> or a package whose visibility you deliberately changed needs
+> `docker login ghcr.io` with a `read:packages` Personal Access Token.
+> See [upgrading.md](upgrading.md#registry-access).
 
 `deploy.sh` still exists for the build-here-ship-there case, but it predates
 this flow and takes no pre-deploy backup and does no health-checked rollback.

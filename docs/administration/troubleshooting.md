@@ -641,7 +641,7 @@ docker compose -f docker-compose.prod.yml pull app
 
 | Docker says | Cause | Fix |
 |---|---|---|
-| `denied` / `unauthorized` / `authentication required` | The GHCR package is private. **This is how the first CI push leaves it, even for a public repo.** | Make the package public (repo → Packages → the package → Package settings → Change visibility), or `docker login ghcr.io -u <username>` on this host with a `read:packages` Personal Access Token. |
+| `denied` / `unauthorized` / `authentication required` | This host is pulling from a **private** package. The upstream package is public and pulls anonymously, so this means a private fork or mirror, or a package whose visibility was changed. | `docker login ghcr.io -u <username>` on this host with a `read:packages` Personal Access Token. |
 | `manifest unknown` / `not found` | `WEALTHVIEW_VERSION` names a tag that was never published — a typo, or a tag whose CI run failed before the publish step. | Check the repo's Releases and Packages pages for the tags that exist; correct the pin. |
 | `no matching manifest for linux/arm64` | The published image is `linux/amd64` only. | Run on x86-64, or build your own image on the ARM host and deploy it with `./wv update --no-pull`. |
 | DNS / TLS errors reaching `ghcr.io` | No outbound HTTPS, or a proxy in the way. | Fix egress, or transfer the image manually and use `--no-pull`. |

@@ -32,9 +32,10 @@ name: Backend Release Verify
 #                            reach the host box. The server pulls the published
 #                            image via `wv update`.
 #
-# GHCR VISIBILITY: the first push creates the package as PRIVATE even for a
-# public repo. Make it public once under the repo's Packages settings, or the
-# server needs a read:packages PAT to pull. See docs/deployment/upgrading.md.
+# GHCR VISIBILITY: the package inherits the repository's visibility. This repo
+# is public, so the package is public and any server pulls it anonymously — no
+# login, no setup. Only a private fork or mirror needs a read:packages PAT on
+# the server. See docs/deployment/upgrading.md.
 on:
   push:
     tags:

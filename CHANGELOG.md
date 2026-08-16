@@ -21,10 +21,11 @@ This is the first release whose image is published, so it is also the first one
   was ever published — v1.2.5 and earlier only ever existed as images built on
   the server itself. Do not set `WEALTHVIEW_VERSION` below 1.2.6 on a host that
   has taken these files; there is no such image to pull.
-- **The GHCR package is created PRIVATE on first push, even for a public repo.**
-  Make it public under the repository's Packages settings, or give the host a
-  `docker login ghcr.io` with a `read:packages` token. Otherwise the first pull
-  fails with an unauthorized error whose cause is not obvious.
+- **No registry setup is needed.** The GHCR package inherits the repository's
+  visibility, and the repository is public — so `ghcr.io/jakefearsd/wealthview:1.2.6`
+  pulls anonymously from any host, with no `docker login` at all. A
+  `read:packages` token is only needed when you deploy from a private fork, a
+  private mirror, or a package whose visibility you deliberately changed.
 
 ### Changed
 - Tagged releases now publish a container image instead of building one and

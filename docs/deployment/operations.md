@@ -98,10 +98,10 @@ Recognised `wv.conf` keys — all optional, defaults in brackets:
   Point `WV_BACKUPS_DIR` at the same directory, or symlink one to the other,
   so `wv backups` sees the cron'd dumps too.
 
-If the GHCR package is private — which is how the first CI push leaves it, even
-for a public repo — this host needs `docker login ghcr.io` with a
-`read:packages` token before `wv update` can pull. See
-[upgrading.md](upgrading.md#before-your-first-pull-registry-access).
+The GHCR package is public — it inherits the repository's visibility — so this
+host pulls the image with no credentials and no registry setup. Only a private
+fork or mirror needs `docker login ghcr.io` with a `read:packages` token before
+`wv update` can pull. See [upgrading.md](upgrading.md#registry-access).
 
 ---
 
@@ -253,9 +253,10 @@ Exit codes:
 - **2** — update failed; rollback also failed (manual intervention required)
 
 If the pull fails, the error names the two usual causes: `WEALTHVIEW_VERSION`
-does not name a published release, or this host cannot read the registry
-(a private GHCR package needs `docker login ghcr.io` with a `read:packages`
-token). Nothing has been swapped at that point.
+does not name a published release, or this host cannot read the registry (the
+upstream package is public, so that means a private fork or mirror, which needs
+`docker login ghcr.io` with a `read:packages` token). Nothing has been swapped
+at that point.
 
 ---
 
@@ -526,7 +527,7 @@ the remote host itself, run `wv` from a shell on that host.
 | `./wv rotate-secret DB_PASSWORD` succeeded but app won't start | `.env` and DB role got out of sync (rare; only if `ALTER USER` failed silently) | Run `./wv psql` and `ALTER USER wv_app WITH PASSWORD '<value-from-env>'` |
 | `./wv update` aborts: "db container is not running" | `update` needs a live database to take its pre-update backup | `./wv up` first, then re-run `./wv update` |
 | `./wv rollback` errors "No previous image recorded" | `update` never ran, or it could not read the running image tag at Step 2/5 | Pin a known-good `WEALTHVIEW_VERSION` in `.env` and run `./wv up` |
-| `./wv update` stops at Step 3/5: "Image pull failed" | GHCR package is private and this host has no credential; or `WEALTHVIEW_VERSION` names a tag that was never published | `docker login ghcr.io` with a `read:packages` PAT (or make the package public); check the tag exists on the repo's Releases/Packages page |
+| `./wv update` stops at Step 3/5: "Image pull failed" | `WEALTHVIEW_VERSION` names a tag that was never published; or this host pulls from a private fork/mirror with no credential (the upstream package is public) | Check the tag exists on the repo's Releases/Packages page; for a private package, `docker login ghcr.io` with a `read:packages` PAT |
 | `./wv update --build` refuses: "has no 'build:' key" | `docker-compose.prod.yml` is image-only by design | Drop `--build` and pull; use `--no-pull` if the image is already loaded locally |
 | `docker compose pull` says "no matching manifest for linux/arm64" | The published image is `linux/amd64` only | Deploy on x86-64, or build your own image on the ARM host and use `wv update --no-pull` |
 | `wv` exits: "No wv.conf found ... and \<dir\> is not a source tree" | Running the system-wide `wv` with no config file | Create `/etc/wealthview/wv.conf` or pass `--config /path/to/wv.conf` |

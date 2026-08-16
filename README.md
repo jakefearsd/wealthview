@@ -32,9 +32,9 @@ For a **production** deployment, also set `WEALTHVIEW_VERSION` in `.env` —
 that flips `./wv` into prod mode (uses `docker-compose.prod.yml`, with the
 nightly backup container and stricter config validation). Prod **pulls** the
 release image CI published to `ghcr.io/<owner>/wealthview:<version>` rather
-than building locally, so the host needs no source tree and no JDK. See
-[Upgrading](docs/deployment/upgrading.md) — including the registry-access step
-you need the first time, since the GHCR package starts out private.
+than building locally, so the host needs no source tree and no JDK. The GHCR
+package is public, so the host pulls it with no login and no registry setup.
+See [Upgrading](docs/deployment/upgrading.md).
 
 - **URL:** http://localhost
 - **Super admin:** `admin@wealthview.local` / `admin123`

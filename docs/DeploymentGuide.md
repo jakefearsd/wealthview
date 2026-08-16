@@ -155,11 +155,11 @@ backend in-stage, so an emulated arm64 build would take 30-60+ minutes.
 server. You pin `WEALTHVIEW_VERSION` in the env file and run `./wv update`,
 which pulls the published image.
 
-> **The first CI push creates the GHCR package as private**, even for a public
-> repo. Make it public in the repo's Packages settings, or give the server a
-> `docker login ghcr.io` with a `read:packages` token — otherwise the first
-> deploy after this change fails on an unauthorized pull. Details in
-> [`deployment/upgrading.md`](deployment/upgrading.md#before-your-first-pull-registry-access).
+> **The GHCR package is public**, inheriting the repository's visibility, so the
+> server pulls it with no credentials and no setup step. Only a private fork, a
+> private mirror, or a package whose visibility you changed needs a
+> `docker login ghcr.io` with a `read:packages` token. Details in
+> [`deployment/upgrading.md`](deployment/upgrading.md#registry-access).
 
 ### Health and metrics
 

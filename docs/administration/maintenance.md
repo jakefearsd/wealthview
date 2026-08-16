@@ -47,10 +47,9 @@ source tree nor a JDK, only Docker and read access to the registry.
 
 If step 5 fails, nothing has been swapped — the old container is still serving. The two
 usual causes are a `WEALTHVIEW_VERSION` that names no published release, and a host that
-cannot read the registry (the GHCR package starts out **private**, even for a public repo,
-so it needs `docker login ghcr.io` with a `read:packages` token until someone makes it
-public). See
-[Upgrading](../deployment/upgrading.md#before-your-first-pull-registry-access).
+cannot read the registry (the GHCR package is **public**, so that only bites a private
+fork or mirror, which needs `docker login ghcr.io` with a `read:packages` token). See
+[Upgrading](../deployment/upgrading.md#registry-access).
 
 **Exit codes:**
 

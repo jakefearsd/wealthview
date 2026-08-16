@@ -16,20 +16,18 @@ backup, pulls the new image, swaps the container, health-checks the result, and
 automatically rolls back if the new version doesn't come up. The sections below
 explain what it does and what to do when it doesn't work.
 
-## Before your first pull: registry access
+## Registry access
 
-The first CI push **creates the GHCR package as private, even for a public
-repository.** Until that is changed, `./wv update` fails at the pull step with
-an `unauthorized` / `denied` error. Sort this out once, before you need it:
+**The published package is public, so there is nothing to set up.** A GHCR
+package inherits the visibility of the repository that published it, and this
+repository is public — so `ghcr.io/<owner>/wealthview:<version>` pulls
+anonymously from any host, with no `docker login` and no first-time step.
 
-**Option A — make the package public (simplest for a public repo).**
-On GitHub, go to the repository → **Packages** → the `wealthview` package →
-**Package settings** → **Change visibility** → *Public*. Anonymous pulls then
-work from any host with no login at all.
-
-**Option B — authenticate the host.** Keep the package private and give the
-server a Personal Access Token (classic) with the **`read:packages`** scope
-only:
+**If you pull from a private package**, the host does need a credential, or
+`./wv update` fails at the pull step with an `unauthorized` / `denied` error.
+That applies to a fork in a private repository, a private mirror, or a package
+whose visibility you deliberately changed. Give the server a Personal Access
+Token (classic) with the **`read:packages`** scope only:
 
 ```bash
 # On the deployment host. Paste the token when prompted — do not put it on the
@@ -425,7 +423,7 @@ docker compose -f docker-compose.prod.yml pull app
 
 | Docker says | Cause | Fix |
 |---|---|---|
-| `denied`, `unauthorized`, or `authentication required` | The GHCR package is private (**the default for the first CI push, even on a public repo**) and this host has no credential. | Make the package public, or `docker login ghcr.io` with a `read:packages` PAT — see [Before your first pull](#before-your-first-pull-registry-access). |
+| `denied`, `unauthorized`, or `authentication required` | This host is pulling from a **private** package and has no credential — a private fork or mirror, or a package whose visibility was changed. The upstream package is public and needs none. | `docker login ghcr.io` with a `read:packages` PAT — see [Registry access](#registry-access). |
 | `manifest unknown` / `not found` | `WEALTHVIEW_VERSION` names a tag that was never published — a typo, or a tag whose CI run failed before the publish step. | Check the repo's Releases and Packages pages for the tags that exist, then correct `WEALTHVIEW_VERSION`. |
 | `no matching manifest for linux/arm64` | The host is ARM; the published image is `linux/amd64` only. | Run WealthView on an x86-64 host, or build your own image on the ARM box and load it, then `wv update --no-pull`. |
 | DNS or TLS errors reaching `ghcr.io` | The host has no outbound HTTPS, or a proxy is in the way. | Fix egress, or use the offline transfer in [Upgrading a host with no source tree](#upgrading-a-host-with-no-source-tree). |

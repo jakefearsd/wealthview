@@ -114,8 +114,10 @@ CONTAINER DEPLOYMENT FLOW
     neither the source tree nor a JDK. WEALTHVIEW_IMAGE only needs setting
     to point at a fork or a private mirror.
 
-    If the GHCR package is private, this host must `docker login ghcr.io`
-    with a read:packages token before `wv update` can pull.
+    The GHCR package is public, so this host pulls it with no credentials
+    and no registry setup. Only a private fork or mirror requires a
+    `docker login ghcr.io` with a read:packages token before `wv update`
+    can pull.
 
     Upgrade lifecycle:
       1. Set WEALTHVIEW_VERSION=<new tag> in $WV_ENV_FILE.
