@@ -48,6 +48,15 @@ COPY --from=build --chown=wv:wv /app/backend/wealthview-app/target/*.jar app.jar
 COPY --from=frontend-build --chown=wv:wv /app/frontend/dist /app/static
 USER wv
 EXPOSE 8080
+# Health probe uses wget: this is an Alpine JRE image and curl is NOT installed.
+# This is the single source of truth for the container healthcheck — compose files
+# deliberately do not override it, so the two definitions cannot drift apart.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s \
     CMD wget -q -O- http://localhost:8080/actuator/health || exit 1
+# JVM tuning: set JAVA_TOOL_OPTIONS (e.g. "-Xmx1g -XX:MaxRAMPercentage=75"), NOT JAVA_OPTS.
+# The entrypoint is exec-form on purpose — it keeps java as PID 1 so SIGTERM from
+# `docker stop` reaches the JVM directly and Spring shuts down gracefully. Exec form
+# means there is no shell, so no ${JAVA_OPTS} expansion happens. JAVA_TOOL_OPTIONS is
+# read by the JVM itself at startup, so it works without a shell wrapper.
+# Do not "fix" this by re-adding JAVA_OPTS via `sh -c` — that regresses signal handling.
 ENTRYPOINT ["java", "-jar", "app.jar"]
