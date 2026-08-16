@@ -204,8 +204,10 @@ SUBCOMMANDS
     Operational
       psql                Open a psql shell in the running db container.
       rotate-secret NAME  Generate a new secure value for one of:
-                          JWT_SECRET, DB_PASSWORD, SUPER_ADMIN_PASSWORD,
-                          MFA_ENCRYPTION_KEY.
+                          JWT_SECRET, DB_PASSWORD, SUPER_ADMIN_PASSWORD.
+                          MFA_ENCRYPTION_KEY is deliberately NOT rotatable:
+                          it decrypts stored TOTP secrets at rest, so
+                          replacing it would lock every MFA user out.
       config-check        Validate the resolved config: wv.conf,
                           env file, compose files, required tools.
 
