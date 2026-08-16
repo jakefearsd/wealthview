@@ -27,7 +27,11 @@ elif VERSION="$(git describe --tags --always --dirty 2>/dev/null)"; then
 else
     VERSION="$(git rev-parse --short HEAD 2>/dev/null || date -u +%Y%m%d%H%M%S)"
 fi
-IMAGE_NAME="wealthview:${VERSION}"
+# Bare repository name for the locally-built image. Also exported as
+# WEALTHVIEW_IMAGE on the remote so compose resolves the tarball we shipped
+# rather than the GHCR default — see the comment at that export below.
+IMAGE_REPO="wealthview"
+IMAGE_NAME="${IMAGE_REPO}:${VERSION}"
 TARBALL="/tmp/wealthview-image.tar.gz"
 
 echo "==> Building Docker image ${IMAGE_NAME} locally..."
@@ -67,10 +71,11 @@ echo "==> Transferring image tarball..."
 scp "$TARBALL" "$DEPLOY_HOST:/tmp/wealthview-image.tar.gz"
 
 echo "==> Loading image and restarting services on remote..."
-ssh "$DEPLOY_HOST" bash -s "$DEPLOY_DIR" "$VERSION" <<'REMOTE'
+ssh "$DEPLOY_HOST" bash -s "$DEPLOY_DIR" "$VERSION" "$IMAGE_REPO" <<'REMOTE'
 set -euo pipefail
 DEPLOY_DIR="$1"
 VERSION="$2"
+IMAGE_REPO="$3"
 echo "  Loading Docker image..."
 docker load < /tmp/wealthview-image.tar.gz
 rm -f /tmp/wealthview-image.tar.gz
@@ -80,11 +85,13 @@ cd "$DEPLOY_DIR"
 # This script deliberately ships a locally-built tarball instead of pulling
 # from a registry, so point WEALTHVIEW_IMAGE at the bare repository name the
 # tarball was tagged with — otherwise compose ignores the image we just loaded
-# and tries to pull from GHCR.
-export WEALTHVIEW_IMAGE="wealthview"
+# and tries to pull from GHCR. Passed in from IMAGE_REPO above rather than
+# repeated here: the heredoc is quoted, so a second literal could drift out of
+# sync with the tag the image was actually built under.
+export WEALTHVIEW_IMAGE="$IMAGE_REPO"
 echo "  Stopping existing services..."
 WEALTHVIEW_VERSION="$VERSION" docker compose down
-echo "  Starting services (wealthview:${VERSION})..."
+echo "  Starting services (${IMAGE_REPO}:${VERSION})..."
 WEALTHVIEW_VERSION="$VERSION" docker compose up -d
 echo "  Waiting for health check..."
 sleep 5
