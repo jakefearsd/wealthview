@@ -26,6 +26,9 @@ class AuditLogControllerIT extends AbstractApiIntegrationTest {
 
     private static final String URL = "/api/v1/audit-log";
     private static final int MAX_PAGE_SIZE = 200;
+    private static final String MEMBER_EMAIL = "it-audit-member@wealthview.test";
+    private static final String VIEWER_EMAIL = "it-audit-viewer@wealthview.test";
+    private static final String ROLE_TEST_PASSWORD = "testpass123";
 
     @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> entriesOf(Map<String, Object> body) {
@@ -148,5 +151,33 @@ class AuditLogControllerIT extends AbstractApiIntegrationTest {
         var response = api.getAnonForEntity(URL);
 
         assertThat(response.getStatusCode()).isIn(HttpStatus.UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+
+    /**
+     * The audit log is an administrative surface: it exposes every action taken in the tenant,
+     * including other users' activity and admin operations. The web UI only reaches it through the
+     * admin area, but the endpoint itself carried no role check and fell through to
+     * {@code anyRequest().authenticated()} — so any member or viewer could read the whole trail
+     * over HTTP. These two tests pin the role gate so that cannot silently regress to UI-only
+     * enforcement again.
+     */
+    @Test
+    void getAuditLogs_asMember_isForbidden() {
+        authHelper.createUserDirectly(MEMBER_EMAIL, ROLE_TEST_PASSWORD, "member");
+        var token = authHelper.loginAs(restTemplate, MEMBER_EMAIL, ROLE_TEST_PASSWORD);
+
+        var response = api.getForEntityAs(token, URL, String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void getAuditLogs_asViewer_isForbidden() {
+        authHelper.createUserDirectly(VIEWER_EMAIL, ROLE_TEST_PASSWORD, "viewer");
+        var token = authHelper.loginAs(restTemplate, VIEWER_EMAIL, ROLE_TEST_PASSWORD);
+
+        var response = api.getForEntityAs(token, URL, String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 }

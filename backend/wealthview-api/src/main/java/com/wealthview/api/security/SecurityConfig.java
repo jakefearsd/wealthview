@@ -127,6 +127,14 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/app/version-check").permitAll()
                         .requestMatchers("/api/v1/admin/prices/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .requestMatchers("/api/v1/admin/**").hasRole("SUPER_ADMIN")
+                        // The audit log exposes every action taken in the tenant — other
+                        // users' activity and admin operations included. The web UI only
+                        // reaches it from the admin area, but the endpoint itself carried
+                        // no matcher and fell through to anyRequest().authenticated(),
+                        // so any member or viewer could read the whole trail directly over
+                        // HTTP. UI-only gating is not access control.
+                        .requestMatchers("/api/v1/audit-log", "/api/v1/audit-log/**")
+                                .hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/prices", "/api/v1/prices/**")
                                 .hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/prices/**")
