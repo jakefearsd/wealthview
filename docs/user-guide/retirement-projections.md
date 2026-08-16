@@ -2,22 +2,30 @@
 
 # Retirement Projections
 
-WealthView's projection engine runs a deterministic year-by-year simulation of your financial future through retirement. You can model different scenarios — varying retirement ages, spending levels, Roth conversion strategies, and income assumptions — then compare them side by side.
+WealthView's projection engine runs a year-by-year simulation of your financial future through retirement. You can model different scenarios — varying retirement ages, spending levels, asset allocations, Roth conversion strategies, spouse assumptions, and income streams — then compare them side by side.
+
+Two engines work together:
+
+- The **deterministic projection** walks one year at a time using a single set of assumptions and produces the detailed year-by-year table and charts.
+- The **Monte Carlo spending optimizer** (reached from **Optimize Spending**) runs thousands of simulated market histories to answer "how much can I actually spend, and how likely is this to work?" See [Spending and Income](spending-and-income.md) for that workflow.
+
+> **A note on taxes.** WealthView provides planning estimates only, not tax advice. All tax calculations are approximations. Talk to a CPA before making decisions with real money.
 
 ---
 
 ## What the Projection Engine Does
 
-The engine steps through each year from now until your specified end age, computing:
+For each year from today until your end age, the engine computes:
 
-- Contributions to each investment pool during your working years.
-- Investment growth based on expected returns.
+- Contributions to each account during your working years.
+- Investment growth, driven by each account's **asset allocation** (or an override return you set).
 - Withdrawals needed to fund your spending in retirement.
-- Tax liability on withdrawals, income sources, and Roth conversions.
+- Required Minimum Distributions (RMDs) once you reach the applicable age.
+- Tax on withdrawals, income sources, Roth conversions, and realized capital gains.
 - Income from Social Security, pensions, rental properties, and other sources.
-- Spending analysis breaking down essential vs. discretionary needs.
+- Spending, split into essential vs. discretionary.
 
-The result is a year-by-year table showing your projected balances, income, taxes, and spending through retirement.
+**Everything is reported in today's dollars.** The results page says so explicitly. Rather than showing you an inflated $4.1M in 2055, the engine works in *real* (inflation-adjusted) terms so the numbers mean something to you today.
 
 ---
 
@@ -25,248 +33,314 @@ The result is a year-by-year table showing your projected balances, income, taxe
 
 ### Investment Pools
 
-The projection engine groups your accounts into three pools, matching how retirement accounts are taxed:
+Each projection account belongs to one of three pools, matching how retirement accounts are taxed:
 
 | Pool | Tax Treatment | Examples |
 |------|--------------|---------|
-| **Traditional** | Contributions are pre-tax. Withdrawals taxed as ordinary income. | IRA, 401(k) |
-| **Roth** | Contributions are after-tax. Qualified withdrawals are tax-free. | Roth IRA, Roth 401(k) |
-| **Taxable** | No special tax treatment. Gains taxed when realized. | Brokerage accounts |
+| **Taxable** | Regular brokerage. After-tax contributions; growth taxed as capital gains. | Brokerage accounts |
+| **Traditional (Pre-tax)** | Contributions reduce taxable income now. Withdrawals taxed as ordinary income. | IRA, 401(k) |
+| **Roth** | After-tax contributions. Growth and qualified withdrawals are tax-free. | Roth IRA, Roth 401(k) |
 
-### Withdrawal Ordering
+The form shows this help text inline as you pick a type.
 
-When you need money in retirement, the engine withdraws in this order:
+> One thing the engine does **not** model: when you compare Roth vs. Traditional contributions here, it does not credit you for the pre-tax wage deduction a Traditional contribution gives you today. It models only each account's own growth and withdrawal taxation. The scenario form carries this caveat too.
 
-1. **Taxable accounts first** — These have the most favorable tax treatment for withdrawals (only gains are taxed, not the full amount).
-2. **Traditional accounts second** — Withdrawals are fully taxed as ordinary income.
-3. **Roth accounts last** — Withdrawals are tax-free, so these are preserved as long as possible.
+### Asset Allocation Drives Returns
 
-This ordering is a common tax-efficient strategy. The engine follows it automatically.
+This is the biggest change from earlier versions of WealthView. You no longer have to guess an "expected return" per account. Instead, each account has an **allocation** across four asset classes:
+
+- **US Stocks**
+- **Intl Stocks**
+- **Bonds**
+- **Cash**
+
+The engine converts that mix into a projected **real** (after-inflation) return using historical asset-class returns going back to 1972 (or 1928, if you opt in — see below).
+
+- If the account is **linked to a real WealthView account**, the allocation is *derived from your actual holdings*. The form shows "Derived from holdings" with a summary like `70.0% US / 15.0% Intl / 10.0% Bond / 5.0% Cash`.
+- Click **Customize allocation** to override it. The four percentages must sum to 100% — the editor shows a running `Total: 100%` and blocks saving until it does.
+- Click **Reset to derived** to go back to the holdings-derived mix.
+- **Override Return (%)** on the account still exists as an escape hatch. Leave it blank to use the allocation-derived return; fill it in to force a specific rate.
+
+If some of your holdings can't be classified into an asset class, the results page shows an orange notice: *"These holdings were modeled as US Stock because we couldn't classify them."* You can pick the right class per symbol right there and re-run.
 
 ### Inflation
 
-All dollar amounts in future years are adjusted for inflation. The inflation rate you set on the scenario compounds annually. For example, with 3% inflation, $50,000 of spending today becomes $51,500 next year, $53,045 the year after, and so on.
+The inflation rate you set drives the real-terms conversion. Because results are in today's dollars, you generally will not see spending numbers grow year over year — a flat line means your purchasing power is holding steady.
 
-### Growth
+### Market History Window
 
-Each projection account has its own expected annual return. The engine applies this growth rate to the account balance each year (after contributions and before withdrawals).
+By default the simulated return sample uses 1972–2025. Tick **Include 1928–1971 market history** to widen it to include the Great Depression and postwar era. The form's own description: *"Slightly higher average equity returns, materially fatter tails."* Turn it on if you want your plan stress-tested against genuinely bad decades.
+
+### Drags on Returns
+
+Three scenario-level assumptions reduce what you actually keep:
+
+| Field | Default | What it does |
+|-------|---------|--------------|
+| **Dividend Yield (%)** | 1.8 | Annual qualified-dividend drag on taxable accounts. |
+| **Bond Interest Yield (%)** | 4.0 | Nominal coupon on the bond portion of taxable accounts, taxed annually as ordinary income (bonds are tax-inefficient). Only matters if an account holds bonds. |
+| **Investment Fees (%)** | 0.25 | Annual all-in cost — expense ratios plus advisory fees — subtracted from returns. |
 
 ---
 
 ## Creating a Scenario
 
 1. Navigate to **Projections** in the sidebar.
-2. Click **Create Scenario**.
-3. Fill in the scenario parameters:
+2. Click **New Scenario**.
+3. Fill in the form (described in the sections below).
+4. Click **Create Scenario**.
 
-| Field | Description | Example |
-|-------|-------------|---------|
-| **Name** | A descriptive name for this scenario. | "Retire at 62, moderate spending" |
-| **Retirement Date** | When you plan to stop working. | 2035-06-01 |
-| **End Age** | The age through which to project. | 95 |
-| **Inflation Rate** | Annual inflation as a decimal. | 0.03 (for 3%) |
-| **Filing Status** | Your tax filing status. | `single` or `married_filing_jointly` |
+To change a scenario later, open it and click **Edit**. The save button there is **Save & Re-run** — it saves and immediately re-runs the projection.
 
-4. Click **Save** to create the scenario. You can then add accounts, configure withdrawal strategy, and link spending profiles and income sources.
-
----
-
-## Adding Projection Accounts
-
-Each scenario contains one or more **projection accounts** that represent your investment pools.
-
-### Linked Accounts
-
-You can link a projection account to a real WealthView account. When linked:
-
-- The **initial balance** is automatically pulled from the real account's current market value.
-- The account type (traditional/roth/taxable) is inferred from the real account type.
-
-### Hypothetical Accounts
-
-You can also create accounts that do not correspond to a real account. This is useful for modeling:
-
-- Future accounts you plan to open.
-- Employer 401(k) plans not yet tracked in WealthView.
-- "What if" scenarios with different balances.
-
-### Account Fields
+### Scenario Basics
 
 | Field | Description |
 |-------|-------------|
-| **Account Type** | `traditional`, `roth`, or `taxable`. Determines the pool. |
-| **Initial Balance** | Starting balance (auto-filled if linked to a real account). |
-| **Annual Contribution** | How much you contribute per year during working years. |
-| **Expected Return** | Annual growth rate as a decimal (e.g., 0.07 for 7%). |
+| **Name** | A descriptive label, e.g. "Retire at 62, moderate spending". |
+| **Retirement Date** | The date you stop working. |
+| **Birth Year** | Used to calculate your age at each projection year. |
+| **End Age** | Age at which the projection ends. Plan beyond your expected lifespan for safety. |
+| **Inflation Rate (%)** | Annual rate of price increases. `3` = 3%, the historical U.S. average. |
+| **Withdrawal Rate (%)** | Percentage of portfolio to withdraw annually in retirement. `4` = 4%. Used when no spending plan is linked. |
+| **Dividend Yield (%)** / **Bond Interest Yield (%)** / **Investment Fees (%)** | See "Drags on Returns" above. |
+| **Include 1928–1971 market history** | Checkbox. See above. |
+| **Spending Plan** | A single dropdown — see the next section. |
 
----
+### The Spending Plan Dropdown
 
-## Withdrawal Strategies
+**This is one dropdown, not two features.** A "spending profile" (your own age-based tiers) and a "guardrail profile" (a plan the Monte Carlo optimizer computed for you) are two ways of answering the same question: *how much do I spend each retirement year?* A scenario can have **at most one** of them active at a time.
 
-The withdrawal strategy determines how much you pull from your portfolio each year in retirement. WealthView supports three strategies:
+The dropdown contains:
 
-### Fixed Percentage
+- **None (use withdrawal rate)** — no spending plan. The engine falls back to your **Withdrawal Rate (%)** and the withdrawal strategy you chose.
+- Every **spending profile** you have created (see [Spending and Income](spending-and-income.md)).
+- The scenario's **guardrail profile**, if one exists, marked with a ⚙ gear icon. It may be labelled `(stale)` if the scenario changed since the optimizer ran, or `(inactive)`.
 
-Calculates your first-year withdrawal as a fixed percentage of your total portfolio balance **at retirement**. Each subsequent year, that dollar amount is adjusted upward for inflation.
+Picking one automatically clears the other. There is no way to have both.
 
-**Example:** With a $1,000,000 portfolio and a 4% fixed rate:
-- Year 1: Withdraw $40,000
-- Year 2: Withdraw $41,200 (with 3% inflation)
-- Year 3: Withdraw $42,436
+The form's own help text: *"Choose a spending profile (user-defined tiers) or guardrail profile (Monte Carlo optimized). When linked, the projection withdraws what you need each year, minus non-portfolio income."*
 
-**Pros:** Predictable, inflation-adjusted income. The classic "4% rule" approach.
-**Cons:** Does not adapt to market performance. A bad sequence of returns early in retirement can deplete the portfolio.
+### Income Sources
 
-### Dynamic Percentage
+Add one or more income sources to the scenario from the **Income Sources** section. For each, you can set a **per-scenario override amount** so the same income source can be reused across scenarios with different assumptions (e.g. Social Security at 62 vs. 67). See [Spending and Income](spending-and-income.md).
 
-Withdraws a fixed percentage of the **current** portfolio balance each year. The dollar amount fluctuates with market performance.
+### Withdrawal Strategy
 
-**Example:** With a 4% dynamic rate:
-- Year 1 (portfolio $1,000,000): Withdraw $40,000
-- Year 2 (portfolio grew to $1,050,000): Withdraw $42,000
-- Year 3 (portfolio dropped to $950,000): Withdraw $38,000
+Pick one of three cards. This determines *how much* you pull from the portfolio each year when no spending plan is driving the number.
 
-**Pros:** The portfolio can never fully deplete (you always take a percentage of what remains). Spending automatically adjusts to market conditions.
-**Cons:** Income is unpredictable. A market crash means a significant spending cut.
+**Fixed Percentage (4% Rule)** — Year 1 withdrawal is balance × rate. Each subsequent year adjusts for inflation rather than being recalculated from the balance. Predictable income that doesn't adapt to market performance.
 
-### Vanguard Dynamic Spending
+**Dynamic Percentage** — Every year, withdraw current balance × rate. Income fluctuates with markets. The portfolio cannot mathematically deplete to zero, but income can drop significantly in downturns.
 
-A hybrid approach that starts like the fixed percentage method but limits year-over-year changes with **guardrails**:
+**Vanguard Dynamic Spending** — Year 1 is balance × rate. Subsequent years recalculate from the current balance, but the year-over-year change is clamped between a floor and a ceiling. Balances adaptability with income stability. Selecting it reveals two extra fields:
 
-- **Ceiling** — The maximum percentage increase allowed from one year to the next (e.g., 5%).
-- **Floor** — The maximum percentage decrease allowed (e.g., -2.5%).
+- **Ceiling (max increase, %)** — e.g. `5` = 5%.
+- **Floor (max decrease, %)** — e.g. `-2.5` = 2.5% decrease.
 
-**Example:** With 4% initial rate, 5% ceiling, -2.5% floor:
-- Year 1: Withdraw $40,000
-- Year 2 (market boomed, formula says $48,000): Capped at $42,000 (5% increase ceiling)
-- Year 3 (market crashed, formula says $35,000): Floored at $40,950 (2.5% decrease floor)
+### Withdrawal Order
 
-**Pros:** Smooths income volatility while still responding to market conditions. You get some upside in good years and protection in bad years.
-**Cons:** More complex. The ceiling/floor parameters require thoughtful calibration.
+Separately from *how much*, this controls *which accounts* you draw from first.
 
----
+**Taxable First** — Draw from taxable accounts first, then traditional, then Roth. Preserves tax-advantaged growth longest. This is the default.
 
-## Roth Conversion Modeling
+**Dynamic Sequencing** — Draws from the Traditional IRA first, up to a bracket ceiling you choose, to burn down that balance at low tax rates, then switches to Taxable. Helps manage RMDs and avoid IRMAA surcharges. Selecting it reveals a **Traditional Withdrawal Bracket Ceiling** dropdown with 10%, 12%, and 22% options.
 
-A Roth conversion moves money from a traditional (pre-tax) account to a Roth (after-tax) account. You pay income tax on the converted amount now, but future growth and withdrawals from Roth are tax-free.
+### Roth Conversion
 
-To model Roth conversions in a scenario:
+A Roth conversion moves pre-tax retirement funds to a Roth account. You pay income tax on the converted amount now, but all future growth and withdrawals are tax-free. A conversion ladder spreads conversions over multiple years to stay in lower tax brackets.
 
-1. Set the **Annual Roth Conversion** amount on the scenario (e.g., $50,000 per year).
-2. The engine converts that amount from the traditional pool to the Roth pool each year.
-3. The converted amount is added to your taxable income for that year, and the tax is calculated using federal tax brackets and the standard deduction.
+Two strategies:
 
-This lets you model a **Roth conversion ladder** — systematically converting traditional funds to Roth during low-income years (e.g., early retirement before Social Security starts) to fill up low tax brackets.
+**Fixed Amount** — Convert a fixed dollar amount each year. Set **Annual Roth Conversion** to `$0` to skip conversions entirely.
 
----
+**Fill Tax Bracket** — Automatically convert enough to fill income up to the top of a **Target Tax Bracket** you pick (10%, 12%, 22%, 24%, 32%, or 35%) each year.
 
-## Spending Profiles
+Once conversions are active, three more fields appear:
 
-Link a **spending profile** to your scenario to enable spending analysis in the projection results.
+- **Conversion Start Year** — Calendar year when conversions begin. Leave blank to start immediately.
+- **Filing Status** — Single or Married Filing Jointly.
+- **Other Income** — Non-retirement income (salary, rental income) that affects which bracket your conversions land in.
 
-A spending profile defines your retirement spending needs, split into essential and discretionary categories, with optional age-based spending tiers. See [Spending and Income](spending-and-income.md) for details on creating spending profiles.
+For a fully optimized conversion schedule computed against thousands of market paths, use **Optimize Spending** instead — the optimizer can search for conversions jointly with the spending plan.
 
-When a spending profile is linked:
+### Tax Configuration
 
-- The projection results include a spending analysis tab.
-- In shortfall years, essential expenses are covered first; discretionary spending is cut.
-- The year-by-year table shows essential and discretionary amounts separately.
+**State** — Adds state income tax to the projection and unlocks SALT deduction and itemized-vs-standard comparison. The modeled options are:
 
----
+- None (federal only)
+- AZ – Arizona
+- CA – California
+- NV – Nevada (no income tax)
+- OR – Oregon
+- WA – Washington (no income tax)
 
-## Income Sources
+If you pick a state WealthView doesn't model, the results page shows a warning banner saying so.
 
-Link one or more **income sources** to your scenario to model retirement income streams like Social Security, pensions, or rental income.
+Selecting a state reveals:
 
-Each income source has a start age, end age, annual amount, and tax treatment. When linked to a scenario, the income reduces the amount you need to withdraw from your portfolio.
+- **Primary Residence Property Tax** — Annual property tax on your primary residence. Feeds the SALT deduction (capped at $10K together with state income tax).
+- **Primary Residence Mortgage Interest** — Annual mortgage interest, added to SALT for the itemized deduction comparison.
 
-You can set a **per-scenario override amount** for any income source, allowing the same income source to be reused across scenarios with different assumed amounts (e.g., modeling Social Security at full benefit vs. reduced early benefit).
+### Spouse / Household
 
-See [Spending and Income](spending-and-income.md) for details on creating and configuring income sources.
+Leave **Spouse Birth Year** blank for a single-person household. Fill it in and the engine models a two-person household properly:
+
+| Field | What it does |
+|-------|--------------|
+| **Spouse Birth Year** | Enables all the fields below. |
+| **Primary Death Age** | Assumed planning age at which the primary passes away (50–120). Blank uses the SSA planning default, shown as a placeholder. |
+| **Spouse Death Age** | Same, for the spouse. |
+| **Survivor Spending Factor (%)** | Share of pre-transition spending the survivor keeps from the first death forward (50–100%, default 75%). |
+| **Community Property State** | Steps up 100% of the embedded gain on joint taxable accounts at the first death, instead of the common-law 50%. |
+| **Model Uncertain Lifespans** | Opt-in stochastic mortality — see below. |
+
+When a household is active, every projection account also gets an **Owner** field: **Primary**, **Spouse**, or **Joint**. Joint ownership is only available for taxable accounts; the form disables the option otherwise. Income sources carry an owner too.
+
+**What happens at the first death.** In the year the first spouse dies, the engine performs a single atomic transition: the surviving spouse keeps the larger of the two Social Security benefits, the decedent's retirement accounts roll over to the survivor, joint taxable accounts get a cost-basis step-up, spending scales down by the survivor spending factor, and the tax filing status flips from Married Filing Jointly to Single. The decedent's required distribution for that year is still taken first. From then on, income the decedent owned is scaled by that source's survivor percentage.
+
+**Model Uncertain Lifespans (opt-in).** Instead of the fixed death ages above, this samples each spouse's death year per Monte Carlo trial from an SSA mortality table, giving you a longevity-aware success rate. Two important limits, stated in the form itself: it *only* affects the guardrail optimizer's Monte Carlo results — **not** the deterministic projection or its recommendation. Enabling it reveals:
+
+- **Primary Sex** / **Spouse Sex** — Selects the sex-specific column of the mortality table. Leave unset for a blended (both-sex) table.
+- **Longevity Age** — Age threshold (80–110, default 95) for the "the survivor lives to this age" success metric shown beside lifetime success.
+
+### Accounts
+
+Each scenario needs at least one projection account. Click **+ Add Account** to add more, **Remove** to delete one.
+
+**Link Existing Account** — Pick a real WealthView account from the dropdown, or leave it on **Manual Entry**.
+
+When linked:
+- **Initial Balance** becomes read-only and is labelled *(live)* — it updates automatically each time the projection runs.
+- The account type is inferred from the real account (`roth` → Roth; `401k` and `traditional_ira` → Traditional; everything else → Taxable).
+- **Cost Basis** and **Allocation** are derived from the account's holdings. Cost basis shows "Available after first run" until you've run the projection once.
+
+Manual (unlinked) accounts let you model future accounts, an employer 401(k) you don't track in WealthView, or pure "what if" balances.
+
+| Field | Description |
+|-------|-------------|
+| **Account Type** | Taxable, Traditional (Pre-tax), or Roth. |
+| **Owner** | Primary / Spouse / Joint. Only shown when a spouse birth year is set. |
+| **Initial Balance** | Starting balance. Read-only when linked. |
+| **Annual Contribution** | How much you add per year during working years. |
+| **Override Return (%)** | Optional. Blank uses the allocation-derived return. |
+| **Cost Basis** | Total dollars invested, used for capital-gains tax calculations. Derived when linked. |
+| **Allocation** | US/Intl stocks, bonds, cash. Derived from holdings by default. |
 
 ---
 
 ## Running a Projection
 
-Once your scenario is configured with accounts, a withdrawal strategy, and optionally spending profiles and income sources:
-
-1. Navigate to the scenario detail page.
+1. Open the scenario from the **Projections** list (or click **Run** on the card to open it and run immediately).
 2. Click **Run Projection**.
-3. Results are computed on-demand and displayed immediately. They are not stored — you can re-run at any time with updated inputs.
+3. Results are computed on demand and shown immediately. They are not stored — re-run any time with updated inputs.
 
 ---
 
 ## Reading the Results
 
-### Year-by-Year Table
+### Headline Cards
 
-The main results view is a table with one row per year. Columns include:
+| Card | Meaning |
+|------|---------|
+| **Final Balance** | Portfolio value at the end of your projection period. |
+| **Net Worth** | Portfolio balance plus property equity at the end of the projection. |
+| **Years in Retirement** | Years between your retirement date and the projection end. |
+| **Peak Balance** | Highest portfolio value reached, with the year it happens. |
+| **Plan Outcome** / **Depletion** | See below. |
 
-| Column | Description |
-|--------|-------------|
-| **Year** | Calendar year. |
-| **Age** | Your age in that year. |
-| **Contributions** | Total contributions across all accounts (working years only). |
-| **Growth** | Investment returns earned that year. |
-| **Withdrawals** | Total withdrawals needed to fund spending. |
-| **Traditional Balance** | End-of-year traditional pool balance. |
-| **Roth Balance** | End-of-year Roth pool balance. |
-| **Taxable Balance** | End-of-year taxable pool balance. |
-| **Roth Conversion** | Amount converted from traditional to Roth that year. |
-| **Tax Liability** | Federal income tax owed that year. |
-| **Essential Spending** | Essential expenses (if spending profile linked). |
-| **Discretionary Spending** | Discretionary expenses (may be reduced in shortfall years). |
-| **Income** | Total income from linked income sources. |
-| **Net Need** | Spending minus income = amount needed from portfolio. |
-| **Surplus** | Excess funds if income exceeds spending. |
-| **Discretionary After Cuts** | Actual discretionary spending after any shortfall reductions. |
+The last card changes shape depending on what you've configured:
 
-### Spending Analysis Tab
+- With **no spending plan**, it's labelled **Depletion** and reads either the year and age the portfolio hits zero, or "Funds last through plan".
+- With a spending plan linked, it's labelled **Plan Outcome** and reads **Fully Sustainable**, **Depleted at age N**, or **Underfunded at age N**. "Underfunded" means the money technically lasts, but there are years where it can't cover your full planned spending.
 
-If a spending profile is linked, a **stacked area chart** visualizes essential spending, discretionary spending, and income over time. This makes it easy to see when income covers spending vs. when portfolio withdrawals are needed.
+A **Milestone Strip** below repeats the retirement year, peak balance, and plan outcome in a compact band.
 
-### Viability
+### Tax Cards
 
-A projection is considered **viable** if the total portfolio balance remains above zero through your specified end age. If any pool depletes before the end age, the scenario is flagged as non-viable, and the depletion year is highlighted.
+- **Lifetime Tax** — Federal plus state taxes over retirement.
+- **Avg Effective Rate** — Average tax rate on retirement income.
+
+If you selected a state, two more appear:
+
+- **Total State Tax** — Cumulative state tax over retirement.
+- **SALT Claimed** — with a subtitle showing how many of your retirement years itemized.
+
+### Banners
+
+- **Spending Shortfall Detected** — Appears when your plan needs more than the portfolio can sustain. It tells you the required annual spending, the sustainable annual spending, and the age the shortfall begins.
+- **Warnings** — e.g. your filing state isn't one WealthView models.
+- **Unclassified holdings** — described under "Asset Allocation Drives Returns" above.
+
+### Tabs
+
+Which tabs appear depends on what your scenario contains.
+
+| Tab | What it shows |
+|-----|---------------|
+| **Balance Over Time** | Portfolio balance through time, with Total Contributions overlaid. When pool data exists, it stacks Traditional / Roth / Taxable. |
+| **Annual Flows** | Bar chart of Contributions, Growth, Withdrawals, and Income Streams per year. |
+| **Data Table** | The full year-by-year table. Includes a **Download CSV** button. |
+| **Spending Analysis** | Stacked area of Essential Expenses and Discretionary (After Cuts), with Withdrawal and Income Streams lines over the top. Only when a spending plan is linked. |
+| **Income & Tax** | Per-year tax detail — see below. Only when income sources or state tax produce data. |
+| **Income Streams** | Each linked income source charted over time. |
+| **Tax Shield** | Depreciation-driven tax savings from rental properties. Only when there is depreciation to show. |
+
+### The Data Table
+
+The default columns are: Year, Age, Start, Contributions, Growth, Withdrawals, Income, Total Spending, End — then, when pool data is present, Traditional, Roth, Taxable, Conversion, and Tax.
+
+Click **Show Pool Details** to reveal a much wider view: Essential / Discretionary / Net Need, per-pool growth, tax paid out of each pool, **RMD**, **Cap-Gains Tax**, withdrawals from each pool, Surplus/Deficit, Surplus Reinvested, and a Working/Retired status flag.
+
+Retirement years are shaded, with a thick line marking the transition year. A ⚠ next to a year means income exceeded the 22% bracket — hover it for the tooltip: *"Income exceeds 22% bracket — review IRMAA implications for Medicare (2-year lookback)."*
+
+### The Income & Tax Tab
+
+One row per year, with columns for Rental Gross, Rental Expenses, Depreciation, Loss Applied, Suspended Loss, SS Taxable, SE Tax, and Tax Liability — plus Federal Tax, State Tax, SALT and Deduction when a state is set, and RMD, Cap-Gains Tax, IRMAA, and Early Penalty columns when those apply. Rows expand for a per-year breakdown.
 
 ---
 
-## Comparing Scenarios
+## Required Minimum Distributions
 
-WealthView lets you compare two or three scenarios side by side.
+Once you reach the RMD age, the IRS forces money out of traditional accounts whether you need it or not — and it's taxed as ordinary income. WealthView models this inside the main projection.
 
-1. Navigate to **Projections** in the sidebar.
-2. Click **Compare**.
-3. Select the scenarios you want to compare (2 or 3).
-4. View the comparison:
-   - **Overlay chart** — Portfolio balance lines for each scenario on the same axes.
-   - **Summary table** — Key metrics side by side: final balance, peak balance, and depletion year (if applicable).
+- RMDs begin at **age 73** if you were born before 1960, or **age 75** if you were born in 1960 or later (SECURE Act 2.0).
+- The amount uses the IRS Uniform Lifetime Table (Publication 590-B, Table III).
+- In a household scenario, each person has their own RMD stream based on their own age and their own traditional balance.
+- The per-year amount appears in the **RMD** column of the Data Table (with Pool Details shown) and the Income & Tax tab.
 
-This is the most powerful way to evaluate different retirement strategies.
+This is why Roth conversions and Dynamic Sequencing matter: both shrink the traditional balance before RMDs force it out at a potentially higher rate.
+
+---
+
+## Capital Gains on Taxable Accounts
+
+Withdrawals from a taxable account are not tax-free — you owe tax on the *gain*. The engine tracks cost basis per lot and sells oldest-first (FIFO), computing long-term capital gains tax and the Net Investment Income Tax where it applies. This is why the **Cost Basis** field on each account matters: without it the engine can't tell how much of a withdrawal is gain.
+
+Realized capital gains tax shows up in the **Cap-Gains Tax** column.
 
 ---
 
 ## Tax Modeling
 
-The projection engine includes detailed tax calculations:
+The engine's tax model includes federal brackets with the standard deduction, an age-65 additional deduction, Social Security's provisional-income rule (up to 85% of benefits taxable), self-employment tax, rental passive-loss rules, long-term capital gains brackets, state income tax with SALT and itemized-vs-standard comparison, IRMAA Medicare surcharge flags, and early-withdrawal penalties.
 
-### Federal Tax Brackets
+Bracket schedules fall back to the most recent defined year when a future year isn't seeded.
 
-Income from traditional withdrawals, Roth conversions, and taxable income sources is taxed using federal income tax brackets. The engine uses the bracket schedule for the relevant tax year, with year fallback (if future-year brackets are not defined, the most recent available year is used).
+**Again: these are planning estimates, not tax advice.** The app says so on the Income Sources screen and it applies to every number here.
 
-### Standard Deduction
+---
 
-The standard deduction is subtracted from your gross income before applying bracket math. This means the first portion of your income (e.g., $14,600 for single filers in 2024) is not taxed.
+## Comparing Scenarios
 
-### Social Security 85% Rule
+1. Navigate to **Projections**.
+2. Click **Compare Scenarios**.
+3. Select 2 or 3 scenarios (the third is optional). You'll get an error if you select fewer than 2.
+4. Click **Compare**.
 
-Social Security benefits are taxed using the provisional income formula. Up to 85% of benefits may be taxable, depending on your total income. The engine calculates the taxable portion based on your combined income from all sources.
+You get:
 
-### Self-Employment Tax
-
-Income sources with the `self_employment` tax treatment are subject to a 15.3% self-employment tax:
-- 12.4% Social Security tax (up to the annual wage base).
-- 2.9% Medicare tax (no cap).
+- **Balance Over Time** — an overlay area chart of each scenario's end-of-year balance.
+- **Summary** — a table comparing **Final Balance**, **Peak Balance** (with year), **Depletion Year** (or "Never"), and **Years in Retirement**.
 
 ---
 
@@ -274,20 +348,20 @@ Income sources with the `self_employment` tax treatment are subject to a 15.3% s
 
 ### "Can I retire at 60?"
 
-Create three scenarios with identical spending and accounts but different retirement dates: age 60, 62, and 65. Run all three and use the Compare feature. Look at the final balances and whether any scenario depletes before your end age.
+Create three scenarios with identical spending and accounts but different retirement dates — age 60, 62, 65. Compare them and look at the Plan Outcome card and depletion year on each.
 
 ### "Should I do Roth conversions?"
 
-Create two versions of the same scenario:
-1. No Roth conversions (set annual conversion to $0).
-2. With Roth conversions (e.g., $50,000/year during early retirement).
-
-Compare the tax liability over time and final portfolio balances. Roth conversions often pay off when you convert during low-income years (after retirement but before Social Security starts), filling up the lower tax brackets.
+Duplicate a scenario and set one to Fixed Amount / $0 and the other to Fill Tax Bracket at 12% or 22%. Compare **Lifetime Tax** and **Final Balance**. Conversions usually pay off in low-income years — after you retire but before Social Security and RMDs start — because they let you fill up cheap brackets that would otherwise go unused.
 
 ### "What withdrawal rate is safe?"
 
-Create multiple scenarios with different withdrawal strategies and rates (3.5%, 4%, 4.5%). Compare to find the rate that keeps your portfolio viable through your end age while providing adequate income.
+Rather than guessing, run **Optimize Spending**. The Monte Carlo optimizer searches for the highest spending your portfolio can support at your chosen confidence level, instead of asking you to pick a rate and hope.
 
-### "How does inflation affect my plan?"
+### "How much does my allocation matter?"
 
-Duplicate a scenario and change only the inflation rate (e.g., 2.5% vs. 3.5%). The comparison will show how sensitive your plan is to inflation assumptions.
+Duplicate a scenario, customize the allocation on your largest account (say 80/20 stocks/bonds vs. 50/50), and compare. Then tick **Include 1928–1971 market history** on both and re-run to see how each holds up against worse history.
+
+### "What if I die first?"
+
+Fill in the spouse fields and set **Primary Death Age** to something early. Watch the Income & Tax tab: the filing status flip from Married Filing Jointly to Single is often a bigger tax shock than people expect, because the same income gets squeezed into narrower single-filer brackets.

@@ -4,7 +4,7 @@
 
 WealthView is a self-hosted, multi-tenant personal finance app (investments, rental properties, retirement projections). See PROJECT.md for full architecture, data model, and feature roadmap.
 
-**Tech stack:** Java 25 / Spring Boot 4.1 / Maven multi-module backend, React 18+ / Vite frontend, PostgreSQL 16+, Docker Compose deployment.
+**Tech stack:** Java 25 / Spring Boot 4.1 / Maven multi-module backend, React 19 / Vite frontend, PostgreSQL 16+, Docker Compose deployment.
 
 **Monorepo layout:**
 - `backend/` — Maven multi-module: wealthview-api, wealthview-core, wealthview-persistence, wealthview-import, wealthview-projection, wealthview-app
@@ -81,7 +81,9 @@ If you catch yourself writing production code first, stop, delete it, write the 
 | Equality defined by all fields | Custom equals/hashCode logic |
 
 ### Exception Handling
-- Define domain exceptions in `wealthview-core`: `EntityNotFoundException`, `DuplicateImportException`, `TenantAccessDeniedException`, etc.
+- Define domain exceptions in `wealthview-core`, package `com.wealthview.core.exception`. The
+  current set is `EntityNotFoundException`, `DuplicateEntityException`, `TenantAccessDeniedException`,
+  `InvalidInviteCodeException`, `InvalidSessionException`, `ServiceUnavailableException`.
 - Controllers should NOT catch exceptions directly. Use a `@RestControllerAdvice` global exception handler in `wealthview-api`.
 - Return the standard error envelope: `{ "error": "NOT_FOUND", "message": "...", "status": 404 }`.
 
@@ -111,7 +113,7 @@ If you catch yourself writing production code first, stop, delete it, write the 
 
 ### Controller Tests
 - Use `@WebMvcTest(FooController.class)` + `MockMvc`.
-- Mock the service layer with `@MockBean`.
+- Mock the service layer with `@MockitoBean` (Spring Boot 4 removed `@MockBean`).
 - Verify HTTP status codes, response body structure, and content type.
 - Test both happy path and error paths (400, 401, 403, 404).
 
@@ -305,7 +307,7 @@ and `guardrail_profile` (summary) so the UI can display whichever is active.
 
 ---
 
-## Frontend Conventions (React 18+ / Vite)
+## Frontend Conventions (React 19 / Vite)
 
 ### Project Structure
 ```
@@ -317,14 +319,26 @@ frontend/src/
   api/              (Axios client, API call functions)
   utils/            (pure utility functions)
   types/            (TypeScript interfaces/types)
+  testutil/         (shared test builders and mocks — not product code)
 ```
+
+Cross-platform code that mobile also consumes lives in the `shared/` workspace
+(`@wealthview/shared`), not in `frontend/src/`.
 
 ### Patterns
 - Functional components only. No class components.
 - TypeScript for all files. No `any` types — define interfaces for all API responses.
-- Custom hooks for data fetching and shared stateful logic: `useAccounts()`, `useAuth()`.
-- Context API + useReducer for global state (auth, tenant).
-- Axios instance with interceptors for JWT attachment and 401 redirect.
+- Routing is react-router v8, imported from `react-router` (NOT `react-router-dom`).
+  Authenticated pages are lazy-loaded via `React.lazy` + `<Suspense>`.
+- Generic data-fetching hooks — `useApiQuery`, `useApiMutation`, `useCrudForm` — rather
+  than one bespoke hook per resource.
+- Context API + useReducer for global state: `AuthContext` and `ProjectionCacheContext`.
+- **Web auth is HttpOnly cookies, not a JWT in a header.** `frontend/src/api/client.ts`
+  is a thin cookie-transport wrapper over the shared `createApiClient` factory. Tokens
+  are never in localStorage and never readable by JS. CSRF uses the double-submit
+  pattern (`XSRF-TOKEN` cookie echoed as the `X-XSRF-TOKEN` header). A 401 triggers a
+  single coalesced `/auth/refresh` and one replay of the original request. Mobile uses
+  the same factory with the bearer-token transport against `/api/v1/auth/token/*`.
 - **Subresource Integrity (SRI):** `index.html` currently loads no third-party CDN assets. If one is
   ever added (Google Fonts, a `<script src="https://...">`, etc.), it MUST carry
   `integrity="sha384-..."` and `crossorigin="anonymous"`. See the comment in `frontend/index.html`
@@ -336,6 +350,11 @@ frontend/src/
 - **Must test:** Page components, custom hooks, complex logic/utilities.
 - **May skip:** Simple presentational components with no logic.
 - TDD encouraged but not mandatory on the frontend. Focus test energy on the backend.
+- **Coverage is measured and gated** — `npm run test:coverage` enforces ratchet floors in
+  `frontend/vite.config.ts` (statements 83, branches 75, functions 74, lines 86). Raise a
+  floor when you raise coverage; never lower one to make a build pass. `coverage.include`
+  is set deliberately: without it, v8 only counts files a test happened to import, so an
+  entirely untested component would be invisible rather than 0%.
 
 ---
 
@@ -427,12 +446,18 @@ mvn -q test-compile org.pitest:pitest-maven:mutationCoverage -pl wealthview-core
   find tests that pass through coverage without actually pinning behavior.
 
 ### Frontend (development only)
+
+Install from the **repo root**, not from `frontend/` — this is an npm workspaces monorepo
+and a single root install wires all three workspaces up together.
+
 ```bash
+npm install                                        # From the REPO ROOT — installs all workspaces
 cd frontend
-npm install                                        # Install dependencies
-npm run dev                                        # Dev server (hot reload)
-npm run build                                      # Production build
+npm run dev                                        # Dev server (hot reload, port 5173)
+npm run build                                      # Production build (tsc && vite build)
 npm run test                                       # Run tests (Vitest)
+npm run test:coverage                              # Tests + coverage, enforces ratchet floors
+npm run typecheck                                  # tsc --noEmit
 npm run lint                                       # ESLint check
 ```
 

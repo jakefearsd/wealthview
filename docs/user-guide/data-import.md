@@ -2,96 +2,96 @@
 
 # Data Import
 
-WealthView can import transactions directly from CSV and OFX/QFX files downloaded from your brokerage. This is the fastest way to populate your accounts with historical data.
+WealthView can import transactions and positions directly from CSV and OFX/QFX files downloaded from your brokerage. This is the fastest way to populate your accounts with historical data.
+
+---
+
+## Getting to the Import Screen
+
+Imports always target one specific account.
+
+1. Click **Accounts** in the sidebar and open the account you want to load data into.
+2. Click the blue **Import** button.
+
+You land on the **Import** page for that account. It has two tabs and, below them, a shared **Import History** table.
+
+| Tab | What It Does |
+|-----|--------------|
+| **Transaction History** | Adds buys, sells, dividends, and cash movements to what is already there. Duplicates are skipped. |
+| **Current Positions** | Replaces the account's entire contents with a snapshot of what you hold today. |
+
+Uploads are limited to 10 MB per file.
 
 ---
 
 ## Supported Formats
 
-| Format | Source | What It Imports |
-|--------|--------|----------------|
-| **Fidelity CSV** | Fidelity Investments activity export | Transactions (buys, sells, dividends, etc.) |
-| **Vanguard CSV** | Vanguard transaction history export | Transactions |
-| **Schwab CSV** | Charles Schwab transaction export | Transactions |
-| **Generic CSV** | Any brokerage (manual column mapping) | Transactions |
-| **OFX/QFX** | Any brokerage supporting Open Financial Exchange | Transactions |
+Everything on the **Transaction History** tab is chosen from a single dropdown:
+
+| Dropdown Option | Source | File Type |
+|-----------------|--------|-----------|
+| **Generic CSV** (default) | Any brokerage, in WealthView's own column layout | `.csv` |
+| **Fidelity** | Fidelity Investments activity export | `.csv` |
+| **Vanguard** | Vanguard transaction history export | `.csv` |
+| **Schwab** | Charles Schwab transaction export | `.csv` |
+| **OFX / QFX** | Any brokerage supporting Open Financial Exchange | `.ofx`, `.qfx` |
+
+The **Current Positions** tab currently supports one format: **Fidelity** (the Fidelity positions/holdings CSV).
+
+The file picker filters to the right extension automatically when you change the dropdown.
 
 ---
 
-## Importing from Fidelity
+## Importing Transaction History
 
-### Downloading Your Data
+1. Open the **Transaction History** tab.
+2. Choose your format from the dropdown.
+3. Use the file picker to select your download.
+4. Click **Upload**.
 
-1. Log in to Fidelity.com.
-2. Navigate to **Accounts & Trade** > **Account Activity**.
-3. Select the account and date range you want to export.
-4. Click **Download** and choose **CSV** format.
-5. Save the file to your computer.
+A toast confirms the result, e.g. *"Imported: 142 successful, 0 failed"*, and the Import History table refreshes.
 
-### Uploading to WealthView
+### Fidelity
 
-1. Navigate to **Accounts** in the sidebar and click on the target account.
-2. Click the **Import** button.
-3. Select **Fidelity** as the format.
-4. Choose your downloaded CSV file.
-5. Click **Upload**.
+Download from Fidelity.com under **Accounts & Trade → Account Activity**: pick the account and date range, then **Download** as CSV.
 
-The Fidelity parser expects columns for date, action (buy/sell/dividend), symbol, quantity, price, and amount. The parser automatically maps Fidelity's column names and action descriptions to WealthView transaction types.
+The parser skips everything above the row containing **Run Date**, then reads the `Run Date`, `Action`, `Symbol`, `Quantity`, and `Amount ($)` columns. Dates are `MM/DD/YYYY`. Actions are matched like this:
 
----
+| Fidelity Action | Becomes |
+|-----------------|---------|
+| YOU BOUGHT | Buy |
+| REINVESTMENT | Buy |
+| YOU SOLD | Sell |
+| DIVIDEND RECEIVED | Dividend |
+| ELECTRONIC FUNDS TRANSFER | Deposit or Withdrawal, depending on the sign of the amount |
 
-## Importing from Vanguard
+### Vanguard
 
-### Downloading Your Data
+Download from Vanguard.com under **Transaction History**, choosing CSV.
 
-1. Log in to Vanguard.com.
-2. Navigate to **Transaction History**.
-3. Select the account, date range, and choose **CSV download**.
-4. Save the file.
+The parser skips everything above the row containing **Trade Date**, then reads `Trade Date`, `Transaction Type`, `Symbol`, `Shares`, and `Net Amount`. Dates are `MM/DD/YYYY`. Buy, Sell, Dividend, Reinvestment, short- and long-term capital gains, incoming/outgoing transfers, and sweep in/out are all recognized.
 
-### Uploading to WealthView
+### Schwab
 
-1. Navigate to the target account in WealthView.
-2. Click **Import** and select **Vanguard** as the format.
-3. Choose your CSV file and click **Upload**.
+Download from Schwab.com under **Accounts → History**, exporting as CSV.
 
-The Vanguard parser handles Vanguard's specific column layout and transaction type naming.
+The parser skips everything above the row starting with **Date**, then reads `Date`, `Action`, `Symbol`, `Quantity`, and `Amount`. Dates are `MM/DD/YYYY`. Schwab's long action vocabulary is mapped for you — the various dividend flavours become Dividend, the reinvest actions become Buy, bank and credit interest become Dividend, margin interest becomes Withdrawal, and MoneyLink transfers, wires, and journals become Deposit or Withdrawal based on the sign. The trailing "Total" row and any malformed rows at the end of the file are skipped silently.
 
----
+### Generic CSV
 
-## Importing from Schwab
+Use this when your brokerage is not one of the three above. The file must have a **header row** (its contents are ignored — it is simply skipped) followed by data rows with these five columns **in this exact order**:
 
-### Downloading Your Data
+| Position | Column | Required | Description |
+|----------|--------|----------|-------------|
+| 1 | date | Yes | `YYYY-MM-DD` only |
+| 2 | type | Yes | buy, sell, dividend, deposit, withdrawal, or opening_balance |
+| 3 | symbol | For buy/sell/dividend | Ticker symbol (e.g., AAPL) |
+| 4 | quantity | For buy/sell | Number of shares; may be blank |
+| 5 | amount | Yes | Dollar amount, as a plain number |
 
-1. Log in to Schwab.com.
-2. Navigate to **Accounts** > **History**.
-3. Select the account and date range.
-4. Click **Export** and choose CSV.
-5. Save the file.
+Column *order* is what matters — the header names are never inspected, so a file whose columns are in a different order will import wrong data rather than failing. Transaction types are matched case-insensitively, so `BUY` and `buy` both work.
 
-### Uploading to WealthView
-
-1. Navigate to the target account in WealthView.
-2. Click **Import** and select **Schwab** as the format.
-3. Choose your CSV file and click **Upload**.
-
----
-
-## Generic CSV Import
-
-If your brokerage is not Fidelity, Vanguard, or Schwab, you can use the generic CSV format. Your file needs the following columns:
-
-| Column | Required | Description |
-|--------|----------|-------------|
-| **date** | Yes | Transaction date (YYYY-MM-DD or MM/DD/YYYY) |
-| **type** | Yes | One of: buy, sell, dividend, deposit, withdrawal, opening_balance |
-| **symbol** | For buy/sell/dividend | Ticker symbol (e.g., AAPL) |
-| **quantity** | For buy/sell | Number of shares |
-| **amount** | Yes | Dollar amount of the transaction |
-
-The column headers must match these names (case-insensitive). Extra columns are ignored.
-
-### Example Generic CSV
+#### Example Generic CSV
 
 ```
 date,type,symbol,quantity,amount
@@ -101,100 +101,100 @@ date,type,symbol,quantity,amount
 2025-03-01,sell,BND,25,1900.00
 ```
 
----
+### OFX / QFX
 
-## OFX/QFX Import
+OFX (Open Financial Exchange) is a standardized format used by banks and brokerages; QFX is Quicken's variant. Look for a download option labelled "Download to Quicken", "QFX download", or "OFX export" in your brokerage's activity page.
 
-### What Is OFX?
+WealthView reads both investment and banking statements:
 
-OFX (Open Financial Exchange) is a standardized data format used by banks and brokerages. QFX files are Quicken's variant of OFX. Most major brokerages offer OFX or QFX downloads.
+- **Investment transactions** — buys and sells become Buy and Sell, reinvested income becomes a Buy, and other income becomes a Dividend. Ticker symbols are resolved from the security list embedded in the file.
+- **Banking transactions** — credits, deposits, and direct deposits become Deposit; debits, checks, payments, point-of-sale, ATM, and direct debits become Withdrawal; dividends and interest become Dividend. Anything else falls back to the sign of the amount.
 
-### Downloading OFX Files
-
-The download location varies by brokerage. Look for options labeled "Download to Quicken," "QFX download," or "OFX export" in your account's transaction history or activity page.
-
-### Uploading to WealthView
-
-1. Navigate to the target account in WealthView.
-2. Click **Import** and select **OFX** as the format.
-3. Choose your .ofx or .qfx file and click **Upload**.
-
-WealthView parses the OFX XML structure and extracts transaction data including dates, types, symbols, quantities, and amounts.
+Transaction types the parser doesn't recognize are skipped rather than failing the import.
 
 ---
 
-## Positions Import
+## Importing Current Positions
 
-In addition to importing transaction history, you can import current **positions** (holdings). This is useful when you want to set up an account with its current state without entering all historical transactions.
+The **Current Positions** tab loads a snapshot of what you hold right now, which is handy for standing up an account without reconstructing years of trades.
 
-A positions import creates holdings directly rather than creating transactions that compute into holdings. The imported holdings will have the manual override flag set since they were not derived from transactions.
+> **This tab is destructive.** An orange banner and a confirmation dialog both warn you: importing positions **deletes every existing transaction and holding in the account** before loading the snapshot. There is no undo.
+
+1. Open the **Current Positions** tab.
+2. Leave the format on **Fidelity**.
+3. Choose your positions CSV.
+4. Click the red **Replace & Import** button and confirm the dialog.
+
+Under the hood, each position becomes an **opening balance** transaction dated from the "Date downloaded" line in the file's footer (today's date if that line is missing), and holdings are then computed from those transactions in the normal way. Cash held in the Fidelity core position (FCASH) is recorded as a Deposit instead. Positions whose cost basis Fidelity reports as `--` fall back to the snapshot's current value.
 
 ---
 
 ## Deduplication
 
-WealthView automatically prevents duplicate transactions during import. Each transaction row is assigned a **content hash** — a SHA-256 hash computed from the transaction's key fields (date, type, symbol, quantity, amount).
+WealthView automatically prevents duplicate transactions on the **Transaction History** tab. Each row is fingerprinted with a hash of its date, type, symbol, quantity, and amount, and compared against the transactions already in that account.
 
-When you import a file:
-
-- If a transaction with the same content hash already exists in the account, it is silently skipped.
+- If a transaction with the same fingerprint already exists in the account, it is silently skipped.
 - Only genuinely new transactions are created.
-- The import summary shows how many rows were imported vs. skipped.
+- Skipped duplicates are counted separately — they are **not** failures.
 
-This means you can safely re-import the same file without creating duplicates. It also means that if you download overlapping date ranges, the overlap is handled automatically.
+This means you can safely re-import the same file without creating duplicates, and overlapping date ranges sort themselves out.
+
+Two caveats worth knowing:
+
+- The fingerprint is exact. If your brokerage rounds an amount differently between two exports, the same trade will look like two different transactions.
+- Two genuinely separate but identical trades on the same day — same symbol, same quantity, same amount — are indistinguishable, so the second one is treated as a duplicate and skipped. Add it by hand with a slightly different amount if this matters to you.
 
 ---
 
-## Import Job History
+## Import History
 
-Every import creates a job record that tracks the import's progress and results. You can view past imports from the account detail page.
+Every import — from any account in your tenant — is recorded in the **Import History** table at the bottom of the page.
 
-Each import job shows:
+| Column | Description |
+|--------|-------------|
+| **Date** | When the import ran. |
+| **Source** | `csv` for any of the four CSV formats, `ofx` for OFX/QFX, `positions` for a positions snapshot. It does not record which broker layout you picked. |
+| **Status** | `completed` once the import has finished. |
+| **Total** | Rows found in the file — successfully parsed rows plus rows that could not be parsed. |
+| **Success** | New transactions created. |
+| **Failed** | Rows that could not be parsed or could not be saved. |
 
-| Field | Description |
-|-------|-------------|
-| **Status** | The current state: `pending` (queued), `processing` (in progress), `completed` (finished successfully), or `failed` (error occurred). |
-| **Format** | Which parser was used (fidelity, vanguard, schwab, generic, ofx). |
-| **Total Rows** | The number of transaction rows found in the file. |
-| **Imported Rows** | The number of new transactions created. |
-| **Skipped Rows** | The number of rows skipped as duplicates. |
-| **Failed Rows** | The number of rows that could not be parsed. |
-| **Created At** | When the import was initiated. |
+Duplicates do not appear in any column. A re-import of a file you have already loaded therefore shows a healthy Total with **Success: 0** and **Failed: 0** — that is the expected result, not an error.
+
+An import that fails outright (a corrupt file, an unreadable format) leaves no history row at all, because the whole operation is rolled back.
 
 ---
 
 ## Troubleshooting
 
-### "Wrong format" or unexpected parse errors
+### "Unsupported file type"
 
-If your import fails or produces unexpected results, double-check that you selected the correct format. A Fidelity CSV uploaded with the Schwab parser will likely fail because the column layouts differ.
+The browser reported a content type WealthView doesn't accept. Make sure you are uploading the raw `.csv`, `.ofx`, or `.qfx` file rather than a `.xls`/`.xlsx` workbook or a zip archive.
 
-**Fix:** Delete the failed import's transactions (if any were created) and re-import with the correct format.
+### Wrong format selected
 
-### "Missing required columns"
+If your import produces zero rows or a pile of failures, check the dropdown. A Fidelity CSV uploaded as Schwab will not find the columns it expects, because each broker parser looks for a different header row.
 
-The parser could not find expected column headers in your file. This usually means:
+**Fix:** delete any transactions that were created and re-import with the correct format.
 
-- The file has a different column layout than expected. Try the **Generic CSV** format instead.
-- The file has extra header rows or metadata above the actual column headers. Open the file in a text editor and remove any lines above the header row.
-- The file is not actually a CSV (some brokerages export tab-separated or Excel files).
+### Everything came back as 0 successful, 0 failed
 
-### "All rows rejected as duplicates"
+Every transaction in the file already exists in the account. This is normal if you have already imported this file, or a file covering the same trades.
 
-Every transaction in the file already exists in the account. This is normal if you have already imported this file or a file covering the same transactions.
+If you believe the transactions are genuinely new, open the account and check the transaction list for the dates in question.
 
-If you believe the transactions are genuinely new, check whether a previous import already loaded them. Navigate to the account's transaction list and look for the transactions in question.
+### High "Failed" count
 
-### Import shows "failed" status
+Failed rows are usually one of:
 
-The import encountered an error it could not recover from. Common causes:
+- **Generic CSV with the wrong column order or a non-ISO date.** The generic parser reads the date from the first column and only accepts `YYYY-MM-DD`. Reorder the columns or convert the dates.
+- **An action the broker parser doesn't recognize.** Brokers add new action names over time. Rows with an unknown action are reported as errors rather than guessed at; you can add those transactions manually.
+- **Extra header/metadata rows.** Fidelity, Vanguard, and Schwab exports normally carry a preamble, and the parsers skip it — but only if the real header row is intact. If you have edited the file, make sure the header line survived.
 
-- The file is corrupted or truncated.
-- The file uses an encoding that the parser cannot read.
-- An OFX file has malformed XML.
+### Transactions landed in the wrong account
 
-Try downloading a fresh copy of the file from your brokerage and re-importing.
+WealthView imports into whichever account you started the import from. If transactions ended up in the wrong place, delete them and re-import from the correct account's Import page.
 
-### Transactions imported to the wrong account
+### A positions import wiped data I wanted
 
-WealthView imports into whichever account you initiated the import from. If transactions ended up in the wrong account, delete them and re-import from the correct account page.
+There is no undo. Restore from a backup (`./wv restore`) if the data mattered — and prefer the **Transaction History** tab for anything additive.

@@ -8,112 +8,180 @@ WealthView values your portfolio by multiplying each holding's share quantity by
 
 ## How Valuation Works
 
-For each holding in your accounts, WealthView calculates market value as:
+For each holding, WealthView calculates market value as:
 
-**Market Value = Quantity x Latest Price**
+**Market Value = Quantity × Latest Price**
 
-If no price is available for a symbol, WealthView falls back to the holding's **cost basis** as an estimate. This ensures every holding contributes to your net worth calculation, even if price data is unavailable.
+The "latest price" is simply the most recent close price on record for that symbol, whatever its origin — an automated sync, an uploaded file, or something you typed in yourself.
 
-On the dashboard and account detail pages, you will see both:
+If no price is available for a symbol, WealthView falls back to the holding's **cost basis** when totalling an account or your net worth, so nothing vanishes from the sum. On the Holdings table itself, an unpriced holding shows `—` in the Price, Market Value, and Gain/Loss columns — a clear signal that the number is missing rather than zero.
 
-- **Market Value** — Based on the latest price (or cost basis if no price exists).
-- **Gain/Loss** — The difference between market value and cost basis.
+On the account detail page you will see, per holding:
+
+- **Price** — The latest close on record.
+- **Market Value** — Quantity × that price.
+- **Gain/Loss** — Market value minus cost basis, in dollars.
 
 ---
 
-## Manual Price Entry
+## The Prices Page
 
-You can enter or update prices manually from the **Prices** page.
+**Prices** in the sidebar shows what WealthView currently knows about every symbol it has a price for.
 
-1. Navigate to **Prices** in the sidebar.
-2. You will see a list of all symbols that appear in your holdings.
-3. Click on a symbol to view its price history.
-4. Click **Add Price** to enter a new price point.
-5. Enter the **date** and **price**, then save.
+### Latest Prices
+
+A table with one row per symbol:
+
+| Column | What It Shows |
+|--------|---------------|
+| **Symbol** | The ticker. |
+| **Latest Date** | The date of the most recent close price on record. |
+| **Close Price** | That price. |
+| **Source** | Where it came from: `finnhub`, `yahoo`, or `manual`. |
+
+A **Refresh** button in the panel header re-reads the list. Note that this table lists every symbol that has price data — including symbols you no longer hold — because prices are shared reference data rather than per-account information.
+
+### Add Manual Price
+
+Above the table, admins and super-admins see an **Add Manual Price** panel with three fields — **Symbol**, **Date**, and **Price** — and a **Save** button. Symbols are upper-cased for you. Saved prices are recorded with the source `manual`, and each one you add in the current session is also echoed in a **Recently Added** panel at the bottom of the page (it disappears on reload; the price itself is stored permanently).
+
+Adding a price requires an admin or super-admin account; members and viewers do not see the panel. If you are a member and need a price added, ask an admin.
 
 Manual entry is useful for:
 
-- Securities not covered by the automated price feed (e.g., private placements, foreign securities).
+- Securities not covered by the automated feeds (private placements, some foreign securities, obscure mutual funds).
 - Correcting a price that was fetched incorrectly.
-- Adding historical prices for backdated portfolio analysis.
+- Adding historical prices so a portfolio history chart has something to draw.
 
 ---
 
-## Finnhub Automated Price Feed
+## Where Prices Come From
 
-WealthView can automatically fetch daily closing prices from the **Finnhub** financial data API.
+WealthView has three sources of price data, plus the seed data it ships with. All of the automated controls live under **Admin → Prices**, which is available to admins and super-admins and is split into four tabs.
 
-### Setup
+### Finnhub (automatic)
 
-To enable automated price fetching, set the `FINNHUB_API_KEY` environment variable to your Finnhub API key. You can get a free API key by registering at [finnhub.io](https://finnhub.io).
+The primary feed. If your deployment sets a `FINNHUB_API_KEY`, WealthView fetches quotes from [finnhub.io](https://finnhub.io) — free API keys are available.
 
-For Docker Compose deployments, add the key to your environment configuration:
+- **Scheduled sync** — runs automatically at **6:00 PM US Eastern, Monday to Friday**, after the US market close. It walks every symbol held anywhere in the deployment and records that day's price.
+- **On-demand sync** — **Admin → Prices → Finnhub Sync** has a **Sync All Holdings** button that runs the same job immediately. Below it, a **Price Sync Status** table lists every symbol with its latest date, source, and a **Current** or **Stale** badge.
+- **Automatic backfill** — the first time a holding appears for a symbol WealthView has never seen, it pulls roughly two years of daily history so charts have something to show right away.
 
-```yaml
-environment:
-  FINNHUB_API_KEY: your_api_key_here
-```
+Finnhub's free tier is rate-limited, so WealthView deliberately paces its requests. If you hold many different securities, a sync can take a few minutes.
 
-### How It Works
+If no API key is configured, the Finnhub sync simply doesn't run — nothing breaks, but prices only come from the other sources.
 
-- The price feed runs automatically on **weekdays at 4:30 PM** (after U.S. market close).
-- It fetches the closing price for every symbol that appears in your holdings.
-- Prices are stored with the current date and become the "latest price" used for valuation.
+### Yahoo Finance (manual fallback)
 
-### Free Tier Rate Limits
+**Admin → Prices → Yahoo Finance** covers symbols Finnhub doesn't. The tab opens with an orange warning: *"Yahoo Finance scraping may break without notice. Use as a fallback for symbols Finnhub doesn't cover."* Take it at face value — this source reads a public web page and can stop working at any time.
 
-Finnhub's free tier has API rate limits. WealthView respects these limits by spacing out requests. If you hold many different securities, the price sync may take a few minutes to complete. All symbols will be updated within a single sync cycle.
+Two controls:
+
+- **Sync All Holdings from Yahoo** — one button, fetches everything you hold.
+- **Fetch Specific Symbols** — enter comma-separated tickers and a **From** / **To** date range (defaulting to the last 30 days), click **Fetch Preview**, review the results in a table, then click **Save All** to commit them. Nothing is written until you press Save.
+
+Prices from here are stored with the source `yahoo`.
+
+### CSV Upload
+
+**Admin → Prices → CSV Upload** takes a file with a header row and three columns: `symbol`, `date`, `close_price`, with dates as `YYYY-MM-DD`.
+
+Rows are validated individually. A row is rejected — with the line number and the reason listed on screen — if the symbol is missing, the date is unparseable or in the future, or the price is not a positive number. Everything else imports. Uploaded prices are stored with the source `manual`.
+
+### Browse and Correct
+
+**Admin → Prices → Browse** lets you look up one symbol over a date range. Enter a **Symbol**, a **From** and **To** date, and click **Search**. You get a line chart of the period plus a table of every stored price with its source, and a **Delete** link on each row for removing a bad data point.
 
 ---
 
-## Historical Price Data
+## Bundled Historical Price Data
 
-WealthView includes **seed price data** for 12 commonly held symbols, covering historical prices from 2006 to present:
+WealthView ships with seed price data for twelve commonly held symbols:
 
-AAPL, AMZN, BND, FXAIX, GOOG, MSFT, NVDA, SCHD, VOO, VTI, VUG, VXUS
+**AAPL, AMZN, BND, FXAIX, GOOG, MSFT, NVDA, SCHD, VOO, VTI, VUG, VXUS**
 
-This seed data powers the portfolio history charts immediately, without waiting for the Finnhub feed to accumulate data. If your holdings include symbols outside this list, historical chart data will only be available from the date Finnhub begins collecting prices (or from any prices you enter manually).
+Each series runs from as far back as the security has history (AAPL starts in December 1980) through March 2026, so portfolio history charts for these symbols work immediately, without waiting for a live feed to accumulate data.
+
+If your holdings include symbols outside this list, historical chart data only exists from whenever a feed first collected it — or from whatever you entered manually.
+
+> **On upgrades:** when a WealthView release ships refreshed seed data, the price table is rebuilt from the seed file. Prices you entered by hand for other symbols are replaced along with it, so keep your own price CSVs if they are hard to reconstruct.
 
 ---
 
 ## Symbols Without Prices
 
-Some securities do not have publicly traded prices. The most common example is **money market funds** like SPAXX (Fidelity Government Money Market).
+### Money Market Funds
 
-For money market holdings:
+The most common case. Funds like SPAXX hold a stable $1.00 NAV and pay interest instead of trading, so no price exists to fetch.
 
-- Mark the holding as a money market fund on the account detail page (see [Investment Accounts](investment-accounts.md) for details).
-- WealthView values the holding using cost basis rather than looking up a market price.
-- Portfolio history charts **skip** money market and other unpriced symbols, since there is no meaningful price series to graph.
+WealthView detects these automatically from the ticker — **SPAXX, FDRXX, FZFXX, VMFXX, VMMXX, SWVXX, SNVXX, SPRXX** — and flags the holding. You do not configure anything. See [Investment Accounts](investment-accounts.md#money-market-funds) for what changes on screen.
 
-If you see a holding valued at its cost basis on the dashboard, it likely means no price data exists for that symbol. You can either:
+In charts, money market holdings are **not** dropped: they are carried at a constant $1.00 per share, and the chart shows a note saying so. In account and net-worth totals they fall back to cost basis, which for a $1 NAV fund is the same thing.
 
-1. Enter prices manually on the Prices page.
-2. Ensure the Finnhub feed is configured and the symbol is supported.
-3. Mark the holding as a money market fund if appropriate.
+### Everything Else
+
+If a holding shows `—` in the Price column, WealthView has no price on record for that symbol. Your options:
+
+1. Add prices manually on the **Prices** page (or ask an admin to).
+2. Check that the Finnhub feed is configured and that the symbol is one Finnhub covers — the **Price Sync Status** table under Admin → Prices will show it as missing or stale.
+3. Try the Yahoo Finance fallback for mutual funds and less common tickers.
+4. Bulk-load a history via **Admin → Prices → CSV Upload**.
+
+Symbols with no price data are excluded from portfolio history charts entirely rather than plotted at zero — which is why a chart can look "short" when one of your holdings has no data.
+
+---
+
+## Stock Splits
+
+WealthView detects and applies stock splits for you. You do not have to adjust anything by hand after a split.
+
+**What happens automatically.** A nightly job at 2:00 AM US Eastern checks every symbol the deployment has ever transacted in for new splits. When one is found:
+
+- Every transaction for that symbol dated on or before the effective date has its **share quantity** multiplied by the split ratio. The dollar amounts are left alone — you paid what you paid.
+- Holdings are recomputed from the adjusted transactions, so your position reflects the post-split share count.
+- Historical prices before the effective date are divided by the same ratio, which keeps long-term price charts from showing a fake cliff on the split date.
+
+**What you see.** A **Recent stock splits** panel at the bottom of the Dashboard lists splits affecting your portfolio, and each holding's detail page has a **Splits affecting *SYMBOL*** panel scoped to that one symbol. Both show:
+
+| Column | What It Shows |
+|--------|---------------|
+| **Symbol** | The ticker. |
+| **Effective date** | The date the split took effect. |
+| **Ratio** | Numerator:denominator — a 4:1 forward split reads `4:1`. |
+| **Source** | A coloured badge: *Auto-detected via Finnhub*, *Auto-detected via Yahoo*, *Manually entered*, or *Backfilled*. |
+
+If nothing has affected you, the panel simply says so and reminds you that new splits are detected automatically each night.
+
+**Two things worth knowing:**
+
+- Split detection depends on the Finnhub key. Without one, splits are not detected automatically and must be entered by a super-admin under **Admin → Stock Splits**.
+- A holding with the **manual override** flag set is skipped by the post-split recompute, because manual overrides always win over computed values. If you have manually overridden a holding and it later splits, you will need to update its quantity yourself.
 
 ---
 
 ## Portfolio History Charts
 
-Portfolio history charts show how your account values have changed over time. They appear in two places:
+Two charts use the stored price history. Both work the same way underneath and both are described in more detail in [Portfolio Analysis](portfolio-analysis.md).
 
-### Per-Account Chart
+### Per-Account: Theoretical Portfolio History
 
-On each account's detail page, a chart shows the historical value of that single account. It multiplies your current holdings by the daily price for each symbol to produce a value series.
+On each non-bank account's detail page. Prices that account's **current** holdings at each weekly point over a window you choose (6 months to 20 years, defaulting to 2 years).
 
-### Dashboard Combined Chart
+### Dashboard: Combined Portfolio History
 
-On the main dashboard, a combined chart aggregates the value across all your accounts. You can filter by time range to focus on recent performance or view the full history.
+On the Dashboard. Stacks investments and property equity across everything you own, over 1 to 10 years (defaulting to 2).
 
 ### How the Charts Work
 
-The charts use your **current holdings** applied against **historical prices**. This means:
+Both charts take the shares you hold **today** and value them at historical prices. This means:
 
-- If you bought 100 shares of VTI last month, the chart shows what those 100 shares would have been worth at every historical date where price data exists.
-- The chart does not reconstruct past holdings from transaction history — it uses today's positions.
-- Symbols without price data are excluded from the chart rather than plotted at zero.
+- If you bought 100 shares of VTI last month, the chart shows what those 100 shares would have been worth at every past date where price data exists.
+- The charts do **not** reconstruct your past holdings from transaction history — they use today's positions throughout.
+- Points are sampled weekly (each Friday), plus today, so the line always reaches the current date.
+- For any given week, a point is only drawn if a price exists for **every** priced symbol in the set. A symbol with sparse history can therefore shorten the whole chart.
+- Symbols with no price data at all are excluded rather than plotted at zero.
+- Balances in non-USD accounts are converted to USD at the rate an admin has configured.
 
 ### Time Range Filter
 
-You can filter portfolio history charts by time period (e.g., 1 year, 5 years, all time). This controls the date range of the x-axis without changing the underlying data.
+The dropdown in each chart's top-right corner changes the window. The per-account chart offers 6 Months, 1 / 2 / 3 / 5 / 10 / 20 Years; the dashboard chart offers 1 / 2 / 3 / 5 / 10 Years. Changing it reloads the chart with a fresh calculation over the new window.

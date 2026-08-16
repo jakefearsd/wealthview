@@ -6,7 +6,117 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Documentation
+- Repo-wide documentation truth pass: 58 files reconciled against the code they
+  describe. Most reference, user-guide and administration pages had not been
+  touched since 2026-03-14 and had accumulated five months of drift.
+  The corrections that mattered most:
+  - **API reference** was missing roughly 90 endpoints, documented six that do
+    not exist, and described the auth scheme backwards — it claimed tokens are
+    returned in the login body, when web auth is HttpOnly cookies with CSRF
+    double-submit and Bearer is the *mobile* transport.
+  - **Data model** documented 23 entities across 8 domains; the schema has 42
+    across 9. All of auth/MFA/sessions, stock splits, exchange rates, the
+    projection-realism tables, mortality, IRMAA and state tax were absent.
+  - **Projection docs** were wrong on the numbers that matter: confidence levels
+    (documented 90/80/70, actually 0.95/0.90/0.80), the definition of success
+    (it is the essential floor being funded every year), and a claim that tax
+    brackets are inflation-indexed "matching IRS COLA methodology" when the
+    engine is constant-real. `PoolStrategy.SinglePool` and
+    `IRMAA_BRACKET_RATE` were documented but do not exist.
+  - **Spending tiers** were documented as having per-tier inflation.
+    `TierBasedSpendingPlan.computeInflationFactor()` returns `1.0`
+    unconditionally — tier amounts are today's dollars held constant real.
+  - **PROJECT.md listed email alerts as shipped.** There is no mail sender in
+    the codebase; notification preferences are storage plus a GET/PUT endpoint,
+    with no delivery and no web UI. Moved to the roadmap.
+  - **Cost basis** was documented as "buys minus sells"; it is average cost, and
+    the worked example gave the wrong answer.
+  - `docs/reference/configuration.md` had been publishing a `JWT_SECRET` default
+    that `ProductionConfigValidator` actively rejects, plus
+    `SUPER_ADMIN_PASSWORD=admin123`. Both removed.
+  - Operator procedures across the administration and deployment guides now use
+    the `./wv` command surface rather than the ad-hoc scripts it replaced.
+  - `docs/DeploymentGuide.md`, an orphaned duplicate with no inbound links, is
+    now a routing index rather than a fourth copy of the deployment facts.
+
+### Security
+- `GET /api/v1/audit-log` now requires `admin` or `super_admin`. It carried no
+  matcher at all and fell through to `anyRequest().authenticated()`, so any
+  member or viewer could read the tenant's entire audit trail — every action by
+  every user, admin operations included — straight over HTTP. The web UI only
+  linked it from the admin area, which made it look gated; UI-only gating is not
+  access control. Covered by two new integration tests.
+- The bundled Prometheus/Grafana stack was collecting **nothing**, on every
+  profile except `loadtest`, for its entire existence. `prometheus.yml` scraped
+  with HTTP Basic, but the filter chain only ever accepted a JWT — Basic was
+  never enabled and there is no `UserDetailsService` — so every scrape got 401.
+  The configured scrape user (`super-admin@wealthview.local`) did not exist
+  either; the super admin is `admin@wealthview.local`. Nothing failed loudly:
+  monitoring was simply blind.
+
+  Rather than bolt a second authentication mechanism onto the app for metrics
+  alone, `/actuator/prometheus` and `/actuator/metrics` can now be opened
+  explicitly via `app.observability.anonymous-metrics`, **default false**.
+  `docker-compose.observability.yml` sets it, and the `basic_auth` block is gone.
+  **Where the flag is on, those two endpoints are unauthenticated** — keep the
+  app's port off the internet and block `/actuator` at the reverse proxy. A test
+  asserts the flag does not unlock the rest of `/actuator`. The old hardcoded
+  `loadtest`-profile carve-out in `SecurityConfig` collapsed into this same
+  property, so there is one mechanism instead of two.
+- `docker-compose.prod.yml` now fails loudly on missing secrets. `DB_PASSWORD`,
+  `JWT_SECRET`, `SUPER_ADMIN_PASSWORD` and `MFA_ENCRYPTION_KEY` used bare
+  `${VAR}`, so a missing prod secret silently became an empty string. Only the
+  `./wv` path was guarded, by `wv_env_check`; a direct `docker compose` had no
+  guard at all.
+
 ### Fixed
+- The daily price sync ran **twice every weekday**, burning double the Finnhub
+  quota. `PriceSyncService.syncDailyPrices()` carries its own `@Scheduled`
+  (18:00 ET), and a leftover `PriceSyncScheduler` wrapper in `wealthview-app`
+  scheduled a second call to it at 16:30 ET. The wrapper is deleted. A new
+  `PriceSyncSchedulingTest` classpath-scans for `@Scheduled` methods and asserts
+  exactly one trigger reaches the sweep, so a second one cannot creep back.
+- The Grafana latency panel and the `WealthViewHttpP99Latency` alert read empty
+  in production. `http.server.requests` histogram buckets were enabled only
+  under the `loadtest` profile, so `histogram_quantile` had no series to read —
+  an alert that could never fire looked exactly like healthy latency. Buckets
+  are now published on every profile.
+- The prod app container reported permanently `unhealthy`. `docker-compose.prod.yml`
+  overrode the image healthcheck with `curl`, which is not installed in the
+  `eclipse-temurin:25-jre-alpine` runtime. The override is deleted so the
+  Dockerfile's `wget` probe is the single definition and the two cannot drift
+  apart again. (Deploys were unaffected — `wv_wait_healthy` probes over HTTP from
+  the host.)
+- The backup retention sweep deleted on-demand backups. It matched
+  `wealthview_*.dump`, which is also what `wv backup` produces, so a manual
+  pre-change backup was aged out by the cron container. Scheduled dumps are now
+  `wealthview_auto_<ts>.dump` and the sweep only reclaims what it created, plus
+  the matching `.age` files it previously never pruned at all.
+- Members were shown an "Add Manual Price" form the server rejects with 403.
+  Prices are shared reference data aggregated across tenants, so the server rule
+  is right and the client gate was wrong; it now matches admin/super-admin.
+- Super admins saw no write controls on accounts, holdings or property detail.
+  Four pages omitted `super_admin` from their gate while the server permits it.
+  The role predicate is now a single shared helper rather than five copies.
+- `JAVA_OPTS` was silently ignored — the exec-form `ENTRYPOINT` has no shell to
+  expand it. The Dockerfile now documents `JAVA_TOOL_OPTIONS` as the supported
+  knob and warns against "fixing" it with `sh -c`, which would regress signal
+  handling and graceful shutdown.
+- `ExchangeRateResolver` told users to add a missing rate "in Settings" — a page
+  that no longer exists. It now points at Admin → Exchange Rates.
+- `LtcgBracketEntity` inherited a `precision = 5` mapping for `rate` while
+  `ltcg_brackets.rate` is `numeric(6,4)`. Corrected with an `@AttributeOverride`;
+  no migration was touched.
+- `shared/src/api/types.ts` declared `device_label` on `RegisterRequest`; the
+  backend record has only email, password and invite code. (It is genuine on
+  `LoginRequest` and was left alone.)
+- `wv help` no longer advertises `MFA_ENCRYPTION_KEY` as a `rotate-secret`
+  target. `rotate-secret.sh` accepts only `JWT_SECRET`, `SUPER_ADMIN_PASSWORD`
+  and `DB_PASSWORD`, and rejects anything else — rotating the MFA key would
+  make every stored TOTP secret undecryptable, which the help text now says.
+- `mobile/.sdkmanrc` comment said "React Native 0.85.x"; the workspace is on
+  0.87.0. The pinned JDK (17) was already correct.
 - `GET /actuator/prometheus` no longer returns 500 after a guardrail
   optimization. `MonteCarloSpendingOptimizer.optimize` carried both `@Timed`
   and `@Observed` under one meter name; both register a timer, and because only

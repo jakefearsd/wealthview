@@ -15,14 +15,15 @@ NAT / CG-NAT, you can't forward ports 80/443, or you prefer to let Cloudflare
 handle certificates.
 
 Before you start, complete [production-setup.md](production-setup.md) Steps
-1–5. Running `curl http://localhost/actuator/health` on the server should
+1–6. Running `curl http://localhost/actuator/health` on the server should
 return `{"status":"UP"}`.
 
 **A note on where nginx runs:** this guide installs nginx directly on the
-host (as a native system package), not as a Docker container. Some older
-versions of our docs implied nginx lived in `docker-compose.prod.yml` — it
-does not. Running nginx on the host is simpler for certificate renewals and
-keeps the app's Docker environment focused on WealthView itself.
+host (as a native system package), not as a Docker container. Neither
+`docker-compose.yml` nor `docker-compose.prod.yml` defines an nginx service —
+grep them and you will find no mention of it. Running nginx on the host is
+simpler for certificate renewals and keeps the app's Docker environment focused
+on WealthView itself.
 
 ---
 
@@ -39,9 +40,9 @@ keeps the app's Docker environment focused on WealthView itself.
 
 ## Step 1: Change the app's port to not conflict with nginx
 
-nginx will take port 80 and 443 on the public interface. WealthView's `app`
-container currently also publishes `80:8080`. Move the container to a
-non-conflicting loopback port.
+nginx will take ports 80 and 443 on the public interface. The `app` service in
+`docker-compose.prod.yml` publishes `${APP_PORT:-80}:8080`, so by default it is
+already on port 80. Move it to a non-conflicting loopback port.
 
 Edit `.env`:
 
@@ -49,7 +50,11 @@ Edit `.env`:
 APP_PORT=8080
 ```
 
-Edit `docker-compose.prod.yml` so the port mapping binds to loopback only
+`APP_PORT` is only honoured by `docker-compose.prod.yml`. The dev file
+`docker-compose.yml` hardcodes `80:8080` and ignores the variable — this guide
+assumes you are on the production compose file.
+
+Now edit `docker-compose.prod.yml` so the port mapping binds to loopback only
 (not the public interface):
 
 ```yaml
@@ -57,7 +62,7 @@ services:
   app:
     # ...
     ports:
-      - "127.0.0.1:${APP_PORT:-8080}:8080"
+      - "127.0.0.1:${APP_PORT:-80}:8080"
 ```
 
 The `127.0.0.1:` prefix is important — it ensures the app is only reachable
@@ -68,6 +73,15 @@ Restart the app:
 
 ```bash
 docker compose -f docker-compose.prod.yml up -d app
+```
+
+Tell `wv` where to probe for health, so `./wv up`, `./wv status`, and
+`./wv update` don't look on port 80. Either set `APP_PORT` (which `wv` reads
+from the env file) — already done above — or, if nginx is terminating in front,
+pin the full URL in `wv.conf`:
+
+```
+WV_HEALTH_URL=https://wealthview.example.com/actuator/health
 ```
 
 Verify from the host:
@@ -271,11 +285,17 @@ Inside the `server { listen 443 ssl; ... }` block, add:
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 ```
 
-Note: WealthView's Spring Boot layer already emits
-`Content-Security-Policy`, `Permissions-Policy`, and `X-Content-Type-Options`
-headers on every response. The headers above are **duplicates at the nginx
-layer** and act as belt-and-suspenders for any request path that bypasses
-Spring (e.g. nginx-served error pages). It is safe to have both.
+Note: WealthView's Spring Boot layer (`SecurityConfig`) already emits
+`Strict-Transport-Security` (`max-age=31536000; includeSubDomains; preload`),
+`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
+`Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()`, and
+a `Content-Security-Policy` of
+`default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`.
+
+Four of the headers above are therefore **duplicates at the nginx layer**, and
+act as belt-and-suspenders for any request path that bypasses Spring (e.g.
+nginx-served error pages). It is safe to have both. `Referrer-Policy` is the
+one the app does **not** set, so nginx is its only source.
 
 Reload:
 
@@ -299,11 +319,28 @@ You should see all six.
 
 ```dotenv
 # The public HTTPS URL is now the allowed origin for /api/* requests.
+# Required on the prod profile: empty or non-https:// aborts startup.
 CORS_ORIGIN=https://wealthview.example.com
 
 # nginx is the immediate peer — trust its forwarded client IP.
 APP_RATE_LIMIT_TRUSTED_PROXIES=127.0.0.1
 ```
+
+`CORS_ORIGIN` is already listed in the `app` service's `environment:` block, so
+it reaches the container as soon as you restart. **`APP_RATE_LIMIT_TRUSTED_PROXIES`
+is not.** Compose passes only the variables a service explicitly lists, so
+setting it in `.env` alone does nothing. Add it to `docker-compose.prod.yml`:
+
+```yaml
+services:
+  app:
+    environment:
+      # ...existing entries...
+      APP_RATE_LIMIT_TRUSTED_PROXIES: ${APP_RATE_LIMIT_TRUSTED_PROXIES:-}
+```
+
+Spring's relaxed binding maps that env name onto the
+`app.rate-limit.trusted-proxies` property that `ClientIpResolver` reads.
 
 Restart the app so Spring picks up the new env vars:
 
@@ -311,10 +348,20 @@ Restart the app so Spring picks up the new env vars:
 docker compose -f docker-compose.prod.yml up -d app
 ```
 
-Without `APP_RATE_LIMIT_TRUSTED_PROXIES=127.0.0.1`, login audit and rate
-limit records will log the loopback IP instead of the real client IP
-(because every request technically arrives from nginx, which runs on
-localhost).
+Without the trusted-proxy setting, login audit and rate limit records log the
+proxy's IP instead of the real client IP — because every request technically
+arrives from nginx. `ClientIpResolver` only honours `X-Forwarded-For` when the
+connecting peer is in the trusted list.
+
+> **Confirm the peer IP rather than assuming `127.0.0.1`.** nginx runs on the
+> host and connects to a *published* container port, so Docker NATs the
+> connection and the container may see the bridge network's gateway address
+> (something in `172.x.x.x`) rather than loopback. The value you need is
+> whatever the app actually observes as the remote address. Log in once and
+> read the IP recorded against that login in **Admin → Login Activity**; that
+> is the address to put in `APP_RATE_LIMIT_TRUSTED_PROXIES`. Set it, restart,
+> log in again, and confirm the recorded IP has switched to your real client
+> address.
 
 ---
 
@@ -394,18 +441,39 @@ by `python3-certbot-nginx` the first time it runs.)
 
 ---
 
-## About `nginx-prod.conf` in the repo
+## About the two `nginx*.conf` files in the repo
 
-The repo contains a file called `nginx-prod.conf` at its root. This is a
-reference config for people who prefer to run nginx **inside** a Docker
-container alongside WealthView (rather than on the host). It is not wired
-into `docker-compose.prod.yml` by default and you can ignore it if you
-followed this guide.
+The repo root holds `nginx.conf` and `nginx-prod.conf`. **Neither is
+referenced by any compose file or by the `Dockerfile`** — they are reference
+configs for running nginx *inside* a container alongside WealthView, and you
+can ignore both if you followed this guide.
 
-If you do want to run nginx in Docker, copy `nginx-prod.conf` into a bind
-mount and add a service in a Compose override. The certificate lifecycle
-is tricker in that setup (you need a `certbot` container too and a shared
-volume). Most home-lab / small-team deployments are better served by
+If you are curious what they actually contain:
+
+**`nginx-prod.conf`** — a two-server-block TLS config:
+
+- Port 80 server: serves `/.well-known/acme-challenge/` from `/var/www/certbot`
+  (a webroot-mode certbot layout, not the `--nginx` plugin layout this guide
+  uses), and 301-redirects everything else to HTTPS.
+- Port 443 server: `ssl_protocols TLSv1.2 TLSv1.3`, HSTS with `preload`,
+  `X-Content-Type-Options`, `X-Frame-Options: DENY`, and `Referrer-Policy`.
+  Both `/api/` and `/` proxy to `http://app:8080` — the Docker service name, so
+  it only resolves from inside the compose network.
+- `server_name _` (matches any host) and the certificate paths are
+  `/etc/letsencrypt/live/**wealthview**/fullchain.pem` and `privkey.pem` — note
+  the literal directory name `wealthview`, not your domain. certbot names that
+  directory after the first `-d` argument, so you would need
+  `--cert-name wealthview` to make the paths line up.
+
+**`nginx.conf`** — a plain-HTTP config that serves a static SPA build from
+`/usr/share/nginx/html` and proxies `/api/` to `http://app:8080`. It predates
+the current single-image layout, where the Spring Boot container serves the
+built frontend itself from `/app/static`. There is nothing to bind-mount that
+directory from in the shipped compose files.
+
+To actually use either, you would add an nginx service in a Compose override,
+bind-mount the config, and add a `certbot` container plus a shared certificate
+volume. Most home-lab / small-team deployments are better served by
 nginx-on-host as described above or by [Cloudflare Tunnel](cloudflared.md).
 
 ---
@@ -447,8 +515,10 @@ than the one in the `app` service's `ports:` mapping. They must match.
 
 ### Login audit rows show `127.0.0.1` instead of the real user IP
 
-Set `APP_RATE_LIMIT_TRUSTED_PROXIES=127.0.0.1` in `.env` and restart the
-app. See [Step 8](#step-8-update-wealthviews-env).
+Set `APP_RATE_LIMIT_TRUSTED_PROXIES=127.0.0.1` in `.env` **and** add it to the
+`app` service's `environment:` block in `docker-compose.prod.yml`, then restart
+the app. Setting it in `.env` alone has no effect. See
+[Step 8](#step-8-update-wealthviews-env).
 
 ### Certificate renewal fails
 
@@ -474,5 +544,7 @@ sudo systemctl reload nginx
 ## Related guides
 
 - [Production Setup](production-setup.md) — overall deployment walkthrough.
+- [Operations Handbook](operations.md) — the `wv` command surface, including
+  `WV_HEALTH_URL` for probing through the proxy.
 - [Cloudflared Deployment](cloudflared.md) — alternative: no open ports.
 - [Security Hardening](security-hardening.md) — host + app-level security.

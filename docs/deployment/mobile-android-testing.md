@@ -8,11 +8,24 @@ iOS deployment is deferred until first release; that section is a placeholder at
 
 | Tool | Version | Notes |
 |---|---|---|
-| Android Studio | Panda Feature Drop (2025.3.4+) | Installed at `~/android-studio/`. Launchable from the apps menu (entry created at `~/.local/share/applications/android-studio.desktop`) or via `studio.sh` once `~/android-studio/bin` is on PATH. |
-| JDK | 17.0.x via SDKMAN | RN 0.85 requires JDK 17. Backend uses JDK 25. SDKMAN auto-switches based on `mobile/.sdkmanrc`. |
-| Node | 22.11+ | Same engine pin as the rest of the monorepo. |
-| Android phone | Android 9+ | Older versions also work but cleartext-HTTP behaviour differs. |
+| React Native | 0.87.0 | Pinned in `mobile/package.json` (`react-native`, `@react-native/*` tooling, and `@react-native/new-app-screen` all on 0.87.0). React 19.2.x. |
+| Android Studio | Recent enough to install SDK Platform 37 | Installed at `~/android-studio/`. Launchable from the apps menu (entry created at `~/.local/share/applications/android-studio.desktop`) or via `studio.sh` once `~/android-studio/bin` is on PATH. |
+| JDK | 17.0.19-tem via SDKMAN | Declared in `mobile/.sdkmanrc`. The backend uses JDK 25 (`backend/.sdkmanrc`); SDKMAN auto-switches per directory. |
+| Node | ≥ 22.13.0 | `engines` in `mobile/package.json`. |
+| Gradle | 9.4.1 | Via the wrapper — don't install it separately, use `./gradlew`. |
+| Android phone | Android 9+ (`minSdkVersion = 24` allows 7.0+) | Older versions also work but cleartext-HTTP behaviour differs. |
 | `adb` on `PATH` | from platform-tools | `adb devices` should list your phone after USB debugging is enabled. Installed alongside the SDK by Studio's first-run wizard. |
+
+Android SDK versions come from `mobile/android/build.gradle`:
+
+| Property | Value |
+|---|---|
+| `compileSdkVersion` | 37 |
+| `targetSdkVersion` | 36 |
+| `minSdkVersion` | 24 |
+| `buildToolsVersion` | 37.0.0 |
+| `ndkVersion` | 27.1.12297006 |
+| `kotlinVersion` | 2.2.0 |
 
 ### One-time machine setup (already done on the dev workstation)
 
@@ -33,7 +46,7 @@ tar -xzf /tmp/studio.tgz -C ~
 #   export PATH="$HOME/android-studio/bin:$PATH"
 ```
 
-The `mobile/.sdkmanrc` file in this repo declares `java=17.0.19-tem`. With `sdkman_auto_env=true`, every `cd` into `mobile/` switches the shell's JDK automatically; `cd ..` reverts to JDK 25 for backend work.
+The `mobile/.sdkmanrc` file in this repo declares `java=17.0.19-tem`. With `sdkman_auto_env=true`, every `cd` into `mobile/` switches the shell's JDK automatically; `cd backend` picks up `backend/.sdkmanrc` (JDK 25) for backend work.
 
 ### Android Studio first-run wizard (one-time, GUI)
 
@@ -47,17 +60,18 @@ The `mobile/.sdkmanrc` file in this repo declares `java=17.0.19-tem`. With `sdkm
 
 ### Install the Android API levels RN needs (also one-time, GUI)
 
-The Standard wizard installs the latest SDK platform Studio's release ships with — that's not always the version this repo's `mobile/android/build.gradle` pins (today: `compileSdk = 36`, `buildToolsVersion = 36.0.0` — i.e. Android 16). If they don't match, `npm run android` fails with an unhelpful Gradle error pointing at a missing platform.
+The Standard wizard installs the latest SDK platform Studio's release ships with — that's not always the version this repo's `mobile/android/build.gradle` pins (today: `compileSdkVersion = 37`, `buildToolsVersion = 37.0.0`, `targetSdkVersion = 36`). If they don't match, `npm run android` fails with an unhelpful Gradle error pointing at a missing platform.
 
 From the **Welcome to Android Studio** screen:
 
 1. Click **More Actions** (top-right of the project list) → **SDK Manager**. (The SDK Manager is hidden behind this dropdown when no project is open; once a project is open it lives under Tools → SDK Manager.)
 2. **SDK Platforms** tab — tick at least:
-   - **Android 16 (API 36)** — required, matches the repo's `compileSdk`.
-   - **Android 15 (API 35)** — recommended for compatibility testing one version back.
+   - **API 37** — required, matches the repo's `compileSdkVersion`.
+   - **Android 16 (API 36)** — the repo's `targetSdkVersion`; useful for emulator images.
 3. **SDK Tools** tab — verify these are present (install if missing):
    - **Android SDK Command-line Tools (latest)** — gives you `sdkmanager` on the CLI.
-   - **Android SDK Build-Tools** at version 36.0.0.
+   - **Android SDK Build-Tools** at version 37.0.0.
+   - **NDK (Side by side)** at 27.1.12297006 — the version `build.gradle` pins.
    - **Android Emulator** (only if you want to use an emulator instead of a physical phone).
 4. Apply → accept licenses → wait for the download (~1-2 GB depending on what was missing).
 
@@ -65,10 +79,10 @@ After this, **open a new terminal** so `ANDROID_HOME` and the `platform-tools` P
 
 ```bash
 adb --version             # should print Android Debug Bridge version 1.0.x
-sdkmanager --version      # should print 20.0 (or similar)
-echo "$ANDROID_HOME"      # should print /home/jakefear/Android/Sdk
-sdkmanager --list_installed | grep -E "platforms|build-tools"
-# should show platforms;android-36 and build-tools;36.0.0 at minimum
+sdkmanager --version
+echo "$ANDROID_HOME"      # e.g. /home/<you>/Android/Sdk
+sdkmanager --list_installed | grep -E "platforms|build-tools|ndk"
+# should show platforms;android-37, build-tools;37.0.0 and ndk;27.1.12297006
 ```
 
 On the phone:
@@ -110,47 +124,50 @@ The first launch shows the Server URL screen. To talk to your local backend:
 
    Look for an address on your home subnet — usually `192.168.x.y` or `10.0.x.y`.
 
-2. Make sure the backend is running and bound to all interfaces. `./wv up` from the repo root binds to `0.0.0.0:80` so any host on the LAN can reach it.
+2. Make sure the backend is running and bound to all interfaces. `./wv up` from the repo root starts the dev stack, whose `app` service publishes `80:8080` with no address restriction — so it listens on all interfaces and any host on the LAN can reach it.
 
-3. On the phone, enter the URL into the Server URL field. Examples:
+3. On the phone, enter the URL into the Server URL field. It must parse as an `http:`/`https:` URL with a host — `ServerConfigScreen` rejects anything else. Examples:
    - `http://192.168.1.50` — typical home LAN
    - `http://10.0.2.2` — Android emulator's host gateway (not for physical devices)
    - `https://wealthview.example.com` — Cloudflare-tunnelled or otherwise TLS-terminated deployment
 
-4. Sign in with the seeded demo credentials:
+4. Sign in with the seeded demo credentials. The mobile client authenticates against `POST /api/v1/auth/token/login` (the token-based endpoints in `AuthMobileController`), not the cookie-based web ones.
    - **Email:** `demo@wealthview.local`
    - **Password:** `demo123`
+
+   These are seeded by `SampleDataInitializer`, which runs on the `dev` and `docker` profiles only — so they exist against a local `./wv up` stack, not against a `prod` deployment.
 
 ### What you should see
 
 After login you'll land on the **Portfolio** tab showing your net worth and accounts grouped by category (Investment Accounts / Cash / Other). Pull down to refresh. Tap any account card to see its details. The **Settings** tab lets you change the server URL or log out.
 
-If the Portfolio screen lands on the empty state ("No accounts yet"), the demo data probably hasn't seeded yet — confirm `SampleDataInitializer` ran in the backend logs (`docker compose logs app | grep -i sample`).
+If the Portfolio screen lands on the empty state ("No accounts yet"), the demo data probably hasn't seeded yet — confirm `SampleDataInitializer` ran in the backend logs (`./wv logs --no-follow app | grep -i sample`).
 
 ## 4. HTTP-vs-HTTPS gotcha
 
-Android 9+ blocks plaintext HTTP traffic by default. The RN scaffold sets `usesCleartextTraffic="true"` only for `localhost` and `10.0.2.2` (the emulator gateway). For an arbitrary LAN IP, you need to allowlist your subnet explicitly **for debug builds only**.
+Android 9+ blocks plaintext HTTP traffic by default, and the app opts back in via the manifest placeholder `android:usesCleartextTraffic="${usesCleartextTraffic}"` in `mobile/android/app/src/main/AndroidManifest.xml`. React Native's Gradle plugin fills that placeholder for you: **`true` for the `debug` and `debugOptimized` build types, `false` for `release`**. There is no per-domain allowlist involved — a debug build permits cleartext to *any* host, including an arbitrary LAN IP.
 
-Drop this file at `mobile/android/app/src/main/res/xml/network_security_config.xml`:
+So for the normal `npm run android` debug workflow, plain `http://192.168.x.y` just works. If "Network request failed" hits you in debug mode, look at the backend URL, LAN reachability, and firewall before you suspect cleartext.
+
+Where it *does* bite: a **release** build (`assembleRelease`, §5) has `usesCleartextTraffic="false"` and will refuse any `http://` server URL. The right answer there is to terminate TLS at the edge and use `https://`. If you must sideload a release build against a plaintext LAN backend, add a scoped exception rather than flipping cleartext on globally.
+
+Drop this file at `mobile/android/app/src/main/res/xml/network_security_config.xml` (neither the `res/xml/` directory nor the file exists in the repo — you are creating both):
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Cleartext is allowed for these subnets in debug builds only.
-         Release builds rely on HTTPS (Cloudflare Tunnel, real TLS, etc.). -->
+    <!-- Narrow cleartext exceptions. `<domain>` entries are hostnames or
+         literal IPs — not CIDR ranges — so list the exact addresses you use. -->
     <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">10.0.2.2</domain>
         <domain includeSubdomains="true">localhost</domain>
-        <!-- LAN ranges. Trim to whichever subnet your home network uses. -->
-        <domain includeSubdomains="true">192.168.0.0</domain>
-        <domain includeSubdomains="true">192.168.1.0</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <!-- Your dev machine's LAN IP. Replace with the real one. -->
         <domain includeSubdomains="true">192.168.1.50</domain>
-        <domain includeSubdomains="true">10.0.0.0</domain>
     </domain-config>
 </network-security-config>
 ```
 
-Reference it from `AndroidManifest.xml` in the `<application>` tag (debug variant only — Android Studio's flavour system can scope this to `src/debug/AndroidManifest.xml`):
+Reference it from `AndroidManifest.xml` in the `<application>` tag. `mobile/android/app/src/` currently contains only `main/`, so to scope this to debug builds you first create a `src/debug/AndroidManifest.xml` that AGP merges over the main one:
 
 ```xml
 <application
@@ -171,7 +188,9 @@ cd mobile/android
 
 The APK lands in `mobile/android/app/build/outputs/apk/release/app-release.apk`. Copy it to the phone (USB, AirDroid, email-to-self, etc.) and tap to install — the phone will prompt for "Install from unknown sources" the first time.
 
-**Signing.** The scaffold's `release` build type currently reuses the debug keystore so `assembleRelease` succeeds out of the box. For a real sideload you should generate your own keystore:
+Two things about this build type, both visible in `mobile/android/app/build.gradle`: `enableProguardInReleaseBuilds` is `false`, so nothing is minified; and `usesCleartextTraffic` resolves to `false`, so the server URL must be `https://` unless you added the exception in §4.
+
+**Signing.** The scaffold's `release` build type reuses `signingConfigs.debug` (storeFile `debug.keystore`, alias `androiddebugkey`, password `android`) so `assembleRelease` succeeds out of the box. That is a placeholder, not a release configuration. For a real sideload, generate your own keystore:
 
 ```bash
 keytool -genkeypair -v \
@@ -187,9 +206,12 @@ Place the keystore **outside** the repo (e.g. `~/.android/wealthview-release.key
 | Symptom | Cause / fix |
 |---|---|
 | `Unable to load script` | Metro isn't running, or the phone can't reach the dev machine on port 8081. Try `adb reverse tcp:8081 tcp:8081`. |
-| `Network request failed` on login | Backend URL wrong, cleartext blocked by Android (see §4), or backend bound only to `localhost`. Confirm with `curl http://<lan-ip>:80/actuator/health` from another LAN device. |
-| App crashes on launch | Check `adb logcat | grep -i react`. Often a missing native module: `cd mobile/android && ./gradlew clean` and rebuild. |
+| `Network request failed` on login (debug build) | Backend URL wrong, host firewall, or the backend isn't up. Cleartext is *not* the cause in a debug build (see §4). Confirm with `curl http://<lan-ip>/actuator/health` from another LAN device. |
+| `Network request failed` on login (release build) | `usesCleartextTraffic` is `false` in release. Use an `https://` URL or add the scoped exception in §4. |
+| App crashes on launch | Check `adb logcat \| grep -i react`. Often a missing native module: `cd mobile/android && ./gradlew clean` and rebuild. |
+| Gradle error about a missing platform / build-tools | The SDK Manager didn't install what `mobile/android/build.gradle` pins. You need platform 37, build-tools 37.0.0, and NDK 27.1.12297006. |
 | `SDK location not found` | Set `ANDROID_HOME` to your SDK path (e.g. `~/Android/Sdk` on Linux, `~/Library/Android/sdk` on macOS) and add `$ANDROID_HOME/platform-tools` to `PATH`. |
+| Gradle picks the wrong JDK | `mobile/.sdkmanrc` pins `17.0.19-tem`. Confirm with `java -version` inside `mobile/`; the backend's JDK 25 will not build the Android project. |
 | Login succeeds but Dashboard shows blank | The `/auth/me` round-trip on focus is failing silently. Check `adb logcat` for axios errors and confirm rate limits aren't tripping (`X-RateLimit-Remaining`). |
 | Tokens "stick" after backend restart | The backend bumps `token_generation` on restart only if you've also rotated `JWT_SECRET`. Otherwise pull-to-refresh / re-login should clear it. If it doesn't, `Settings → Log out` wipes the keychain. |
 
@@ -208,6 +230,6 @@ cd mobile/ios && pod install
 cd ..        && npm run ios
 ```
 
-Sideload-to-physical-iPhone via Xcode requires opening `mobile/ios/MobileApp.xcworkspace` and signing the build with a personal team. App Store distribution requires an App ID, provisioning profile, and an archive build through Xcode's Organizer.
+`mobile/ios/` currently holds `MobileApp.xcodeproj` and a `Podfile`; `pod install` is what generates `MobileApp.xcworkspace`. Sideload-to-physical-iPhone via Xcode requires opening that workspace and signing the build with a personal team. App Store distribution requires an App ID, provisioning profile, and an archive build through Xcode's Organizer.
 
 This document will be expanded with the concrete iOS instructions when the user is ready to ship to TestFlight.

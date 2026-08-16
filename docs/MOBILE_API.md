@@ -4,20 +4,38 @@ This document is the contract between the WealthView backend and any native
 mobile client. The web frontend uses cookie-based auth; native clients use
 the parallel token-in-body endpoints described here.
 
-The cookie endpoints (`/api/v1/auth/login`, `/api/v1/auth/refresh`,
-`/api/v1/auth/logout`) are unchanged and remain the recommended path for
-browser clients. Native apps SHOULD use the `/api/v1/auth/token/**`
-endpoints below.
+The cookie endpoints (`/api/v1/auth/login`, `/api/v1/auth/register`,
+`/api/v1/auth/refresh`, `/api/v1/auth/logout`, `/api/v1/auth/mfa/challenge`)
+are unchanged and remain the recommended path for browser clients. Native
+apps SHOULD use the `/api/v1/auth/token/**` endpoints below. Both
+controllers delegate to the same `AuthService` — the only difference is
+where the tokens end up (HttpOnly cookies vs. the response body).
 
 ## Auth endpoints
 
-| Method | Path                          | Auth          | Request body                               | Response body |
-|--------|-------------------------------|---------------|--------------------------------------------|---------------|
-| POST   | `/api/v1/auth/token/login`    | none          | `{email, password}`                        | `MobileAuthResponse` (200) |
-| POST   | `/api/v1/auth/token/register` | none          | `{email, password, invite_code}`           | `MobileAuthResponse` (201) |
-| POST   | `/api/v1/auth/token/refresh`  | none          | `{refresh_token}`                          | `MobileAuthResponse` (200) |
-| POST   | `/api/v1/auth/token/logout`   | Bearer        | (empty)                                    | (empty, 204) |
-| GET    | `/api/v1/auth/me`             | Bearer or Cookie | (none)                                  | `CurrentUserResponse` (200) |
+| Method | Path                                 | Auth          | Request body                                          | Response body |
+|--------|--------------------------------------|---------------|-------------------------------------------------------|---------------|
+| POST   | `/api/v1/auth/token/login`           | none          | `{email, password, device_label?}`                    | `MobileAuthResponse` OR `MfaRequiredResponse` (200) |
+| POST   | `/api/v1/auth/token/mfa/challenge`   | none          | `{mfa_token, totp_code}` or `{mfa_token, recovery_code}` | `MobileAuthResponse` (200) |
+| POST   | `/api/v1/auth/token/register`        | none          | `{email, password, invite_code}`                      | `MobileAuthResponse` (201) |
+| POST   | `/api/v1/auth/token/refresh`         | none          | `{refresh_token}`                                     | `MobileAuthResponse` (200) |
+| POST   | `/api/v1/auth/token/logout`          | Bearer        | (empty)                                               | (empty, 204) |
+| GET    | `/api/v1/auth/me`                    | Bearer or Cookie | (none)                                             | `CurrentUserResponse` (200) |
+
+That is the complete `/api/v1/auth/token/**` surface — there is no `GET /me`
+under the `token` prefix, and no separate mobile session or MFA-management
+controller. Everything else mobile needs lives on the shared paths
+(`/api/v1/auth/me`, `/api/v1/auth/sessions`, `/api/v1/auth/mfa/**`), all of
+which accept a Bearer token.
+
+Request-body validation (Jakarta Bean Validation, enforced with `@Valid`):
+
+- `email` — not blank, must parse as an email address.
+- `password` — not blank on login; 8–64 characters on register.
+- `invite_code` — not blank on register. Register does **not** accept
+  `device_label`.
+- `device_label` — optional on login, max 64 characters.
+- `mfa_token` — not blank. `totp_code` 6–8 chars, `recovery_code` exactly 8.
 
 `MobileAuthResponse` is JSON with `snake_case` field names (Jackson global
 strategy):
@@ -33,6 +51,17 @@ strategy):
 }
 ```
 
+`MfaRequiredResponse` — the other branch of `POST .../token/login`, returned
+with HTTP 200 when the account has TOTP MFA enabled. Clients MUST branch on
+the presence of `mfa_required` before treating the body as a token pair:
+
+```json
+{
+  "mfa_required": true,
+  "mfa_token": "<short-lived jwt>"
+}
+```
+
 `CurrentUserResponse`:
 
 ```json
@@ -43,6 +72,10 @@ strategy):
   "role": "member"
 }
 ```
+
+`role` is one of `admin`, `member`, `viewer`, or the synthetic
+`super_admin` (which is derived at token-issue time, not a stored
+`users.role` value).
 
 `GET /api/v1/auth/me` works for both transports. It is the recommended
 "am I logged in?" check on app launch — it round-trips the token through
@@ -66,8 +99,9 @@ but is **not** required for Bearer-authenticated requests — the
 exempts the request.
 
 CORS is not a factor for native clients (no `Origin` header). Rate
-limiting buckets per-user-id when authenticated, so it works identically
-for cookie and Bearer transports.
+limiting buckets on the authenticated user (the principal's email) rather
+than on the transport, so it behaves identically for cookie and Bearer
+callers.
 
 ## Token lifetimes
 
@@ -113,9 +147,15 @@ Implementation hints for the client interceptor:
 - Serialize concurrent refresh attempts. If multiple requests 401 at the
   same time, only one should call `/refresh`; the others wait for that
   call and then retry.
-- The refresh response **rotates both tokens**. The previous refresh
-  token is invalidated server-side (`token_generation` increment); reusing
-  it returns 401.
+- The refresh response **rotates both tokens**. Every successful refresh
+  increments the user's `token_generation`, which invalidates the previous
+  refresh token *and* the previous access token — so overwrite both from
+  the refresh response rather than keeping the old access token around.
+- Two concurrent refreshes lose the optimistic-lock race server-side. The
+  loser gets 401 `UNAUTHORIZED` ("Refresh token has been revoked"), not a
+  second valid pair. This is exactly why the client must serialize refreshes.
+- Refresh keeps the device's `user_sessions` row stable — rotating a token
+  does not spawn a new session entry.
 
 ## Token storage
 
@@ -132,6 +172,11 @@ platform-managed secure storage:
 
 Access tokens may be held in memory for the session and re-derived from a
 successful refresh on app resume.
+
+The in-repo React Native client satisfies this with
+`react-native-keychain` (`mobile/src/auth/tokenStorage.ts`), storing the
+access token, refresh token, and cached identity under three separate
+`com.wealthview.mobile.*` service keys.
 
 ## Logout
 
@@ -155,14 +200,23 @@ All error responses use the standard envelope:
 
 Examples mobile clients should be ready for:
 
-| Status | `error`            | When |
-|--------|--------------------|------|
-| 401    | `UNAUTHORIZED`     | Invalid credentials, missing/expired Bearer token, revoked refresh token |
-| 403    | `FORBIDDEN`        | Authenticated but role lacks permission for this endpoint |
-| 400    | `VALIDATION_FAILED`| Request body fails Bean Validation (e.g., missing `email`) |
-| 409    | `CONFLICT`         | Duplicate email on register |
-| 429    | `RATE_LIMITED`     | Too many requests for this principal/IP |
-| 5xx    | `INTERNAL_ERROR`   | Server fault. Retry with exponential backoff. |
+The `error` codes below are the exact strings emitted by
+`GlobalExceptionHandler` — match on these, not on the human-readable
+`message`, which is not part of the contract.
+
+| Status | `error`                | When |
+|--------|------------------------|------|
+| 400    | `BAD_REQUEST`          | Request body fails Bean Validation (e.g. missing `email`), an unparseable body, a bad query-param type, or a rejected argument (`IllegalArgumentException`). |
+| 401    | `UNAUTHORIZED`         | Invalid credentials, missing/expired Bearer token, revoked or reused refresh token, failed MFA code. |
+| 403    | `FORBIDDEN`            | Authenticated but role lacks permission for this endpoint, or a cross-tenant access attempt. |
+| 404    | `NOT_FOUND`            | Entity does not exist, or exists but isn't the caller's (see per-device sessions below). |
+| 409    | `CONFLICT`             | Duplicate entity (e.g. email already registered) or an illegal-state conflict. |
+| 429    | `RATE_LIMITED`         | Too many requests for this principal/IP. |
+| 5xx    | `INTERNAL_SERVER_ERROR`| Server fault. Retry with exponential backoff. |
+
+Note that Bean Validation failures come back as `BAD_REQUEST`, not a
+dedicated validation code; the `message` carries `field: reason` pairs
+joined by `; `.
 
 ## Per-device sessions
 
@@ -177,9 +231,26 @@ way `token_generation` does.
 | DELETE | `/api/v1/auth/sessions/{id}`          | Bearer or Cookie    | Revokes one session. Returns 404 if the id doesn't belong to the caller (avoids cross-tenant existence oracle). |
 | DELETE | `/api/v1/auth/sessions`               | Bearer or Cookie    | "Log out everywhere else." Revokes every active session except the caller's current one. |
 
-Optional `device_label` field on `POST /api/v1/auth/{token,}/login`
-(max 64 chars) is surfaced in the session list so users can recognize
-their own devices.
+`GET /api/v1/auth/sessions` returns a bare JSON array (no pagination
+envelope) of:
+
+```json
+{
+  "id": "3f2c…",
+  "device_label": "Jake's Pixel",
+  "transport": "bearer",
+  "ip_address": "203.0.113.7",
+  "user_agent": "okhttp/5.0",
+  "created_at": "2026-08-16T14:02:11Z",
+  "last_used_at": "2026-08-16T18:41:03Z",
+  "current": true
+}
+```
+
+`transport` is `bearer` for sessions created through
+`/api/v1/auth/token/**` and `cookie` for the browser flow. Optional
+`device_label` on `POST /api/v1/auth/{token,}/login` (max 64 chars) is what
+populates that field, so users can recognize their own devices.
 
 ## Single-use refresh tokens
 
@@ -193,17 +264,21 @@ token; if a refresh fails for any reason, drop both tokens and re-auth.
 
 ## Rate-limit headers
 
-Every API response carries:
+Responses under `/api/` carry:
 
 | Header                  | Meaning |
 |-------------------------|---------|
-| `X-RateLimit-Limit`     | The bucket size for this principal/IP. Auth endpoints: 60/min/IP. Authenticated API: 300/min/user. |
+| `X-RateLimit-Limit`     | The bucket size for this principal/IP. Anything under `/api/v1/auth/`: 60/min keyed on client IP, authenticated or not. Everything else: 300/min keyed on the authenticated user's email, falling back to client IP when anonymous. |
 | `X-RateLimit-Remaining` | Requests left in the current 60-second window. |
-| `X-RateLimit-Reset`     | Unix epoch (seconds) when the current window resets. |
+| `X-RateLimit-Reset`     | Unix epoch (seconds) when the current fixed window resets. |
 
-Headers travel on 2xx, 4xx, AND the 429 response itself. Clients should
-back off proactively when `X-RateLimit-Remaining` falls below ~10, and
-must wait until `X-RateLimit-Reset` after a 429.
+Headers travel on 2xx, 4xx, AND the 429 response itself. Two exceptions
+where no headers appear at all: paths outside `/api/`, and requests
+authenticated as `SUPER_ADMIN` (the filter short-circuits for that role).
+
+Clients should back off proactively when `X-RateLimit-Remaining` falls
+below ~10, and must wait until `X-RateLimit-Reset` after a 429. The 429
+body is the standard envelope with `error: "RATE_LIMITED"`.
 
 ## TOTP MFA
 
@@ -252,9 +327,13 @@ POST /api/v1/auth/mfa/disable          (Bearer or Cookie, 204)
   Body: { totp_code }
   → requires a current TOTP. Clears all mfa_* state and recovery codes.
 
-POST /api/v1/auth/mfa/regenerate-recovery-codes
+POST /api/v1/auth/mfa/regenerate-recovery-codes  (Bearer or Cookie, 200)
+  Response: { recovery_codes: [...10] }
   → invalidates the prior batch and returns 10 fresh codes.
 ```
+
+A wrong `totp_code` on verify-setup or disable comes back as 401
+`UNAUTHORIZED`, not 400 — the controller raises `BadCredentialsException`.
 
 ### Sequence diagram (login w/ MFA)
 
@@ -290,8 +369,13 @@ Two required query parameters:
 
 | Param      | Required | Notes |
 |------------|----------|-------|
-| `platform` | yes      | `android` or `ios` (case-insensitive, normalized to lowercase server-side). |
-| `version`  | yes      | The installed build's version. Semver shape: `\d+\.\d+\.\d+` with optional `-pre.release` suffix. |
+| `platform` | yes      | `android` or `ios` (case-insensitive, normalized to lowercase server-side). Anything else is a 400. |
+| `version`  | yes      | The installed build's version. Semver shape: `\d+\.\d+\.\d+` with an optional `-<alphanumerics-and-dots>` pre-release suffix. |
+
+Version comparison is a deliberately minimal `major.minor.patch` ordering,
+not full semver 2.0.0. A pre-release sorts *below* the same release triple
+(`1.2.3-alpha` never satisfies a floor of `1.2.3`), and two pre-releases on
+the same triple compare equal.
 
 Examples:
 
@@ -337,10 +421,11 @@ GET /api/v1/app/version-check?platform=ios&version=2.0.0-beta.1
 
 ### Errors
 
-| Status | When |
-|--------|------|
-| 400    | Missing `platform` / `version`, unknown platform (anything other than android/ios), or malformed semver. |
-| 5xx    | Server fault. Client should treat as "no policy returned" and proceed. |
+| Status | `error`                | When |
+|--------|------------------------|------|
+| 400    | `BAD_REQUEST`          | Missing `platform` / `version`, unknown platform (anything other than android/ios), or malformed semver. |
+| 404    | `NOT_FOUND`            | No row configured for the platform. Should not happen — V063 seeds both. |
+| 5xx    | `INTERNAL_SERVER_ERROR`| Server fault. Client should treat as "no policy returned" and proceed. |
 
 ### Caching
 
@@ -356,6 +441,11 @@ backend values get bumped:
 
 ```
 GET  /api/v1/admin/mobile-versions
+       → JSON array of VersionCheckResponse, one per platform row.
+         On this endpoint current_version is always null and both
+         update_required and update_recommended are always false —
+         there is no "current client" to compare against.
+
 PUT  /api/v1/admin/mobile-versions/{platform}
        body: {
          "minimum_supported_version": "1.5.0",
@@ -363,16 +453,57 @@ PUT  /api/v1/admin/mobile-versions/{platform}
          "store_url": "https://play.google.com/store/apps/details?id=com.wealthview",
          "message": "Required for new tax features"
        }
+       → the updated row, same shape as GET.
 ```
 
-The seeded defaults (`0.0.1` / `0.0.1` and dummy store URLs) MUST be
+`minimum_supported_version`, `latest_version`, and `store_url` are all
+required and non-blank; the two versions must be valid semver. `message` is
+optional — send `null` to clear it. `{platform}` must be `android` or `ios`;
+anything else is a 400, and a platform with no seeded row is a 404.
+
+Authorization is path-based: `SecurityConfig` restricts all of
+`/api/v1/admin/**` to `SUPER_ADMIN`.
+
+The seeded defaults from `V063__create_mobile_app_versions_table.sql`
+(`0.0.1` / `0.0.1`, plus placeholder Play Store and App Store URLs) MUST be
 updated by the operator before announcing a real mobile build.
+
+## What the shipped React Native client uses
+
+The in-repo client (`mobile/`) does not consume the whole contract above.
+The HTTP layer lives in the `shared/` workspace — `createApiClient`
+(axios instance, Bearer header, refresh-on-401 with single retry and
+coalesced refreshes) and `createAuthApi` / `createDashboardApi` /
+`createAccountsApi`. `mobile/src/auth/apiClient.ts` wires them with
+`transport: 'bearer'` and a base URL of `<serverUrl>/api/v1`.
+
+Endpoints actually called today:
+
+| Endpoint | Called from |
+|----------|-------------|
+| `POST /auth/token/login`   | `AuthContext.login` |
+| `POST /auth/token/refresh` | `createApiClient` 401 interceptor + cold-start restore |
+| `POST /auth/token/logout`  | `AuthContext.logout` (best-effort; local state is cleared regardless) |
+| `GET  /auth/me`            | Cold-start restore and `refreshMe` |
+| `GET  /dashboard/summary`  | `PortfolioScreen` |
+| `GET  /accounts`           | `PortfolioScreen` (default page size) |
+| `GET  /accounts/{id}`      | Exposed by `createAccountsApi`; the detail screen currently reuses the row it navigated with |
+
+Not yet wired up in the RN client, though the backend supports them:
+
+- `POST /auth/token/mfa/challenge` — `AuthContext.login` detects the
+  `mfa_required` branch and shows a friendly refusal instead of prompting.
+- `POST /auth/token/register` — `createAuthApi` exposes `register()`, but
+  there is no registration screen.
+- `GET /app/version-check` — no launch-time call yet.
+- `/auth/sessions` and `/auth/mfa/**` — no UI.
 
 ## Out of scope (future work)
 
 Not implemented today; surface here so the mobile developer can plan:
 
 - Push notifications (no `device_registrations` table yet).
-- Export-as-JSON-body variant of `DataExportController` (currently emits
-  `text/csv` with `Content-Disposition: attachment`, which native apps
-  can't trivially trigger).
+- Native-friendly data export. `GET /api/v1/export/json` does return a JSON
+  body a native client can parse, but it (like the four `/export/csv/*`
+  endpoints) sets `Content-Disposition: attachment`, which is aimed at a
+  browser download rather than an in-app consumer.

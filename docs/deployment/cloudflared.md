@@ -20,8 +20,14 @@ It is ideal for a home lab, a Raspberry Pi, a spare laptop, or anywhere the
 server does not have a clean public IP.
 
 **Before you start:** make sure WealthView itself is already running (see
-[production-setup.md](production-setup.md) Steps 1–5). You should be able to
-`curl http://localhost/actuator/health` on the server and get `{"status":"UP"}`.
+[production-setup.md](production-setup.md) Steps 1–6). You should be able to
+`curl http://localhost:${APP_PORT}/actuator/health` on the server and get
+`{"status":"UP"}`.
+
+**Nothing cloudflared-related ships in this repo.** There is no cloudflared
+service in `docker-compose.yml`, `docker-compose.prod.yml`, or
+`docker-compose.observability.yml`, and nothing under `infra/`. Every file
+below is one you create yourself on the server.
 
 ---
 
@@ -67,8 +73,8 @@ DNS `CNAME` at Cloudflare pointing your chosen hostname at that tunnel.
 
 When a user visits `https://wealthview.yourdomain.com`, Cloudflare terminates
 TLS and forwards the request through the tunnel to whatever local address you
-configured — in our case, `http://localhost:80`, which is the WealthView app
-container.
+configured — the WealthView app container, published on the host at
+`${APP_PORT}` (default 80) by `docker-compose.prod.yml`.
 
 ---
 
@@ -119,7 +125,7 @@ Runs as part of the same Docker environment as WealthView. Simpler if you
 don't want to manage a second package manager.
 
 There is no install step up front — we will add a `cloudflared` service to a
-Compose override file in [Step 5](#step-5b-docker-compose-override).
+Compose override file in [Step 5](#step-5b--docker-compose-override).
 
 ---
 
@@ -219,7 +225,7 @@ change the `service:` line to match (e.g. `http://localhost:8080`).
 ### Step 5b — Docker Compose override
 
 Create a new file `docker-compose.cloudflared.yml` next to the main compose
-file:
+file. This file is **not** in the repo — you are writing it from scratch:
 
 ```yaml
 services:
@@ -286,24 +292,51 @@ The app enforces CORS and rate-limit rules based on which public URL is in
 use. Edit `.env` at the repo root:
 
 ```dotenv
-# Your public Cloudflare Tunnel hostname
+# Your public Cloudflare Tunnel hostname. Must be https:// and non-empty on
+# the prod profile — ProductionConfigValidator aborts startup otherwise.
 CORS_ORIGIN=https://wealthview.example.com
 
-# When the app is reached via cloudflared + localhost, the immediate peer
-# is the loopback interface. Trust it so the real client IP lands in rate
-# limiter and login_activity records.
-APP_RATE_LIMIT_TRUSTED_PROXIES=127.0.0.1
+# The IP the app sees cloudflared connecting from. Trust it so the real
+# client IP lands in rate limiter and login_activity records.
+APP_RATE_LIMIT_TRUSTED_PROXIES=<see below>
 ```
 
-Restart the app for the change to take effect:
+`CORS_ORIGIN` is already listed in the `app` service's `environment:` block in
+`docker-compose.prod.yml`, so it reaches the container on restart.
+**`APP_RATE_LIMIT_TRUSTED_PROXIES` is not.** Compose passes only the variables
+a service explicitly lists, so putting it in `.env` alone does nothing. Add it
+to the `app` service:
+
+```yaml
+services:
+  app:
+    environment:
+      # ...existing entries...
+      APP_RATE_LIMIT_TRUSTED_PROXIES: ${APP_RATE_LIMIT_TRUSTED_PROXIES:-}
+```
+
+Spring's relaxed binding maps that env name onto `app.rate-limit.trusted-proxies`,
+which `ClientIpResolver` reads. It only honours `X-Forwarded-For` when the
+connecting peer is in that list.
+
+**Which IP to use depends on how you ran cloudflared.**
+
+- *Option B (Docker, `network_mode: "service:app"`)* — cloudflared shares the
+  app container's network namespace, so it genuinely connects over loopback:
+  `127.0.0.1`.
+- *Option A (native, proxying to a published host port)* — Docker NATs the
+  connection, and the container may see the bridge network's gateway address
+  (something in `172.x.x.x`) rather than loopback.
+
+Don't guess. Log in once and read the IP recorded against that login in
+**Admin → Login Activity** — that is the address to trust. Set it, restart, log
+in again, and confirm the recorded IP has switched to your real client address.
+
+Restart the app for any of these changes to take effect:
 
 ```bash
 docker compose -f docker-compose.prod.yml up -d app
 ```
-
-Without `CORS_ORIGIN` set, the production profile aborts on startup. Without
-`APP_RATE_LIMIT_TRUSTED_PROXIES`, every login audit entry will show the
-loopback IP instead of the end user's IP.
 
 ---
 
@@ -338,9 +371,9 @@ sudo journalctl -u cloudflared -f
 docker compose -f docker-compose.prod.yml -f docker-compose.cloudflared.yml logs -f cloudflared
 ```
 
-You want to see `Connection registered connIndex=0` (and probably
-`connIndex=1..3` — cloudflared maintains four redundant connections by
-default). Press `Ctrl-C` to stop tailing.
+You want to see `Connection registered` lines with increasing `connIndex`
+values — cloudflared establishes several redundant edge connections. Press
+`Ctrl-C` to stop tailing.
 
 ---
 
@@ -357,14 +390,20 @@ dig +short wealthview.example.com
 curl -s https://wealthview.example.com/actuator/health
 # {"status":"UP"}
 
-# 3. Security headers are in place
-curl -sI https://wealthview.example.com/ | grep -Ei "strict-transport|permissions-policy|x-frame-options|x-content-type-options"
+# 3. Security headers are in place (all emitted by the app itself,
+#    from SecurityConfig — Cloudflare adds nothing here)
+curl -sI https://wealthview.example.com/ | grep -Ei "strict-transport|permissions-policy|x-frame-options|x-content-type-options|content-security-policy"
 # Expected:
-#   strict-transport-security: ...
+#   strict-transport-security: max-age=31536000 ; includeSubDomains ; preload
 #   permissions-policy: geolocation=(), microphone=(), camera=(), payment=()
 #   x-frame-options: DENY
 #   x-content-type-options: nosniff
+#   content-security-policy: default-src 'self'; script-src 'self'; ...
 ```
+
+Note the app does **not** set `Referrer-Policy`; with Cloudflare Tunnel there
+is no nginx layer to add one. Add it as a Cloudflare Transform Rule if you
+want it.
 
 Load `https://wealthview.example.com/` in a browser. The padlock should show
 a Cloudflare-issued cert; click through to `/login` and sign in with
@@ -382,16 +421,18 @@ a Cloudflare-issued cert; click through to `/login` and sign in with
   sudo ufw delete allow 443/tcp   # if previously opened
   sudo ufw status
   ```
-- **Lock the container port to loopback.** If you set `APP_PORT=80` and your
-  server also has a public IP, the container is still reachable directly on
-  port 80, bypassing Cloudflare. Either:
-  - Keep inbound port 80 closed at the firewall (easiest), OR
-  - Change `APP_PORT=8080` and bind to loopback only by editing the `ports:`
-    line in `docker-compose.prod.yml`:
+- **Lock the container port to loopback.** With the default
+  `ports: "${APP_PORT:-80}:8080"` and a public IP, the container is still
+  reachable directly on that port, bypassing Cloudflare. Either:
+  - Keep the inbound port closed at the firewall (easiest), OR
+  - Bind to loopback only by editing the `ports:` line in
+    `docker-compose.prod.yml`:
     ```yaml
     ports:
-      - "127.0.0.1:${APP_PORT:-8080}:8080"
+      - "127.0.0.1:${APP_PORT:-80}:8080"
     ```
+    If you also change `APP_PORT`, remember `wv`'s health probe follows it —
+    set `WV_APP_PORT` or `WV_HEALTH_URL` in `wv.conf` if the two diverge.
 - **Cloudflare Access (optional).** You can require a Cloudflare Access login
   (email OTP, Google SSO, etc.) in addition to WealthView's own authentication.
   In the Cloudflare dashboard: **Zero Trust → Access → Applications → Add**,
@@ -407,10 +448,10 @@ The tunnel is up but can't reach the app.
 
 ```bash
 # On the server — is the container responding?
-curl -s http://localhost/actuator/health
+curl -s http://localhost:${APP_PORT:-80}/actuator/health
 
 # If not, inspect WealthView app logs:
-docker compose -f docker-compose.prod.yml logs --tail=50 app
+./wv logs --tail 50 --no-follow app
 ```
 
 If the local curl works but the public one doesn't, the ingress rule in
@@ -428,10 +469,12 @@ cloudflared tunnel route dns wealthview wealthview.example.com
 …and verify the CNAME appears in the Cloudflare dashboard under
 **DNS → Records**.
 
-### Login audit / rate limit rows all show 127.0.0.1
+### Login audit / rate limit rows all show one internal IP
 
-Set `APP_RATE_LIMIT_TRUSTED_PROXIES=127.0.0.1` in `.env` and restart the app.
-See [Step 7](#step-7-update-wealthviews-env).
+That IP *is* the peer address the app sees. Put it in
+`APP_RATE_LIMIT_TRUSTED_PROXIES`, make sure the variable is listed in the `app`
+service's `environment:` block (it is not there by default), and restart the
+app. See [Step 7](#step-7-update-wealthviews-env).
 
 ### cloudflared service won't start — "credentials file missing"
 
@@ -450,9 +493,9 @@ the new path, and `sudo systemctl restart cloudflared`.
 
 ### The app is reachable publicly without HTTPS
 
-This means inbound port 80 on your host is open to the internet and the app
-container is listening on it. Close it at the firewall (`sudo ufw deny
-80/tcp`) or bind the container port to loopback only (see the
+This means the host port published by the `app` service (`${APP_PORT:-80}`) is
+open to the internet. Close it at the firewall (`sudo ufw deny 80/tcp`) or bind
+the container port to loopback only (see the
 [security notes](#security-notes-specific-to-cloudflare-tunnel) above).
 
 ---
@@ -478,6 +521,8 @@ cloudflared tunnel delete wealthview
 ## Related guides
 
 - [Production Setup](production-setup.md) — the main deployment walkthrough.
+- [Operations Handbook](operations.md) — the `wv` command surface, including
+  `WV_HEALTH_URL` for probing through the tunnel.
 - [TLS and Nginx](tls-and-nginx.md) — alternative: host-managed TLS with
   Let's Encrypt.
 - [Security Hardening](security-hardening.md) — firewall, SSH, secrets.

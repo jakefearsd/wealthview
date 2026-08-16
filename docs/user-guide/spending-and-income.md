@@ -2,7 +2,9 @@
 
 # Spending Profiles and Income Sources
 
-Spending profiles and income sources are the building blocks that feed into your retirement projections. Spending profiles define how much you plan to spend in retirement. Income sources define how much money comes in from Social Security, pensions, rental properties, and other streams.
+Spending profiles and income sources are the building blocks that feed into your retirement projections. Spending profiles define how much you plan to spend. Income sources define how much money comes in from Social Security, pensions, rental properties, and other streams.
+
+There is also a third way to answer the spending question — let WealthView compute it for you with the **Spending Optimizer**. That's covered at the end of this page.
 
 ---
 
@@ -13,63 +15,65 @@ Spending profiles and income sources are the building blocks that feed into your
 A spending profile models your annual retirement spending, split into two categories:
 
 - **Essential expenses** — Non-negotiable costs: housing, food, healthcare, insurance, utilities. These are always funded first.
-- **Discretionary expenses** — Flexible costs: travel, dining out, hobbies, gifts. These can be cut in years when your portfolio cannot fully cover both.
+- **Discretionary expenses** — Flexible costs: travel, dining out, hobbies, gifts. These get cut first when the money doesn't stretch.
 
-This split matters in projection results. In a shortfall year (when your portfolio and income cannot cover total spending), the engine funds essential expenses first and reduces discretionary spending. This gives you a realistic view of your retirement quality of life, not just whether the money lasts.
+That split is what makes the projection results useful. In a shortfall year, the engine funds essentials first and reduces discretionary spending, so you see what retirement would actually *feel* like rather than just a pass/fail on whether the money lasts.
+
+The page describes it this way: *"Spending profiles define your retirement cost of living. Attach one to a projection scenario to see whether your portfolio can sustain your planned lifestyle."*
 
 ### Creating a Profile
 
 1. Navigate to **Spending Profiles** in the sidebar.
-2. Click **Create Profile**.
+2. Click **New Profile**.
 3. Enter:
-   - **Name** — A descriptive label (e.g., "Moderate Retirement", "Lean FIRE").
-   - **Essential Expenses** — Annual amount in today's dollars (e.g., $35,000).
-   - **Discretionary Expenses** — Annual amount in today's dollars (e.g., $15,000).
-4. Click **Save**.
+   - **Name** — A descriptive label, e.g. "Moderate Retirement".
+   - **Essential Expenses (annual)** — *"Default non-negotiable annual costs when no spending tier matches the current age."*
+   - **Discretionary Expenses (annual)** — *"Default flexible annual spending when no spending tier matches the current age."*
+4. Optionally add spending tiers (below).
+5. Click **Create Profile**.
 
-The total annual spending for this profile is the sum of essential and discretionary amounts ($50,000 in the example above). In projections, these amounts are adjusted for inflation each year.
+Only the name is required. Each profile card in the list shows the annual total plus tiles for **Essential**, **Discretionary**, **Monthly Equivalent**, and how many **Spending Tiers** it has.
+
+> **All amounts are in today's dollars.** This is important and it's different from how most retirement calculators work. WealthView projects in *real* terms — you enter what your lifestyle costs today and the engine keeps that purchasing power constant. You will not see your spending line climb year after year in the results, and that is correct.
 
 ### Spending Tiers
 
-Retirement spending rarely stays constant for 30+ years. Most people spend more in early retirement (travel, activities) and less as they age. Spending tiers let you model this with **age-based spending phases**.
+Retirement spending rarely stays flat for 30 years. Most people spend more early (travel, activities) and less later. Tiers let you model this as **age-based spending phases**.
 
-#### Adding Tiers
+The page's own description: *"Define age-based spending phases. When tiers are defined, spending varies by life stage instead of staying flat. Amounts are in today's dollars; inflation is applied automatically."*
 
-On the spending profile detail page, click **Add Tier** to define a spending phase:
+Click **+ Add Spending Tier**. Each tier has exactly five fields:
 
 | Field | Description | Example |
 |-------|-------------|---------|
-| **Label** | A name for this phase. | "Active Retirement" |
+| **Phase Name** | A name for this phase. | "Go-Go Years" |
 | **Start Age** | The age when this tier begins. | 65 |
-| **Essential Expenses** | Annual essential spending for this phase. | $40,000 |
-| **Discretionary Expenses** | Annual discretionary spending for this phase. | $20,000 |
+| **End Age (blank = forever)** | The age when it ends. Leave blank for an open-ended final phase. | 74 |
+| **Essential (annual)** | Annual essential spending for this phase. | $40,000 |
+| **Discretionary (annual)** | Annual discretionary spending for this phase. | $25,000 |
 
-You can add multiple tiers to model different life stages:
+A typical three-phase setup:
 
-| Tier | Start Age | Essential | Discretionary | Total |
-|------|-----------|-----------|---------------|-------|
-| Active Retirement | 65 | $40,000 | $25,000 | $65,000 |
-| Slowing Down | 75 | $35,000 | $15,000 | $50,000 |
-| Quiet Years | 85 | $30,000 | $5,000 | $35,000 |
+| Phase Name | Start Age | End Age | Essential | Discretionary | Total |
+|------------|-----------|---------|-----------|---------------|-------|
+| Go-Go Years | 65 | 74 | $40,000 | $25,000 | $65,000 |
+| Slow-Go Years | 75 | 84 | $35,000 | $15,000 | $50,000 |
+| No-Go Years | 85 | *(blank)* | $30,000 | $5,000 | $35,000 |
 
-Each tier's spending amounts are in base (today's) dollars. Inflation is applied on top.
+### How Tiers Are Matched
 
-#### Per-Tier Inflation
+A tier matches an age when `start age ≤ age ≤ end age`. Both ends are inclusive, and a blank end age means the tier runs forever.
 
-Inflation within each tier compounds from the **later of** the tier's start age or your retirement start age.
+Two edge cases are worth knowing about, because WealthView handles them silently rather than warning you:
 
-This means:
+- **Overlapping tiers** — If two or more tiers match the same age, WealthView **averages** them. It does not pick the narrower one or the first one. Two overlapping tiers at $60,000 and $40,000 produce $50,000.
+- **Gaps between tiers** — If no tier matches an age but there are bounded tiers on both sides, WealthView uses the **midpoint** of the two neighbours. If the gap is before your first tier or after your last bounded tier, it falls back to the profile-level **Essential Expenses** and **Discretionary Expenses** you set at the top of the form.
 
-- When you enter a new tier, spending resets to that tier's base dollar amounts.
-- From the first year in the tier onward, inflation compounds annually.
-- The first year in a new tier is always at base dollars — inflation has not yet accumulated for that tier.
+Neither case produces an error or a warning, so it's worth reading your tier ages back to yourself. The cleanest setup is contiguous, non-overlapping tiers with a blank end age on the last one.
 
-**Example:** You retire at 62 with 3% inflation. The "Slowing Down" tier starts at age 75 with $50,000 base spending.
-- Age 75: $50,000 (base — no inflation accumulated yet for this tier)
-- Age 76: $51,500 (one year of 3% inflation)
-- Age 77: $53,045 (two years of inflation)
+### Editing and Deleting
 
-This approach reflects the reality that when your lifestyle changes (a new spending tier), your costs reset to a new baseline rather than carrying forward decades of compounded inflation from a previous lifestyle.
+Click a profile to edit it; the button becomes **Update Profile**. Deleting a profile is immediate — **there is no confirmation prompt**. If any scenario was using the profile, its reference is cleared and that scenario falls back to its withdrawal-rate strategy.
 
 ---
 
@@ -77,158 +81,292 @@ This approach reflects the reality that when your lifestyle changes (a new spend
 
 ### What They Are
 
-Income sources represent retirement income streams beyond portfolio withdrawals. They are reusable definitions that you link to one or more projection scenarios.
+Income sources represent retirement income beyond portfolio withdrawals. They're reusable definitions you attach to one or more projection scenarios.
 
-When an income source is active during a projection year (you have reached the start age and have not passed the end age), the income reduces the amount you need to withdraw from your portfolio.
+The page explains: *"Income sources reduce how much you need to withdraw from your investment portfolio each year. They are separate from spending profiles (which define your expenses). Each income source has a type that determines how it is taxed in projections. You can reuse income sources across multiple scenarios — attach them when you create or edit a projection scenario."*
 
 ### Income Types
 
-WealthView supports six types of income:
-
-| Type | Description |
-|------|-------------|
-| **Rental Property** | Income from a rental property you own. Can be linked to a WealthView property for depreciation deductions. |
-| **Social Security** | Federal retirement benefits. Typically starts at 62-70. Subject to the 85% provisional income taxation rule. |
-| **Pension** | Defined-benefit pension payments from a former employer. |
-| **Part-Time Work** | Income from part-time employment or consulting in retirement. |
+| Type | Notes |
+|------|-------|
+| **Social Security** | Federal retirement benefits. Selecting it defaults the start age to 67 and the inflation rate to 2%. |
+| **Pension** | Defined-benefit payments from a former employer. |
+| **Rental Property** | Income from a rental. Can be linked to a WealthView property to pull in depreciation. Defaults the inflation rate to 2%. |
+| **Part-Time Work / Consulting** | Employment or consulting income in retirement. |
 | **Annuity** | Payments from an annuity contract. |
-| **Other** | Any income that does not fit the above categories. |
+| **Other** | Anything else. |
+
+Changing the type resets the tax treatment to that type's first valid option, so pick the type first.
 
 ### Creating an Income Source
 
 1. Navigate to **Income Sources** in the sidebar.
-2. Click **Create Income Source**.
+2. Click **New Income Source**.
 3. Fill in the fields:
 
-| Field | Description | Example |
-|-------|-------------|---------|
-| **Name** | A descriptive label. | "Social Security - Full Benefit" |
-| **Income Type** | Select from the six types above. | `social_security` |
-| **Annual Amount** | The annual income in today's dollars. | $28,000 |
-| **Start Age** | When this income begins. | 67 |
-| **End Age** | When this income stops. Leave empty for lifetime income. | (blank) |
-| **Inflation Rate** | Annual growth rate for this income as a decimal. | 0.02 |
-| **One-Time** | Toggle on if this is a lump sum received once, not recurring. | Off |
+| Field | Description |
+|-------|-------------|
+| **Name** | A descriptive label. Required. |
+| **Income Type** | One of the six above. *"Type determines how this income is taxed in projections."* |
+| **Owner** | **Primary** or **Spouse**. *"Whose income this is, for household/survivor modeling."* |
+| **Survivor Benefit / Survivor % (%)** | See below. |
+| **Tax Treatment** | Pick a card. Options depend on the type — see below. |
+| **Link to Property (optional)** | Rental Property only. See below. |
+| **One-time payment** | Checkbox. See below. |
+| **Annual Amount** | The yearly income in today's dollars. Must be greater than zero. |
+| **Start Age** | When this income begins. |
+| **End Age (blank = forever)** | *"Leave blank if this income continues for life."* |
+| **Inflation Rate (%)** | *"Annual adjustment rate (e.g., 2 = 2%). SS COLA is typically ~2%."* |
 
-4. Click **Save**.
+4. Click **Create Income Source**.
 
-### One-Time Income
+Deleting an income source is immediate, with no confirmation prompt.
 
-Enable the **One-Time** flag for lump-sum events like an inheritance, a property sale, or a one-time bonus. The amount is received only in the year you reach the start age, not annually.
+### Owner and Survivor Percent
+
+These two fields exist for household scenarios (see [Retirement Projections](retirement-projections.md)).
+
+**Owner** is **Primary** or **Spouse** — there is no "joint" option, because income belongs to one person even when the accounts don't.
+
+**Survivor %** controls what happens to this income after its owner dies: *"Share of this income the survivor keeps after the owner's death (0–100%, default 100%)."* A single-life pension that stops at death would be 0%. A joint-and-survivor annuity at 50% would be 50%.
+
+**Social Security is different.** For Social Security, the field is replaced with a read-only note: *"Statutory survivor rule applies automatically (survivor keeps the larger benefit)."* You don't set a percentage because the law already determines the answer — the surviving spouse keeps whichever of the two benefits is larger, and the smaller one stops. WealthView models that rule directly.
+
+### One-Time Payments
+
+Tick **One-time payment (e.g., deferred compensation, inheritance)** for a lump sum. The labels change: **Annual Amount** becomes **Payment Amount** and **Start Age** becomes **Payment Age**. The end age and inflation fields disappear, because a one-time payment is received in a single year and doesn't grow.
+
+### Linking to a Property
+
+For **Rental Property** income, a **Link to Property (optional)** dropdown appears listing your properties with their current values. The help text: *"Link to a property to pull depreciation data into projections. Leave unlinked for hypothetical planning."*
+
+When linked, the **Annual Amount** field is relabelled **Annual Rent Amount**, and the projection engine nets the property's expenses and applies its depreciation as a deduction against the rental income — which can turn a cash-flow-positive rental into a taxable loss that shields other income. See [Rental Properties](rental-properties.md).
 
 ---
 
 ## Tax Treatments
 
-Each income source has a tax treatment that determines how the income is taxed in the projection engine. Choosing the correct treatment is important for accurate tax projections.
+Each income type offers a different set of tax treatments, shown as selectable cards with the app's own one-line explanation.
 
-### Taxable
+### Social Security
 
-The income is **fully taxed as ordinary income**. It is added to your gross income and taxed at your marginal federal tax rate.
+**Partially Taxable** — *"IRS formula determines 0–85% taxable based on provisional income."*
 
-**Use for:** Pensions, part-time work wages, most annuity payments, traditional IRA/401(k) distributions.
+The page explains the mechanism: *"Social Security benefits are taxed based on 'provisional income' (your other income + 50% of SS benefits). For single filers: below $25,000 = 0% taxable; $25,000–$34,000 = up to 50% taxable; above $34,000 = up to 85% taxable. For married filing jointly: thresholds are $32,000 and $44,000. The projection engine applies this formula automatically."*
 
-### Partially Taxable
+### Pension
 
-Applies the **Social Security 85% provisional income rule**. The taxable portion of your Social Security benefits depends on your total "provisional income" (adjusted gross income + non-taxable interest + half of Social Security benefits):
+- **Fully Taxable** — *"Most pensions are fully taxable as ordinary income."*
+- **Tax-Free** — *"Some government pensions may be partially or fully tax-exempt."*
 
-- Below the first threshold: benefits are not taxed.
-- Between thresholds: up to 50% of benefits are taxable.
-- Above the second threshold: up to 85% of benefits are taxable.
+### Rental Property
 
-The projection engine calculates this automatically based on your total income from all sources.
+- **Passive** — *"Losses only offset other passive income ($25k exception for MAGI < $150k)."*
+- **Active - REPS** — *"Real Estate Professional Status: all losses offset any income type."*
+- **Active - STR** — *"Short-Term Rental loophole: losses offset any income type."*
 
-**Use for:** Social Security benefits.
+The page expands on all three:
 
-### Tax-Free
+> **Passive (default):** Rental losses can only offset other passive income. There is a $25,000 exception if your MAGI is below $100,000, phased out completely at $150,000.
+>
+> **REPS (Real Estate Professional Status):** If you qualify (750+ hours, >50% of services in real estate), all rental losses offset any income type. Discuss with your CPA.
+>
+> **STR (Short-Term Rental):** If average guest stay is 7 days or less and you materially participate (100+ hours), losses offset any income. Discuss with your CPA.
 
-The income is **not taxed at all**. It does not appear in your gross income for tax calculations.
+### Part-Time Work / Consulting
 
-**Use for:** Roth IRA distributions, municipal bond interest, return-of-principal payments, tax-free gifts.
+- **Self-Employment** — *"Subject to 15.3% SE tax (Social Security + Medicare) on 92.35% of net."*
+- **W-2 Income** — *"Taxed as ordinary income. Employer handles payroll taxes."*
 
-### Rental Passive
+The page's explainer: *"Self-employment income is subject to a 15.3% SE tax (12.4% Social Security + 2.9% Medicare) on 92.35% of net earnings. The Social Security portion caps at the annual wage base (~$168,600 in 2024). Half of SE tax is deductible from AGI. W-2 income avoids SE tax because employers handle payroll taxes."*
 
-Applies **passive activity loss rules**. Rental income is considered passive income. If you have rental losses (because depreciation exceeds rental income), the deduction is limited:
+### Annuity
 
-- Up to $25,000 in passive losses can be deducted if your adjusted gross income (AGI) is below $100,000.
-- The $25,000 allowance phases out between $100,000 and $150,000 AGI.
-- Above $150,000 AGI, no passive losses can be deducted (they are carried forward).
+- **Fully Taxable** — *"Qualified annuity distributions taxed as ordinary income."*
+- **Tax-Free** — *"Roth annuity or return of after-tax basis."*
 
-**Use for:** Rental property income when you are not a real estate professional and do not materially participate.
+### Other
 
-### Rental Active (Real Estate Professional Status)
+- **Taxable** — *"Ordinary income subject to federal income tax."*
+- **Tax-Free** — *"Not subject to income tax (e.g., gifts, Roth distributions)."*
 
-If you qualify as a **real estate professional** (750+ hours annually in real estate activities, more than half your working time), there is **no limit** on rental loss deductions. All rental losses can be deducted against ordinary income.
+### The Disclaimer
 
-**Use for:** Rental income when you qualify for Real Estate Professional Status (REPS).
+The Income Sources page carries a **Talk to your CPA about...** section listing REPS qualification, the short-term rental rules, whether a cost segregation study makes sense, your provisional income estimate, and Roth conversion timing in rental-loss years. It closes with:
 
-### Rental Active (Short-Term Rental)
+> *WealthView provides planning estimates only, not tax advice. All tax calculations are approximations.*
 
-If you operate a **short-term rental** (average guest stay of 7 days or fewer) and you materially participate in the rental activity, the passive loss limitations do not apply. This is similar to REPS but applies specifically to short-term rental operators.
-
-**Use for:** Airbnb, VRBO, or other short-term rental income where you materially participate.
-
-### Self-Employment
-
-Income subject to **self-employment tax** in addition to regular income tax. The SE tax rate is 15.3%:
-
-- **12.4%** Social Security tax (applies up to the annual Social Security wage base).
-- **2.9%** Medicare tax (applies to all SE income, no cap).
-
-The SE tax is calculated separately from income tax and added to the total tax liability.
-
-**Use for:** Freelance work, consulting, sole proprietorship income, independent contractor payments.
-
----
-
-## Property-Linked Income
-
-When you create an income source of type `rental_property`, you can link it to a specific property in WealthView. This connection enables **depreciation deductions** in projections.
-
-How it works:
-
-1. Create an income source with type `rental_property`.
-2. Select the property to link.
-3. The property's annual depreciation (calculated from the depreciation configuration on the property — see [Rental Properties](rental-properties.md)) is applied as a deduction against the rental income.
-4. The deduction reduces the taxable portion of the rental income, lowering your projected tax liability.
-
-For example, if your rental property generates $24,000 in annual income and has $9,000 in annual depreciation, only $15,000 is treated as taxable rental income (subject to the applicable tax treatment rules above).
+That applies to everything on this page.
 
 ---
 
 ## Per-Scenario Overrides
 
-The same income source can be linked to multiple projection scenarios. When linking, you can set a **per-scenario override amount** that replaces the income source's default annual amount for that specific scenario.
+The same income source can be attached to multiple scenarios, and each scenario can set an **override amount** that replaces the default annual amount just for that scenario.
 
-This is useful for modeling:
+This is how you model:
 
-- **Social Security timing:** Link the same "Social Security" income source to two scenarios — one assuming full benefit at 67, another assuming reduced early benefit at 62, using different override amounts.
-- **Optimistic vs. conservative rental income:** Same rental property income source with $24,000 in one scenario and $20,000 in another.
-- **Part-time work variations:** Different assumed hourly rates or hours per week.
+- **Social Security timing** — one "Social Security" source attached to two scenarios, at full benefit in one and reduced early benefit in the other.
+- **Optimistic vs. conservative rent** — $24,000 in one scenario, $20,000 in another.
 
-The override only affects the amount. All other settings (start age, end age, tax treatment, inflation rate) remain as defined on the income source.
+The override changes only the amount. Start age, end age, tax treatment, owner, survivor percent, and inflation rate stay as defined on the income source itself.
 
----
-
-## Inflation Adjustment
-
-Each income source has its own **inflation rate**. The annual amount grows by this rate each year.
-
-- Social Security typically uses a COLA adjustment (often around 2-3%).
-- Pensions may have a fixed COLA or no inflation adjustment (set to 0).
-- Rental income may grow faster than general inflation in strong markets.
-
-Set each income source's inflation rate to match your assumptions for that specific income stream.
+The projection detail page shows all three numbers side by side — **Base Amount**, **Override**, and **Effective** — so it's always clear which is in play. For property-linked rental income the effective figure is shown as a *net* number next to the *gross* base amount, because expenses and depreciation have been netted out.
 
 ---
 
-## Connecting to Projections
+## Attaching Them to a Scenario
 
-To use spending profiles and income sources in a projection:
+Both spending profiles and income sources are attached from the **scenario form** (Projections → New Scenario, or Edit on an existing one):
 
-1. Navigate to the projection scenario detail page.
-2. In the **Spending Profile** section, link a spending profile.
-3. In the **Income Sources** section, add one or more income sources. Optionally set per-scenario override amounts.
-4. Run the projection.
+- Spending profiles appear in the unified **Spending Plan** dropdown.
+- Income sources are added in the scenario's **Income Sources** section, where you can also set the per-scenario override.
 
-The engine uses the spending profile to determine annual spending needs and the income sources to determine non-portfolio income. The difference (spending minus income) is the amount withdrawn from investment pools.
+Remember that a scenario has **at most one** spending plan. Choosing a spending profile clears any guardrail profile, and vice versa. Choosing **None (use withdrawal rate)** clears both and falls back to the withdrawal-rate strategy.
+
+---
+
+## The Spending Optimizer
+
+Instead of guessing a spending number and checking whether it works, you can ask WealthView to find the highest spending your portfolio can support at a confidence level you choose. This is the **Monte Carlo spending optimizer**, and it produces a **guardrail profile**.
+
+A guardrail profile is a spending plan just like a spending profile — the two are interchangeable in the Spending Plan dropdown, and a scenario can only have one of them at a time. The difference is where the numbers come from: you write a spending profile, the optimizer computes a guardrail profile.
+
+### Starting an Optimization
+
+1. Open a projection scenario.
+2. Click **Optimize Spending**.
+
+The top of the page shows a read-only summary of the scenario — inflation, retirement year, end age, account balances by type, and income sources — with the note: *"These values come from the projection scenario. Edit the scenario to change them."* To change any of that, go back and edit the scenario.
+
+### Optimization Parameters
+
+| Field | Default | What it means |
+|-------|---------|---------------|
+| **Profile Name** | "Optimized Spending Plan" | A label for the resulting plan. |
+| **Essential Spending Floor (per year)** | $30,000 | The spending level you refuse to go below. Success is measured against this. |
+| **Terminal Balance Target** | $0 | How much you want left at the end. Raise it if you want to leave an inheritance. |
+| **Portfolio Safety Net** | $0 | *"Minimum portfolio balance to maintain during retirement."* |
+| **Risk Tolerance** | moderate | See below. |
+| **Spending Flexibility** | 5%/yr | *"Maximum annual spending change."* |
+| **Phase Blending** | 1 year | *"Smooth transitions between life phases."* Off, 1 year, or 2 years. |
+| **Gate on adaptive spending rules** | on | See below. |
+
+### Risk Tolerance Is Your Target Success Probability
+
+This is the single most important dial on the page. It isn't a vague "how bold are you" slider — it maps directly to the probability the optimizer must hit:
+
+| Setting | Target success probability | The app's description |
+|---------|---------------------------|----------------------|
+| **conservative** | 95% | *"Very likely sustainable without adjustments"* |
+| **moderate** | 90% | *"Sustainable with occasional adjustments in bad markets"* |
+| **aggressive** | 80% | *"Expected spending, requires active management in downturns"* |
+
+Aggressive isn't reckless — it's a deliberate trade. You spend more now and accept that roughly one in five simulated market histories would require you to cut back. Conservative buys certainty at the price of spending less than you probably could.
+
+You can override the number directly under **Advanced Settings → Confidence Level** if you want something in between.
+
+### What "Success" Means Here
+
+Success is defined as **funding your essential floor every single year**. The optimizer reports the fraction of simulated market histories in which you never fall short of that floor. Discretionary spending above the floor may get cut in bad trials — that's expected, and it's why the floor is the thing being measured.
+
+This is stricter and more meaningful than "the portfolio never hit zero", which is what most retirement calculators report.
+
+**Gate on adaptive spending rules** decides which of two success numbers the optimizer must certify. Left on (the default), it assumes you'll actually follow the plan's spending-cut rule when markets go against you: *"Recommended spending assumes you follow the profile's spending-cut rule in downturns (certifies the 'With Guardrail Cuts' number). Uncheck for the conservative never-adjust gate."* Turn it off if you want the plan to hold up even if you never adjust.
+
+### Spending Phases
+
+The **Spending Phases** editor is where you tell the optimizer what you *want* to spend at each life stage: *"Set your desired annual spending for each life stage. The optimizer will find the best achievable plan within your portfolio's capacity."*
+
+Each phase has four fields — a name, **Start**, **End** (blank for open-ended), and a **$ Target**. Rows can be dragged to reorder. Click **+ Add Phase** for more.
+
+The defaults give you a sensible starting point:
+
+| Phase | Ages | Target |
+|-------|------|--------|
+| Early retirement | 62–72 | $80,000 |
+| Mid retirement | 73–82 | $60,000 |
+| Late retirement | 83+ | $45,000 |
+
+The targets are aspirations, not constraints. The optimizer reports how much of each one it could actually fund.
+
+### Advanced Settings
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| **Cash Reserve** | 2 years | *"Years of spending held in cash to avoid selling during downturns."* |
+| **Cash Rate** | 4% | *"Expected annual return on cash reserves (money market rate)."* |
+| **Trial Count** | 5,000 | Number of simulated market histories. Options: 1,000 / 2,500 / 5,000 / 10,000. |
+| **Confidence Level** | *(uses risk tolerance)* | A direct override, 50–99%. |
+| **Dynamic-Sequencing Bracket Rate (%)** | Off | *"Target tax bracket for dynamic withdrawal sequencing."* |
+
+### Roth Conversion Strategy
+
+Tick the checkbox next to **Roth Conversion Strategy** to have the optimizer search for a conversion schedule at the same time as the spending plan: *"Optimize Roth conversions alongside spending to minimize lifetime taxes. Conversions shift money from Traditional to Roth accounts, paying tax now at a lower bracket to avoid higher RMD-driven taxes later."*
+
+Three settings appear:
+
+- **Conversion Bracket** — *"Maximum tax bracket to fill with conversions each year."* 10% through 37%, default 22%.
+- **RMD Target Bracket** — *"Target bracket for RMDs after conversions are complete."* Default 12%. Can't exceed the conversion bracket.
+- **RMD Bracket Headroom** — *"Reserve headroom for market growth years. Higher = more conservative."* Default 10%.
+
+### Running It
+
+Click **Run Optimization**. You'll see *"Running 5,000 Monte Carlo trials..."* (or whatever trial count you chose) while it works.
+
+Running the optimizer **replaces** any previous guardrail profile on the scenario and **detaches** whatever spending profile the scenario had. That's the mutual exclusivity rule in action.
+
+---
+
+## Reading the Optimizer Results
+
+### Headline Metrics
+
+| Card | Meaning |
+|------|---------|
+| **Success Probability** (or **If Never Adjusted**) | The share of trials that funded your essential floor every year with no mid-course corrections. |
+| **If Rules Followed** (or **With Guardrail Cuts**) | The same measure assuming you follow the plan's spending-cut rule in downturns. |
+| **Failure Rate** | Colour-coded — green, amber above 10%, red above 20%. |
+| **10th Percentile Final** | Final balance in a pessimistic outcome. |
+| **25th Percentile Final** | Final balance in a below-average outcome. |
+| **Median Final Balance** | Final balance in the middle outcome. |
+
+One of the two success cards carries a green **Certified** badge — that's the number the optimizer actually gated on, determined by the **Gate on adaptive spending rules** checkbox.
+
+### Warnings
+
+A **Plan Warnings** banner appears when something needs your attention, with messages like *"Early retirement is only 74% funded"*, *"Failure rate exceeds 20%"*, or *"In a pessimistic scenario (10th percentile), portfolio depleted by age 88"*.
+
+If your essential floor is simply more than the portfolio can support, you get: *"Your essential floor exceeds what the portfolio can sustain at this confidence. Results measure a REDUCED floor; against your original floor, success is X%."* That's a signal to either lower the floor, work longer, or save more — the optimizer can't conjure money that isn't there.
+
+### Longevity-Aware Success
+
+If the scenario has **Model Uncertain Lifespans** enabled (that toggle lives on the *scenario* form, not here), an extra card appears: *"Instead of the fixed death ages above, this samples each spouse's death year per Monte Carlo trial from an SSA mortality table. The fixed-death Success Probability above stays for comparison."*
+
+It shows **Lifetime Success** (*"Never falls short while either spouse is alive"*) and **Longevity-Conditional Success** (*"If the survivor lives to age 95"*, or whatever longevity age you set), plus the sampled second-death age at the 10th percentile, median, and 90th percentile.
+
+### The Tax Disclaimer
+
+The results carry this note, and it's worth reading:
+
+> **Note:** Spending recommendations account for income tax on traditional account withdrawals using your scenario's filing status and withdrawal ordering. Actual tax liability may vary based on deductions, credits, and state taxes not fully modeled in the Monte Carlo simulation.
+
+### Charts and Tables
+
+- **Outcome Range** — a band from **Pessimistic (p10)** to **Median (p50)** final portfolio balance.
+- **Phase Achievement** — per phase: target, average recommended, and an achievement bar (green at 90%+, amber at 70%+, red below).
+- **Portfolio Balance Projections** — the fan chart. *"The dark line shows the median outcome. The shaded bands show the range between pessimistic (10th percentile) and median (50th percentile) scenarios. The red dashed line is the worst-case floor."*
+- **Spending Corridor** — *"The blue line shows recommended spending at your confidence level. The shaded band shows the adjustment range — spend near the top in good markets, cut toward the bottom in downturns. The green area represents income that offsets portfolio withdrawals."*
+- **Year-by-Year Breakdown** — Age, Phase, Recommended, Floor, Discretionary, Income, Portfolio Draw, portfolio balance at p10/p25/p50, and the spending corridor range.
+- **Near-Term Spending Guide** — the tactical view. A hero card for year one with the recommended amount broken into Essential, Discretionary, Income, and Portfolio Draw, then a short run of following years. Each year also shows what you could spend if the portfolio outperforms: a **Recommended (p25)** figure and an **Expected path (p50)** figure.
+- **Roth Conversion Strategy** — when conversions were optimized: lifetime tax with and without conversions, estimated savings, the conversion and RMD bracket settings, a Traditional/Roth balance trajectory chart, and the full year-by-year conversion schedule.
+
+### Living With the Plan
+
+Back on **Spending Profiles**, guardrail profiles get their own section: *"Optimized spending plans generated by the Monte Carlo simulator. These override the standard spending profile on their attached scenario."*
+
+Each shows a **$min – $max / year** range with tiles for **Essential Floor**, **Failure Rate**, **Median Final Balance**, **Trials**, **Cash Buffer**, and **Balance Range (P10–P50)**, plus **View**, **Re-optimize**, and **Delete** actions.
+
+A **Stale** badge means the scenario changed after the optimization ran — balances moved, you added an account, you changed the retirement date. The numbers are no longer trustworthy; click **Re-optimize** to refresh them using the same confidence level and risk tolerance as before.
+
+Deleting a guardrail profile asks first: *"Delete this guardrail profile? The scenario will revert to its spending profile for projections."*

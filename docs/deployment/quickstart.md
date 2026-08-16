@@ -3,8 +3,8 @@
 # Quick Start Guide
 
 Get WealthView running locally in about 5 minutes. This uses the development
-Docker Compose setup, which is ideal for trying the app out. For a real
-deployment (public URL, TLS, backups), see
+Docker Compose setup (`docker-compose.yml`), which is ideal for trying the app
+out. For a real deployment (public URL, TLS, backups), see
 [production-setup.md](production-setup.md).
 
 ---
@@ -14,7 +14,9 @@ deployment (public URL, TLS, backups), see
 - **Docker** with the Compose plugin (`docker compose` as two words — not the
   legacy `docker-compose`).
 - **1 GB RAM** minimum (2 GB recommended).
-- **Port 80** available on the host.
+- **Port 80** free on the host (the app) and **port 5433** free (PostgreSQL is
+  published on 5433 so it doesn't collide with a native PostgreSQL on 5432).
+- `curl` and `openssl` — used by `./wv` for health probes and secret generation.
 
 Verify Docker is installed:
 
@@ -49,17 +51,33 @@ cd wealthview
 cp .env.example .env
 ```
 
-Open `.env` in an editor and replace every `CHANGE_ME` with a random value.
-You can generate values directly on the command line:
+Open `.env` in an editor and replace every `CHANGE_ME`. Four variables are
+**required** — the Compose file uses `${VAR:?...}` syntax and refuses to start
+without them:
 
-```bash
-openssl rand -base64 24   # DB_PASSWORD
-openssl rand -base64 48   # JWT_SECRET (must be 32+ chars)
-openssl rand -base64 18   # SUPER_ADMIN_PASSWORD
-```
+| Variable | Generate with |
+|---|---|
+| `DB_PASSWORD` | `openssl rand -base64 24` |
+| `JWT_SECRET` (32+ chars) | `openssl rand -base64 48` |
+| `SUPER_ADMIN_PASSWORD` | `openssl rand -base64 18` |
+| `MFA_ENCRYPTION_KEY` (base64 32 bytes) | `openssl rand -base64 32` |
 
-For a local trial you can leave `FINNHUB_API_KEY`, `ZILLOW_ENABLED`,
-`CORS_ORIGIN`, and `APP_PORT` at their defaults.
+Everything else in `.env.example` is optional for a local trial. Leave
+`FINNHUB_API_KEY` and `ZILLOW_ENABLED` alone, and leave `WEALTHVIEW_VERSION`
+commented out — setting it flips the tooling into production mode.
+
+> `CORS_ORIGIN` and `APP_PORT` have **no effect** on the dev stack.
+> `docker-compose.yml` hardcodes the port mapping `80:8080`, and the `docker`
+> Spring profile hardcodes the allowed origin to `http://localhost`. Both
+> variables only matter for `docker-compose.prod.yml`.
+
+Two things to know about the placeholders:
+
+- `ProductionConfigValidator` runs on the `docker` profile as well as `prod`.
+  It rejects blank values, JWT secrets under 32 characters, the known dev
+  defaults (`admin123`, `demo123`), and anything starting with `LOCAL_DEV_`.
+- `./wv` refuses to start the stack while any required variable is still
+  literally `CHANGE_ME`.
 
 Lock down file permissions:
 
@@ -71,42 +89,47 @@ chmod 600 .env
 
 ## Step 3: Start WealthView
 
+`./wv` is the single command surface for the stack. It picks the right compose
+file automatically — dev, because `WEALTHVIEW_VERSION` is unset.
+
 ```bash
-docker compose up --build -d
+./wv up
 ```
 
-Line-by-line:
+This validates `.env`, runs `docker compose up --build -d`, then polls
+`http://localhost/actuator/health` for up to 120 seconds and reports success or
+points you at the logs. The first build takes 2–5 minutes (it pulls Maven and
+npm dependencies); later builds reuse Docker's layer cache and are much faster.
 
-- `docker compose up` — create and start every service in the default
-  `docker-compose.yml` file.
-- `--build` — build the application Docker image from source before starting.
-  First build takes 2–5 minutes (it pulls Maven + npm dependencies). Later
-  builds reuse Docker's layer cache and are much faster.
-- `-d` — detach; run in the background.
+Useful flags: `--no-build` (skip the rebuild), `--no-detach` (run in the
+foreground), `--no-wait` (skip the health poll).
 
-Watch the startup logs until you see `Started WealthviewApplication`:
+To watch the startup logs until you see `Started WealthviewApplication`:
 
 ```bash
-docker compose logs -f app
+./wv logs app
 ```
 
 Press `Ctrl-C` to stop tailing. The containers keep running.
+
+> The equivalent raw command is
+> `docker compose up --build -d`. `./wv` adds the `.env` validation and the
+> health wait, so prefer it.
 
 ---
 
 ## Step 4: Verify
 
-Check that both containers are healthy:
-
 ```bash
-docker compose ps
+./wv status
 ```
 
-You should see two services (`app` and `db`) both marked `running`. The
-`app` row also shows `(healthy)` once the container-level HEALTHCHECK passes
-(30–60 seconds after startup).
+This prints the compose mode, the compose file in use, `docker compose ps`, and
+a one-shot health probe. You should see two services (`app` and `db`) both
+`running`; the `app` row also shows `(healthy)` once the container-level
+HEALTHCHECK passes (30–60 seconds after startup).
 
-Hit the health endpoint:
+You can hit the health endpoint directly too:
 
 ```bash
 curl -s http://localhost/actuator/health
@@ -124,8 +147,8 @@ Log in with the super-admin account:
 - **Email:** `admin@wealthview.local`
 - **Password:** the `SUPER_ADMIN_PASSWORD` value you put in `.env`
 
-A demo tenant is seeded automatically with the `docker` profile. You can
-also log in with:
+A demo tenant is seeded automatically by `SampleDataInitializer` on the
+`docker` profile. You can also log in with:
 
 - **Email:** `demo@wealthview.local`
 - **Password:** `demo123`
@@ -141,30 +164,50 @@ The default Compose setup runs two containers:
 
 | Container | Role |
 |-----------|------|
-| **db** | PostgreSQL 16 with persistent storage in a named Docker volume (`pgdata`). |
-| **app** | Spring Boot application serving both the API and the React frontend at port 80. |
+| **db** | PostgreSQL 16 (image pinned by digest). Data persists in the named Docker volume `pgdata`. Published on host port **5433**. |
+| **app** | Spring Boot application serving both the API and the built React SPA. Container port 8080, published on host port **80**. |
 
-The `docker` Spring profile is active — this enables seeded demo data and
-allows `http://localhost` as a valid CORS origin. It is **not** suitable for
-internet-facing deployments.
+The image is built by the multi-stage `Dockerfile` at the repo root: Node 24
+Alpine builds the frontend, `maven:3.9-eclipse-temurin-25` builds the backend,
+and the runtime layer is `eclipse-temurin:25-jre-alpine` running as the
+non-root user `wv`. All three base images are pinned by digest.
+
+The `docker` Spring profile is active — this enables seeded demo data, disables
+the `Secure` cookie flag so plain HTTP works, and allows `http://localhost` as
+the CORS origin. It is **not** suitable for internet-facing deployments.
+
+There is no `backup` container in the dev stack; that service only exists in
+`docker-compose.prod.yml`.
+
+---
+
+## Talking to the database
+
+PostgreSQL is published on host port 5433, so a local backend run
+(`mvn spring-boot:run`) or an IDE run config connects without extra config —
+`application.yml` defaults to `jdbc:postgresql://localhost:5433/wealthview`.
+
+For an interactive shell inside the container:
+
+```bash
+./wv psql            # psql -U wv_app wealthview
+```
 
 ---
 
 ## Stopping / restarting
 
 ```bash
-# Stop everything, preserve data.
-docker compose down
-
-# Stop and DELETE the database volume. Everything is gone after this.
-docker compose down -v
-
-# Restart after a code change.
-docker compose up --build -d
-
-# Tail combined logs.
-docker compose logs -f
+./wv down                   # stop everything, preserve the pgdata volume
+./wv down --with-volumes    # DESTROY the database volume (prompts first)
+./wv restart                # down, then up (volumes preserved)
+./wv up                     # rebuild and restart after a code change
+./wv logs                   # tail all services
+./wv logs --tail 100 app    # last 100 lines of one service, then follow
 ```
+
+Run `./wv help` for the full operator man page, or `./wv <subcommand> --help`
+for per-subcommand detail.
 
 ---
 
@@ -172,6 +215,7 @@ docker compose logs -f
 
 - [Production Setup](production-setup.md) — deploy on a real host with TLS,
   backups, and an edge proxy.
+- [Operations Handbook](operations.md) — every `./wv` subcommand, end to end.
 - [Cloudflare Tunnel](cloudflared.md) — expose a self-hosted server to the
   internet without opening any ports.
 - [TLS and Nginx](tls-and-nginx.md) — host-managed TLS via Let's Encrypt.
