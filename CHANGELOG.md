@@ -6,47 +6,41 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Documentation
-- Repo-wide documentation truth pass: 58 files reconciled against the code they
-  describe. Most reference, user-guide and administration pages had not been
-  touched since 2026-03-14 and had accumulated five months of drift.
-  The corrections that mattered most:
-  - **API reference** was missing roughly 90 endpoints, documented six that do
-    not exist, and described the auth scheme backwards — it claimed tokens are
-    returned in the login body, when web auth is HttpOnly cookies with CSRF
-    double-submit and Bearer is the *mobile* transport.
-  - **Data model** documented 23 entities across 8 domains; the schema has 42
-    across 9. All of auth/MFA/sessions, stock splits, exchange rates, the
-    projection-realism tables, mortality, IRMAA and state tax were absent.
-  - **Projection docs** were wrong on the numbers that matter: confidence levels
-    (documented 90/80/70, actually 0.95/0.90/0.80), the definition of success
-    (it is the essential floor being funded every year), and a claim that tax
-    brackets are inflation-indexed "matching IRS COLA methodology" when the
-    engine is constant-real. `PoolStrategy.SinglePool` and
-    `IRMAA_BRACKET_RATE` were documented but do not exist.
-  - **Spending tiers** were documented as having per-tier inflation.
-    `TierBasedSpendingPlan.computeInflationFactor()` returns `1.0`
-    unconditionally — tier amounts are today's dollars held constant real.
-  - **PROJECT.md listed email alerts as shipped.** There is no mail sender in
-    the codebase; notification preferences are storage plus a GET/PUT endpoint,
-    with no delivery and no web UI. Moved to the roadmap.
-  - **Cost basis** was documented as "buys minus sells"; it is average cost, and
-    the worked example gave the wrong answer.
-  - `docs/reference/configuration.md` had been publishing a `JWT_SECRET` default
-    that `ProductionConfigValidator` actively rejects, plus
-    `SUPER_ADMIN_PASSWORD=admin123`. Both removed.
-  - Operator procedures across the administration and deployment guides now use
-    the `./wv` command surface rather than the ad-hoc scripts it replaced.
-  - `docs/DeploymentGuide.md`, an orphaned duplicate with no inbound links, is
-    now a routing index rather than a fourth copy of the deployment facts.
+## [1.2.5] — 2026-08-16
+
+A documentation-truth pass over the whole repository, and the twelve code
+defects that pass uncovered. No schema changes (still V080).
+
+Most reference, user-guide and administration pages had not been touched since
+2026-03-14. Reconciling them against the code turned up bugs that were invisible
+precisely because the docs described the broken behavior as if it were intended —
+monitoring that had never collected a metric, an audit log any user could read,
+and a price sync running twice a day.
+
+### Upgrade notes
+
+Three changes are operator-visible. None require a schema migration or a config
+change to keep working, but read these before upgrading:
+
+- **`docker-compose.prod.yml` now refuses to start when a required secret is
+  missing.** `DB_PASSWORD`, `JWT_SECRET`, `SUPER_ADMIN_PASSWORD` and
+  `MFA_ENCRYPTION_KEY` moved to the fail-loud `${VAR:?}` form. A deployment that
+  was silently running with an empty secret will now stop and tell you. If you
+  drive the stack with `./wv`, `wv_env_check` was already catching this.
+- **`GET /api/v1/audit-log` now requires `admin` or `super_admin`.** It was
+  readable by any authenticated user, including viewers. Anything scripted
+  against that endpoint with a member token will start getting 403.
+- **Scheduled backups are now named `wealthview_auto_<ts>.dump`.** Existing
+  backups are untouched and still listed and restorable; only external tooling
+  that globs the exact old scheduled filename needs updating.
 
 ### Security
 - `GET /api/v1/audit-log` now requires `admin` or `super_admin`. It carried no
-  matcher at all and fell through to `anyRequest().authenticated()`, so any
-  member or viewer could read the tenant's entire audit trail — every action by
-  every user, admin operations included — straight over HTTP. The web UI only
-  linked it from the admin area, which made it look gated; UI-only gating is not
-  access control. Covered by two new integration tests.
+  matcher and fell through to `anyRequest().authenticated()`, so any member or
+  viewer could read the tenant's entire audit trail — every action by every
+  user, admin operations included — straight over HTTP. The web UI only linked
+  it from the admin area, which made it look gated; UI-only gating is not access
+  control.
 - The bundled Prometheus/Grafana stack was collecting **nothing**, on every
   profile except `loadtest`, for its entire existence. `prometheus.yml` scraped
   with HTTP Basic, but the filter chain only ever accepted a JWT — Basic was
@@ -64,11 +58,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   asserts the flag does not unlock the rest of `/actuator`. The old hardcoded
   `loadtest`-profile carve-out in `SecurityConfig` collapsed into this same
   property, so there is one mechanism instead of two.
-- `docker-compose.prod.yml` now fails loudly on missing secrets. `DB_PASSWORD`,
-  `JWT_SECRET`, `SUPER_ADMIN_PASSWORD` and `MFA_ENCRYPTION_KEY` used bare
-  `${VAR}`, so a missing prod secret silently became an empty string. Only the
-  `./wv` path was guarded, by `wv_env_check`; a direct `docker compose` had no
-  guard at all.
+- `docker-compose.prod.yml` now fails loudly on missing secrets. See upgrade
+  notes above.
+- Cleared the last outstanding npm advisory (`brace-expansion` unbounded-expansion
+  DoS, GHSA-mh99-v99m-4gvg, dev-tooling only). `npm dedupe` after the React Native
+  bump collapsed the vulnerable 1.x paths; `npm audit` now reports 0 vulnerabilities,
+  down from 1 high.
 
 ### Fixed
 - The daily price sync ran **twice every weekday**, burning double the Finnhub
@@ -134,6 +129,40 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   elements and a null reached the service, where it auto-unboxed into a
   primitive `boolean`.
 
+### Documentation
+- Repo-wide documentation truth pass: 58 files reconciled against the code they
+  describe. Most reference, user-guide and administration pages had not been
+  touched since 2026-03-14 and had accumulated five months of drift.
+  The corrections that mattered most:
+  - **API reference** was missing roughly 90 endpoints, documented six that do
+    not exist, and described the auth scheme backwards — it claimed tokens are
+    returned in the login body, when web auth is HttpOnly cookies with CSRF
+    double-submit and Bearer is the *mobile* transport.
+  - **Data model** documented 23 entities across 8 domains; the schema has 42
+    across 9. All of auth/MFA/sessions, stock splits, exchange rates, the
+    projection-realism tables, mortality, IRMAA and state tax were absent.
+  - **Projection docs** were wrong on the numbers that matter: confidence levels
+    (documented 90/80/70, actually 0.95/0.90/0.80), the definition of success
+    (it is the essential floor being funded every year), and a claim that tax
+    brackets are inflation-indexed "matching IRS COLA methodology" when the
+    engine is constant-real. `PoolStrategy.SinglePool` and
+    `IRMAA_BRACKET_RATE` were documented but do not exist.
+  - **Spending tiers** were documented as having per-tier inflation.
+    `TierBasedSpendingPlan.computeInflationFactor()` returns `1.0`
+    unconditionally — tier amounts are today's dollars held constant real.
+  - **PROJECT.md listed email alerts as shipped.** There is no mail sender in
+    the codebase; notification preferences are storage plus a GET/PUT endpoint,
+    with no delivery and no web UI. Moved to the roadmap.
+  - **Cost basis** was documented as "buys minus sells"; it is average cost, and
+    the worked example gave the wrong answer.
+  - `docs/reference/configuration.md` had been publishing a `JWT_SECRET` default
+    that `ProductionConfigValidator` actively rejects, plus
+    `SUPER_ADMIN_PASSWORD=admin123`. Both removed.
+  - Operator procedures across the administration and deployment guides now use
+    the `./wv` command surface rather than the ad-hoc scripts it replaced.
+  - `docs/DeploymentGuide.md`, an orphaned duplicate with no inbound links, is
+    now a routing index rather than a fourth copy of the deployment facts.
+
 ### Changed
 - Test coverage pass across the financial math, the HTTP surface, and the
   import parsers: +145 backend tests (household capital-gains taxation, bracket
@@ -151,12 +180,6 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   3.10.0 → 3.10.1, Playwright 1.62.0 → 1.62.1, plus React type packages.
   Axios 1.18.1 → 1.19.0 in all three workspaces. Mobile: React Native
   0.86.0 → 0.86.2 with every `@react-native/*` package moved in lockstep.
-
-### Security
-- Cleared the last outstanding npm advisory (`brace-expansion` unbounded-expansion
-  DoS, GHSA-mh99-v99m-4gvg, dev-tooling only). `npm dedupe` after the React Native
-  bump collapsed the vulnerable 1.x paths; `npm audit` now reports 0 vulnerabilities,
-  down from 1 high.
 
 ## [1.2.4] — 2026-07-27
 
@@ -424,5 +447,10 @@ First tagged release. Consolidates all development prior to the 1.0 cut.
 - Test-first workflow mandated by `CLAUDE.md`; no production code without a
   failing test.
 
-[Unreleased]: https://github.com/jakefearsd/wealthview/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/jakefearsd/wealthview/compare/v1.2.5...HEAD
+[1.2.5]: https://github.com/jakefearsd/wealthview/compare/v1.2.4...v1.2.5
+[1.2.4]: https://github.com/jakefearsd/wealthview/compare/v1.2.3...v1.2.4
+[1.2.3]: https://github.com/jakefearsd/wealthview/compare/v1.2.2...v1.2.3
+[1.2.2]: https://github.com/jakefearsd/wealthview/compare/v1.2.1...v1.2.2
+[1.2.1]: https://github.com/jakefearsd/wealthview/compare/v1.0.0...v1.2.1
 [1.0.0]: https://github.com/jakefearsd/wealthview/releases/tag/v1.0.0
