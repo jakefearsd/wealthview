@@ -16,6 +16,58 @@ wv_die() {
     exit 1
 }
 
+# --- Cleanup registry. ------------------------------------------------------
+# bash has exactly ONE EXIT trap per shell, and `wv` runs every subcommand in a
+# single shell process (bin/wv sources the library and calls the function). A
+# subcommand that installs its own `trap ... EXIT` therefore silently REPLACES
+# any trap an outer command already set: `wv migrate-in` registered its staging
+# directory for deletion, then sourced restore.sh, whose own EXIT trap wiped
+# that registration out and leaked the extracted bundle on every encrypted
+# restore.
+#
+# RETURN traps are not an escape hatch either, for two reasons that bit this
+# codebase:
+#   1. `exit` does NOT run RETURN traps, so every wv_die path skipped cleanup —
+#      that is how `wv verify` left a live postgres container and a DECRYPTED
+#      database dump behind when the readiness probe timed out.
+#   2. A RETURN trap fires when a SOURCED SCRIPT completes, not only when the
+#      function that set it returns. `wv migrate-out` set one and then sourced
+#      backup.sh, which fired the trap and deleted its own staging directory
+#      mid-run.
+#
+# So: register cleanup actions here instead of calling `trap` directly. Actions
+# are shell command strings, run LIFO (innermost first), each isolated so one
+# failure cannot stop the rest. Use single quotes and pre-expand any variable
+# you need, exactly as with a trap string.
+#
+#   wv_on_exit "docker rm -fv '$container' >/dev/null 2>&1"
+#   wv_on_exit "rm -rf '$staging'"
+WV_CLEANUP_ACTIONS=()
+
+wv_on_exit() {
+    WV_CLEANUP_ACTIONS+=("$1")
+}
+
+_wv_run_cleanup() {
+    # Preserve the exit status we were invoked with — cleanup must never change
+    # the script's result.
+    local rc=$?
+    local i
+    for (( i = ${#WV_CLEANUP_ACTIONS[@]} - 1; i >= 0; i-- )); do
+        eval "${WV_CLEANUP_ACTIONS[i]}" || true
+    done
+    # Clearing the list makes a second invocation a no-op, so the signal traps
+    # below can run cleanup eagerly without it happening twice via EXIT.
+    WV_CLEANUP_ACTIONS=()
+    return "$rc"
+}
+
+# Signals get an explicit handler: relying on EXIT alone is not portable enough
+# to bet a running container on, and 130/143 are the conventional statuses.
+trap '_wv_run_cleanup; exit 130' INT
+trap '_wv_run_cleanup; exit 143' TERM
+trap _wv_run_cleanup EXIT
+
 # --- Required-binary guard. ------------------------------------------------
 wv_require() {
     # wv_require docker docker-compose age
