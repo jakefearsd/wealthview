@@ -105,7 +105,7 @@ EOF
 }
 
 @test "each subcommand supports --help" {
-    for sub in up down restart status logs psql backup backups restore verify update rollback migrate-out migrate-in rotate-secret config-check; do
+    for sub in up down restart status logs psql backup backups restore verify update rollback migrate-out migrate-in rotate-secret config-check prune; do
         run ./wv "$sub" --help
         [ "$status" -eq 0 ] || {
             echo "FAILED: ./wv $sub --help (status $status)"
@@ -442,4 +442,193 @@ EOF
     run _wv_update_default_acquire
     [ "$status" -eq 0 ]
     [ "$output" = "build" ]
+}
+
+# --- Cleanup registry (wv_on_exit) --------------------------------------------
+#
+# bash has exactly ONE EXIT trap per shell, and bin/wv runs every subcommand in
+# a single shell process, so subcommands that called `trap ... EXIT` themselves
+# silently clobbered one another. The RETURN-trap workaround misfired in two
+# further ways. Three production resource leaks came out of that, and each of
+# these tests pins the semantics that makes one of them impossible:
+#
+#   wv verify      used a RETURN trap, but `exit` does not run RETURN traps, so
+#                  a timed-out readiness probe left a live postgres container
+#                  AND a decrypted database dump behind.
+#   wv migrate-out set a RETURN trap and then sourced backup.sh; the trap fired
+#                  when that sourced script completed and deleted migrate-out's
+#                  own staging directory mid-run.
+#   wv migrate-in  registered its staging dir with `trap ... EXIT`, which the
+#                  trap wv_restore installed then replaced, leaking the
+#                  extracted bundle on every encrypted restore.
+#
+# Do not delete these as redundant with each other: they cover different failure
+# modes of the same one-trap-per-shell constraint.
+
+_write_cleanup_script() {
+    # Writes a standalone script at $1 that boots the real common.sh exactly the
+    # way bin/wv does (WV_ROOT + WV_LIB_DIR, config search disabled, `set -euo
+    # pipefail` already in effect), followed by the body read from stdin.
+    #
+    # These tests need a child process: the registry is about what a whole shell
+    # does on its way out, and calling `exit` in a bats test body would just end
+    # the test. Run the result with `run bash "$script"` and assert on $status,
+    # $output, and file side effects under $BATS_TEST_TMPDIR.
+    local path="$1"
+    {
+        echo 'set -euo pipefail'
+        echo "export WV_ROOT='$SANDBOX' WV_LIB_DIR='$SANDBOX/bin/wv-lib'"
+        echo 'export WV_DISABLE_CONFIG_SEARCH=1'
+        echo ". '$SANDBOX/bin/wv-lib/common.sh'"
+        cat
+    } > "$path"
+}
+
+@test "cleanup registry: registered actions run when the shell exits normally" {
+    local marker="$BATS_TEST_TMPDIR/ran"
+    local script="$BATS_TEST_TMPDIR/normal-exit.sh"
+    _write_cleanup_script "$script" <<EOF
+wv_on_exit "touch '$marker'"
+EOF
+    [ ! -f "$marker" ]
+    run bash "$script"
+    [ "$status" -eq 0 ]
+    [ -f "$marker" ]
+}
+
+@test "cleanup registry: actions run LIFO, most recently registered first" {
+    # Innermost-first matters: an inner action often depends on an outer one
+    # (stop the container before deleting the directory it bind-mounts).
+    local script="$BATS_TEST_TMPDIR/lifo.sh"
+    _write_cleanup_script "$script" <<'EOF'
+wv_on_exit "echo outer"
+wv_on_exit "echo inner"
+EOF
+    run bash "$script"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "inner" ]
+    [ "${lines[1]}" = "outer" ]
+}
+
+@test "cleanup registry: preserves the exit status it was invoked with" {
+    local marker="$BATS_TEST_TMPDIR/ran"
+    local script="$BATS_TEST_TMPDIR/exit-status.sh"
+    _write_cleanup_script "$script" <<EOF
+wv_on_exit "touch '$marker'"
+exit 7
+EOF
+    run bash "$script"
+    [ "$status" -eq 7 ]
+    [ -f "$marker" ]
+}
+
+@test "cleanup registry: a wv_die path still exits 1 after cleanup has run" {
+    # Cleanup must never launder a failure into a success — callers (and CI)
+    # key off wv's exit code.
+    local marker="$BATS_TEST_TMPDIR/ran"
+    local script="$BATS_TEST_TMPDIR/die-status.sh"
+    _write_cleanup_script "$script" <<EOF
+wv_on_exit "touch '$marker'"
+wv_die "something went wrong"
+EOF
+    run bash "$script"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"something went wrong"* ]]
+    [ -f "$marker" ]
+}
+
+@test "cleanup registry: cleanup runs on the exit path (regression: wv verify)" {
+    # wv verify used a RETURN trap; `exit` doesn't run those, so a timed-out
+    # readiness probe left a live postgres container and a decrypted dump.
+    local container="$BATS_TEST_TMPDIR/fake-container"
+    local decrypted="$BATS_TEST_TMPDIR/decrypted.dump"
+    local script="$BATS_TEST_TMPDIR/verify-timeout.sh"
+    _write_cleanup_script "$script" <<EOF
+_fake_verify() {
+    touch '$container'
+    wv_on_exit "rm -f '$container'"
+    touch '$decrypted'
+    wv_on_exit "rm -f '$decrypted'"
+    wv_die "throwaway postgres did not become ready in time"
+}
+_fake_verify
+EOF
+    run bash "$script"
+    [ "$status" -eq 1 ]
+    [ ! -f "$container" ]
+    [ ! -f "$decrypted" ]
+}
+
+@test "cleanup registry: a sourced script completing does not fire cleanup (regression: wv migrate-out)" {
+    # migrate-out registered its staging dir, then sourced backup.sh. With a
+    # RETURN trap the source's completion fired cleanup and deleted the staging
+    # dir out from under the still-running command.
+    local staging="$BATS_TEST_TMPDIR/staging"
+    local inner="$BATS_TEST_TMPDIR/inner-lib.sh"
+    local script="$BATS_TEST_TMPDIR/migrate-out.sh"
+    mkdir -p "$staging"
+    echo 'wv_log "inner library ran"' > "$inner"
+    _write_cleanup_script "$script" <<EOF
+wv_on_exit "rm -rf '$staging'"
+. '$inner'
+[[ -d '$staging' ]] || wv_die "staging dir was deleted by the sourced script"
+wv_log "staging dir survived the sourced script"
+EOF
+    run bash "$script"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"staging dir survived the sourced script"* ]]
+    # ...and it is still cleaned up once the shell itself exits.
+    [ ! -d "$staging" ]
+}
+
+@test "cleanup registry: a second registration does not discard the first (regression: wv migrate-in)" {
+    # migrate-in's staging-dir EXIT trap was silently replaced by the one
+    # wv_restore installed, so the extracted bundle leaked on every encrypted
+    # restore. Registering is additive; both actions must run.
+    local outer="$BATS_TEST_TMPDIR/migrate-in-staging"
+    local inner_dir="$BATS_TEST_TMPDIR/restore-staging"
+    local inner="$BATS_TEST_TMPDIR/restore-lib.sh"
+    local script="$BATS_TEST_TMPDIR/migrate-in.sh"
+    mkdir -p "$outer" "$inner_dir"
+    cat > "$inner" <<EOF
+wv_on_exit "rm -rf '$inner_dir'"
+EOF
+    _write_cleanup_script "$script" <<EOF
+wv_on_exit "rm -rf '$outer'"
+. '$inner'
+EOF
+    run bash "$script"
+    [ "$status" -eq 0 ]
+    [ ! -d "$inner_dir" ]
+    [ ! -d "$outer" ]
+}
+
+@test "cleanup registry: the handler is idempotent, so signal and EXIT cannot double-fire" {
+    # The INT/TERM traps run cleanup eagerly and then exit, which fires EXIT
+    # too. Running the handler twice must not run the actions twice.
+    local log="$BATS_TEST_TMPDIR/cleanup.log"
+    local script="$BATS_TEST_TMPDIR/idempotent.sh"
+    _write_cleanup_script "$script" <<EOF
+wv_on_exit "echo ran >> '$log'"
+_wv_run_cleanup
+_wv_run_cleanup
+EOF
+    run bash "$script"
+    [ "$status" -eq 0 ]
+    # Once for the explicit calls, and not again via the EXIT trap.
+    [ "$(wc -l < "$log")" -eq 1 ]
+}
+
+@test "cleanup registry: one failing action does not stop the rest" {
+    # Actions are isolated with `|| true`; without it `set -euo pipefail` would
+    # abort the loop and skip every action registered before the failure.
+    local marker="$BATS_TEST_TMPDIR/still-ran"
+    local script="$BATS_TEST_TMPDIR/failing-action.sh"
+    _write_cleanup_script "$script" <<EOF
+wv_on_exit "touch '$marker'"
+wv_on_exit "false"
+EOF
+    run bash "$script"
+    [ "$status" -eq 0 ]
+    [ -f "$marker" ]
 }
