@@ -1,6 +1,8 @@
 # shellcheck shell=bash
 # verify.sh — restore a backup into a throwaway pg container to confirm
-# integrity. Tears down the container and its volume on exit.
+# integrity. Teardown (the container, its anonymous data volume, and any
+# decrypted plaintext dump) is registered with wv_on_exit from common.sh, so
+# it also runs on the wv_die paths.
 
 # Postgres image used for verification — keep aligned with docker-compose.yml.
 WV_VERIFY_PG_IMAGE="postgres:16"
@@ -43,9 +45,13 @@ USAGE
         [[ -n "$key_file" && -f "$key_file" ]] \
             || wv_die "Encrypted backup requires BACKUP_ENCRYPTION_KEY_FILE pointing to an age identity file."
         tmp_plain="$(mktemp -t wv-verify-XXXXXX.dump)"
+        # Register the unlink the instant the file exists: from here on it is a
+        # DECRYPTED copy of the database, and every later failure path — the
+        # wv_die calls below included — must not leave it in /tmp. backup.sh
+        # takes the same care after encrypting.
+        wv_on_exit "rm -f '$tmp_plain'"
         wv_log "Decrypting $file -> temporary file"
-        age -d -i "$key_file" -o "$tmp_plain" "$file" \
-            || { rm -f "$tmp_plain"; wv_die "age decryption failed"; }
+        age -d -i "$key_file" -o "$tmp_plain" "$file" || wv_die "age decryption failed"
         feed_path="$tmp_plain"
     fi
 
@@ -53,11 +59,14 @@ USAGE
     local password
     password="wvverify$(date +%s)$RANDOM"
 
-    # Cleanup runs on RETURN (function exit) and on signals. We bake the
-    # container name and tmp file path into the trap string so the values
-    # are available even after locals go out of scope under set -u.
-    # shellcheck disable=SC2064
-    trap "docker rm -f '$container' >/dev/null 2>&1 || true; [[ -n '$tmp_plain' ]] && rm -f '$tmp_plain'; trap - INT TERM RETURN" RETURN INT TERM
+    # Registered BEFORE `docker run` so a half-created container is still reaped
+    # when the launch itself fails and wv_die fires. `-v` is not optional:
+    # postgres:16 declares VOLUME /var/lib/postgresql/data, and `docker rm -f`
+    # without it strands that anonymous volume — a full copy of the restored
+    # database — even for a container started with --rm. This used to be a
+    # RETURN trap, which `exit` (and therefore wv_die) never runs, so the
+    # readiness-timeout path leaked the container outright.
+    wv_on_exit "docker rm -fv '$container' >/dev/null 2>&1 || true"
 
     wv_log "Launching throwaway postgres container ($WV_VERIFY_PG_IMAGE)"
     docker run -d --rm \
