@@ -6,7 +6,14 @@
 # suite is safe to run in CI on a Docker-less runner.
 
 setup() {
-    BATS_TEST_TMPDIR="${BATS_TEST_TMPDIR:-$(mktemp -d)}"
+    # bats owns BATS_TEST_TMPDIR and removes it after each test. Do NOT fall back
+    # to a bare `mktemp -d` when it is unset: this file has no teardown(), so a
+    # self-made directory would leak a full sandbox copy of the repo per test.
+    # Fail loudly instead — an unset value means an unsupported bats.
+    [[ -n "${BATS_TEST_TMPDIR:-}" ]] || {
+        echo "BATS_TEST_TMPDIR is unset; bats >= 1.x is required" >&2
+        return 1
+    }
     REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
     export REPO_ROOT
     # Some tests mutate .env; do them in a sandboxed copy of the repo.

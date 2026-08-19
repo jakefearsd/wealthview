@@ -38,6 +38,9 @@ if [[ "$SMOKE" == "1" ]]; then
   export LOADTEST_TXNS_PER_TENANT="${LOADTEST_TXNS_PER_TENANT_SMOKE:-100}"
 fi
 
+# Create results/ on the HOST before any docker command touches it. A bind mount
+# whose target does not exist yet is created by the daemon as root:root, which
+# then needs sudo to clean up. Creating it here keeps it owned by the operator.
 TS="$(date +%Y%m%d-%H%M%S)"; OUT="results/$TS"; mkdir -p "$OUT" results
 # k6 runs as a non-root uid inside its container and writes the summary into this
 # subdir via the bind mount; make it world-writable so that write succeeds.
@@ -183,4 +186,28 @@ python3 gen_report.py "$OUT" "$PROFILE" "$VUS_MAX" "$START_EPOCH" "$END_EPOCH" >
 
 echo "==> Done. Artifacts in $OUT"
 echo "    Explore live: http://localhost:3001 (Grafana)"
-if [[ "$KEEP" == "0" ]]; then echo "==> Tearing down"; $COMPOSE --profile k6 down -v; fi
+
+if [[ "$KEEP" == "0" ]]; then
+  echo "==> Tearing down"
+  $COMPOSE --profile k6 down -v
+else
+  # --keep is the default because the whole point of Grafana/Pyroscope is to dig
+  # through the run afterwards. But the stack is 6 containers, 2 named volumes and
+  # 5 published ports, and it survives reboots (no restart policy, but nothing stops
+  # it either) — so say so plainly rather than letting it be forgotten.
+  cat <<NOTICE
+
+==> The load-test stack is STILL RUNNING (--keep is the default).
+    Containers : loadtest-db, loadtest-app, prometheus, postgres-exporter,
+                 pyroscope, grafana
+    Ports held : 5434 (db), 8081 (app), 9090 (prometheus), 4040 (pyroscope),
+                 3001 (grafana)
+    Volumes    : loadtest-db-data, prometheus-data
+
+    Tear it down when you are finished exploring:
+        $COMPOSE --profile k6 down -v
+
+    Results in ./loadtest/results/ are NOT pruned automatically; delete old
+    timestamped run directories by hand when you no longer need them.
+NOTICE
+fi

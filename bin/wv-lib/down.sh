@@ -12,6 +12,11 @@ wv_down() {
 By default, named volumes (database data, backups) are preserved. Use
 --with-volumes to wipe them; this is destructive and prompts for confirmation.
 
+Containers for services no longer in the compose file are removed too
+(--remove-orphans). Without it, renaming or dropping a service strands its
+container in the project indefinitely: `down` leaves it running with only a
+warning, and no later `wv` command ever reaps it.
+
 OPTIONS
     --with-volumes  also delete named volumes (DESTROYS database data)
 USAGE
@@ -28,8 +33,8 @@ USAGE
             wv_log "Aborted."
             return 1
         }
-        wv_compose down -v
+        wv_compose down -v --remove-orphans
     else
-        wv_compose down
+        wv_compose down --remove-orphans
     fi
 }
