@@ -215,6 +215,10 @@ SUBCOMMANDS
 
     Operational
       psql                Open a psql shell in the running db container.
+      prune               Remove dangling (untagged) WealthView images
+                          orphaned by rebuilds. Project-scoped by image
+                          label — never touches volumes, containers,
+                          networks or tagged images. --dry-run.
       rotate-secret NAME  Generate a new secure value for one of:
                           JWT_SECRET, DB_PASSWORD, SUPER_ADMIN_PASSWORD.
                           MFA_ENCRYPTION_KEY is deliberately NOT rotatable:
@@ -233,6 +237,10 @@ EXAMPLES
         wv backups
         wv verify backups/wealthview_2026-05-13T...dump.age
         wv restore backups/wealthview_2026-05-13T...dump.age
+
+    Reclaim disk after a run of dev rebuilds:
+        ./wv prune --dry-run
+        ./wv prune
 
     Upgrade in place:
         # Edit /etc/wealthview/.env: WEALTHVIEW_VERSION=1.4.0

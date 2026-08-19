@@ -43,6 +43,11 @@ RUN cd backend && mvn clean package -DskipTests -q
 # `docker inspect --format='{{index .RepoDigests 0}}' eclipse-temurin:25-jre-alpine`.
 FROM eclipse-temurin:25-jre-alpine@sha256:cdd967aa55f1d0175ebe57245e4450292e6e6dd185dce73f93580598934128aa
 WORKDIR /app
+# `wv prune` scopes itself to this project by filtering on this label, so it can
+# reclaim orphaned dev-rebuild images without touching other projects sharing the
+# daemon. CI applies the same key via docker/build-push-action, so locally-built
+# and published images are both matched — keep the two in sync.
+LABEL org.opencontainers.image.title="WealthView"
 RUN addgroup -S wv && adduser -S wv -G wv
 COPY --from=build --chown=wv:wv /app/backend/wealthview-app/target/*.jar app.jar
 COPY --from=frontend-build --chown=wv:wv /app/frontend/dist /app/static

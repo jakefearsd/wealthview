@@ -83,7 +83,7 @@ case "$SUBCOMMAND" in
         wv_help "$@"
         ;;
     up|down|restart|status|logs|psql|backup|backups|restore|verify|update|rollback|\
-    migrate-out|migrate-in|rotate-secret|config-check)
+    migrate-out|migrate-in|rotate-secret|config-check|prune)
         SUB_FILE="$WV_LIB_DIR/${SUBCOMMAND}.sh"
         if [[ ! -f "$SUB_FILE" ]]; then
             wv_die "Subcommand '$SUBCOMMAND' is registered but $SUB_FILE is missing."
