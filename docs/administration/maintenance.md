@@ -346,11 +346,29 @@ container, and delete stale `.age` files by hand.
 
 ### Docker Cleanup
 
+The dev stack rebuilds the app image on every `./wv up`, which moves the tag to
+the new image and leaves the previous one behind untagged — roughly 300MB per
+rebuild. `./wv prune` reclaims exactly those.
+
 ```bash
 # Check Docker disk usage
 docker system df
 
-# Remove stopped containers, unused networks, dangling images
+# Reclaim images orphaned by rebuilds. Project-scoped, so it is safe to run
+# routinely: it removes only images that are BOTH dangling AND carry the
+# WealthView image label. It never touches named volumes (which hold the
+# database), containers, networks, or any tagged image.
+./wv prune --dry-run    # list what would go
+./wv prune
+```
+
+The host-wide commands below are **not** project-scoped. On a machine that runs
+other Docker projects they will also delete those projects' images, containers,
+networks and build cache. Prefer `./wv prune` unless you specifically want a
+host-wide sweep.
+
+```bash
+# Remove stopped containers, unused networks, dangling images — ALL projects
 docker system prune -f
 
 # Remove ALL unused images (aggressive — will require re-downloading base images)

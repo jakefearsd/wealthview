@@ -6,6 +6,46 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **`wv verify` no longer leaks a PostgreSQL volume on every run.** Teardown ran
+  `docker rm -f` without `-v`. An explicit force-remove preempts Docker's own
+  auto-removal, so the container's anonymous volume — a full copy of the restored
+  database — was stranded even though the container was started with `--rm`. This
+  fired on the success path, not just on failure.
+- **`wv verify` no longer leaves a running container and a decrypted dump behind
+  on failure.** Teardown was a `RETURN` trap, and `exit` does not run `RETURN`
+  traps, so the readiness-timeout path cleaned up nothing: the throwaway postgres
+  container kept running, and the decrypted plaintext database dump stayed in
+  `/tmp` — undoing the care `wv backup --encrypt` takes to remove plaintext.
+- **`wv migrate-out` works again.** It guarded its staging directory with a
+  `RETURN` trap and then sourced `backup.sh`. A `RETURN` trap fires when a
+  *sourced script* completes, not only when the function that set it returns, so
+  the directory was deleted before the bundle was assembled and the command
+  failed outright.
+- **`wv migrate-in` no longer leaks its extracted bundle.** bash keeps exactly
+  one `EXIT` trap per shell; the trap `wv_restore` installs for the decrypted
+  dump silently replaced the one `migrate-in` had set for its staging directory.
+  Since `migrate-out` encrypts by default, this was the normal path.
+- **`deploy.sh` no longer strands image tarballs or accumulates image tags.** The
+  several-hundred-MB tarball was removed only by the script's final line, so any
+  failure — and the deliberate `exit 0` on the first-deploy path — left it in
+  `/tmp` on both the local and remote host. Old `wealthview:<version>` tags are
+  now swept on both ends, keeping the two most recent so `wv rollback` still has
+  a target.
+
+### Added
+- **`wv prune`** — reclaims app images orphaned by dev rebuilds (the dev stack
+  leaves ~300MB untagged per `wv up`). Scoped to this project by an OCI image
+  label, so unlike `docker system prune` it is safe to run on a host shared with
+  other Docker projects: it removes only images that are both dangling and
+  labelled WealthView, and never touches named volumes, containers, networks or
+  tagged images. Supports `--dry-run`.
+
+### Internal
+- Subcommand cleanup now goes through a shared `wv_on_exit` registry in
+  `bin/wv-lib/common.sh` rather than per-script `trap` calls, which were
+  clobbering each other and misfiring. Covered by nine regression tests.
+
 ## [1.2.6] — 2026-08-16
 
 Turns the release pipeline into an actual release: tagged builds now publish a

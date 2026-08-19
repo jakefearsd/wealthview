@@ -574,7 +574,11 @@ keeps looping until you fix the cause.
 # See what's using space
 docker system df
 
-# Remove stopped containers, unused networks, dangling images
+# Reclaim WealthView images orphaned by rebuilds (project-scoped; never
+# touches volumes, containers, networks or tagged images)
+./wv prune
+
+# Host-wide sweeps — these also hit OTHER projects on this daemon
 docker system prune -f
 
 # Aggressive: remove ALL unused images (will need re-download on next build)
