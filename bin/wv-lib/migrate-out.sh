@@ -46,8 +46,14 @@ USAGE
     local ts staging
     ts="$(wv_timestamp)"
     staging="$(mktemp -d -t wv-migrate-XXXXXX)"
-    # shellcheck disable=SC2064  # expand $staging now, on purpose
-    trap "rm -rf '$staging'" RETURN
+    # Register with wv_on_exit, NEVER with `trap ... RETURN`. A RETURN trap fires
+    # when a SOURCED SCRIPT completes, not just when the function that set it
+    # returns — so the `. backup.sh` a few lines below fired it immediately and
+    # deleted this staging directory before a single file was copied in, making
+    # migrate-out fail outright. `exit` does not run RETURN traps either, so every
+    # wv_die path below leaked the directory. wv_on_exit is wired to EXIT/INT/TERM
+    # and runs LIFO, which fixes both halves.
+    wv_on_exit "rm -rf '$staging'"
 
     wv_log "Taking migration backup..."
     # shellcheck source=bin/wv-lib/backup.sh
