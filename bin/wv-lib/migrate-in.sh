@@ -36,8 +36,15 @@ USAGE
 
     local staging
     staging="$(mktemp -d -t wv-migrate-in-XXXXXX)"
-    # shellcheck disable=SC2064  # expand $staging now, on purpose
-    trap "rm -rf '$staging'" EXIT
+    # Register with the shared cleanup registry, NEVER a bare `trap ... EXIT`.
+    # bash keeps exactly one EXIT trap per shell and wv runs every subcommand in
+    # that one shell, so the wv_restore call below — which sources restore.sh and
+    # registers its own cleanup for the decrypted dump — would REPLACE a trap set
+    # here, leaking this staging directory (the database dump plus the copied
+    # infra/ tree). migrate-out encrypts by default, so that was the normal path,
+    # not an edge case. wv_on_exit accumulates on a LIFO stack instead of
+    # clobbering, so both registrations survive.
+    wv_on_exit "rm -rf '$staging'"
 
     wv_log "Extracting bundle..."
     tar -C "$staging" -xzf "$bundle"

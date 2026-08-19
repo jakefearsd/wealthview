@@ -62,9 +62,15 @@ USAGE
             wv_die "Encrypted backup requires BACKUP_ENCRYPTION_KEY_FILE pointing to an age identity file."
         fi
         tmp_plain="$(mktemp -t wv-restore-XXXXXX.dump)"
-        # Make sure we always clean up the plaintext copy on exit.
-        # shellcheck disable=SC2064  # expand tmp_plain now, on purpose
-        trap "rm -f '$tmp_plain'" EXIT
+        # Always clean up the plaintext copy — via the shared cleanup registry,
+        # NEVER a bare `trap ... EXIT`. bash keeps exactly one EXIT trap per
+        # shell, and wv_restore runs both standalone (`wv restore`) and nested
+        # inside wv_migrate_in, which sources this file into the same shell after
+        # registering its own extracted-bundle staging directory. A trap here
+        # would silently replace that registration and leak the staging dir.
+        # wv_on_exit pushes onto a shared LIFO stack, so every registration
+        # survives on both paths.
+        wv_on_exit "rm -f '$tmp_plain'"
         wv_log "Decrypting $file -> temporary file"
         age -d -i "$key_file" -o "$tmp_plain" "$file" \
             || wv_die "age decryption failed"
