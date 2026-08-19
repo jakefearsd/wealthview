@@ -5,7 +5,7 @@
 WealthView is a self-hosted, multi-tenant personal finance application focused on investment portfolio monitoring, rental property income/expense tracking, and retirement projection modeling. It is designed for financially literate users who want full ownership of their data and the flexibility to share the platform with family or trusted peers.
 
 **Current state:** Phases 1–8 in the [Feature Breakdown](#feature-breakdown) have
-shipped; the latest release is **v1.2.6** (2026-08-16). This document describes
+shipped; the latest release is **v1.2.7** (2026-08-19). This document describes
 what the code actually does — anything not yet built is confined to the
 [Roadmap](#roadmap--not-yet-built) subsection. For the release history see
 [CHANGELOG.md](CHANGELOG.md); for contributor conventions see `CLAUDE.md`.

@@ -29,7 +29,7 @@ production host needs Docker, the compose file, the env file and registry
 access — no source tree and no JDK.
 
 Stack: Java 25, Spring Boot 4.1, Hibernate 7, PostgreSQL 16, React 19, Vite,
-PostgreSQL JDBC + Flyway 13. Latest released version: **v1.2.6**.
+PostgreSQL JDBC + Flyway 13. Latest released version: **v1.2.7**.
 
 Three Compose files live at the repo root:
 

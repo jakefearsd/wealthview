@@ -6,6 +6,34 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.7] — 2026-08-19
+
+A resource-leak pass over the admin tooling. `wv verify` was stranding a
+PostgreSQL volume — a full copy of the restored database — on *every* run
+including successful ones, and `wv migrate-out` did not work at all. No
+application, API or schema changes (still V080).
+
+### Upgrade notes
+- **`wv update` does NOT deliver this release.** Everything here lives in the
+  `wv` admin scripts, which are installed to `/usr/local/bin/wv` and
+  `/usr/local/lib/wv-lib/` by hand — not inside the app image. Pulling the
+  1.2.7 image gives you an identical application and none of these fixes.
+  Re-run the install step from
+  [operations.md](docs/deployment/operations.md#installing-on-a-production-server):
+
+  ```bash
+  sudo install -m 0755 bin/wv /usr/local/bin/wv
+  sudo install -m 0644 bin/wv-lib/*.sh /usr/local/lib/wv-lib/
+  ```
+- **Check for volumes already stranded by `wv verify`.** Every previous run left
+  one behind. They are anonymous, so they show as unnamed hex IDs:
+  `docker volume ls -qf dangling=true`. Confirm they are not in use, then remove
+  them — each holds a full copy of a restored database.
+- **`wv down` now passes `--remove-orphans`.** If you run the optional
+  observability overlay under the same compose project without passing its
+  `-f` file to `wv`, its containers now count as orphans and will be removed.
+  Named volumes are untouched, so no data is lost.
+
 ### Fixed
 - **`wv verify` no longer leaks a PostgreSQL volume on every run.** Teardown ran
   `docker rm -f` without `-v`. An explicit force-remove preempts Docker's own
@@ -32,6 +60,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   `/tmp` on both the local and remote host. Old `wealthview:<version>` tags are
   now swept on both ends, keeping the two most recent so `wv rollback` still has
   a target.
+- **`wv down` no longer strands orphaned containers.** It never passed
+  `--remove-orphans`, so renaming or dropping a compose service left its
+  container in the project indefinitely — `down` reported it as an orphan and
+  moved on, and no other subcommand ever reaped it.
+- **The load-test harness now reports what it leaves running.** `--keep` is
+  still the default, since exploring Grafana and Pyroscope after a run is the
+  point, but it left six containers, five published ports and two named volumes
+  up with no indication. It now prints them and the exact teardown command.
 
 ### Added
 - **`wv prune`** — reclaims app images orphaned by dev rebuilds (the dev stack
@@ -45,6 +81,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 - Subcommand cleanup now goes through a shared `wv_on_exit` registry in
   `bin/wv-lib/common.sh` rather than per-script `trap` calls, which were
   clobbering each other and misfiring. Covered by nine regression tests.
+- The bats suite no longer falls back to a self-made `mktemp -d` when
+  `BATS_TEST_TMPDIR` is unset. bats owns and cleans that directory; a self-made
+  one was never removed, and with no `teardown()` each test would have leaked a
+  full sandbox copy of the repo. It now fails loudly instead.
 
 ## [1.2.6] — 2026-08-16
 
@@ -562,7 +602,8 @@ First tagged release. Consolidates all development prior to the 1.0 cut.
 - Test-first workflow mandated by `CLAUDE.md`; no production code without a
   failing test.
 
-[Unreleased]: https://github.com/jakefearsd/wealthview/compare/v1.2.6...HEAD
+[Unreleased]: https://github.com/jakefearsd/wealthview/compare/v1.2.7...HEAD
+[1.2.7]: https://github.com/jakefearsd/wealthview/compare/v1.2.6...v1.2.7
 [1.2.6]: https://github.com/jakefearsd/wealthview/compare/v1.2.5...v1.2.6
 [1.2.5]: https://github.com/jakefearsd/wealthview/compare/v1.2.4...v1.2.5
 [1.2.4]: https://github.com/jakefearsd/wealthview/compare/v1.2.3...v1.2.4
