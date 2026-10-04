@@ -46,6 +46,17 @@
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>
         </dependency>
+        <!-- Hibernate needs a JSON FormatMapper for every @JdbcTypeCode(SqlTypes.JSON) / jsonb
+             column and auto-detects one from the classpath. Jackson 3 databind used to arrive
+             here only by accident, through flyway-core; Flyway 13.9.0 made it optional, after
+             which every jsonb read/write failed with "Could not find a FormatMapper for the JSON
+             format". Declared explicitly at runtime scope (no persistence code imports it).
+             Version from the Boot BOM. -->
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <scope>runtime</scope>
+        </dependency>
         <!-- Boot 4 moved the @DataJpaTest slice (plus @AutoConfigureTestDatabase
              and TestEntityManager) out of spring-boot-starter-test into dedicated
              test-slice modules. This starter restores them for the repository
