@@ -2,7 +2,7 @@ package com.wealthview.importmodule.ofx;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.Date;
 
 import org.junit.jupiter.api.Test;
@@ -19,7 +19,7 @@ import static org.mockito.Mockito.when;
 class OfxBankTransactionMapperTest {
 
     private static Date dateOf(LocalDate date) {
-        return Date.from(date.atStartOfDay(ZoneId.systemDefault()).toInstant());
+        return Date.from(date.atStartOfDay(ZoneOffset.UTC).toInstant());
     }
 
     @Test
