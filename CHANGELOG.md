@@ -6,6 +6,60 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.8] — 2026-10-04
+
+A dependency-refresh release. It brings the backend to Spring Boot 4.1.1 and
+Flyway 13.9, takes an axios update that closes 12 advisories in the code that
+ships to browsers and phones, rebuilds on JDK 25.0.4.1, and fixes an OFX import
+date bug the refresh exposed. No API or schema changes (still V080).
+
+### Upgrade notes
+- **`wv update` delivers this release.** Unlike 1.2.7, the changes are in the
+  app image. No new environment variables and no `wv` script changes, so the
+  admin scripts need no reinstall.
+- **OFX dates imported before this release may be one day early, but only if
+  the JVM was not running in UTC.** The shipped Docker image runs in UTC and was
+  never affected. Installs that ran the backend outside the container on a host
+  west of UTC (or set `TZ` / `-Duser.timezone`) stored every OFX/QFX
+  transaction one day early. Existing rows are not rewritten. Re-import the
+  affected statements or correct the dates by hand. CSV imports are unaffected.
+
+### Fixed
+- **OFX/QFX transaction dates no longer depend on the server's time zone.**
+  OFX defines a date with no zone suffix as GMT, but dates were converted in the
+  JVM's default zone, which moved them back a day west of UTC (and late-GMT
+  timestamps forward a day east of it). They are now read in UTC.
+- **JSON (jsonb) columns no longer depend on an undeclared transitive
+  dependency.** Hibernate's JSON mapping and several modules were getting
+  Jackson only through Flyway, which made it optional in 13.9 and would have
+  broken every jsonb read and write. The modules now declare it directly.
+
+### Security
+- **axios 1.19.0 → 1.20.0** in the web app, the mobile app and the shared
+  client. The update closes 12 advisories, including prototype-pollution
+  gadgets, header injection, ReDoS, and a fetch-adapter redirect SSRF
+  (`maxRedirects: 0` not enforced).
+- React Native 0.87.1 brings Metro 0.87.1, which drops the `image-size`
+  dependency and clears its DoS advisories. One advisory remains: `braces`
+  (GHSA-vfj7-8cjw-p6xm) has no patched release, and it is reached only through
+  mobile build tooling. Nothing that reaches users includes it.
+- Container base images rebuilt on JDK 25.0.4.1 (July 2026 CPU) and Node
+  24.21.0.
+
+### Changed
+- Spring Boot 4.1.0 → 4.1.1: Spring Framework 7.0.9, Spring Security 7.1.1,
+  Hibernate 7.4.5, Tomcat 11.0.24, Jackson 3.1.5, logback 1.5.38. The
+  postgresql and httpclient5 version overrides are removed, since Boot now pins
+  equal or newer versions itself.
+- Flyway 13.3.0 → 13.9.0; all 89 migrations replay cleanly.
+- caffeine 3.3.0, guava 33.7.2, jsoup 1.23.2.
+- React Native 0.87.1, react-router 8.4, Vite 8.3, plus minor updates across the
+  npm workspaces. React is now pinned exactly to 19.2.8: React 19.3 is held back
+  until React Native supports it.
+- Observability overlay: Prometheus v3.15.0, Grafana 13.2.3.
+- Build tooling: Checkstyle 14.3.0, SpotBugs plugin 4.10.4.1, PIT 1.30.0; local
+  JDK pin `25.0.4-tem`. CI uses `actions/setup-java` v6.
+
 ## [1.2.7] — 2026-08-19
 
 A resource-leak pass over the admin tooling. `wv verify` was stranding a
@@ -602,7 +656,8 @@ First tagged release. Consolidates all development prior to the 1.0 cut.
 - Test-first workflow mandated by `CLAUDE.md`; no production code without a
   failing test.
 
-[Unreleased]: https://github.com/jakefearsd/wealthview/compare/v1.2.7...HEAD
+[Unreleased]: https://github.com/jakefearsd/wealthview/compare/v1.2.8...HEAD
+[1.2.8]: https://github.com/jakefearsd/wealthview/compare/v1.2.7...v1.2.8
 [1.2.7]: https://github.com/jakefearsd/wealthview/compare/v1.2.6...v1.2.7
 [1.2.6]: https://github.com/jakefearsd/wealthview/compare/v1.2.5...v1.2.6
 [1.2.5]: https://github.com/jakefearsd/wealthview/compare/v1.2.4...v1.2.5
