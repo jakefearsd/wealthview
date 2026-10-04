@@ -19,7 +19,7 @@ React SPA  <-->  Spring Boot REST API  <-->  PostgreSQL
 | Layer     | Technology                                                |
 |-----------|-----------------------------------------------------------|
 | Frontend  | React 19, TypeScript, Vite, React Router 8, Recharts, Axios |
-| Backend   | Java 25, Spring Boot 4.1.0, Spring Security, Spring Data JPA / Hibernate 7 |
+| Backend   | Java 25, Spring Boot 4.1.1, Spring Security, Spring Data JPA / Hibernate 7 |
 | JSON      | Jackson 3 (`tools.jackson.*`; annotations remain `com.fasterxml.jackson.annotation`) |
 | Database  | PostgreSQL 16 with Flyway 13 migrations                   |
 | Build     | Maven multi-module (backend), npm workspaces (frontend, mobile, shared) |

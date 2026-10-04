@@ -27,7 +27,7 @@ households (tenants), each with fully isolated data.
 | Layer | Technology |
 |---|---|
 | Frontend | React 19, Vite, TypeScript, Recharts, Axios |
-| Backend | Java 25, Spring Boot 4.1.0, Spring Security, Spring Data JPA |
+| Backend | Java 25, Spring Boot 4.1.1, Spring Security, Spring Data JPA |
 | JSON | Jackson 3 (`tools.jackson.*`; annotations stay `com.fasterxml.jackson.annotation`) |
 | Database | PostgreSQL 16, Flyway 13 (80 versioned + 9 repeatable migrations), Hibernate 7 |
 | Auth | JWT bearer tokens + CSRF-protected cookies, bcrypt (strength 12), TOTP MFA, invite-code registration |

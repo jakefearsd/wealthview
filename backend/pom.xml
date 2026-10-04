@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.0</version>
+        <version>4.1.1</version>
         <relativePath/>
     </parent>
 
@@ -75,22 +75,19 @@
         <jjwt.version>0.13.0</jjwt.version>
         <commons-csv.version>1.14.1</commons-csv.version>
         <ofx4j.version>1.39</ofx4j.version>
-        <jsoup.version>1.23.1</jsoup.version>
-        <caffeine.version>3.2.4</caffeine.version>
+        <jsoup.version>1.23.2</jsoup.version>
+        <caffeine.version>3.3.0</caffeine.version>
         <samstevens-totp.version>1.7.1</samstevens-totp.version>
-        <guava.version>33.6.0-jre</guava.version>
+        <guava.version>33.7.2-jre</guava.version>
         <jsonassert.version>1.5.3</jsonassert.version>
         <logstash-logback-encoder.version>9.0</logstash-logback-encoder.version>
         <!-- Spring Boot BOM overrides. These artifacts are declared without a <version>
              in the module poms, so they normally resolve from spring-boot-dependencies.
              Redeclaring the BOM's own property name here overrides it globally (Boot's
-             documented mechanism). postgresql and httpclient5 are PATCH bumps ahead of the
-             4.1.0 BOM and both are exercised by the test suite, so the compatibility risk we
-             take on from Boot is covered: postgresql by the @DataJpaTest/Testcontainers
-             slices, and httpclient5 only by the wealthview-app HTTP ITs (it is test-scope
-             there). Drop these back to BOM defaults once a Boot release catches up.
+             documented mechanism). The earlier postgresql and httpclient5 patch overrides
+             were dropped at Boot 4.1.1, whose BOM caught up to (and passed) them.
 
-             flyway 12.4.0 -> 13.3.0 is a MAJOR. Its two documented breaking changes do not
+             flyway 12.4.0 -> 13.x is a MAJOR (Boot 4.1.1 still pins 12.4.0). Its two documented breaking changes do not
              reach us: the createSchema -> beforeCreateSchema callback rename (we ship no
              callbacks at all, only V__/R__ migrations) and initSQL -> afterConnect.sql (we
              set no init-sqls in any profile). v13's new Java 21 floor is satisfied by our
@@ -101,9 +98,7 @@
              Deliberately NOT overridden: opentelemetry (micrometer-tracing-bridge-otel is
              compiled against a BOM-pinned OTel API, and a mismatch shows up at prod runtime
              rather than in tests, which is exactly why green tests are not reassurance). -->
-        <httpclient5.version>5.6.3</httpclient5.version>
-        <postgresql.version>42.7.13</postgresql.version>
-        <flyway.version>13.3.0</flyway.version>
+        <flyway.version>13.9.0</flyway.version>
         <!-- Quality tool versions -->
         <spotbugs-maven-plugin.version>4.10.3.0</spotbugs-maven-plugin.version>
         <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
