@@ -21,7 +21,7 @@ This pass ships the daily-driver Portfolio screen on top of the auth MVP: net-wo
 
 Android build inputs live in `android/build.gradle`: `compileSdk` 37, `targetSdk` 36, `minSdk` 24, NDK 27.1.12297006, Kotlin 2.2.0. The app id / namespace is `com.mobileapp`.
 
-**JDK: this workspace is pinned to 17, the backend to 25.** `mobile/.sdkmanrc` sets `java=17.0.19-tem` and `backend/.sdkmanrc` sets `java=25.0.3-tem`; SDKMAN auto-switches on `cd` when `sdkman_auto_env=true`. If a Gradle build fails with an unsupported class-file or toolchain error, you almost certainly have the backend's JDK 25 on `PATH`. Node must be ≥ 22.13.0 (`engines` in `package.json`); CI runs Node 22.
+**JDK: this workspace is pinned to 17, the backend to 25.** `mobile/.sdkmanrc` sets `java=17.0.19-tem` and `backend/.sdkmanrc` sets `java=25.0.4-tem`; SDKMAN auto-switches on `cd` when `sdkman_auto_env=true`. If a Gradle build fails with an unsupported class-file or toolchain error, you almost certainly have the backend's JDK 25 on `PATH`. Node must be ≥ 22.13.0 (`engines` in `package.json`); CI runs Node 22.
 
 ## What ships in this build
 

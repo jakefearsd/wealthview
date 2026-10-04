@@ -4,7 +4,7 @@
 
 | Tool | Minimum Version |
 |---|---|
-| Java (JDK) | 25 — `backend/.sdkmanrc` pins `25.0.3-tem` |
+| Java (JDK) | 25 — `backend/.sdkmanrc` pins `25.0.4-tem` |
 | Maven | 3.9 |
 | Node.js | 20.19 (CI runs 22; the release image builds on 24) |
 | Docker | 24 (with Compose v2) |

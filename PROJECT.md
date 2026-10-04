@@ -608,7 +608,7 @@ and price seed data. Versioned migrations are immutable once committed.
 ## Getting Started (Dev)
 
 ```bash
-# Prerequisites: Java 25 (backend/.sdkmanrc pins 25.0.3-tem), Maven 3.9+,
+# Prerequisites: Java 25 (backend/.sdkmanrc pins 25.0.4-tem), Maven 3.9+,
 #                Node 22+, Docker with the Compose plugin
 
 # Install JS workspace deps once at the repo root (shared, frontend, mobile)
