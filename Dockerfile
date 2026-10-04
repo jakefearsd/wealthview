@@ -1,9 +1,9 @@
 # Stage 1: Build frontend
-# Pinned by digest (node:24-alpine, NODE_VERSION=24.19.0 at time of pin).
+# Pinned by digest (node:24-alpine, NODE_VERSION=24.21.0 at time of pin).
 # Moved off the node:20 line in 2026-08: Node 20 reached end-of-life in April 2026
 # and stopped receiving security patches. 24.x is the current Active LTS line.
 # To upgrade: `docker pull node:<tag>` then `docker inspect --format='{{index .RepoDigests 0}}' node:<tag>`.
-FROM node:24-alpine@sha256:2a49bdf71e9fd965a58c1703fd9ddd205b34e5782b692a72dd1d248abb0beb43 AS frontend-build
+FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS frontend-build
 WORKDIR /app
 # Workspace manifests — must all be present for `npm ci` to resolve the
 # workspace topology even though we only build frontend in this stage.
@@ -21,10 +21,10 @@ RUN npm run build --workspace=frontend
 # Result: /app/frontend/dist
 
 # Stage 2: Build backend
-# Pinned by digest (maven:3.9-eclipse-temurin-25, JDK 25.0.3+9 at time of pin).
+# Pinned by digest (maven:3.9-eclipse-temurin-25, JDK 25.0.4.1+1 at time of pin).
 # To upgrade: `docker pull maven:3.9-eclipse-temurin-25` then
 # `docker inspect --format='{{index .RepoDigests 0}}' maven:3.9-eclipse-temurin-25`.
-FROM maven:3.9-eclipse-temurin-25@sha256:f621e42ff394ccf7e03d0394dba557a5b885d505301886b41bb27adb20b66a65 AS build
+FROM maven:3.9-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976 AS build
 WORKDIR /app
 COPY backend/pom.xml backend/pom.xml
 COPY backend/wealthview-persistence/pom.xml backend/wealthview-persistence/pom.xml
@@ -38,10 +38,10 @@ COPY backend backend
 RUN cd backend && mvn clean package -DskipTests -q
 
 # Stage 3: Runtime
-# Pinned by digest (eclipse-temurin:25-jre-alpine, JDK 25.0.3+9 at time of pin).
+# Pinned by digest (eclipse-temurin:25-jre-alpine, JDK 25.0.4.1+1 at time of pin).
 # To upgrade: `docker pull eclipse-temurin:25-jre-alpine` then
 # `docker inspect --format='{{index .RepoDigests 0}}' eclipse-temurin:25-jre-alpine`.
-FROM eclipse-temurin:25-jre-alpine@sha256:cdd967aa55f1d0175ebe57245e4450292e6e6dd185dce73f93580598934128aa
+FROM eclipse-temurin:25-jre-alpine@sha256:3c0a9084927a221ccd1d007fcaf614465672c0af37aaa834c5184483afe56d61
 WORKDIR /app
 # `wv prune` scopes itself to this project by filtering on this label, so it can
 # reclaim orphaned dev-rebuild images without touching other projects sharing the

@@ -1,7 +1,7 @@
 services:
   db:
     # Pinned by digest (postgres:16, server version 16.15 at time of pin).
-    image: postgres:16@sha256:56f243d2355bad7d2016b1e78b80da8ac9e7967b766be2bfbff84fe85ffa30bc
+    image: postgres:16@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
     environment:
       POSTGRES_DB: wealthview
       POSTGRES_USER: wv_app
