@@ -16,9 +16,12 @@ import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.mortality.MortalityTable;
+import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
+import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
 import com.wealthview.persistence.entity.StandardDeductionEntity;
+import com.wealthview.persistence.repository.LtcgBracketRepository;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
 import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
@@ -27,6 +30,7 @@ import com.wealthview.projection.testutil.ProjectionTestFixtures;
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static com.wealthview.core.testutil.TaxBracketFixtures.mfj2025Brackets;
 import static com.wealthview.core.testutil.TaxBracketFixtures.single2025Brackets;
+import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025Ltcg;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -122,6 +126,36 @@ class OptimizationContextBuilderTest {
         assertThat(taxUnder65).isEqualTo(3871.50, within(1e-6));
         assertThat(taxOver65).isEqualTo(3631.50, within(1e-6));
         assertThat(taxOver65).isLessThan(taxUnder65);
+    }
+
+    // D16 (Phase 1a) wiring pin: buildRegime must hand LtcgTaxTable.computeAll the run's
+    // retirementYearOffsetFromBase (retirementYear - baseYear), so the MC's NIIT threshold deflates on
+    // the calendar clock. Retirement 2030 / base year 2020 -> offset 10. MAGI 180k (140k ordinary floor
+    // + 40k gain) sits between the deflated (200k / 1.03^10 ~ 148.8k) and undeflated (200k) single
+    // thresholds, so ONLY the calendar clock charges NIIT; passing offset 0 here would price it as
+    // retirement-anchored and fail both assertions.
+    @Test
+    void build_baseYearBeforeRetirementYear_ltcgTableDeflatesNiitOnCalendarClock() {
+        var federalTaxCalc = federalTaxCalcWithAge65Addition();
+        var ltcgRepo = mock(LtcgBracketRepository.class);
+        stubSingle2025Ltcg(ltcgRepo);
+        var capitalGainsCalc = new CapitalGainsTaxCalculator(ltcgRepo);
+        var builderWithLtcg = new OptimizationContextBuilder(federalTaxCalc, capitalGainsCalc);
+        var input = GuardrailOptimizationInputBuilder.builder()
+                .withBirthYear(1968).withFilingStatus("single").withBaseYear(2020).build();
+
+        var setup = builderWithLtcg.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        int age = 2030 - 1968;
+        var calendarAnchored = LtcgTaxTable.build(capitalGainsCalc, federalTaxCalc,
+                2030, FilingStatus.SINGLE, 10, 0.03, age);
+        var retirementAnchored = LtcgTaxTable.build(capitalGainsCalc, federalTaxCalc,
+                2030, FilingStatus.SINGLE, 0, 0.03, age);
+
+        double built = setup.taxIncome().ltcgTaxTableByYear()[0].taxAt(140_000, 40_000);
+
+        assertThat(built).isEqualTo(calendarAnchored.taxAt(140_000, 40_000), within(1e-6));
+        assertThat(built).isGreaterThan(retirementAnchored.taxAt(140_000, 40_000) + 1.0);
     }
 
     /** Single-filer 2025 fixtures with a deduction carrying a nonzero age-65 addition. */

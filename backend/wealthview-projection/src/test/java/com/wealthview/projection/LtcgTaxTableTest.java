@@ -161,4 +161,21 @@ class LtcgTaxTableTest {
         assertThat(tables[0].taxAt(140_000, 40_000)).isEqualTo(calendarAnchored.taxAt(140_000, 40_000));
         assertThat(tables[0].taxAt(140_000, 40_000)).isGreaterThan(retirementAnchored.taxAt(140_000, 40_000));
     }
+
+    @Test
+    void computeAll_retirementYearOffsetFromBase_advancesCalendarClockEachYear() {
+        // Year index 1 must deflate by offset + 1 = 11 calendar years, not 10 or 1.
+        var tables = LtcgTaxTable.computeAll(capitalGainsCalc(), federalTaxCalc(),
+                2025, 2, FilingStatus.SINGLE, 0.025, null, null, 10);
+        var yearOneAtOffset11 = LtcgTaxTable.build(capitalGainsCalc(), federalTaxCalc(),
+                2026, FilingStatus.SINGLE, 11, 0.025, -1);
+        var yearOneAtOffset10 = LtcgTaxTable.build(capitalGainsCalc(), federalTaxCalc(),
+                2026, FilingStatus.SINGLE, 10, 0.025, -1);
+
+        // MAGI 156,000 lies between the 11-year (~152.4k) and 10-year (~156.2k) deflated thresholds.
+        double floor = 140_000;
+        double gain = 16_000;
+        assertThat(tables[1].taxAt(floor, gain)).isEqualTo(yearOneAtOffset11.taxAt(floor, gain));
+        assertThat(tables[1].taxAt(floor, gain)).isGreaterThan(yearOneAtOffset10.taxAt(floor, gain));
+    }
 }
