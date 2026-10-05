@@ -747,16 +747,18 @@ class HouseholdTransitionTest extends DeterministicProjectionEngineTestSupport {
         // spouse-owned-decedent 1.0 -> 40,000 gain), not the retired blended-factor approximation
         // (0.75 uniformly -> 22,500 gain). Independent oracle: CapitalGainsTaxCalculator, the SAME
         // primitive the engine itself calls, fed the two candidate gain figures directly -- not the
-        // engine's own annotated output. LTCG stacks on ordinary (34,000 - 15,750 base single
-        // deduction = 18,250 floor; the LTCG stacking floor is base-deduction-only, a documented
-        // pre-existing simplification -- see PoolStrategy#resolveOrdinaryDeduction).
+        // engine's own annotated output. LTCG stacks on ordinary (34,000 - 17,350 age-aware single
+        // deduction [15,750 base + 1,600 age-65 adder, the survivor is 78] = 16,650 floor; Phase 1a:
+        // the stacking floor nets the SAME age-aware deduction the ordinary tax uses -- see
+        // PoolStrategy#resolveOrdinaryDeduction. Previously 18,250 / 1,485.00, when the floor
+        // netted only the base deduction and so overstated this 65+ filer's LTCG tax by 240).
         var ltcgOracle = new CapitalGainsTaxCalculator(ltcgRepo);
-        BigDecimal exactGainTax = ltcgOracle.computeLtcgTax(bd("18250"), bd("40000"), transitionYear,
+        BigDecimal exactGainTax = ltcgOracle.computeLtcgTax(bd("16650"), bd("40000"), transitionYear,
                 FilingStatus.SINGLE, transitionYear - 2031, ZERO, bd("74000"));
-        BigDecimal blendedGainTax = ltcgOracle.computeLtcgTax(bd("18250"), bd("22500"), transitionYear,
+        BigDecimal blendedGainTax = ltcgOracle.computeLtcgTax(bd("16650"), bd("22500"), transitionYear,
                 FilingStatus.SINGLE, transitionYear - 2031, ZERO, bd("56500"));
         assertThat(exactGainTax).isNotEqualByComparingTo(blendedGainTax); // sanity: not coincidentally equal
-        assertThat(exactGainTax).isEqualByComparingTo(bd("1485.00"));     // hand-derived: 30,100@0% + 9,900@15%
+        assertThat(exactGainTax).isEqualByComparingTo(bd("1245.00"));     // hand-derived: 31,700@0% + 8,300@15%
         assertThat(blendedGainTax).isEqualByComparingTo(ZERO);            // hand-derived: 22,500 fully @0%
 
         assertThat(transitionRow.capitalGainsTax()).isEqualByComparingTo(exactGainTax);
