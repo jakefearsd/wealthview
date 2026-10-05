@@ -33,8 +33,9 @@ tax-accuracy fixes in both projection engines. One schema change (V081).
   0-0.50, default 0.24). The run response carries `terminal_value`.
 - **Birth Month** and **Spouse Birth Month** (`birth_month`,
   `spouse_birth_month`, 1-12, each requiring its birth year). The calendar year
-  a person reaches 59½ is penalty-free; without a month the legacy age-60 rule
-  applies.
+  the primary reaches 59½ is penalty-free; without a month the legacy age-60
+  rule applies. The spouse month is stored for future Medicare and per-person
+  early-withdrawal timing and does not yet change any projection.
 - Guardrail profiles persist `optimize_conversions` and
   `dynamic_sequencing_bracket_rate`; `reoptimize` re-uses both as saved.
 

@@ -192,7 +192,7 @@ Leave **Spouse Birth Year** blank for a single-person household. Fill it in and 
 
 | Field | What it does |
 |-------|--------------|
-| **Spouse Birth Year** | Enables all the fields below. **Spouse Birth Month** works the same way as yours. |
+| **Spouse Birth Year** | Enables all the fields below. **Spouse Birth Month** is stored for upcoming Medicare timing; early-withdrawal (59½) timing currently follows the primary's birth month only. |
 | **Primary Death Age** | Assumed planning age at which the primary passes away (50–120). Blank uses the SSA planning default, shown as a placeholder. |
 | **Spouse Death Age** | Same, for the spouse. |
 | **Survivor Spending Factor (%)** | Share of pre-transition spending the survivor keeps from the first death forward (50–100%, default 75%). |

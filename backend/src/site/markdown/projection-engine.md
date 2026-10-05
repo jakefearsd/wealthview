@@ -207,6 +207,8 @@ clock as the Social Security thresholds (D16).
 *taxable* income (net rental income, not gross). The LTCG stacking floor uses the age-aware
 standard deduction (including the 65+ adder), and LTCG is re-stacked over the traditional
 gross-up slice so the gains sit on top of all ordinary income.
+The Monte Carlo does not yet re-stack LTCG over its gross-up slice (a known divergence from the
+deterministic engine, planned for Phase 1c).
 
 ---
 
