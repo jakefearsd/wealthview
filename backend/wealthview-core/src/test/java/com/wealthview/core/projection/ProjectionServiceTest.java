@@ -18,7 +18,10 @@ import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionInputResult;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
+import com.wealthview.core.projection.dto.ProjectionRunDetail;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
+import com.wealthview.core.projection.dto.TaxSpaceYear;
+import com.wealthview.core.projection.dto.TerminalValue;
 import com.wealthview.core.projection.tax.StateTaxCalculatorFactory;
 import com.wealthview.core.testutil.ScenarioMother;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
@@ -101,6 +104,35 @@ class ProjectionServiceTest {
                 .isInstanceOf(EntityNotFoundException.class);
     }
 
+    private static ProjectionRunDetail detailOf(ProjectionResultResponse result) {
+        return new ProjectionRunDetail(result, List.of(), List.of(), null);
+    }
+
+    @Test
+    void runProjection_engineDetail_surfacesTaxSpaceAndTerminalValue() {
+        var scenario = ScenarioMother.scenario(tenant);
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        var input = new ProjectionInput(scenarioId, "Plan", LocalDate.of(2055, 1, 1),
+                90, new BigDecimal("0.03"), null, List.of(), null, null, List.of());
+        when(projectionInputBuilder.buildWithMetadata(scenario, tenantId))
+                .thenReturn(new ProjectionInputResult(input, List.of()));
+        var engineResult = new ProjectionResultResponse(scenarioId, List.of(), BigDecimal.ZERO, 0, null);
+        var taxSpaceYear = new TaxSpaceYear(2055, 62, new BigDecimal("70000"), new BigDecimal("0.12"),
+                List.of(), new BigDecimal("26700"), new BigDecimal("500000"), null, null, null, null,
+                new BigDecimal("180000"), null, null, null, null, new BigDecimal("0.12"), BigDecimal.ZERO);
+        var terminal = TerminalValue.compute(2080, new BigDecimal("400000"), new BigDecimal("300000"),
+                new BigDecimal("200000"), new BigDecimal("0.24"), false);
+        when(projectionEngine.runDetailed(input))
+                .thenReturn(new ProjectionRunDetail(engineResult, List.of(), List.of(taxSpaceYear), terminal));
+
+        var result = service.runProjection(tenantId, scenarioId);
+
+        assertThat(result.result()).isEqualTo(engineResult);
+        assertThat(result.taxSpace()).containsExactly(taxSpaceYear);
+        assertThat(result.terminalValue()).isEqualTo(terminal);
+    }
+
     @Test
     void runProjection_exists_delegatesToEngine() {
         var scenario = ScenarioMother.scenario(tenant);
@@ -118,13 +150,13 @@ class ProjectionServiceTest {
                         BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
                         BigDecimal.ZERO, false)),
                 BigDecimal.ZERO, 0, null);
-        when(projectionEngine.run(input)).thenReturn(engineResult);
+        when(projectionEngine.runDetailed(input)).thenReturn(detailOf(engineResult));
 
         var result = service.runProjection(tenantId, scenarioId);
 
         assertThat(result.result()).isEqualTo(engineResult);
         assertThat(result.unclassifiedSymbols()).isEmpty();
-        verify(projectionEngine).run(input);
+        verify(projectionEngine).runDetailed(input);
     }
 
     @Test
@@ -139,12 +171,12 @@ class ProjectionServiceTest {
                 .thenReturn(new ProjectionInputResult(input, List.of()));
 
         var engineResult = new ProjectionResultResponse(scenarioId, List.of(), BigDecimal.ZERO, 0, null);
-        when(projectionEngine.run(input)).thenReturn(engineResult);
+        when(projectionEngine.runDetailed(input)).thenReturn(detailOf(engineResult));
 
         service.runProjection(tenantId, scenarioId);
 
         verify(projectionInputBuilder).buildWithMetadata(scenario, tenantId);
-        verify(projectionEngine).run(input);
+        verify(projectionEngine).runDetailed(input);
     }
 
     @Test
@@ -159,7 +191,7 @@ class ProjectionServiceTest {
                 .thenReturn(new ProjectionInputResult(input, List.of("ZZZZ")));
 
         var engineResult = new ProjectionResultResponse(scenarioId, List.of(), BigDecimal.ZERO, 0, null);
-        when(projectionEngine.run(input)).thenReturn(engineResult);
+        when(projectionEngine.runDetailed(input)).thenReturn(detailOf(engineResult));
 
         var result = service.runProjection(tenantId, scenarioId);
 
@@ -180,7 +212,7 @@ class ProjectionServiceTest {
                 .thenReturn(new ProjectionInputResult(input, List.of()));
 
         var engineResult = new ProjectionResultResponse(scenarioId, List.of(), BigDecimal.ZERO, 0, null);
-        when(projectionEngine.run(input)).thenReturn(engineResult);
+        when(projectionEngine.runDetailed(input)).thenReturn(detailOf(engineResult));
         when(stateTaxCalculatorFactory.unsupportedStateWarning("NY"))
                 .thenReturn(Optional.of("State tax for NY is not modeled (treated as $0)"));
 
@@ -201,7 +233,7 @@ class ProjectionServiceTest {
                 .thenReturn(new ProjectionInputResult(input, List.of()));
 
         var engineResult = new ProjectionResultResponse(scenarioId, List.of(), BigDecimal.ZERO, 0, null);
-        when(projectionEngine.run(input)).thenReturn(engineResult);
+        when(projectionEngine.runDetailed(input)).thenReturn(detailOf(engineResult));
         when(stateTaxCalculatorFactory.unsupportedStateWarning("CA")).thenReturn(Optional.empty());
 
         var result = service.runProjection(tenantId, scenarioId);
@@ -221,7 +253,7 @@ class ProjectionServiceTest {
                 .thenReturn(new ProjectionInputResult(input, List.of()));
 
         var engineResult = new ProjectionResultResponse(scenarioId, List.of(), BigDecimal.ZERO, 0, null);
-        when(projectionEngine.run(input)).thenReturn(engineResult);
+        when(projectionEngine.runDetailed(input)).thenReturn(detailOf(engineResult));
 
         var result = service.runProjection(tenantId, scenarioId);
 

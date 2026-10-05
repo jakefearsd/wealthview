@@ -59,8 +59,9 @@ public class ProjectionService {
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(Entities.notFound("Scenario"));
         var inputResult = projectionInputBuilder.buildWithMetadata(scenario, tenantId);
-        var result = projectionEngine.run(inputResult.input());
-        return new ProjectionRunResult(result, inputResult.unclassifiedSymbols(), resolveWarnings(scenario));
+        var detail = projectionEngine.runDetailed(inputResult.input());
+        return new ProjectionRunResult(detail.result(), inputResult.unclassifiedSymbols(),
+                resolveWarnings(scenario), detail.taxSpace(), detail.terminalValue());
     }
 
     /**

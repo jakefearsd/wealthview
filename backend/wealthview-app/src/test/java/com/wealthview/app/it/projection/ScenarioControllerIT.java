@@ -1,5 +1,8 @@
 package com.wealthview.app.it.projection;
 
+import java.util.List;
+import java.util.Map;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 
@@ -58,5 +61,19 @@ class ScenarioControllerIT extends AbstractApiIntegrationTest {
         var response = api.deleteForEntity("/api/v1/projections/" + id);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void run_existingScenario_returnsTaxSpaceAndTerminalValue() {
+        var id = (String) data.createScenario("Runnable").get("id");
+
+        var response = api.getForEntity("/api/v1/projections/" + id + "/run");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).containsKeys("yearly_data", "tax_space", "terminal_value");
+        assertThat((List<?>) response.getBody().get("tax_space")).isNotEmpty();
+        assertThat((Map<String, Object>) response.getBody().get("terminal_value"))
+                .containsKeys("after_tax_legacy", "heir_tax_rate");
     }
 }

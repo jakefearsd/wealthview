@@ -24,6 +24,8 @@ import com.wealthview.core.projection.dto.ProjectionRunResult;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.dto.ScenarioRequest;
 import com.wealthview.core.projection.dto.ScenarioResponse;
+import com.wealthview.core.projection.dto.TaxSpaceYear;
+import com.wealthview.core.projection.dto.TerminalValue;
 import tools.jackson.databind.ObjectMapper;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.TENANT_ID;
@@ -366,5 +368,58 @@ class ProjectionControllerTest {
                 .andExpect(jsonPath("$.warnings").isArray())
                 .andExpect(jsonPath("$.warnings.length()").value(1))
                 .andExpect(jsonPath("$.warnings[0]").value("State tax for NY is not modeled (treated as $0)"));
+    }
+
+    @Test
+    void run_withTaxSpaceAndTerminalValue_serializesSnakeCaseFields() throws Exception {
+        var result = new ProjectionResultResponse(
+                SCENARIO_ID,
+                List.of(ProjectionYearDto.simple(2026, 36,
+                        new BigDecimal("100000"), new BigDecimal("10000"),
+                        new BigDecimal("7700"), BigDecimal.ZERO,
+                        new BigDecimal("117700"), false)),
+                new BigDecimal("117700"), 0, null);
+        var bracket = new TaxSpaceYear.BracketRoom(
+                new BigDecimal("0.12"), new BigDecimal("126700"), new BigDecimal("56700"));
+        var taxSpaceYear = new TaxSpaceYear(2031, 62, new BigDecimal("70000"), new BigDecimal("0.12"),
+                List.of(bracket), new BigDecimal("26700"), new BigDecimal("500000"),
+                null, null, null, null, new BigDecimal("180000"),
+                null, null, null, null, new BigDecimal("0.12"), BigDecimal.ZERO);
+        var terminal = TerminalValue.compute(2060, new BigDecimal("400000"), new BigDecimal("300000"),
+                new BigDecimal("200000"), new BigDecimal("0.24"), false);
+        when(projectionService.runProjection(TENANT_ID, SCENARIO_ID))
+                .thenReturn(new ProjectionRunResult(result, List.of(), List.of(), List.of(taxSpaceYear), terminal));
+
+        mockMvc.perform(get("/api/v1/projections/{id}/run", SCENARIO_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tax_space.length()").value(1))
+                .andExpect(jsonPath("$.tax_space[0].year").value(2031))
+                .andExpect(jsonPath("$.tax_space[0].marginal_ordinary_rate").value(0.12))
+                .andExpect(jsonPath("$.tax_space[0].bracket_room[0].gross_ceiling").value(126700))
+                .andExpect(jsonPath("$.tax_space[0].ltcg_zero_room").value(26700))
+                .andExpect(jsonPath("$.tax_space[0].effective_marginal_ordinary").value(0.12))
+                .andExpect(jsonPath("$.terminal_value.heir_tax_rate").value(0.24))
+                .andExpect(jsonPath("$.terminal_value.after_tax_legacy").value(804000))
+                .andExpect(jsonPath("$.terminal_value.at_second_death").value(false));
+    }
+
+    @Test
+    void run_emptyTaxSpaceAndNoTerminalValue_omitsTaxSpaceAndNullsTerminalValue() throws Exception {
+        var result = new ProjectionResultResponse(
+                SCENARIO_ID,
+                List.of(ProjectionYearDto.simple(2026, 36,
+                        new BigDecimal("100000"), new BigDecimal("10000"),
+                        new BigDecimal("7700"), BigDecimal.ZERO,
+                        new BigDecimal("117700"), false)),
+                new BigDecimal("117700"), 0, null);
+        when(projectionService.runProjection(TENANT_ID, SCENARIO_ID))
+                .thenReturn(new ProjectionRunResult(result, List.of()));
+
+        mockMvc.perform(get("/api/v1/projections/{id}/run", SCENARIO_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tax_space").doesNotExist())
+                .andExpect(jsonPath("$.terminal_value").value(org.hamcrest.Matchers.nullValue()));
     }
 }
