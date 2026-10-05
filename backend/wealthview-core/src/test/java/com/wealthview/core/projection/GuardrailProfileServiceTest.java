@@ -35,9 +35,12 @@ import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 
+import tools.jackson.databind.ObjectMapper;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -436,7 +439,12 @@ class GuardrailProfileServiceTest {
                 new GuardrailPhaseInput("Go-go", 62, 70, 3, new BigDecimal("90000")),
                 new GuardrailPhaseInput("Slow-go", 71, 80, 2, new BigDecimal("70000")),
                 new GuardrailPhaseInput("No-go", 81, null, 1, new BigDecimal("50000")));
-        assertThat(savedCaptor.getValue().getPhases()).contains("Go-go", "Slow-go", "No-go");
+        var savedPhases = new ObjectMapper().readValue(savedCaptor.getValue().getPhases(),
+                GuardrailPhaseInput[].class);
+        assertThat(savedPhases).containsExactly(
+                new GuardrailPhaseInput("Go-go", 62, 70, 3, new BigDecimal("90000")),
+                new GuardrailPhaseInput("Slow-go", 71, 80, 2, new BigDecimal("70000")),
+                new GuardrailPhaseInput("No-go", 81, null, 1, new BigDecimal("50000")));
     }
 
     @Test
@@ -968,10 +976,10 @@ class GuardrailProfileServiceTest {
         assertThat(captor.getValue().getConversionSchedule()).contains("50000");
     }
 
-    // ---- reoptimize: malformed phases falls back ----
+    // ---- reoptimize: malformed stored phases must never be overwritten ----
 
     @Test
-    void reoptimize_malformedPhasesJson_fallsBackToEmptyList() {
+    void reoptimize_malformedPhasesJson_throwsAndDoesNotSave() {
         var entity = new GuardrailSpendingProfileEntity(
                 tenant, scenario, "Plan", new BigDecimal("30000"));
         entity.setPhases("{not-json");
@@ -980,19 +988,17 @@ class GuardrailProfileServiceTest {
         entity.setTrialCount(5000);
         entity.setConfidenceLevel(new BigDecimal("0.95"));
         entity.setTerminalBalanceTarget(BigDecimal.ZERO);
+        when(guardrailRepository.findByTenant_IdAndScenario_Id(tenantId, scenarioId))
+                .thenReturn(Optional.of(entity));
 
-        stubReoptimizeHappyPath(entity);
-        when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
-                .thenReturn(baseOptimizerResponse());
-        when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
+        assertThatThrownBy(() -> service.reoptimize(tenantId, scenarioId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("unreadable");
 
-        var inputCaptor = ArgumentCaptor.forClass(GuardrailOptimizationInput.class);
-
-        service.reoptimize(tenantId, scenarioId);
-
-        verify(spendingOptimizer).optimize(inputCaptor.capture());
-        assertThat(inputCaptor.getValue().phases()).isEmpty();
+        assertThat(entity.getPhases()).isEqualTo("{not-json");
+        verify(spendingOptimizer, never()).optimize(any(GuardrailOptimizationInput.class));
+        verify(guardrailRepository, never()).save(any(GuardrailSpendingProfileEntity.class));
+        verify(guardrailRepository, never()).delete(any(GuardrailSpendingProfileEntity.class));
     }
 
     // ---- computeScenarioHash: malformed paramsJson is quietly ignored ----

@@ -256,7 +256,11 @@ public class GuardrailProfileService {
             phases = MAPPER.readValue(existing.getPhases(),
                     MAPPER.getTypeFactory().constructCollectionType(List.class, GuardrailPhaseInput.class));
         } catch (JacksonException e) {
-            phases = List.of();
+            // Never fall back to empty phases: optimize() replaces the stored profile, which would
+            // silently destroy the user's phase configuration. Fail loudly and leave data untouched.
+            log.warn("Stored guardrail phases for scenario {} are unreadable; reoptimize aborted", scenarioId);
+            throw new IllegalStateException(
+                    "Stored guardrail phases are unreadable; re-run the optimizer with explicit phases", e);
         }
 
         var request = GuardrailOptimizationRequest.builder()
@@ -383,8 +387,9 @@ public class GuardrailProfileService {
      * itself, both sexes, and the longevity-conditional age -- each changes the Monte Carlo death-
      * age sampling (or its reported metric) for an otherwise-identical scenario.
      * Phase 1a (D15) adds filing status, state, other income, the resolved withdrawal order and
-     * both birth months; changing the signature re-seeds every profile, so existing profiles read
-     * stale once after this ships (a flag only -- no stored data changes).
+     * both birth months; changing the signature re-seeds every profile, so existing profiles are
+     * flagged stale the next time their scenario is saved (staleness is recomputed only in
+     * {@code ScenarioCrudService.updateScenario}; a flag only -- no stored data changes).
      * Accounts and income sources are sorted by id before hashing — {@code accounts} is an unordered
      * JPA bag ({@code @OrderBy("id")} on the entity keeps normal reads stable too) — so the same
      * scenario always yields the same signature regardless of collection iteration order.
