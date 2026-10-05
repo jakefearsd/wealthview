@@ -105,12 +105,11 @@
          a suppressed outlier. Stochastic-mortality plumbing (sub-project B, T3)
          pushed ScenarioCrudService's total to 93 (four new small validators
          mirroring the existing household-field validation shape); 94 locks in
-         just above that new next-highest class. Phase 1a birth-month validation (two small
-         validators mirroring the same shape) pushed it to 105; 106 locks in just above. -->
+         just above that new next-highest class. -->
     <rule ref="category/java/design.xml/CyclomaticComplexity">
         <properties>
             <property name="methodReportLevel" value="22"/>
-            <property name="classReportLevel" value="106"/>
+            <property name="classReportLevel" value="94"/>
         </properties>
     </rule>
 
