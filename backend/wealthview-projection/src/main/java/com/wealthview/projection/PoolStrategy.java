@@ -1219,7 +1219,18 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             var grossUp = growTraditionalGrossUp(taxableIncome, year, effectiveOtherIncome, conversionAmount,
                     alreadyChargedBaseTax, realizedLtcgIncome, federallyTaxedSocialSecurity, ltcgTax,
                     extraPoolFundedTax, ordinaryTax, lots.totalValue(), traditional.total());
-            BigDecimal totalWithdrawalTax = grossUp.tax();
+            // Phase 1a reconciliation: LTCG stacks on the FULL year's ordinary income, including the
+            // C2 gross-up slice. Re-price once on the final base; the (non-negative) delta joins the
+            // pool-funded tax. Its own funding draw is not re-stacked -- the same documented
+            // second-order category as the early-withdrawal penalty's funding.
+            BigDecimal ltcgRestackDelta = BigDecimal.ZERO;
+            if (grossUp.traditionalGrossUp().signum() > 0 && realizedLtcgIncome.signum() > 0) {
+                BigDecimal restackedLtcgTax = computeLtcgTax(realizedGain,
+                        taxableIncome.add(grossUp.traditionalGrossUp()), year, detailed, netRentalIncome);
+                ltcgRestackDelta = restackedLtcgTax.subtract(ltcgTax).max(BigDecimal.ZERO);
+                ltcgTax = ltcgTax.add(ltcgRestackDelta);
+            }
+            BigDecimal totalWithdrawalTax = grossUp.tax().add(ltcgRestackDelta);
             // The converged gross-up draw is itself a traditional distribution: fold it into the
             // reported ordinary income so it (a) feeds the audit-B2 Social Security provisional-
             // income loop the same way the spend draw/RMD excess already do (see

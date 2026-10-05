@@ -185,6 +185,32 @@ class MultiPoolCapitalGainsTest {
         assertThat(r.ltcgTax()).isEqualByComparingTo(bd("5197.50"));
     }
 
+    /**
+     * Phase 1a reconciliation: LTCG stacks on the FULL year's ordinary income, including the C2
+     * gross-up slice (tax paid out of traditional is itself an ordinary distribution). Taxable pool
+     * 100,000 / basis 60,000 is fully drawn for a 100,000 need -> 40,000 gain on 60,000 other income;
+     * the pool is then empty, so the whole bill is grossed up from traditional (>= 10,000, far above the
+     * 3,350 of 0%-LTCG room that 60,000 - 15,000 deduction leaves under the 48,350 ceiling). Stacked on
+     * the final base, none of the gain fits the 0% band: LTCG tax = 40,000 x 0.15 = 6,000.00. Pricing it
+     * before the gross-up slice gives 5,497.50.
+     */
+    @Test
+    void executeWithdrawals_traditionalGrossUp_ltcgStacksOnOrdinaryIncludingGrossUpSlice() {
+        var federal = federalTaxCalc();
+        var combined = new CombinedTaxCalculator(federal, new NullStateTaxCalculator(), ZERO, ZERO);
+        var config = new PoolStrategy.PoolConfig(
+                FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST,
+                combined, null, Map.of(), ZERO, capitalGainsCalc(), ZERO, ZERO, ZERO, BASE_YEAR, federal);
+        var p = new PoolStrategy.MultiPool(
+                PoolFixtures.grouped(taxableAcct("100000", "60000"), acct("500000", "traditional"),
+                        acct("0", "roth")),
+                ZERO, config);
+
+        var r = p.executeWithdrawals(bd("100000"), YEAR, bd("60000"), ZERO, ZERO, AGE_RETIRED);
+
+        assertThat(r.ltcgTax()).isEqualByComparingTo(bd("6000.00"));
+    }
+
     @Test
     void executeWithdrawals_taxableDrawNoEmbeddedGain_noLtcgTax() {
         // Basis == balance → zero realized gain; no dividend (yield 0) → no LTCG tax at all.
