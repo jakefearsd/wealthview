@@ -326,29 +326,35 @@ class MultiPoolCapitalGainsTest {
 
     @Test
     void executeWithdrawals_baseYearBeforeWithdrawalYear_niitThresholdDeflatedByCalendarYears() {
-        // D16 (Phase 1a) regression guard: the engine's PoolStrategy.MultiPool uses year - baseYear
-        // to compute calendar years from base, feeding it to CapitalGainsTaxCalculator. When
-        // baseYear (2015) != withdrawal year (2025), the NIIT threshold deflates by calendar years.
-        // Fixture: baseYear 2015, withdrawal year 2025 → 10 years of deflation.
-        // Deflated NIIT threshold: $200k × (1/1.025)^10 ≈ $156.24k (single filer).
-        // MAGI: ordinary $140k + realized gain $40k = $180k (between deflated $156.24k and undeflated $200k).
-        // Test verifies: with deflation, NIIT is charged; without deflation (baseYear == year), it is not.
-        var federal = federalTaxCalc();
+        // D16 (Phase 1a) regression guard: PoolStrategy.MultiPool feeds year - baseYear (2025 - 2015 =
+        // 10) to CapitalGainsTaxCalculator, which deflates the fixed-nominal $200k single NIIT
+        // threshold by 1/(1 + inflation)^10. Inflation MUST be nonzero here (RealTermsDeflator returns
+        // 1 at zero inflation, which would make baseYear irrelevant).
+        //
+        // Fixture: inflation 2.5%, ordinary income 140k, taxable $500k / $300k basis, draw $100k
+        // -> FIFO gain 100000 * 200000/500000 = 40000; MAGI = 140000 + 40000 = 180000.
+        //   deflated threshold = 200000 * (1/1.025^10 at scale 10 = 0.7811984017) = 156239.6803,
+        //   so MAGI sits between it and the undeflated 200000 -- only the calendar clock charges NIIT.
+        //   bracket tax: floor 140000 - 15000 deduction = 125000, past 48,350 -> all 40000 at 15% = 6000
+        //   NIIT = 3.8% * min(NII 40000, MAGI - threshold = 23760.3197) = 0.038 * 23760.3197 = 902.8921
+        //   pre-D5 bill = 6000 + 902.8921 = 6902.8921
+        // D5: the bill is funded by selling 40%-gain lots (400k value / 240k basis remaining after the
+        // draw); that gain is marginally taxed at 15% + 3.8% NIIT (NII base excess 23760 < 40000 NII,
+        // so NIIT is binding on every extra gain dollar): T = 6902.8921 / (1 - 0.188 * 0.4)
+        // = 6902.8921 / 0.9248 = 7464.2000.
+        // With baseYear == withdrawal year (no deflation) the same fixture charges NO NIIT (MAGI < 200k)
+        // and prices 6000 / (1 - 0.15 * 0.4) = 6382.9787 instead.
         var poolConfig = new PoolStrategy.PoolConfig(
                 FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST,
-                null, null, Map.of(), ZERO, capitalGainsCalc(), bd("0"), ZERO, ZERO,
+                null, null, Map.of(), bd("0.025"), capitalGainsCalc(), bd("0"), ZERO, ZERO,
                 2015,  // D16: baseYear BEFORE withdrawal year
-                federal);
+                federalTaxCalc());
         var pool = new PoolStrategy.MultiPool(
                 PoolFixtures.grouped(taxableAcct("500000", "300000"), acct("0", "traditional"), acct("0", "roth")),
                 ZERO, poolConfig);
 
-        // Execute withdrawal in 2025 (10 calendar years after baseYear 2015).
-        // The pool computes yearsFromBase = 2025 - 2015 = 10 for NIIT deflation.
         var r = pool.executeWithdrawals(bd("100000"), 2025, bd("140000"), ZERO, ZERO, AGE_RETIRED);
 
-        // With 10-year deflation, NIIT is charged (tax > $6000 bracket-only base).
-        // Without wiring fix (offset 0), tax would be exactly $6000.
-        assertThat(r.ltcgTax()).isGreaterThan(bd("6000.00"));
+        assertThat(r.ltcgTax()).isEqualByComparingTo(bd("7464.2000"));
     }
 }
