@@ -149,7 +149,7 @@ class StochasticMortalityGoldenTest {
                 false, null, null, 5, null, null, null, null, 2025, false, null, true,
                 1966, 85, 90, new BigDecimal("0.75"), false,
                 stochastic ? Boolean.TRUE : null, stochastic ? "male" : null,
-                stochastic ? "female" : null, 95, table);
+                stochastic ? "female" : null, 95, table, null);
     }
 
     private static HypotheticalAccountInput account(String balance, String basis, String type, String owner) {

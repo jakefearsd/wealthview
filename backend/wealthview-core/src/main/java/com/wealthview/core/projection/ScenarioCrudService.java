@@ -67,6 +67,8 @@ public class ScenarioCrudService {
     private static final Set<String> VALID_SEXES = Set.of("male", "female");
     private static final int MIN_LONGEVITY_CONDITIONAL_AGE = 80;
     private static final int MAX_LONGEVITY_CONDITIONAL_AGE = 110;
+    private static final int MIN_BIRTH_MONTH = 1;
+    private static final int MAX_BIRTH_MONTH = 12;
 
     private final ProjectionScenarioRepository scenarioRepository;
     private final TenantLookup tenantLookup;
@@ -110,6 +112,7 @@ public class ScenarioCrudService {
         validateInterestYield(request.interestYield());
         validateHouseholdFields(request);
         validateStochasticMortalityFields(request);
+        validateBirthMonths(request);
         validateAccounts(request.accounts());
         var tenant = tenantLookup.requireTenant(tenantId);
 
@@ -162,6 +165,7 @@ public class ScenarioCrudService {
         validateInterestYield(request.interestYield());
         validateHouseholdFields(request);
         validateStochasticMortalityFields(request);
+        validateBirthMonths(request);
         validateAccounts(request.accounts());
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(Entities.notFound("Scenario"));
@@ -463,6 +467,32 @@ public class ScenarioCrudService {
                 || longevityConditionalAge > MAX_LONGEVITY_CONDITIONAL_AGE) {
             throw new IllegalArgumentException("longevity_conditional_age must be between "
                     + MIN_LONGEVITY_CONDITIONAL_AGE + " and " + MAX_LONGEVITY_CONDITIONAL_AGE);
+        }
+    }
+
+    /**
+     * Phase 1a: birth months (when present) must be 1-12. Each month needs its matching birth
+     * year: a month with no year is meaningless, and the engine would pair it with the
+     * {@code currentYear - 35} fallback birth year.
+     */
+    private static void validateBirthMonths(ScenarioParamsSource request) {
+        validateBirthMonth(request.birthMonth(), "birth_month");
+        validateBirthMonth(request.spouseBirthMonth(), "spouse_birth_month");
+        if (request.birthMonth() != null && request.birthYear() == null) {
+            throw new IllegalArgumentException("birth_month requires birth_year to be set");
+        }
+        if (request.spouseBirthMonth() != null && request.spouseBirthYear() == null) {
+            throw new IllegalArgumentException("spouse_birth_month requires spouse_birth_year to be set");
+        }
+    }
+
+    private static void validateBirthMonth(Integer birthMonth, String fieldName) {
+        if (birthMonth == null) {
+            return;
+        }
+        if (birthMonth < MIN_BIRTH_MONTH || birthMonth > MAX_BIRTH_MONTH) {
+            throw new IllegalArgumentException(fieldName + " must be between " + MIN_BIRTH_MONTH
+                    + " and " + MAX_BIRTH_MONTH);
         }
     }
 

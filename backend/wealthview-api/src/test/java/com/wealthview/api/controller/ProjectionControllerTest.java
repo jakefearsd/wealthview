@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,11 +22,14 @@ import com.wealthview.core.projection.dto.CompareResponse;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionRunResult;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
+import com.wealthview.core.projection.dto.ScenarioRequest;
 import com.wealthview.core.projection.dto.ScenarioResponse;
 import tools.jackson.databind.ObjectMapper;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.TENANT_ID;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
+import static com.wealthview.api.testutil.ControllerTestUtils.errorEnvelope;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -88,6 +92,46 @@ class ProjectionControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Retirement Plan"))
                 .andExpect(jsonPath("$.end_age").value(90));
+    }
+
+    // Phase 1a: birth-month validation lives in ScenarioCrudService and surfaces as a 400 through
+    // GlobalExceptionHandler. The stub also proves birth_month binds from the snake_case body.
+    @Test
+    void create_birthMonthWithoutBirthYear_returns400() throws Exception {
+        when(scenarioCrudService.createScenario(eq(TENANT_ID), any())).thenAnswer(inv -> {
+            var request = inv.<ScenarioRequest>getArgument(1);
+            assertThat(request.birthMonth()).isEqualTo(3);
+            throw new IllegalArgumentException("birth_month requires birth_year to be set");
+        });
+
+        mockMvc.perform(post("/api/v1/projections")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Plan", "retirement_date": "2055-01-01", "end_age": 90,
+                                 "inflation_rate": 0.03, "birth_month": 3, "accounts": []}
+                                """))
+                .andExpect(errorEnvelope(HttpStatus.BAD_REQUEST))
+                .andExpect(jsonPath("$.message").value("birth_month requires birth_year to be set"));
+    }
+
+    @Test
+    void create_birthMonthOutOfRange_returns400() throws Exception {
+        when(scenarioCrudService.createScenario(eq(TENANT_ID), any())).thenAnswer(inv -> {
+            var request = inv.<ScenarioRequest>getArgument(1);
+            assertThat(request.birthMonth()).isEqualTo(13);
+            throw new IllegalArgumentException("birth_month must be between 1 and 12");
+        });
+
+        mockMvc.perform(post("/api/v1/projections")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Plan", "retirement_date": "2055-01-01", "end_age": 90,
+                                 "inflation_rate": 0.03, "birth_year": 1970, "birth_month": 13, "accounts": []}
+                                """))
+                .andExpect(errorEnvelope(HttpStatus.BAD_REQUEST))
+                .andExpect(jsonPath("$.message").value("birth_month must be between 1 and 12"));
     }
 
     @Test

@@ -12,6 +12,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -1881,5 +1883,69 @@ class ScenarioCrudServiceTest {
         var counter = meterRegistry.find("wealthview.scenarios").tag("action", "delete").counter();
         assertThat(counter).isNotNull();
         assertThat(counter.count()).isEqualTo(1.0);
+    }
+
+    // Phase 1a: birth months.
+
+    @Test
+    void createScenario_birthMonthWithoutBirthYear_throwsIllegalArgument() {
+        var request = ScenarioRequestBuilder.builder().withBirthYear(null).withBirthMonth(3).build();
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("birth_month requires birth_year");
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 13})
+    void createScenario_birthMonthOutOfRange_throwsIllegalArgument(int badMonth) {
+        var request = ScenarioRequestBuilder.builder().withBirthYear(1970).withBirthMonth(badMonth).build();
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("birth_month must be between 1 and 12");
+    }
+
+    @Test
+    void createScenario_spouseBirthMonthWithoutSpouseBirthYear_throwsIllegalArgument() {
+        var request = ScenarioRequestBuilder.builder().withBirthYear(1970).withSpouseBirthMonth(5).build();
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("spouse_birth_month requires spouse_birth_year");
+    }
+
+    @Test
+    void createScenario_spouseBirthMonthOutOfRange_throwsIllegalArgument() {
+        var request = ScenarioRequestBuilder.builder().withBirthYear(1970)
+                .withSpouseBirthYear(1972).withSpouseBirthMonth(14).build();
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("spouse_birth_month must be between 1 and 12");
+    }
+
+    @Test
+    void updateScenario_birthMonthWithoutBirthYear_throwsIllegalArgument() {
+        var request = ScenarioRequestBuilder.builder().withBirthYear(null).withBirthMonth(3).build();
+
+        assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("birth_month requires birth_year");
+    }
+
+    @Test
+    void createScenario_validBirthMonths_persistsThemInParamsJson() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        var request = ScenarioRequestBuilder.builder().withBirthYear(1970).withBirthMonth(3)
+                .withSpouseBirthYear(1972).withSpouseBirthMonth(11).build();
+
+        service.createScenario(tenantId, request);
+
+        var saved = captureSavedScenario();
+        assertThat(saved.getParamsJson()).contains("\"birth_month\":3");
+        assertThat(saved.getParamsJson()).contains("\"spouse_birth_month\":11");
     }
 }

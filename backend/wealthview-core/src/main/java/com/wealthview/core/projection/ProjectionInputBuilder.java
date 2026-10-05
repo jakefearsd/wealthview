@@ -127,7 +127,8 @@ public class ProjectionInputBuilder {
      * before), otherwise a two-person context with death ages resolved from explicit params or the
      * SSA planning default, truncated to the scenario's own end-of-horizon calendar year (mirroring
      * {@code DeterministicProjectionEngine.resolveProjectionParams}'s identical birthYear/endYear
-     * fallback chain so both stay in lockstep).
+     * fallback chain so both stay in lockstep). Phase 1a: both persons carry their optional birth
+     * month (null = unknown).
      */
     private HouseholdContext resolveHousehold(ProjectionScenarioEntity scenario) {
         var params = ScenarioParams.parseOrEmpty(MAPPER, scenario.getParamsJson());
@@ -135,7 +136,7 @@ public class ProjectionInputBuilder {
         int primaryBirthYear = params.birthYear() != null ? params.birthYear() : currentYear - 35;
 
         if (params.spouseBirthYear() == null) {
-            return HouseholdContext.single(primaryBirthYear);
+            return HouseholdContext.single(primaryBirthYear).withBirthMonths(params.birthMonth(), null);
         }
 
         int endAge = scenario.getEndAge() != null ? scenario.getEndAge() : 90;
@@ -145,7 +146,8 @@ public class ProjectionInputBuilder {
         int spouseDeathAge = params.spouseDeathAge() != null
                 ? params.spouseDeathAge() : LifeExpectancy.defaultDeathAge(params.spouseBirthYear());
         return HouseholdContext.of(primaryBirthYear, primaryDeathAge,
-                params.spouseBirthYear(), spouseDeathAge, horizonEndYear);
+                params.spouseBirthYear(), spouseDeathAge, horizonEndYear)
+                .withBirthMonths(params.birthMonth(), params.spouseBirthMonth());
     }
 
     private SpendingProfileInput resolveSpendingProfile(ProjectionScenarioEntity scenario) {

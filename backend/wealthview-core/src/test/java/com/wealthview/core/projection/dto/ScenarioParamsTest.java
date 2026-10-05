@@ -257,4 +257,39 @@ class ScenarioParamsTest {
                 {"withdrawal_order": "roth_first"}
                 """).resolvedWithdrawalOrder()).isEqualTo(WithdrawalOrder.ROTH_FIRST);
     }
+
+    @Test
+    void toJson_birthMonthsPresent_writesSnakeCaseKeys() throws Exception {
+        var params = ScenarioParams.from(ScenarioRequestBuilder.builder()
+                .withBirthYear(1970).withBirthMonth(3)
+                .withSpouseBirthYear(1972).withSpouseBirthMonth(11)
+                .build());
+
+        var node = mapper.readTree(params.toJson(mapper));
+
+        assertThat(node.get("birth_month").asInt()).isEqualTo(3);
+        assertThat(node.get("spouse_birth_month").asInt()).isEqualTo(11);
+    }
+
+    @Test
+    void parseOrEmpty_legacyJsonWithoutBirthMonths_yieldsNullMonths() {
+        var parsed = ScenarioParams.parseOrEmpty(mapper, """
+                {"birth_year": 1965, "spouse_birth_year": 1967}
+                """);
+
+        assertThat(parsed.birthYear()).isEqualTo(1965);
+        assertThat(parsed.birthMonth()).isNull();
+        assertThat(parsed.spouseBirthMonth()).isNull();
+    }
+
+    @Test
+    void legacy29ArgConstructor_padsBirthMonthsWithNull() {
+        var params = new ScenarioParams(
+                1968, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null);
+
+        assertThat(params.birthMonth()).isNull();
+        assertThat(params.spouseBirthMonth()).isNull();
+    }
 }

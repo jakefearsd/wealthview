@@ -57,6 +57,8 @@ public final class ScenarioRequestBuilder {
     private String primarySex;
     private String spouseSex;
     private Integer longevityConditionalAge;
+    private Integer birthMonth;
+    private Integer spouseBirthMonth;
     private List<CreateProjectionAccountRequest> accounts = List.of();
     private List<ScenarioIncomeSourceInput> incomeSources;
 
@@ -197,6 +199,16 @@ public final class ScenarioRequestBuilder {
         return this;
     }
 
+    public ScenarioRequestBuilder withBirthMonth(@Nullable Integer birthMonth) {
+        this.birthMonth = birthMonth;
+        return this;
+    }
+
+    public ScenarioRequestBuilder withSpouseBirthMonth(@Nullable Integer spouseBirthMonth) {
+        this.spouseBirthMonth = spouseBirthMonth;
+        return this;
+    }
+
     public ScenarioRequestBuilder withAccounts(List<CreateProjectionAccountRequest> accounts) {
         this.accounts = accounts;
         return this;
@@ -214,7 +226,7 @@ public final class ScenarioRequestBuilder {
                 rothConversionStrategy, targetBracketRate, null, null, null, null,
                 dividendYield, feeRate, includeDepressionYears, interestYield,
                 spouseBirthYear, primaryDeathAge, spouseDeathAge, survivorSpendingFactor, communityProperty,
-                stochasticMortality, primarySex, spouseSex, longevityConditionalAge,
+                stochasticMortality, primarySex, spouseSex, longevityConditionalAge, birthMonth, spouseBirthMonth,
                 accounts, null, null, incomeSources);
     }
 }

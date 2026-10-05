@@ -73,6 +73,11 @@ public final class GuardrailOptimizationInputBuilder {
         return this;
     }
 
+    public GuardrailOptimizationInputBuilder withBirthMonth(@Nullable Integer birthMonth) {
+        delegate.birthMonth(birthMonth);
+        return this;
+    }
+
     public GuardrailOptimizationInputBuilder withEndAge(int endAge) {
         delegate.endAge(endAge);
         return this;

@@ -715,6 +715,22 @@ class GuardrailProfileServiceTest {
         assertThat(input.dividendYield()).isNull();
     }
 
+    // Phase 1a: the scenario's birth_month reaches the MC input (early-access age is resolved
+    // engine-side via AgeMilestones). Absent => null (legacy whole-year 60).
+    @Test
+    void optimize_paramsJsonWithBirthMonth_propagatesToInput() {
+        var scenarioWithMonth = ScenarioMother.guardrailScenario(tenant, "Month",
+                "{\"birth_year\":1968,\"birth_month\":4}");
+        var input = captureOptimizationInput(buildRequest(req -> req), scenarioWithMonth);
+        assertThat(input.birthMonth()).isEqualTo(4);
+    }
+
+    @Test
+    void optimize_paramsJsonWithoutBirthMonth_propagatesNull() {
+        var input = captureOptimizationInput(buildRequest(req -> req), scenario);
+        assertThat(input.birthMonth()).isNull();
+    }
+
     // B1 (2026-07-11 audit): the scenario's fee_rate param must reach the MC's
     // GuardrailOptimizationInput the same way dividend_yield does. Absent ⇒ null passed through --
     // OptimizationContextBuilder applies the 0.0025 default (see OptimizationContextBuilderTest).

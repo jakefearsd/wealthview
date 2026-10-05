@@ -552,6 +552,42 @@ class ProjectionInputBuilderTest {
     }
 
     @Test
+    void build_withBirthMonths_threadsThemOntoHouseholdPersons() {
+        var scenario = ScenarioMother.scenarioWithParams(tenant,
+                "{\"birth_year\":1968,\"birth_month\":3,\"spouse_birth_year\":1970,\"spouse_birth_month\":10}");
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.household().primary().birthMonth()).isEqualTo(3);
+        assertThat(result.household().spouse().birthMonth()).isEqualTo(10);
+    }
+
+    @Test
+    void build_singleWithBirthMonth_threadsPrimaryMonth() {
+        var scenario = ScenarioMother.scenarioWithParams(tenant, "{\"birth_year\":1968,\"birth_month\":6}");
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.household().primary().birthMonth()).isEqualTo(6);
+        assertThat(result.household().isHousehold()).isFalse();
+    }
+
+    @Test
+    void build_withoutBirthMonth_leavesPersonMonthNull() {
+        var scenario = ScenarioMother.scenarioWithParams(tenant, "{\"birth_year\":1968}");
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.household().primary().birthMonth()).isNull();
+    }
+
+    @Test
     void build_withExplicitDeathAges_usesExplicitValues() {
         var scenario = ScenarioMother.scenarioWithParams(tenant,
                 "{\"birth_year\":1968,\"spouse_birth_year\":1970,"

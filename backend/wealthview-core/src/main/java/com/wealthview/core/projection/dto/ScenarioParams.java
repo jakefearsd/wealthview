@@ -57,13 +57,44 @@ public record ScenarioParams(
         Boolean stochasticMortality,
         String primarySex,
         String spouseSex,
-        Integer longevityConditionalAge) {
+        Integer longevityConditionalAge,
+        Integer birthMonth,
+        Integer spouseBirthMonth) {
 
     private static final Logger log = LoggerFactory.getLogger(ScenarioParams.class);
 
     public static final ScenarioParams EMPTY = new ScenarioParams(
             null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-            null, null, null, null, null, null, null, null, null, null, null, null);
+            null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+
+    /**
+     * Back-compat convenience for positional callers that predate birth months (Phase 1a): the
+     * 29-component shape. The new components are padded with {@code null}, meaning "not set", so
+     * ages stay whole-year exactly as before.
+     */
+    // ExcessiveParameterList: mirrors the record's pre-Phase-1a canonical constructor so existing
+    // positional call sites keep compiling unchanged.
+    @SuppressWarnings("PMD.ExcessiveParameterList")
+    public ScenarioParams(
+            Integer birthYear, BigDecimal withdrawalRate, String withdrawalStrategy,
+            BigDecimal dynamicCeiling, BigDecimal dynamicFloor, String filingStatus,
+            BigDecimal otherIncome, BigDecimal annualRothConversion, String withdrawalOrder,
+            BigDecimal dynamicSequencingBracketRate, String rothConversionStrategy,
+            BigDecimal targetBracketRate, Integer rothConversionStartYear, String state,
+            BigDecimal primaryResidencePropertyTax, BigDecimal primaryResidenceMortgageInterest,
+            BigDecimal dividendYield, BigDecimal feeRate, Boolean includeDepressionYears,
+            BigDecimal interestYield, Integer spouseBirthYear, Integer primaryDeathAge,
+            Integer spouseDeathAge, BigDecimal survivorSpendingFactor, Boolean communityProperty,
+            Boolean stochasticMortality, String primarySex, String spouseSex,
+            Integer longevityConditionalAge) {
+        this(birthYear, withdrawalRate, withdrawalStrategy, dynamicCeiling, dynamicFloor, filingStatus,
+                otherIncome, annualRothConversion, withdrawalOrder, dynamicSequencingBracketRate,
+                rothConversionStrategy, targetBracketRate, rothConversionStartYear, state,
+                primaryResidencePropertyTax, primaryResidenceMortgageInterest, dividendYield, feeRate,
+                includeDepressionYears, interestYield, spouseBirthYear, primaryDeathAge, spouseDeathAge,
+                survivorSpendingFactor, communityProperty, stochasticMortality, primarySex, spouseSex,
+                longevityConditionalAge, null, null);
+    }
 
     public static ScenarioParams from(ScenarioParamsSource source) {
         return new ScenarioParams(
@@ -77,7 +108,7 @@ public record ScenarioParams(
                 source.interestYield(), source.spouseBirthYear(), source.primaryDeathAge(),
                 source.spouseDeathAge(), source.survivorSpendingFactor(), source.communityProperty(),
                 source.stochasticMortality(), source.primarySex(), source.spouseSex(),
-                source.longevityConditionalAge());
+                source.longevityConditionalAge(), source.birthMonth(), source.spouseBirthMonth());
     }
 
     /**

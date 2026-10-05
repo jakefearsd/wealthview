@@ -130,4 +130,15 @@ public interface ScenarioParamsSource {
      * {@code 95}. Only meaningful when {@link #stochasticMortality()} is {@code true}.
      */
     Integer longevityConditionalAge();
+
+    /**
+     * Phase 1a: the primary's birth month (1-12). {@code null} means unknown, which keeps the
+     * legacy whole-year 59½ proxy (age 60; see {@code AgeMilestones}). Requires
+     * {@link #birthYear()}.
+     */
+    Integer birthMonth();
+
+    /** Phase 1a: the spouse's birth month (1-12), mirroring {@link #birthMonth()}. Requires
+     * {@link #spouseBirthYear()}. */
+    Integer spouseBirthMonth();
 }

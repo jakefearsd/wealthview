@@ -11,6 +11,7 @@ import org.springframework.lang.Nullable;
 import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.projection.dto.TierBasedSpendingPlan;
+import com.wealthview.core.projection.household.AgeMilestones;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -76,6 +77,14 @@ final class ScenarioParamsParser {
      */
     boolean includeDepressionYears(ScenarioParams params) {
         return Boolean.TRUE.equals(params.includeDepressionYears());
+    }
+
+    /**
+     * Phase 1a: the age of the calendar year the primary reaches 59½ (penalty-free from that year
+     * on). Without a birth month this is the legacy whole-year proxy, 60.
+     */
+    int earlyAccessAge(ScenarioParams params) {
+        return AgeMilestones.earlyAccessAge(params.birthMonth());
     }
 
     @Nullable

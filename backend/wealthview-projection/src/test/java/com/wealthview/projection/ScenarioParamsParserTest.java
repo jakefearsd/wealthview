@@ -263,4 +263,38 @@ class ScenarioParamsParserTest {
     void defaultParams_isTheEmptyParams() {
         assertThat(parser.defaultParams()).isSameAs(ScenarioParams.EMPTY);
     }
+
+    // Phase 1a: birth month -> early-access age (59 1/2 year).
+
+    @Test
+    void earlyAccessAge_legacyParamsWithoutBirthMonth_returns60() {
+        var params = parser.parseParams("""
+                {"birth_year": 1965, "withdrawal_rate": 0.04}
+                """);
+
+        assertThat(parser.earlyAccessAge(params)).isEqualTo(60);
+    }
+
+    @Test
+    void earlyAccessAge_marchBirth_returns59() {
+        var params = parser.parseParams("""
+                {"birth_year": 1970, "birth_month": 3}
+                """);
+
+        assertThat(parser.earlyAccessAge(params)).isEqualTo(59);
+    }
+
+    @Test
+    void earlyAccessAge_septemberBirth_returns60() {
+        var params = parser.parseParams("""
+                {"birth_year": 1970, "birth_month": 9}
+                """);
+
+        assertThat(parser.earlyAccessAge(params)).isEqualTo(60);
+    }
+
+    @Test
+    void earlyAccessAge_emptyParams_returns60() {
+        assertThat(parser.earlyAccessAge(ScenarioParams.EMPTY)).isEqualTo(60);
+    }
 }

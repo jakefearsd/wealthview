@@ -565,6 +565,8 @@ public class GuardrailProfileService {
                 .spouseSex(params.spouseSex())
                 .longevityConditionalAge(params.longevityConditionalAge())
                 .mortalityTable(projectionInputBuilder.resolveMortalityTable(params))
+                // Phase 1a: raw birth month; OptimizationContextBuilder resolves the early-access age.
+                .birthMonth(params.birthMonth())
                 .build();
     }
 

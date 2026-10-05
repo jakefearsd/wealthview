@@ -79,6 +79,7 @@ import com.wealthview.core.projection.mortality.MortalityTable;
  *         ProjectionInputBuilder.resolveMortalityTable} ONLY when {@link #stochasticMortality} is
  *         {@code true} — {@code null} otherwise, so a toggle-off run never touches
  *         {@code mortality_rates} (part of the byte-identical-to-sub-project-A anchor).
+ * @param birthMonth the primary's birth month (1-12) or null; see AgeMilestones
  */
 public record GuardrailOptimizationInput(
         LocalDate retirementDate,
@@ -129,7 +130,10 @@ public record GuardrailOptimizationInput(
         @Nullable String primarySex,
         @Nullable String spouseSex,
         @Nullable Integer longevityConditionalAge,
-        @Nullable MortalityTable mortalityTable
+        @Nullable MortalityTable mortalityTable,
+        // Phase 1a: the primary's birth month (1-12, null = unknown). Resolved engine-side to the
+        // early-access (59 1/2) age via AgeMilestones; null => legacy whole-year age 60.
+        @Nullable Integer birthMonth
 ) {
 
     /**
@@ -164,7 +168,9 @@ public record GuardrailOptimizationInput(
                 // Household task 6: pre-household callers are single-person (spouse absent).
                 null, null, null, null, false,
                 // Sub-project B: pre-stochastic-mortality callers keep the toggle off.
-                null, null, null, null, null);
+                null, null, null, null, null,
+                // Phase 1a: birthMonth null (legacy age 60)
+                null);
     }
 
     /**
@@ -229,6 +235,7 @@ public record GuardrailOptimizationInput(
         private String spouseSex;
         private Integer longevityConditionalAge;
         private MortalityTable mortalityTable;
+        private Integer birthMonth;
 
         private Builder() {}
 
@@ -442,6 +449,11 @@ public record GuardrailOptimizationInput(
             return this;
         }
 
+        public Builder birthMonth(@Nullable Integer birthMonth) {
+            this.birthMonth = birthMonth;
+            return this;
+        }
+
         public GuardrailOptimizationInput build() {
             return new GuardrailOptimizationInput(retirementDate, birthYear, endAge, inflationRate, accounts,
                     incomeSources, essentialFloor, terminalBalanceTarget, returnMean, trialCount, confidenceLevel,
@@ -452,7 +464,7 @@ public record GuardrailOptimizationInput(
                     baseYear != null ? baseYear : retirementDate.getYear(), includeDepressionYears, interestYield,
                     gateOnAdaptiveRules, spouseBirthYear, primaryDeathAge, spouseDeathAge, survivorSpendingFactor,
                     communityProperty, stochasticMortality, primarySex, spouseSex, longevityConditionalAge,
-                    mortalityTable);
+                    mortalityTable, birthMonth);
         }
     }
 }
