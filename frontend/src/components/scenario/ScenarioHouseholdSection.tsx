@@ -4,6 +4,7 @@ import type { Sex } from '../../types/projection';
 import {
     MIN_LONGEVITY_CONDITIONAL_AGE,
     MAX_LONGEVITY_CONDITIONAL_AGE,
+    MONTH_OPTIONS,
     type ScenarioFormFields,
     type SetScenarioField,
 } from './scenarioFormFields';
@@ -38,7 +39,7 @@ export interface ScenarioHouseholdSectionProps {
 /** Spouse / household modeling: death ages, survivor spending, community property, and stochastic mortality. */
 export default function ScenarioHouseholdSection({ fields, setField, onSpouseBirthYearChange }: ScenarioHouseholdSectionProps) {
     const {
-        birthYear, spouseBirthYear, primaryDeathAge, spouseDeathAge, survivorSpendingFactor,
+        birthYear, spouseBirthYear, spouseBirthMonth, primaryDeathAge, spouseDeathAge, survivorSpendingFactor,
         communityProperty, stochasticMortality, primarySex, spouseSex, longevityConditionalAge,
     } = fields;
 
@@ -58,6 +59,19 @@ export default function ScenarioHouseholdSection({ fields, setField, onSpouseBir
                 </FormField>
                 {household && (
                     <>
+                        <FormField
+                            label="Spouse Birth Month"
+                            helpText="Optional. Makes the spouse's 59½ and Medicare dates exact. Blank uses whole-year ages."
+                        >
+                            <select
+                                style={inputStyle}
+                                value={spouseBirthMonth ?? ''}
+                                onChange={e => setField('spouseBirthMonth', e.target.value === '' ? null : Number(e.target.value))}
+                            >
+                                <option value="">Not set</option>
+                                {MONTH_OPTIONS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                            </select>
+                        </FormField>
                         <FormField
                             label="Primary Death Age"
                             helpText="Assumed planning age at which the primary passes away (50-120). Blank uses the SSA planning default."

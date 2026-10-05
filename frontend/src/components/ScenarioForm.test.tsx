@@ -844,5 +844,92 @@ describe('ScenarioForm', () => {
             expect(labeledInput('Longevity Age').min).toBe('80');
             expect(labeledInput('Longevity Age').max).toBe('110');
         });
+
+        it('defaults Birth Month to unset and submits birth_month null', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+            expect(labeledInput<HTMLSelectElement>('Birth Month').value).toBe('');
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            const call = onSubmit.mock.calls[0][0];
+            expect(call.birth_month).toBeNull();
+            expect(call.spouse_birth_month).toBeNull();
+        });
+
+        it('submits the selected birth month as a number', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+            fireEvent.change(labeledInput<HTMLSelectElement>('Birth Month'), { target: { value: '3' } });
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            expect(onSubmit.mock.calls[0][0].birth_month).toBe(3);
+        });
+
+        it('pre-fills birth months from an existing scenario params_json', () => {
+            setupMocks();
+            render(
+                <ScenarioForm
+                    onSubmit={vi.fn()}
+                    submitLabel="Save"
+                    initialValues={{
+                        id: 's1',
+                        name: 'Existing',
+                        retirement_date: '2035-01-01',
+                        end_age: 90,
+                        inflation_rate: 0.03,
+                        params_json: JSON.stringify({
+                            birth_year: 1970, birth_month: 9, spouse_birth_year: 1972, spouse_birth_month: 2,
+                        }),
+                        accounts: [],
+                    } as never}
+                />,
+            );
+
+            expect(labeledInput<HTMLSelectElement>('Birth Month').value).toBe('9');
+            expect(labeledInput<HTMLSelectElement>('Spouse Birth Month').value).toBe('2');
+        });
+
+        it('shows Spouse Birth Month only with a spouse and clears it when the spouse is removed', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+            expect(screen.queryByText('Spouse Birth Month')).not.toBeInTheDocument();
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1972' } });
+            fireEvent.change(labeledInput<HTMLSelectElement>('Spouse Birth Month'), { target: { value: '11' } });
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '' } });
+
+            expect(screen.queryByText('Spouse Birth Month')).not.toBeInTheDocument();
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            expect(onSubmit.mock.calls[0][0].spouse_birth_month).toBeNull();
+        });
+
+        it('submits spouse_birth_month when a spouse is present', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1972' } });
+            fireEvent.change(labeledInput<HTMLSelectElement>('Spouse Birth Month'), { target: { value: '11' } });
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            expect(onSubmit.mock.calls[0][0].spouse_birth_month).toBe(11);
+        });
     });
 });

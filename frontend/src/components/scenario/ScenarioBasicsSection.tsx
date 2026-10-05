@@ -1,7 +1,7 @@
 import FormField from '../FormField';
 import { inputStyle } from '../../utils/styles';
 import type { GuardrailProfileSummary, SpendingProfile } from '../../types/projection';
-import type { ScenarioFormFields, SetScenarioField } from './scenarioFormFields';
+import { MONTH_OPTIONS, type ScenarioFormFields, type SetScenarioField } from './scenarioFormFields';
 
 export interface ScenarioBasicsSectionProps {
     fields: ScenarioFormFields;
@@ -13,7 +13,7 @@ export interface ScenarioBasicsSectionProps {
 /** Core scenario inputs: name, dates, rates, market drags, and the unified Spending Plan dropdown. */
 export default function ScenarioBasicsSection({ fields, setField, profiles, guardrailProfile }: ScenarioBasicsSectionProps) {
     const {
-        name, retirementDate, birthYear, endAge, inflationRate, withdrawalRate,
+        name, retirementDate, birthYear, birthMonth, endAge, inflationRate, withdrawalRate,
         dividendYield, interestYield, feeRate, includeDepressionYears, spendingPlanSelection,
     } = fields;
 
@@ -27,6 +27,19 @@ export default function ScenarioBasicsSection({ fields, setField, profiles, guar
             </FormField>
             <FormField label="Birth Year" helpText="Used to calculate your age at each projection year.">
                 <input style={inputStyle} type="number" value={birthYear} onChange={e => setField('birthYear', Number(e.target.value))} />
+            </FormField>
+            <FormField
+                label="Birth Month"
+                helpText="Optional. Makes the 59½ penalty-free year exact (born January–June: the year you turn 59). Blank uses the year you turn 60."
+            >
+                <select
+                    style={inputStyle}
+                    value={birthMonth ?? ''}
+                    onChange={e => setField('birthMonth', e.target.value === '' ? null : Number(e.target.value))}
+                >
+                    <option value="">Not set</option>
+                    {MONTH_OPTIONS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
             </FormField>
             <FormField label="End Age" helpText="Age at which the projection ends. Plan beyond your expected lifespan for safety.">
                 <input style={inputStyle} type="number" value={endAge} onChange={e => setField('endAge', Number(e.target.value))} />

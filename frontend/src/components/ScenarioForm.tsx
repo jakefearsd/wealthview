@@ -71,6 +71,7 @@ function buildInitialFields(initialValues: Scenario | null | undefined): Scenari
         endAge: initialValues?.end_age ?? 90,
         inflationRate: toPercent(initialValues?.inflation_rate ?? 0.03),
         birthYear: parsedParams.birth_year ?? 1990,
+        birthMonth: parsedParams.birth_month ?? null,
         withdrawalRate: toPercent(parsedParams.withdrawal_rate ?? 0.04),
         withdrawalStrategy: parsedParams.withdrawal_strategy ?? 'fixed_percentage',
         dynamicCeiling: toPercent(parsedParams.dynamic_ceiling ?? 0.05),
@@ -92,6 +93,7 @@ function buildInitialFields(initialValues: Scenario | null | undefined): Scenari
         includeDepressionYears: parsedParams.include_depression_years ?? false,
         spendingPlanSelection,
         spouseBirthYear: parsedParams.spouse_birth_year ?? null,
+        spouseBirthMonth: parsedParams.spouse_birth_month ?? null,
         primaryDeathAge: parsedParams.primary_death_age ?? null,
         spouseDeathAge: parsedParams.spouse_death_age ?? null,
         survivorSpendingFactor: parsedParams.survivor_spending_factor != null
@@ -152,13 +154,13 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
     const hasInvalidAllocation = accounts.some(a => a.allocation != null && !isAllocationValid(a.allocation));
 
     const {
-        name, retirementDate, endAge, inflationRate, birthYear, withdrawalRate,
+        name, retirementDate, endAge, inflationRate, birthYear, birthMonth, withdrawalRate,
         withdrawalStrategy, dynamicCeiling, dynamicFloor, filingStatus, otherIncome,
         annualRothConversion, rothConversionStrategy, targetBracketRate,
         rothConversionStartYear, withdrawalOrder, dynamicSequencingBracketRate,
         state, primaryResidencePropertyTax, primaryResidenceMortgageInterest,
         dividendYield, feeRate, interestYield, includeDepressionYears, spendingPlanSelection,
-        spouseBirthYear, primaryDeathAge, spouseDeathAge, survivorSpendingFactor, communityProperty,
+        spouseBirthYear, spouseBirthMonth, primaryDeathAge, spouseDeathAge, survivorSpendingFactor, communityProperty,
         stochasticMortality, primarySex, spouseSex, longevityConditionalAge,
     } = fields;
 
@@ -174,6 +176,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
             ...prev,
             spouseBirthYear: value,
             ...(value == null ? {
+                spouseBirthMonth: null,
                 primaryDeathAge: null,
                 spouseDeathAge: null,
                 survivorSpendingFactor: DEFAULT_SURVIVOR_SPENDING_FACTOR,
@@ -252,6 +255,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 end_age: endAge,
                 inflation_rate: inflationRate / 100,
                 birth_year: birthYear,
+                birth_month: birthMonth,
                 withdrawal_rate: withdrawalRate / 100,
                 withdrawal_strategy: withdrawalStrategy,
                 dynamic_ceiling: withdrawalStrategy === 'vanguard_dynamic_spending' ? dynamicCeiling / 100 : null,
@@ -274,6 +278,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 interest_yield: interestYield != null ? interestYield / 100 : undefined,
                 include_depression_years: includeDepressionYears,
                 spouse_birth_year: spouseBirthYear,
+                spouse_birth_month: household ? spouseBirthMonth : null,
                 primary_death_age: household && primaryDeathAge != null ? primaryDeathAge : null,
                 spouse_death_age: household && spouseDeathAge != null ? spouseDeathAge : null,
                 survivor_spending_factor: household ? survivorSpendingFactor / 100 : null,

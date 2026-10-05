@@ -195,6 +195,10 @@ export interface CreateScenarioRequest {
     /** Nominal coupon assumption for the bond portion of taxable accounts (decimal, default 0.04, range 0-0.10). */
     interest_yield?: number | null;
     include_depression_years?: boolean | null;
+    /** Phase 1a: primary's birth month (1-12). Null = unknown -> early access at the legacy age-60 year. Requires birth_year. */
+    birth_month?: number | null;
+    /** Phase 1a: spouse's birth month (1-12). Only meaningful when spouse_birth_year is set. */
+    spouse_birth_month?: number | null;
     /** Household/survivor modeling: null means single-person; every field below is then ignored. */
     spouse_birth_year?: number | null;
     /** Primary's assumed death age (50-120). Null resolves to the server's SSA planning default. */
