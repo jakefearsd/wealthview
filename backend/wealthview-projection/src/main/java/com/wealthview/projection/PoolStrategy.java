@@ -1525,7 +1525,8 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
          * The deduction the ordinary tax actually used, for netting the LTCG stacking floor onto the
          * same base. Prefers the itemized figure when {@code ordinaryTaxDetail} shows itemizing won
          * (mirrors {@code CombinedTaxCalculator.computeTax}'s own itemized-vs-standard choice);
-         * otherwise falls back to the federal standard deduction for (year, filingStatus). Returns ZERO
+         * otherwise the tax strategy's age-aware standard deduction, falling back to the age-unaware
+         * federal figure for (year, filingStatus). Returns ZERO
          * -- i.e. the floor stays gross, pre-fix -- when neither is available (no ordinary-tax result
          * AND no standard-deduction source wired).
          */
@@ -1533,10 +1534,14 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             if (ordinaryTaxDetail != null && ordinaryTaxDetail.usedItemized()) {
                 return ordinaryTaxDetail.itemizedDeductions();
             }
-            if (federalTaxCalculator != null) {
-                return federalTaxCalculator.loadStandardDeduction(year, filingStatus);
-            }
-            return BigDecimal.ZERO;
+            // Phase 1a: prefer the strategy's AGE-AWARE standard deduction -- the same one the
+            // ordinary tax was computed with -- so a 65+ filer's adder is not treated as ordinary
+            // income sitting under the LTCG band.
+            Optional<BigDecimal> ageAware = taxCalculator != null
+                    ? taxCalculator.standardDeduction(year, filingStatus) : Optional.empty();
+            return ageAware.orElseGet(() -> federalTaxCalculator != null
+                    ? federalTaxCalculator.loadStandardDeduction(year, filingStatus)
+                    : BigDecimal.ZERO);
         }
 
         @Override

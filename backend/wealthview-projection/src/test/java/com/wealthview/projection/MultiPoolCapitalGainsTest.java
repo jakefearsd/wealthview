@@ -23,6 +23,7 @@ import com.wealthview.persistence.repository.TaxBracketRepository;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
+import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025WithAge65Adder;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025Ltcg;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -154,6 +155,34 @@ class MultiPoolCapitalGainsTest {
         var r = p.executeWithdrawals(bd("100000"), YEAR, bd("60000"), ZERO, ZERO, AGE_RETIRED);
 
         assertThat(r.ltcgTax()).isEqualByComparingTo(bd("2197.50"));
+    }
+
+    /**
+     * Phase 1a: the LTCG stacking floor must net the SAME age-aware standard deduction the ordinary
+     * tax uses. Same $40,000-gain / $60,000-ordinary fixture as the first test in this class, but a
+     * 66-year-old filer whose 2025 deduction is 15,000 + 2,000 (age-65 adder) = 17,000:
+     * floor = 60,000 - 17,000 = 43,000 -> 0% room = 48,350 - 43,000 = 5,350 ->
+     * LTCG tax = (40,000 - 5,350) x 0.15 = 5,197.50. The age-unaware floor (15,000) gives 5,497.50.
+     */
+    @Test
+    void executeWithdrawals_filerOver65_stackingFloorNetsAgeAwareStandardDeduction() {
+        var taxBracketRepo = mock(TaxBracketRepository.class);
+        var deductionRepo = mock(StandardDeductionRepository.class);
+        stubSingle2025WithAge65Adder(taxBracketRepo, deductionRepo);
+        var federal = new FederalTaxCalculator(taxBracketRepo, deductionRepo);
+        var combinedAge66 = new CombinedTaxCalculator(federal, new NullStateTaxCalculator(),
+                ZERO, ZERO, 1959);
+        var config = new PoolStrategy.PoolConfig(
+                FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST,
+                combinedAge66, null, Map.of(), ZERO, capitalGainsCalc(), ZERO, ZERO, ZERO, BASE_YEAR,
+                federal);
+        var p = new PoolStrategy.MultiPool(
+                PoolFixtures.grouped(taxableAcct("500000", "300000"), acct("0", "traditional"), acct("0", "roth")),
+                ZERO, config);
+
+        var r = p.executeWithdrawals(bd("100000"), YEAR, bd("60000"), ZERO, ZERO, 66);
+
+        assertThat(r.ltcgTax()).isEqualByComparingTo(bd("5197.50"));
     }
 
     @Test
