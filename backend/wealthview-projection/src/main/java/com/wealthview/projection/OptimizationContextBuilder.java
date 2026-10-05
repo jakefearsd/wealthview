@@ -345,7 +345,8 @@ final class OptimizationContextBuilder {
         OrdinaryTaxTable[] ordinary = OrdinaryTaxTable.computeAll(
                 taxCalculator, frame.retirementYear(), frame.years(), status, frame.birthYear(), household);
         LtcgTaxTable[] ltcg = LtcgTaxTable.computeAll(capitalGainsTaxCalculator, taxCalculator,
-                frame.retirementYear(), frame.years(), status, frame.inflationRate(), frame.birthYear(), household);
+                frame.retirementYear(), frame.years(), status, frame.inflationRate(), frame.birthYear(), household,
+                frame.retirementYearOffsetFromBase());
         double[] ds = computeDsBracketCeilings(
                 withdrawalOrder, dsBracketRate, frame.years(), frame.retirementYear(), status);
         double[] rental = computeRentalIncomeDelta(

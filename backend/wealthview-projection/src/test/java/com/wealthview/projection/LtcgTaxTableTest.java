@@ -144,4 +144,21 @@ class LtcgTaxTableTest {
         double tax = table.taxAt(50_000, 1_000);
         assertThat(tax).isCloseTo(150.0, within(1e-6));
     }
+
+    @Test
+    void computeAll_retirementYearOffsetFromBase_deflatesNiitOnCalendarClock() {
+        // Retirement 10 calendar years after the base year: year index 0 must deflate the fixed
+        // nominal NIIT threshold by 10 years (the SAME clock the Social Security thresholds use),
+        // not by 0. MAGI 180k sits between the deflated (~$156k) and undeflated ($200k)
+        // thresholds, so only the calendar clock charges NIIT.
+        var tables = LtcgTaxTable.computeAll(capitalGainsCalc(), federalTaxCalc(),
+                2025, 1, FilingStatus.SINGLE, 0.025, null, null, 10);
+        var calendarAnchored = LtcgTaxTable.build(capitalGainsCalc(), federalTaxCalc(),
+                2025, FilingStatus.SINGLE, 10, 0.025, -1);
+        var retirementAnchored = LtcgTaxTable.build(capitalGainsCalc(), federalTaxCalc(),
+                2025, FilingStatus.SINGLE, 0, 0.025, -1);
+
+        assertThat(tables[0].taxAt(140_000, 40_000)).isEqualTo(calendarAnchored.taxAt(140_000, 40_000));
+        assertThat(tables[0].taxAt(140_000, 40_000)).isGreaterThan(retirementAnchored.taxAt(140_000, 40_000));
+    }
 }

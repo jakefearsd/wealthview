@@ -217,6 +217,22 @@ final class LtcgTaxTable {
                                       int retirementYear, int years, FilingStatus filingStatus,
                                       double inflationRate, @Nullable Integer birthYear,
                                       @Nullable HouseholdContext household) {
+        return computeAll(capitalGainsTaxCalculator, federalTaxCalculator, retirementYear, years,
+                filingStatus, inflationRate, birthYear, household, 0);
+    }
+
+    /**
+     * D16 (Phase 1a): like the 8-arg overload, but deflates each year's fixed-nominal NIIT threshold
+     * by CALENDAR years from the base year ({@code retirementYearOffsetFromBase + y}) -- the same
+     * clock {@code OptimizationContextBuilder} uses for the Social Security thresholds and the
+     * deterministic engine uses ({@code year - baseYear}). Offset 0 reproduces the old
+     * retirement-anchored clock exactly.
+     */
+    static LtcgTaxTable[] computeAll(@Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator,
+                                      @Nullable FederalTaxCalculator federalTaxCalculator,
+                                      int retirementYear, int years, FilingStatus filingStatus,
+                                      double inflationRate, @Nullable Integer birthYear,
+                                      @Nullable HouseholdContext household, int retirementYearOffsetFromBase) {
         LtcgTaxTable[] tables = new LtcgTaxTable[years];
         if (capitalGainsTaxCalculator == null) {
             Arrays.fill(tables, ZERO);
@@ -224,16 +240,17 @@ final class LtcgTaxTable {
         }
         for (int y = 0; y < years; y++) {
             int taxYear = retirementYear + y;
+            int yearsFromBase = Math.max(0, retirementYearOffsetFromBase + y);
             if (household != null) {
                 int age = household.filerAgeIn(taxYear);
                 Integer secondAge = filingStatus == FilingStatus.MARRIED_FILING_JOINTLY
                         ? household.secondFilerAgeIn(taxYear) : null;
-                tables[y] = build(capitalGainsTaxCalculator, federalTaxCalculator, taxYear, filingStatus, y,
-                        inflationRate, age, secondAge);
+                tables[y] = build(capitalGainsTaxCalculator, federalTaxCalculator, taxYear, filingStatus,
+                        yearsFromBase, inflationRate, age, secondAge);
             } else {
                 int age = birthYear != null ? taxYear - birthYear : -1;
-                tables[y] = build(capitalGainsTaxCalculator, federalTaxCalculator, taxYear, filingStatus, y,
-                        inflationRate, age);
+                tables[y] = build(capitalGainsTaxCalculator, federalTaxCalculator, taxYear, filingStatus,
+                        yearsFromBase, inflationRate, age);
             }
         }
         return tables;

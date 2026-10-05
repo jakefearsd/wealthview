@@ -320,4 +320,34 @@ class MultiPoolCapitalGainsTest {
         // by the funding-sale factor 1 / 0.9248 (D5 Phase 1a: was 1140.00).
         assertThat(r.taxLiability().subtract(bd("8131.4879"))).isEqualByComparingTo(bd("1232.6990"));
     }
+
+    // ---- D16 (Phase 1a): deterministic engine (CapitalGainsTaxCalculator) already deflates NIIT by calendar years ----
+
+    @Test
+    void capitalGainsTaxCalculator_niitThresholdDeflatesByCalendarYearsFromBase() {
+        // D16 (Phase 1a): the deterministic engine's CapitalGainsTaxCalculator already deflates the NIIT
+        // threshold by yearsFromBase (calendar years from the base year), which is the same clock the
+        // Monte Carlo LtcgTaxTable now uses after D16's fix. This test pins that the existing behavior
+        // is correct: yearsFromBase 0 (no deflation) vs yearsFromBase 10 (10 years of deflation) produce
+        // different NIIT charges when MAGI is between the deflated and undeflated thresholds.
+        //
+        // Fixture: ordinary income $140k + realized gain $40k = MAGI $180k.
+        // Undeflated NIIT threshold: $200k (excess 0, no NIIT).
+        // Deflated by 10 years at 2.5% inflation: $200k × (1/1.025)^10 ≈ $156.24k (excess ~$24k, NIIT ≈ $912).
+        var calc = capitalGainsCalc();
+        BigDecimal magi = bd("180000");
+        BigDecimal gain = bd("40000");
+
+        // yearsFromBase 0: no deflation, threshold stays $200k.
+        BigDecimal taxNoDeflation = calc.computeLtcgTax(bd("140000"), gain, YEAR, FilingStatus.SINGLE, 0,
+                bd("0.025"), magi);
+        // yearsFromBase 10: threshold deflates to ~$156k, triggering NIIT.
+        BigDecimal taxWith10YearDeflation = calc.computeLtcgTax(bd("140000"), gain, YEAR, FilingStatus.SINGLE, 10,
+                bd("0.025"), magi);
+
+        // With no deflation, MAGI $180k < $200k threshold → no NIIT, only bracket tax ($6000).
+        assertThat(taxNoDeflation).isEqualByComparingTo(bd("6000.00"));
+        // With 10-year deflation, MAGI $180k > ~$156k deflated threshold → NIIT applies.
+        assertThat(taxWith10YearDeflation).isGreaterThan(taxNoDeflation);
+    }
 }
