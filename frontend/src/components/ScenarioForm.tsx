@@ -91,7 +91,7 @@ function buildInitialFields(initialValues: Scenario | null | undefined): Scenari
         feeRate: parsedParams.fee_rate != null ? parsedParams.fee_rate * 100 : 0.25,
         interestYield: parsedParams.interest_yield != null ? parsedParams.interest_yield * 100 : 4.0,
         includeDepressionYears: parsedParams.include_depression_years ?? false,
-        heirTaxRate: parsedParams.heir_tax_rate != null ? parsedParams.heir_tax_rate * 100 : 24,
+        heirTaxRate: parsedParams.heir_tax_rate != null ? toPercent(parsedParams.heir_tax_rate) : 24,
         spendingPlanSelection,
         spouseBirthYear: parsedParams.spouse_birth_year ?? null,
         spouseBirthMonth: parsedParams.spouse_birth_month ?? null,

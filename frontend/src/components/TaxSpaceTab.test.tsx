@@ -56,7 +56,7 @@ describe('TaxSpaceTab', () => {
         expect(within(row).getAllByText('—').length).toBeGreaterThanOrEqual(2);
     });
 
-    it('labels the Social Security inclusion zone and the IRMAA tier with its premium year', () => {
+    it('labels the Social Security inclusion zone and the IRMAA tier with its premium year and annual cost cliff', () => {
         render(<TaxSpaceTab taxSpace={[makeYear({
             provisional_income: 52000, ss_base_threshold: 32000, ss_upper_threshold: 44000,
             ss_inclusion_rate: 0.85,
@@ -66,7 +66,7 @@ describe('TaxSpaceTab', () => {
 
         const row = screen.getByRole('row', { name: /2031/ });
         expect(within(row).getByText('85¢ per $1')).toBeInTheDocument();
-        expect(within(row).getByText('Tier 0 · $36,000 to next (2033)')).toBeInTheDocument();
+        expect(within(row).getByText('Tier 0 · $36,000 to next (+$2,100/yr) (2033)')).toBeInTheDocument();
     });
 
     it('marks the IRMAA top tier when there is no next tier', () => {

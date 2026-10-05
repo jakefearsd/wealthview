@@ -24,7 +24,9 @@ function ssZone(rate: number | null): string {
 function irmaa(y: TaxSpaceYear): string {
     if (y.irmaa_premium_year == null || y.irmaa_tier == null) return DASH;
     if (y.irmaa_room_to_next_tier == null) return `Tier ${y.irmaa_tier} (top) · ${y.irmaa_premium_year}`;
-    return `Tier ${y.irmaa_tier} · ${formatCurrency(y.irmaa_room_to_next_tier)} to next (${y.irmaa_premium_year})`;
+    const roomStr = formatCurrency(y.irmaa_room_to_next_tier);
+    const costStr = y.irmaa_next_tier_annual_cost != null ? ` (+${formatCurrency(y.irmaa_next_tier_annual_cost)}/yr)` : '';
+    return `Tier ${y.irmaa_tier} · ${roomStr} to next${costStr} (${y.irmaa_premium_year})`;
 }
 
 const EXPLAINERS: [string, string][] = [

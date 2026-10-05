@@ -11,7 +11,7 @@ vi.mock('../api/incomeSources', () => ({ listIncomeSources: vi.fn() }));
 
 vi.mock('../utils/format', () => ({
     formatCurrency: (v: number) => `$${v.toLocaleString()}`,
-    toPercent: (v: number) => v * 100,
+    toPercent: (v: number) => parseFloat((v * 100).toPrecision(10)),
     formatCurrencyInput: (v: string | number) => String(v),
     parseCurrencyInput: (v: string) => v.replace(/,/g, ''),
 }));
@@ -354,6 +354,24 @@ describe('ScenarioForm', () => {
             const call = onSubmit.mock.calls[0][0];
             expect(call[paramKey]).toBe(0);
         });
+    });
+
+    it('hydrates heir_tax_rate from 0.29 decimal without IEEE 754 float noise, displaying "29"', () => {
+        setupMocks();
+        const scenario = makeScenario({});
+        scenario.params_json = JSON.stringify({ heir_tax_rate: 0.29 });
+        render(<ScenarioForm initialValues={scenario} onSubmit={vi.fn()} submitLabel="Save" />);
+
+        expect(labeledInput('Heir Tax Rate (%)').value).toBe('29');
+    });
+
+    it('hydrates heir_tax_rate from 0.07 decimal without IEEE 754 float noise, displaying "7"', () => {
+        setupMocks();
+        const scenario = makeScenario({});
+        scenario.params_json = JSON.stringify({ heir_tax_rate: 0.07 });
+        render(<ScenarioForm initialValues={scenario} onSubmit={vi.fn()} submitLabel="Save" />);
+
+        expect(labeledInput('Heir Tax Rate (%)').value).toBe('7');
     });
 
     it('submits include_depression_years as false by default', async () => {
