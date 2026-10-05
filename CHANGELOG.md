@@ -6,6 +6,55 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+Phase 1a of the tactical retirement planning work: a tax-space view of each
+retirement year, an after-tax legacy figure, exact 59½ early access, and a set of
+tax-accuracy fixes in both projection engines. One schema change (V081).
+
+### Upgrade notes
+- **Existing optimizer profiles are flagged stale the next time their scenario
+  is saved**, because the plan signature now also covers filing status, state,
+  other income, withdrawal order and birth months. This is a flag only: no saved
+  data or phases change, and nothing goes stale at deploy.
+- **Projection numbers move slightly.** Balances are a little lower in scenarios
+  that fund tax bills from taxable accounts (the gain on those sales is now
+  taxed), and Social Security taxation, capital-gains stacking and Monte Carlo
+  NIIT thresholds changed as described under Fixed.
+- V081 adds `optimize_conversions` and `dynamic_sequencing_bracket_rate` to
+  `guardrail_spending_profiles` and backfills the former from the saved
+  conversion schedule.
+
+### Added
+- **Tax Space tab** on the projection results: per retirement year, the
+  marginal bracket and the room left in it, the 0% and 15% capital-gains bands,
+  the Social Security taxation zone, NIIT headroom, IRMAA tier and the room to
+  the next one, and the effective marginal rate on the next $1,000 of ordinary
+  income or capital gains. The run response carries it as `tax_space`.
+- **After-tax Legacy card** and the **Heir Tax Rate** input (`heir_tax_rate`,
+  0-0.50, default 0.24). The run response carries `terminal_value`.
+- **Birth Month** and **Spouse Birth Month** (`birth_month`,
+  `spouse_birth_month`, 1-12, each requiring its birth year). The calendar year
+  a person reaches 59½ is penalty-free; without a month the legacy age-60 rule
+  applies.
+- Guardrail profiles persist `optimize_conversions` and
+  `dynamic_sequencing_bracket_rate`; `reoptimize` re-uses both as saved.
+
+### Changed
+- The optimizer's default cash return is 1.5% real.
+- The conversion schedule's **Bracket** column (`bracket_used`) is populated
+  (for example "12%") instead of blank.
+
+### Fixed
+- Selling taxable lots to pay a tax bill (conversion tax, or seeding and
+  refilling the Monte Carlo cash reserve) now realizes a taxable gain in that
+  year, in both engines; losses offset the year's gains.
+- Social Security provisional income uses non-SS taxable income (net rent, not
+  gross rent).
+- The capital-gains stacking floor uses the age-aware standard deduction,
+  including the 65+ adder, and gains are stacked over the full ordinary income
+  including the traditional gross-up slice.
+- The Monte Carlo deflates the NIIT threshold on the calendar clock.
+- The scenario signature covers every Monte-Carlo-affecting input.
+
 ## [1.2.8] — 2026-10-04
 
 A dependency-refresh release. It brings the backend to Spring Boot 4.1.1 and

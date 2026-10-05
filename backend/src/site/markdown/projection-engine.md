@@ -183,14 +183,29 @@ Additional obligations layered on top of the ordinary brackets:
 | Social Security inclusion | `SocialSecurityTaxCalculator` | IRS two-tier provisional-income formula (max 85% includable), resolved by a fixed-point convergence loop against the portfolio draw |
 | Self-employment tax | `SelfEmploymentTaxCalculator` | Part-time / self-employment income sources |
 | Rental passive losses | `RentalLossCalculator` | $25k allowance with MAGI phase-out, suspended-loss carryforward |
-| Early withdrawal penalty | 10% (IRC 72(t)) | Pre-59½ traditional distributions |
+| Early withdrawal penalty | 10% (IRC 72(t)) | Pre-59½ traditional distributions; the year you reach 59½ (from birth year + optional birth month, `AgeMilestones`) is penalty-free, age 60 when no month is given |
 | IRMAA | `IrmaaSurchargeCalculator`, `irmaa_tiers` (V075) | Part B + Part D monthly surcharge x12; keyed on MAGI from **two calendar years prior**; multiplied by the count of Medicare-enrolled (65+, alive) household members |
+| Tax-funding sale gains (D5) | `PoolStrategy.MultiPool#settleTaxSaleGain`, `TrialPools#sellTaxableForTax` / `TrialSimulator#ltcgTaxForYear` | Gain realized by selling taxable lots to pay tax (or to seed/refill the Monte Carlo cash reserve) is LTCG income that year; the paying sale's own gain is solved by a closed-form warm start plus polish passes |
 
 **Scope limits, stated plainly.** The MAGI used for IRMAA and the Social Security convergence is a
 proxy (effective other income + conversion + traditional draw + realized LTCG + ordinary interest);
 it does not add back tax-exempt interest. IRMAA is modeled in the **deterministic engine only** —
 the Monte Carlo engine does not model it. IRMAA is also gated on `retired`, so working-past-Medicare
 scenarios are out of scope. None of this is tax advice; treat the output as planning estimates.
+
+**Tax space and legacy value (Phase 1a).** `runDetailed()` returns, alongside the byte-pinned
+result, a `YearTaxPicture` per retired year and the `TerminalValue`. `TaxSpaceCalculator`
+(core) turns each picture into bracket/LTCG-band room, SS inclusion zone, NIIT headroom,
+IRMAA tier distance and effective marginal rates by re-pricing the year with +$1,000 of
+ordinary income / LTCG through the same calculators the engine charges with;
+`TaxSpaceReconciliationTest` pins that the recomputed tax equals the charged tax within $1
+for every golden scenario. The Monte Carlo deflates the NIIT threshold on the same calendar
+clock as the Social Security thresholds (D16).
+
+**Phase 1a tax-accuracy fixes.** Social Security provisional income is built from non-SS
+*taxable* income (net rental income, not gross). The LTCG stacking floor uses the age-aware
+standard deduction (including the 65+ adder), and LTCG is re-stacked over the traditional
+gross-up slice so the gains sit on top of all ordinary income.
 
 ---
 

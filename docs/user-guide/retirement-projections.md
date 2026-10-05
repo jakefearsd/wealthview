@@ -99,6 +99,7 @@ To change a scenario later, open it and click **Edit**. The save button there is
 | **Name** | A descriptive label, e.g. "Retire at 62, moderate spending". |
 | **Retirement Date** | The date you stop working. |
 | **Birth Year** | Used to calculate your age at each projection year. |
+| **Birth Month** | Optional. Makes early-access dates exact: the calendar year you reach 59½ is treated as penalty-free for traditional withdrawals (time withdrawals after the date). Without it, penalty-free access starts the year you turn 60. |
 | **End Age** | Age at which the projection ends. Plan beyond your expected lifespan for safety. |
 | **Inflation Rate (%)** | Annual rate of price increases. `3` = 3%, the historical U.S. average. |
 | **Withdrawal Rate (%)** | Percentage of portfolio to withdraw annually in retirement. `4` = 4%. Used when no spending plan is linked. |
@@ -165,6 +166,10 @@ For a fully optimized conversion schedule computed against thousands of market p
 
 ### Tax Configuration
 
+**Heir Tax Rate** — The income-tax rate your heirs are assumed to pay on inherited traditional
+(pre-tax) money, which they must withdraw within 10 years. Default 24%. Used only for the
+**After-tax Legacy** card.
+
 **State** — Adds state income tax to the projection and unlocks SALT deduction and itemized-vs-standard comparison. The modeled options are:
 
 - None (federal only)
@@ -187,7 +192,7 @@ Leave **Spouse Birth Year** blank for a single-person household. Fill it in and 
 
 | Field | What it does |
 |-------|--------------|
-| **Spouse Birth Year** | Enables all the fields below. |
+| **Spouse Birth Year** | Enables all the fields below. **Spouse Birth Month** works the same way as yours. |
 | **Primary Death Age** | Assumed planning age at which the primary passes away (50–120). Blank uses the SSA planning default, shown as a placeholder. |
 | **Spouse Death Age** | Same, for the spouse. |
 | **Survivor Spending Factor (%)** | Share of pre-transition spending the survivor keeps from the first death forward (50–100%, default 75%). |
@@ -244,6 +249,7 @@ Manual (unlinked) accounts let you model future accounts, an employer 401(k) you
 |------|---------|
 | **Final Balance** | Portfolio value at the end of your projection period. |
 | **Net Worth** | Portfolio balance plus property equity at the end of the projection. |
+| **After-tax Legacy** | What the portfolio is worth to heirs: traditional balance after the heir tax rate, plus Roth and taxable at full value (taxable basis steps up at death). Property equity is not included. |
 | **Years in Retirement** | Years between your retirement date and the projection end. |
 | **Peak Balance** | Highest portfolio value reached, with the year it happens. |
 | **Plan Outcome** / **Depletion** | See below. |
@@ -282,6 +288,7 @@ Which tabs appear depends on what your scenario contains.
 | **Data Table** | The full year-by-year table. Includes a **Download CSV** button. |
 | **Spending Analysis** | Stacked area of Essential Expenses and Discretionary (After Cuts), with Withdrawal and Income Streams lines over the top. Only when a spending plan is linked. |
 | **Income & Tax** | Per-year tax detail — see below. Only when income sources or state tax produce data. |
+| **Tax Space** | For each retirement year: your marginal bracket and the room left in it, room left in the 0% and 15% capital-gains bands, where you sit in the Social Security taxation zone, distance to the 3.8% NIIT threshold, your IRMAA tier and the room to the next one (for the premium year two years later), and your *effective* marginal rate on the next $1,000 of ordinary income or capital gains — counting federal and state tax, extra Social Security taxation and bracket stacking. Planning estimates, not tax advice. |
 | **Income Streams** | Each linked income source charted over time. |
 | **Tax Shield** | Depreciation-driven tax savings from rental properties. Only when there is depreciation to show. |
 
@@ -317,6 +324,10 @@ This is why Roth conversions and Dynamic Sequencing matter: both shrink the trad
 Withdrawals from a taxable account are not tax-free — you owe tax on the *gain*. The engine tracks cost basis per lot and sells oldest-first (FIFO), computing long-term capital gains tax and the Net Investment Income Tax where it applies. This is why the **Cost Basis** field on each account matters: without it the engine can't tell how much of a withdrawal is gain.
 
 Realized capital gains tax shows up in the **Cap-Gains Tax** column.
+
+Selling taxable shares to *pay* a tax bill (for example the tax on a Roth conversion) also
+realizes a gain, and that gain is taxed in the same year — including in pre-retirement
+conversion years. A sale at a loss offsets the year's gains but never creates negative tax.
 
 ---
 

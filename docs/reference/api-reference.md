@@ -360,7 +360,9 @@ Create and update take an identical payload. Beyond the basics (`name`,
 `interest_yield`, `fee_rate`), the household/survivor fields (`spouse_birth_year`,
 `primary_death_age`, `spouse_death_age`, `survivor_spending_factor`,
 `community_property`, `stochastic_mortality`, `primary_sex`, `spouse_sex`,
-`longevity_conditional_age`), plus `accounts`, `income_sources`, `spending_profile_id`,
+`longevity_conditional_age`), the early-access and legacy fields (`birth_month` and
+`spouse_birth_month`, 1-12, optional — a month requires the matching birth year;
+`heir_tax_rate`, 0-0.50, default 0.24), plus `accounts`, `income_sources`, `spending_profile_id`,
 and `use_guardrail_profile`.
 
 `spending_profile_id` and the guardrail profile are mutually exclusive — setting one
@@ -371,8 +373,24 @@ render whichever is active.
 `compare` takes `{ "scenario_ids": ["...", "..."] }` with 2 or 3 ids.
 
 `run` returns `scenario_id`, `yearly_data`, `final_balance`, `years_in_retirement`,
-`spending_feasibility`, `final_net_worth`, `unclassified_symbols`, and `warnings` (the
-last is omitted when empty).
+`spending_feasibility`, `final_net_worth`, `unclassified_symbols`, `tax_space`,
+`terminal_value`, and `warnings` (the last is omitted when empty; `tax_space` is omitted
+when there are no retired years; `terminal_value` is null when absent).
+
+- `tax_space` — one object per retired year: `year`, `age`, `magi`,
+  `marginal_ordinary_rate`, `bracket_room` (list of `{rate, gross_ceiling, room}`),
+  `ltcg_zero_room`, `ltcg_fifteen_room`, `provisional_income`, `ss_base_threshold`,
+  `ss_upper_threshold`, `ss_inclusion_rate`, `niit_headroom`, `irmaa_premium_year`,
+  `irmaa_tier`, `irmaa_room_to_next_tier`, `irmaa_next_tier_annual_cost`,
+  `effective_marginal_ordinary`, `effective_marginal_ltcg`. Social Security fields are null
+  when no benefit is active; IRMAA fields are null unless someone is 65+ in the premium year
+  (`year + 2`).
+- `terminal_value` — `year`, `traditional`, `roth`, `taxable`, `heir_tax_rate`,
+  `after_tax_legacy` (`traditional × (1 − heir_tax_rate) + roth + taxable`; the taxable pool
+  passes at full value because its basis steps up at death), and `at_second_death` (true
+  when the household's second death ended the projection early).
+
+`compare` responses are unchanged — they carry neither field.
 
 ## Guardrail Profiles
 
@@ -392,11 +410,15 @@ The optimization request accepts `essential_floor`, `terminal_balance_target`,
 `cash_reserve_years`, `cash_return_rate`, `optimize_conversions`,
 `conversion_bracket_rate`, `rmd_target_bracket_rate`, `traditional_exhaustion_buffer`,
 `rmd_bracket_headroom`, `dynamic_sequencing_bracket_rate`, and `gate_on_adaptive_rules`.
-Every field is optional; the service resolves defaults for anything omitted.
+Every field is optional; the service resolves defaults for anything omitted. When `cash_return_rate` is omitted it
+defaults to 1.5% real.
+`optimize_conversions` and `dynamic_sequencing_bracket_rate` are stored on the profile
+(migration V081), and `reoptimize` re-uses both as saved, along with the saved phases.
 
 The response includes the resolved settings plus `yearly_spending`, `median_final_balance`,
 `failure_rate`, `success_probability`, `percentile10_final`, `stale`,
-`conversion_schedule`, and `stochastic_mortality`.
+`conversion_schedule`, and `stochastic_mortality`. Each conversion-schedule row's
+`bracket_used` names the bracket the conversion fills (for example `"12%"`).
 
 ## Spending Profiles
 

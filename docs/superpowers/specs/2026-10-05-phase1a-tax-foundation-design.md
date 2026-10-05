@@ -288,3 +288,14 @@ Golden policy: goldens change **only** in the D5 commit (§4.1). Birth month def
 - **Migration:** V081 is the only migration.
 - **Wire format:** snake_case JSON via the global naming strategy. Records for every new DTO. No floating point for money in core or the deterministic engine; the MC keeps its existing `double` hot loop.
 - **Performance:** tax space adds about 3 tax evaluations per retired year to a deterministic run (base, +$1k ordinary, +$1k LTCG). That is negligible against the run itself. The MC is unaffected by tax space. D5 adds a closed-form step per tax-funding sale.
+
+## 8. Implementation notes (as built)
+
+Deviations from the sections above, ratified during review:
+
+- **`AgeMilestones` signatures.** `earlyAccessAge(birthMonth)` and `medicareStartMonth(birthMonth)` take only the (nullable) month, with no `birthYear` parameter. `earlyAccessYear(birthYear, birthMonth)` composes the year.
+- **`TaxSpaceCalculator.compute(picture, strategy)`.** The household is folded into `YearTaxPicture.medicareCountInPremiumYear` rather than passed as a separate argument.
+- **Tax space is computed inside the engine.** `runDetailed` builds the `TaxSpaceYear` list; `ProjectionService` only plumbs it onto the response.
+- **Extra engine fixes** landed with the picture work because the reconciliation test exposed them: SS provisional income now uses non-SS taxable income (net rent, not gross); the LTCG stacking floor uses the age-aware standard deduction (65+ adder); LTCG is re-stacked over the C2 traditional gross-up slice.
+- **Extractions.** `TerminalValueResolver` and `YearTaxPictureBuilder` (projection module) and `ScenarioParamsValidator` (core) were extracted from the classes that first held that logic.
+- **D8 moved to Phase 2.**
