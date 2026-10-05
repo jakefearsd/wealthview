@@ -38,8 +38,15 @@ public record HouseholdContext(
      * One household member's fixed-death-age mortality assumption.
      *
      * @param deathAge the age at which this person is assumed to die (SSA default or user override)
+     * @param birthMonth 1-12, or {@code null} when unknown (legacy whole-year ages; see
+     *         {@link AgeMilestones})
      */
-    public record Person(PersonId id, int birthYear, int deathAge) {
+    public record Person(PersonId id, int birthYear, int deathAge, @Nullable Integer birthMonth) {
+
+        /** Pre-Phase-1a shape: birth month unknown. */
+        public Person(PersonId id, int birthYear, int deathAge) {
+            this(id, birthYear, deathAge, null);
+        }
 
         public int deathYear() {
             return birthYear + deathAge;
@@ -47,6 +54,10 @@ public record HouseholdContext(
 
         public int ageIn(int calendarYear) {
             return calendarYear - birthYear;
+        }
+
+        Person withBirthMonth(@Nullable Integer month) {
+            return new Person(id, birthYear, deathAge, month);
         }
     }
 
@@ -122,6 +133,18 @@ public record HouseholdContext(
             count++;
         }
         return count;
+    }
+
+    /**
+     * Phase 1a: a copy of this context with the given birth months. The spouse month is ignored for
+     * a single-person context. Mortality shape (transition / second-death years, survivor) is
+     * unchanged: those are whole-year quantities.
+     */
+    public HouseholdContext withBirthMonths(@Nullable Integer primaryMonth, @Nullable Integer spouseMonth) {
+        return new HouseholdContext(
+                primary.withBirthMonth(primaryMonth),
+                spouse != null ? spouse.withBirthMonth(spouseMonth) : null,
+                transitionYear, secondDeathYear, survivor);
     }
 
     /** Degenerate single-person context: no spouse, no transition, ever. */

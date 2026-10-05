@@ -176,4 +176,44 @@ class HouseholdContextTest {
 
         assertThat(context.age65QualifyingCount(2025)).isZero();
     }
+
+    @Test
+    void person_threeArgConstructor_leavesBirthMonthNull() {
+        var person = new HouseholdContext.Person(PersonId.PRIMARY, 1970, 87);
+
+        assertThat(person.birthMonth()).isNull();
+    }
+
+    @Test
+    void withBirthMonths_twoPersonHousehold_setsBothMonthsAndKeepsEverythingElse() {
+        var base = HouseholdContext.of(1968, 85, 1970, 90, 2060);
+
+        var withMonths = base.withBirthMonths(3, 11);
+
+        assertThat(withMonths.primary().birthMonth()).isEqualTo(3);
+        assertThat(withMonths.spouse().birthMonth()).isEqualTo(11);
+        assertThat(withMonths.primary().birthYear()).isEqualTo(1968);
+        assertThat(withMonths.spouse().deathAge()).isEqualTo(90);
+        assertThat(withMonths.transitionYear()).isEqualTo(base.transitionYear());
+        assertThat(withMonths.secondDeathYear()).isEqualTo(base.secondDeathYear());
+        assertThat(withMonths.survivor()).isEqualTo(base.survivor());
+    }
+
+    @Test
+    void withBirthMonths_singlePerson_setsPrimaryMonthAndIgnoresSpouseMonth() {
+        var single = HouseholdContext.single(1970);
+
+        var withMonths = single.withBirthMonths(5, 8);
+
+        assertThat(withMonths.primary().birthMonth()).isEqualTo(5);
+        assertThat(withMonths.spouse()).isNull();
+        assertThat(withMonths.isHousehold()).isFalse();
+    }
+
+    @Test
+    void withBirthMonths_nullMonths_equalsTheOriginalContext() {
+        var base = HouseholdContext.of(1968, 85, 1970, 90, 2060);
+
+        assertThat(base.withBirthMonths(null, null)).isEqualTo(base);
+    }
 }
