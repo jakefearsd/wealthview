@@ -203,6 +203,9 @@ public class GuardrailProfileService {
         entity.setCashReturnRate(optimizationInput.cashReturnRate());
         entity.setRiskTolerance(request.riskTolerance());
         entity.setGateOnAdaptiveRules(optimizationInput.gateOnAdaptiveRules());
+        // D13: persisted so reoptimize echoes the user's actual choice instead of inferring it.
+        entity.setOptimizeConversions(optimizationInput.optimizeConversions());
+        entity.setDynamicSequencingBracketRate(optimizationInput.dynamicSequencingBracketRate());
     }
 
     private void serializeGuardrailJson(GuardrailSpendingProfileEntity entity,
@@ -276,13 +279,13 @@ public class GuardrailProfileService {
                 .riskTolerance(existing.getRiskTolerance())
                 .cashReserveYears(existing.getCashReserveYears())
                 .cashReturnRate(existing.getCashReturnRate())
-                .optimizeConversions(existing.getTraditionalExhaustionBuffer() != null)
+                // D13: the persisted flag (V081), not an inference from the always-written buffer.
+                .optimizeConversions(existing.isOptimizeConversions())
                 .conversionBracketRate(existing.getConversionBracketRate())
                 .rmdTargetBracketRate(existing.getRmdTargetBracketRate())
                 .traditionalExhaustionBuffer(existing.getTraditionalExhaustionBuffer())
                 .rmdBracketHeadroom(existing.getRmdBracketHeadroom())
-                // dynamicSequencingBracketRate is intentionally left unset (was an explicit null):
-                // it is not persisted on the profile, so a reoptimize cannot echo it back.
+                .dynamicSequencingBracketRate(existing.getDynamicSequencingBracketRate())
                 // T24: reoptimize honors the profile's stored search-gate toggle.
                 .gateOnAdaptiveRules(existing.isGateOnAdaptiveRules())
                 .build();

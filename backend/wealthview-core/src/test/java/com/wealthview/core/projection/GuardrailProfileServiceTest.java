@@ -325,6 +325,100 @@ class GuardrailProfileServiceTest {
     }
 
     @Test
+    void reoptimize_profileSavedWithoutConversions_keepsConversionsOff() {
+        var entity = storedProfile();
+        entity.setOptimizeConversions(false);
+        entity.setTraditionalExhaustionBuffer(5);   // always written -- the old inference read this
+        stubReoptimizeHappyPath(entity);
+        var captor = ArgumentCaptor.forClass(GuardrailOptimizationInput.class);
+        when(spendingOptimizer.optimize(captor.capture())).thenReturn(baseOptimizerResponse());
+        when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.reoptimize(tenantId, scenarioId);
+
+        assertThat(captor.getValue().optimizeConversions()).isFalse();
+    }
+
+    @Test
+    void reoptimize_profileSavedWithConversions_echoesConversionsAndDynamicSequencingRate() {
+        var entity = storedProfile();
+        entity.setOptimizeConversions(true);
+        entity.setConversionBracketRate(new BigDecimal("0.22"));
+        entity.setRmdTargetBracketRate(new BigDecimal("0.12"));
+        entity.setDynamicSequencingBracketRate(new BigDecimal("0.12"));
+        stubReoptimizeHappyPath(entity);
+        var captor = ArgumentCaptor.forClass(GuardrailOptimizationInput.class);
+        when(spendingOptimizer.optimize(captor.capture())).thenReturn(baseOptimizerResponse());
+        when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.reoptimize(tenantId, scenarioId);
+
+        assertThat(captor.getValue().optimizeConversions()).isTrue();
+        assertThat(captor.getValue().dynamicSequencingBracketRate()).isEqualByComparingTo("0.12");
+    }
+
+    @Test
+    void reoptimize_preservesUsersSavedPhasesExactly() {
+        var entity = storedProfile();
+        entity.setPhases("""
+                [{"name":"Go-go","startAge":62,"endAge":70,"priorityWeight":3,"targetSpending":90000},
+                 {"name":"Slow-go","startAge":71,"endAge":80,"priorityWeight":2,"targetSpending":70000},
+                 {"name":"No-go","startAge":81,"endAge":null,"priorityWeight":1,"targetSpending":50000}]
+                """);
+        stubReoptimizeHappyPath(entity);
+        var captor = ArgumentCaptor.forClass(GuardrailOptimizationInput.class);
+        when(spendingOptimizer.optimize(captor.capture())).thenReturn(baseOptimizerResponse());
+        var savedCaptor = ArgumentCaptor.forClass(GuardrailSpendingProfileEntity.class);
+        when(guardrailRepository.save(savedCaptor.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.reoptimize(tenantId, scenarioId);
+
+        assertThat(captor.getValue().phases()).containsExactly(
+                new GuardrailPhaseInput("Go-go", 62, 70, 3, new BigDecimal("90000")),
+                new GuardrailPhaseInput("Slow-go", 71, 80, 2, new BigDecimal("70000")),
+                new GuardrailPhaseInput("No-go", 81, null, 1, new BigDecimal("50000")));
+        assertThat(savedCaptor.getValue().getPhases()).contains("Go-go", "Slow-go", "No-go");
+    }
+
+    @Test
+    void optimize_persistsOptimizeConversionsAndDynamicSequencingRate() {
+        stubOptimizeHappyPath();
+        when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
+                .thenReturn(baseOptimizerResponse());
+        var savedCaptor = ArgumentCaptor.forClass(GuardrailSpendingProfileEntity.class);
+        when(guardrailRepository.save(savedCaptor.capture())).thenAnswer(inv -> inv.getArgument(0));
+        var request = GuardrailOptimizationRequest.builder()
+                .scenarioId(scenarioId)
+                .name("Plan")
+                .essentialFloor(new BigDecimal("30000"))
+                .optimizeConversions(true)
+                .conversionBracketRate(new BigDecimal("0.22"))
+                .rmdTargetBracketRate(new BigDecimal("0.12"))
+                .dynamicSequencingBracketRate(new BigDecimal("0.12"))
+                .build();
+
+        service.optimize(tenantId, scenarioId, request);
+
+        assertThat(savedCaptor.getValue().isOptimizeConversions()).isTrue();
+        assertThat(savedCaptor.getValue().getDynamicSequencingBracketRate()).isEqualByComparingTo("0.12");
+    }
+
+    /** A stored profile with every NOT NULL field populated, ready for reoptimize. */
+    private GuardrailSpendingProfileEntity storedProfile() {
+        var entity = new GuardrailSpendingProfileEntity(tenant, scenario, "Existing Plan", new BigDecimal("30000"));
+        entity.setPhases("[]");
+        entity.setYearlySpending("[]");
+        entity.setScenarioHash("old-hash");
+        entity.setReturnMean(new BigDecimal("0.10"));
+        entity.setTrialCount(5000);
+        entity.setConfidenceLevel(new BigDecimal("0.95"));
+        entity.setTerminalBalanceTarget(BigDecimal.ZERO);
+        return entity;
+    }
+
+    @Test
     void reoptimize_storedGateOnAdaptiveRulesTrue_honorsFlagOnInput() {
         var entity = new GuardrailSpendingProfileEntity(
                 tenant, scenario, "Existing Plan", new BigDecimal("30000"));
