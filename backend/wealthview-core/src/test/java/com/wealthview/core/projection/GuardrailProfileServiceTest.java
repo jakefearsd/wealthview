@@ -8,10 +8,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -268,14 +272,67 @@ class GuardrailProfileServiceTest {
     }
 
     @Test
-    void computeScenarioHash_irrelevantParamsDoNotChangeHash() {
+    void computeScenarioHash_deterministicOnlyParamDoesNotChangeHash() {
+        // withdrawal_strategy drives only the deterministic engine's no-plan withdrawal rate; the
+        // Monte Carlo never reads it, so it must not invalidate a guardrail profile.
         var scenarioMinimal = ScenarioMother.guardrailScenario(tenant, "Plan", "{\"birth_year\":1968}");
-        var scenarioWithExtras = ScenarioMother.guardrailScenario(tenant, "Plan", "{\"birth_year\":1968,\"withdrawal_strategy\":\"vanguard_dynamic_spending\",\"filing_status\":\"married_filing_jointly\"}");
+        var scenarioWithExtras = ScenarioMother.guardrailScenario(tenant, "Plan",
+                "{\"birth_year\":1968,\"withdrawal_strategy\":\"vanguard_dynamic_spending\"}");
 
         var hash1 = GuardrailProfileService.computeScenarioHash(scenarioMinimal, List.of());
         var hash2 = GuardrailProfileService.computeScenarioHash(scenarioWithExtras, List.of());
 
         assertThat(hash1).isEqualTo(hash2);
+    }
+
+    static Stream<Arguments> monteCarloAffectingParams() {
+        return Stream.of(
+                Arguments.of("filing_status", "{\"birth_year\":1968,\"filing_status\":\"single\"}",
+                        "{\"birth_year\":1968,\"filing_status\":\"married_filing_jointly\"}"),
+                Arguments.of("state", "{\"birth_year\":1968}",
+                        "{\"birth_year\":1968,\"state\":\"CA\"}"),
+                Arguments.of("other_income", "{\"birth_year\":1968}",
+                        "{\"birth_year\":1968,\"other_income\":25000}"),
+                Arguments.of("withdrawal_order", "{\"birth_year\":1968,\"withdrawal_order\":\"taxable_first\"}",
+                        "{\"birth_year\":1968,\"withdrawal_order\":\"dynamic_sequencing\"}"),
+                Arguments.of("birth_month", "{\"birth_year\":1968}",
+                        "{\"birth_year\":1968,\"birth_month\":3}"),
+                Arguments.of("spouse_birth_month", "{\"birth_year\":1968,\"spouse_birth_year\":1970}",
+                        "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"spouse_birth_month\":9}"));
+    }
+
+    @ParameterizedTest(name = "{0} changes the hash")
+    @MethodSource("monteCarloAffectingParams")
+    void computeScenarioHash_monteCarloAffectingParam_changesHash(String field, String before, String after) {
+        var hashBefore = GuardrailProfileService.computeScenarioHash(
+                ScenarioMother.guardrailScenario(tenant, "Plan", before), List.of());
+        var hashAfter = GuardrailProfileService.computeScenarioHash(
+                ScenarioMother.guardrailScenario(tenant, "Plan", after), List.of());
+
+        assertThat(hashAfter).as(field).isNotEqualTo(hashBefore);
+    }
+
+    @Test
+    void computeScenarioHash_absentWithdrawalOrderEqualsExplicitDefault() {
+        // The RESOLVED order is hashed, so omitting the key and spelling out the default agree.
+        var implicit = ScenarioMother.guardrailScenario(tenant, "Plan", "{\"birth_year\":1968}");
+        var explicit = ScenarioMother.guardrailScenario(tenant, "Plan",
+                "{\"birth_year\":1968,\"withdrawal_order\":\"taxable_first\"}");
+
+        assertThat(GuardrailProfileService.computeScenarioHash(implicit, List.of()))
+                .isEqualTo(GuardrailProfileService.computeScenarioHash(explicit, List.of()));
+    }
+
+    @Test
+    void computeScenarioHash_absentFilingStatusEqualsExplicitDefault() {
+        // The RESOLVED filing status is hashed (PF12), so omitting the key and spelling out the
+        // default both resolve to SINGLE and produce the same hash.
+        var implicit = ScenarioMother.guardrailScenario(tenant, "Plan", "{\"birth_year\":1968}");
+        var explicit = ScenarioMother.guardrailScenario(tenant, "Plan",
+                "{\"birth_year\":1968,\"filing_status\":\"single\"}");
+
+        assertThat(GuardrailProfileService.computeScenarioHash(implicit, List.of()))
+                .isEqualTo(GuardrailProfileService.computeScenarioHash(explicit, List.of()));
     }
 
     @Test

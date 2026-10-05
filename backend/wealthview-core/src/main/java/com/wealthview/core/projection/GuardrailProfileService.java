@@ -29,6 +29,7 @@ import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.core.projection.household.LifeExpectancy;
+import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
@@ -381,6 +382,9 @@ public class GuardrailProfileService {
      * source's owner + survivor_percent. Stochastic mortality (sub-project B) adds: the toggle
      * itself, both sexes, and the longevity-conditional age -- each changes the Monte Carlo death-
      * age sampling (or its reported metric) for an otherwise-identical scenario.
+     * Phase 1a (D15) adds filing status, state, other income, the resolved withdrawal order and
+     * both birth months; changing the signature re-seeds every profile, so existing profiles read
+     * stale once after this ships (a flag only -- no stored data changes).
      * Accounts and income sources are sorted by id before hashing — {@code accounts} is an unordered
      * JPA bag ({@code @OrderBy("id")} on the entity keeps normal reads stable too) — so the same
      * scenario always yields the same signature regardless of collection iteration order.
@@ -408,7 +412,17 @@ public class GuardrailProfileService {
                 .append('|').append(Boolean.TRUE.equals(hashParams.stochasticMortality()))
                 .append('|').append(hashParams.primarySex())
                 .append('|').append(hashParams.spouseSex())
-                .append('|').append(hashParams.longevityConditionalAge());
+                .append('|').append(hashParams.longevityConditionalAge())
+                // D15 (Phase 1a): Monte-Carlo-affecting inputs previously missing from the
+                // signature -- tax tables (filing status, state), the ordinary base (other
+                // income), pool sequencing (RESOLVED withdrawal order, so an absent key and the
+                // explicit default hash alike), and early-access dates (birth months).
+                .append('|').append(FilingStatus.fromString(hashParams.filingStatus()))
+                .append('|').append(hashParams.state())
+                .append('|').append(hashParams.otherIncome())
+                .append('|').append(hashParams.resolvedWithdrawalOrder())
+                .append('|').append(hashParams.birthMonth())
+                .append('|').append(hashParams.spouseBirthMonth());
 
         scenario.getAccounts().stream()
                 .sorted(Comparator.comparing(ProjectionAccountEntity::getId,
