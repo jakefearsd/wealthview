@@ -143,6 +143,21 @@ public class FederalTaxCalculator {
         return BigDecimal.ZERO;
     }
 
+    /**
+     * Age-aware gross-income ceiling for the bracket taxed at {@code targetRate}: the bracket's taxable
+     * ceiling (latest-seeded-year fallback, no inflation indexing -- the real-terms frame) plus the
+     * standard deduction including the age-65 adder per qualifying person. Zero for the top bracket or an
+     * unknown rate. The age-less overloads are unchanged (Phase 1c retires their optimizer callers).
+     */
+    public BigDecimal computeMaxIncomeForBracket(BigDecimal targetRate, int taxYear, FilingStatus status,
+                                                 int age, @Nullable Integer secondQualifyingAge) {
+        BigDecimal ceiling = findBracketCeiling(targetRate, taxYear, status);
+        if (ceiling.signum() <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return ceiling.add(loadStandardDeduction(taxYear, status, age, secondQualifyingAge));
+    }
+
     private static BigDecimal bracketInflationFactor(BigDecimal rate, int taxYear, int maxYear) {
         if (rate == null || rate.compareTo(BigDecimal.ZERO) <= 0 || taxYear <= maxYear) {
             return BigDecimal.ONE;

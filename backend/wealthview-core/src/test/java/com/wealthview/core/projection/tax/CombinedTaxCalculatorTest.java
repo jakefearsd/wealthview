@@ -27,6 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class CombinedTaxCalculatorTest {
@@ -588,5 +590,79 @@ class CombinedTaxCalculatorTest {
         public boolean taxesCapitalGainsAsOrdinaryIncome() {
             return true;
         }
+    }
+
+    @Test
+    void computeGrossCeilingForRate_noStateTax_age66_usesAgeAwareStandardDeduction() {
+        var bracketRepo = mock(TaxBracketRepository.class);
+        var ageDeductionRepo = mock(StandardDeductionRepository.class);
+        when(bracketRepo.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
+                .thenReturn(TaxBracketFixtures.single2025Brackets());
+        when(ageDeductionRepo.findByTaxYearAndFilingStatus(2025, "single"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15750"), bd("2000"))));
+        var combined = new CombinedTaxCalculator(new FederalTaxCalculator(bracketRepo, ageDeductionRepo),
+                new NullStateTaxCalculator(), BigDecimal.ZERO, BigDecimal.ZERO, 1959);
+
+        // 48475 + 17750 = 66225
+        assertThat(combined.computeGrossCeilingForRate(bd("0.12"), 2025, FilingStatus.SINGLE))
+                .isEqualByComparingTo("66225");
+    }
+
+    @Test
+    void computeGrossCeilingForRate_itemizedBeatsStandard_usesItemizedEvenWithoutStateTax() {
+        var bracketRepo = mock(TaxBracketRepository.class);
+        var ageDeductionRepo = mock(StandardDeductionRepository.class);
+        when(bracketRepo.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
+                .thenReturn(TaxBracketFixtures.single2025Brackets());
+        when(ageDeductionRepo.findByTaxYearAndFilingStatus(2025, "single"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15750"), bd("2000"))));
+        var combined = new CombinedTaxCalculator(new FederalTaxCalculator(bracketRepo, ageDeductionRepo),
+                new NullStateTaxCalculator(), bd("20000"), bd("5000"), 1959);
+
+        // SALT = min(0 + 20000, 40000) = 20000 ; itemized = 25000 > 17750 ; 48475 + 25000 = 73475
+        assertThat(combined.computeGrossCeilingForRate(bd("0.12"), 2025, FilingStatus.SINGLE))
+                .isEqualByComparingTo("73475");
+    }
+
+    @Test
+    void computeGrossCeilingForRate_topBracketOrUnknownRate_isZero() {
+        var bracketRepo = mock(TaxBracketRepository.class);
+        when(bracketRepo.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
+                .thenReturn(TaxBracketFixtures.single2025Brackets());
+        var combined = new CombinedTaxCalculator(
+                new FederalTaxCalculator(bracketRepo, mock(StandardDeductionRepository.class)),
+                new NullStateTaxCalculator(), BigDecimal.ZERO, BigDecimal.ZERO, 1959);
+
+        assertThat(combined.computeGrossCeilingForRate(bd("0.37"), 2025, FilingStatus.SINGLE))
+                .isEqualByComparingTo("0");
+    }
+
+    @Test
+    void standardDeduction_birthYearAge66_returnsAgeAwareAmountNotItemized() {
+        var ageDeductionRepo = mock(StandardDeductionRepository.class);
+        when(ageDeductionRepo.findByTaxYearAndFilingStatus(2025, "single"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15750"), bd("2000"))));
+        // Large property tax would make itemizing win, but this method reports the STANDARD amount only.
+        var combined = new CombinedTaxCalculator(
+                new FederalTaxCalculator(mock(TaxBracketRepository.class), ageDeductionRepo),
+                new NullStateTaxCalculator(), bd("30000"), bd("10000"), 1959);
+
+        assertThat(combined.standardDeduction(2025, FilingStatus.SINGLE)).hasValueSatisfying(
+                d -> assertThat(d).isEqualByComparingTo("17750"));
+    }
+
+    @Test
+    void standardDeduction_householdSurvivorFilingSingle_appliesOneAdder() {
+        var ageDeductionRepo = mock(StandardDeductionRepository.class);
+        when(ageDeductionRepo.findByTaxYearAndFilingStatus(2045, "single"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2045, "single", bd("15750"), bd("2000"))));
+        // Primary (1958) dies 2040; in 2045 the spouse (1959, age 86) files SINGLE alone.
+        var household = HouseholdContext.of(1958, 82, 1959, 95, 2060);
+        var combined = new CombinedTaxCalculator(
+                new FederalTaxCalculator(mock(TaxBracketRepository.class), ageDeductionRepo),
+                new NullStateTaxCalculator(), BigDecimal.ZERO, BigDecimal.ZERO, 1958, household);
+
+        assertThat(combined.standardDeduction(2045, FilingStatus.SINGLE)).hasValueSatisfying(
+                d -> assertThat(d).isEqualByComparingTo("17750"));
     }
 }

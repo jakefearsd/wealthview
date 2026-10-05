@@ -236,4 +236,29 @@ class CapitalGainsTaxCalculatorTest {
         assertThat(y20).isLessThan(y0);
         assertThat(y20).isCloseTo(bd("122060"), org.assertj.core.data.Offset.offset(bd("50")));
     }
+
+    @Test
+    void ltcgBandRoom_ordinaryAndGainBelowZeroCeiling_reportsRemainingRoomInBothBands() {
+        // stacked = 30000 + 10000 = 40000 ; zero room 48350-40000 = 8350 ; fifteen room 533400-48350 = 485050
+        var room = calculator.ltcgBandRoom(bd("30000"), bd("10000"), 2025, FilingStatus.SINGLE);
+
+        assertThat(room.zeroRoom()).isEqualByComparingTo("8350");
+        assertThat(room.fifteenRoom()).isEqualByComparingTo("485050");
+    }
+
+    @Test
+    void ltcgBandRoom_ordinaryAboveZeroCeiling_zeroRoomIsZeroAndFifteenRoomStartsAtOrdinary() {
+        // stacked = 60000 > 48350 ; fifteen room 533400-60000 = 473400
+        var room = calculator.ltcgBandRoom(bd("60000"), bd("0"), 2025, FilingStatus.SINGLE);
+
+        assertThat(room.zeroRoom()).isEqualByComparingTo("0");
+        assertThat(room.fifteenRoom()).isEqualByComparingTo("473400");
+    }
+
+    @Test
+    void ltcgBandRoom_negativeOrdinary_isFlooredAtZero() {
+        var room = calculator.ltcgBandRoom(bd("-5000"), bd("0"), 2025, FilingStatus.SINGLE);
+
+        assertThat(room.zeroRoom()).isEqualByComparingTo("48350");
+    }
 }

@@ -29,6 +29,7 @@ import static com.wealthview.core.common.Money.SCALE;
 public class CapitalGainsTaxCalculator {
 
     private static final BigDecimal NIIT_RATE = new BigDecimal("0.038");
+    private static final BigDecimal FIFTEEN_PERCENT = new BigDecimal("0.15");
     private static final BigDecimal NIIT_THRESHOLD_SINGLE = new BigDecimal("200000");
     private static final BigDecimal NIIT_THRESHOLD_MFJ = new BigDecimal("250000");
 
@@ -114,9 +115,34 @@ public class CapitalGainsTaxCalculator {
     }
 
     /**
+     * Room left in the 0% and 15% LTCG bands after {@code ordinaryTaxableIncome} (net of the deduction,
+     * floored at zero) and this year's {@code ltcgIncome} are stacked. Zero when the band is already full;
+     * zero for a band whose ceiling is not seeded.
+     */
+    public LtcgBandRoom ltcgBandRoom(BigDecimal ordinaryTaxableIncome, BigDecimal ltcgIncome, int year,
+                                     FilingStatus status) {
+        BigDecimal stacked = ordinaryTaxableIncome.max(BigDecimal.ZERO).add(ltcgIncome.max(BigDecimal.ZERO));
+        BigDecimal zeroCeiling = null;
+        BigDecimal fifteenCeiling = null;
+        for (var bracket : loadBracketsWithFallback(year, status)) {
+            if (bracket.getRate().signum() == 0) {
+                zeroCeiling = bracket.getBracketCeiling();
+            } else if (bracket.getRate().compareTo(FIFTEEN_PERCENT) == 0) {
+                fifteenCeiling = bracket.getBracketCeiling();
+            }
+        }
+        BigDecimal zeroRoom = zeroCeiling != null ? zeroCeiling.subtract(stacked).max(BigDecimal.ZERO)
+                : BigDecimal.ZERO;
+        BigDecimal fifteenFloor = zeroCeiling != null ? stacked.max(zeroCeiling) : stacked;
+        BigDecimal fifteenRoom = fifteenCeiling != null ? fifteenCeiling.subtract(fifteenFloor).max(BigDecimal.ZERO)
+                : BigDecimal.ZERO;
+        return new LtcgBandRoom(zeroRoom, fifteenRoom);
+    }
+
+    /**
      * Deflates the fixed-nominal NIIT threshold for {@code status} onto the projection's
      * real-terms clock -- the SAME deflation {@link #computeLtcgTax} applies internally via
-     * {@link #thresholdDeflator}.
+     * {@link RealTermsDeflator#factor}.
      *
      * <p>Exposed for the Monte Carlo engine's per-year exact-tax precompute (audit C5), which
      * needs the deflated threshold once per year (outside the hot loop) to evaluate NIIT with
@@ -125,7 +151,7 @@ public class CapitalGainsTaxCalculator {
     public BigDecimal niitThresholdReal(FilingStatus status, int yearsFromBase, BigDecimal inflationRate) {
         BigDecimal threshold = status == FilingStatus.MARRIED_FILING_JOINTLY
                 ? NIIT_THRESHOLD_MFJ : NIIT_THRESHOLD_SINGLE;
-        BigDecimal deflator = thresholdDeflator(yearsFromBase, inflationRate);
+        BigDecimal deflator = RealTermsDeflator.factor(yearsFromBase, inflationRate);
         return deflator.compareTo(BigDecimal.ONE) != 0
                 ? threshold.multiply(deflator).setScale(SCALE, ROUNDING)
                 : threshold;
@@ -170,21 +196,13 @@ public class CapitalGainsTaxCalculator {
                                     int yearsFromBase, BigDecimal inflationRate) {
         BigDecimal threshold = status == FilingStatus.MARRIED_FILING_JOINTLY
                 ? NIIT_THRESHOLD_MFJ : NIIT_THRESHOLD_SINGLE;
-        BigDecimal deflator = thresholdDeflator(yearsFromBase, inflationRate);
+        BigDecimal deflator = RealTermsDeflator.factor(yearsFromBase, inflationRate);
         if (deflator.compareTo(BigDecimal.ONE) != 0) {
             threshold = threshold.multiply(deflator).setScale(SCALE, ROUNDING);
         }
         BigDecimal excess = magi.subtract(threshold);
         BigDecimal niitBase = netInvestmentIncome.min(excess).max(BigDecimal.ZERO);
         return niitBase.multiply(NIIT_RATE);
-    }
-
-    private static BigDecimal thresholdDeflator(int yearsFromBase, BigDecimal inflationRate) {
-        if (yearsFromBase <= 0 || inflationRate == null || inflationRate.signum() == 0) {
-            return BigDecimal.ONE;
-        }
-        BigDecimal growth = BigDecimal.ONE.add(inflationRate).pow(yearsFromBase);
-        return BigDecimal.ONE.divide(growth, SCALE + 6, ROUNDING);
     }
 
     private List<LtcgBracketEntity> loadBrackets(int taxYear, FilingStatus status) {

@@ -1,6 +1,7 @@
 package com.wealthview.core.projection.tax;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 
 import org.springframework.lang.Nullable;
 
@@ -46,13 +47,18 @@ public class FederalOnlyTaxStrategy implements TaxCalculationStrategy {
         this.household = household;
     }
 
+    /** The spouse's qualifying age while both are alive and filing jointly; {@code null} otherwise. */
+    @Nullable
+    private Integer secondQualifyingAge(int taxYear, FilingStatus status) {
+        return household != null && status == FilingStatus.MARRIED_FILING_JOINTLY
+                ? household.secondFilerAgeIn(taxYear) : null;
+    }
+
     @Override
     public BigDecimal computeTotalTax(BigDecimal grossIncome, int taxYear, FilingStatus status) {
         if (household != null) {
-            Integer secondAge = status == FilingStatus.MARRIED_FILING_JOINTLY
-                    ? household.secondFilerAgeIn(taxYear) : null;
-            return federalTaxCalculator.computeTax(
-                    grossIncome, taxYear, status, household.filerAgeIn(taxYear), secondAge);
+            return federalTaxCalculator.computeTax(grossIncome, taxYear, status,
+                    household.filerAgeIn(taxYear), secondQualifyingAge(taxYear, status));
         }
         return birthYear != null
                 ? federalTaxCalculator.computeTax(grossIncome, taxYear, status, taxYear - birthYear)
@@ -62,5 +68,28 @@ public class FederalOnlyTaxStrategy implements TaxCalculationStrategy {
     @Override
     public BigDecimal computeMaxIncomeForTargetRate(BigDecimal targetRate, int taxYear, FilingStatus status) {
         return federalTaxCalculator.computeMaxIncomeForBracket(targetRate, taxYear, status);
+    }
+
+    @Override
+    public BigDecimal computeGrossCeilingForRate(BigDecimal targetRate, int taxYear, FilingStatus status) {
+        if (household != null) {
+            return federalTaxCalculator.computeMaxIncomeForBracket(targetRate, taxYear, status,
+                    household.filerAgeIn(taxYear), secondQualifyingAge(taxYear, status));
+        }
+        return birthYear != null
+                ? federalTaxCalculator.computeMaxIncomeForBracket(targetRate, taxYear, status,
+                        taxYear - birthYear, null)
+                : computeMaxIncomeForTargetRate(targetRate, taxYear, status);
+    }
+
+    @Override
+    public Optional<BigDecimal> standardDeduction(int taxYear, FilingStatus status) {
+        if (household != null) {
+            return Optional.of(federalTaxCalculator.loadStandardDeduction(taxYear, status,
+                    household.filerAgeIn(taxYear), secondQualifyingAge(taxYear, status)));
+        }
+        return Optional.of(birthYear != null
+                ? federalTaxCalculator.loadStandardDeduction(taxYear, status, taxYear - birthYear)
+                : federalTaxCalculator.loadStandardDeduction(taxYear, status));
     }
 }

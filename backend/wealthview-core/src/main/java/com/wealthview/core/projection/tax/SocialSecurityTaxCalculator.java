@@ -22,6 +22,10 @@ public class SocialSecurityTaxCalculator {
 
     private static final BigDecimal HALF = new BigDecimal("0.5");
     private static final BigDecimal EIGHTY_FIVE_PERCENT = new BigDecimal("0.85");
+    private static final BigDecimal SINGLE_BASE_THRESHOLD = new BigDecimal("25000");
+    private static final BigDecimal SINGLE_UPPER_THRESHOLD = new BigDecimal("34000");
+    private static final BigDecimal MFJ_BASE_THRESHOLD = new BigDecimal("32000");
+    private static final BigDecimal MFJ_UPPER_THRESHOLD = new BigDecimal("44000");
 
     /**
      * Legacy overload for non-projection callers: no threshold deflation
@@ -41,22 +45,9 @@ public class SocialSecurityTaxCalculator {
 
         var provisionalIncome = otherIncome.add(ssBenefit.multiply(HALF));
 
-        BigDecimal tier1Threshold;
-        BigDecimal tier2Threshold;
-        if ("married_filing_jointly".equals(filingStatus)) {
-            tier1Threshold = new BigDecimal("32000");
-            tier2Threshold = new BigDecimal("44000");
-        } else {
-            tier1Threshold = new BigDecimal("25000");
-            tier2Threshold = new BigDecimal("34000");
-        }
-
-        // Real-terms deflation of the fixed-nominal thresholds.
-        BigDecimal deflator = thresholdDeflator(yearsFromBase, inflationRate);
-        if (deflator.compareTo(BigDecimal.ONE) != 0) {
-            tier1Threshold = tier1Threshold.multiply(deflator).setScale(SCALE, ROUNDING);
-            tier2Threshold = tier2Threshold.multiply(deflator).setScale(SCALE, ROUNDING);
-        }
+        var thresholds = thresholds(FilingStatus.fromString(filingStatus), yearsFromBase, inflationRate);
+        BigDecimal tier1Threshold = thresholds.base();
+        BigDecimal tier2Threshold = thresholds.upper();
 
         if (provisionalIncome.compareTo(tier1Threshold) <= 0) {
             return BigDecimal.ZERO;
@@ -88,11 +79,19 @@ public class SocialSecurityTaxCalculator {
         return taxable;
     }
 
-    private static BigDecimal thresholdDeflator(int yearsFromBase, BigDecimal inflationRate) {
-        if (yearsFromBase <= 0 || inflationRate == null || inflationRate.signum() == 0) {
-            return BigDecimal.ONE;
+    /**
+     * The year's provisional-income thresholds, deflated onto the real-terms clock exactly as
+     * {@link #computeTaxableAmount(BigDecimal, BigDecimal, String, int, BigDecimal)} applies them.
+     */
+    public SsThresholds thresholds(FilingStatus status, int yearsFromBase, BigDecimal inflationRate) {
+        boolean mfj = status == FilingStatus.MARRIED_FILING_JOINTLY;
+        BigDecimal base = mfj ? MFJ_BASE_THRESHOLD : SINGLE_BASE_THRESHOLD;
+        BigDecimal upper = mfj ? MFJ_UPPER_THRESHOLD : SINGLE_UPPER_THRESHOLD;
+        BigDecimal deflator = RealTermsDeflator.factor(yearsFromBase, inflationRate);
+        if (deflator.compareTo(BigDecimal.ONE) != 0) {
+            base = base.multiply(deflator).setScale(SCALE, ROUNDING);
+            upper = upper.multiply(deflator).setScale(SCALE, ROUNDING);
         }
-        BigDecimal growth = BigDecimal.ONE.add(inflationRate).pow(yearsFromBase);
-        return BigDecimal.ONE.divide(growth, SCALE + 6, ROUNDING);
+        return new SsThresholds(base, upper);
     }
 }

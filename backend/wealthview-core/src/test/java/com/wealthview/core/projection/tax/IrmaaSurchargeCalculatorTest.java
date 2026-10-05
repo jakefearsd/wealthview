@@ -101,4 +101,22 @@ class IrmaaSurchargeCalculatorTest {
 
         assertThat(latest).isEqualByComparingTo(seeded);
     }
+
+    @Test
+    void loadTiers_single2025_exposesSixTiersWithAnnualPerPersonSurcharge() {
+        var tiers = calculator.loadTiers(2025, FilingStatus.SINGLE);
+
+        assertThat(tiers).hasSize(6);
+        assertThat(tiers.get(0).magiCeiling()).isEqualByComparingTo("106000");
+        assertThat(tiers.get(0).annualSurchargePerPerson()).isEqualByComparingTo("0");
+        // (74.00 + 13.70) x 12 = 1052.40
+        assertThat(tiers.get(1).annualSurchargePerPerson()).isEqualByComparingTo("1052.40");
+        assertThat(tiers.get(5).magiCeiling()).isNull();
+    }
+
+    @Test
+    void loadTiers_unseededYear_fallsBackLikeComputeAnnualSurcharge() {
+        // The fixture stubs anyInt(), so 2031 resolves to the same 2025 rows.
+        assertThat(calculator.loadTiers(2031, FilingStatus.MARRIED_FILING_JOINTLY)).hasSize(6);
+    }
 }

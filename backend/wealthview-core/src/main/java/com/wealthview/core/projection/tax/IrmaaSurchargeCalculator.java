@@ -29,13 +29,11 @@ import static com.wealthview.core.common.Money.SCALE;
  * real threshold is actually shrinking slightly until 2028), a small, short-lived, and documented
  * simplification consistent with how every other bracket/threshold in this codebase is modeled.
  *
- * <p>The per-COVERED-PERSON multiplier is deliberately NOT applied here (always x1, "primary
- * filer only") -- this engine tracks only the primary filer's age/Medicare status, the same
- * simplification {@code StandardDeductionEntity.additionalAge65} documents for the MFJ age-65
- * deduction adder. A married couple where both spouses are 65+ and both enrolled in Medicare would
- * owe this surcharge TWICE (once per spouse); this model reports it once. See
- * {@code DeterministicProjectionEngine}'s IRMAA orchestration for the 2-year MAGI lookback that
- * feeds this calculator's {@code magi} argument.
+ * <p>Amounts are per Medicare ENROLLEE. Callers multiply by the number of enrolled household members:
+ * {@code DeterministicProjectionEngine} by {@code HouseholdContext#age65QualifyingCount}, and
+ * {@code TaxSpaceCalculator} by {@code YearTaxPicture#medicareCountInPremiumYear}. See
+ * {@code DeterministicProjectionEngine}'s IRMAA orchestration for the 2-year MAGI lookback that feeds
+ * this calculator's {@code magi} argument.
  */
 @Component
 public class IrmaaSurchargeCalculator {
@@ -75,6 +73,18 @@ public class IrmaaSurchargeCalculator {
         return BigDecimal.ZERO;
     }
 
+    /**
+     * The tier table for {@code (taxYear, status)} with the same latest-seeded-year fallback as
+     * {@link #computeAnnualSurcharge}, each tier's Part B + Part D surcharge annualized for ONE enrollee.
+     */
+    public List<IrmaaTier> loadTiers(int taxYear, FilingStatus status) {
+        return loadTiersWithFallback(taxYear, status).stream()
+                .map(t -> new IrmaaTier(t.getMagiFloor(), t.getMagiCeiling(),
+                        t.getPartBSurcharge().add(t.getPartDSurcharge())
+                                .multiply(MONTHS_PER_YEAR).setScale(SCALE, ROUNDING)))
+                .toList();
+    }
+
     public void clearCache() {
         tierCache.clear();
     }
@@ -86,18 +96,18 @@ public class IrmaaSurchargeCalculator {
         return aboveFloor && atOrBelowCeiling;
     }
 
-    private List<IrmaaTierEntity> loadTiers(int taxYear, FilingStatus status) {
+    private List<IrmaaTierEntity> loadTierEntities(int taxYear, FilingStatus status) {
         String key = taxYear + ":" + status.value();
         return tierCache.computeIfAbsent(key,
                 k -> irmaaTierRepository.findByTaxYearAndFilingStatusOrderByMagiFloorAsc(taxYear, status.value()));
     }
 
     private List<IrmaaTierEntity> loadTiersWithFallback(int taxYear, FilingStatus status) {
-        var tiers = loadTiers(taxYear, status);
+        var tiers = loadTierEntities(taxYear, status);
         if (tiers.isEmpty()) {
             Integer maxYear = irmaaTierRepository.findMaxTaxYear();
             if (maxYear != null) {
-                tiers = loadTiers(maxYear, status);
+                tiers = loadTierEntities(maxYear, status);
             }
         }
         return tiers;

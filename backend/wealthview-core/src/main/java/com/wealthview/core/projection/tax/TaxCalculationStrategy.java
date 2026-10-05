@@ -1,6 +1,7 @@
 package com.wealthview.core.projection.tax;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 
 public interface TaxCalculationStrategy {
 
@@ -26,5 +27,23 @@ public interface TaxCalculationStrategy {
     default CombinedTaxResult computeDetailedTax(BigDecimal grossIncome, int taxYear, FilingStatus status,
                                                   BigDecimal ltcgIncome, BigDecimal federallyTaxedSocialSecurity) {
         return computeDetailedTax(grossIncome, taxYear, status);
+    }
+
+    /**
+     * Phase 1a: like {@link #computeMaxIncomeForTargetRate} but using the AGE-AWARE standard deduction
+     * (and, where the implementation itemizes, the deduction that would apply at the ceiling). The
+     * default delegates to the age-less method for implementations with no age concept.
+     */
+    default BigDecimal computeGrossCeilingForRate(BigDecimal targetRate, int taxYear, FilingStatus status) {
+        return computeMaxIncomeForTargetRate(targetRate, taxYear, status);
+    }
+
+    /**
+     * Phase 1a: the AGE-AWARE federal standard deduction this strategy applies for (taxYear, status) --
+     * the same amount its ordinary-tax computation subtracts when it does not itemize. Empty for
+     * implementations with no deduction/age concept; callers then fall back to their own lookup.
+     */
+    default Optional<BigDecimal> standardDeduction(int taxYear, FilingStatus status) {
+        return Optional.empty();
     }
 }

@@ -149,4 +149,21 @@ class SocialSecurityTaxCalculatorTest {
         // = min(2000, 500) = 500
         assertThat(result).isEqualByComparingTo("500");
     }
+
+    @Test
+    void thresholds_singleAtBase_areNominal25kAnd34k() {
+        var t = calculator.thresholds(FilingStatus.SINGLE, 0, new BigDecimal("0.025"));
+
+        assertThat(t.base()).isEqualByComparingTo("25000");
+        assertThat(t.upper()).isEqualByComparingTo("34000");
+    }
+
+    @Test
+    void thresholds_mfjTenYearsOut_areDeflatedAtScale4() {
+        // deflator(10, 2.5%) = 0.7811984017 ; 32000 x d = 24998.3489 ; 44000 x d = 34372.7297
+        var t = calculator.thresholds(FilingStatus.MARRIED_FILING_JOINTLY, 10, new BigDecimal("0.025"));
+
+        assertThat(t.base()).isEqualByComparingTo("24998.3489");
+        assertThat(t.upper()).isEqualByComparingTo("34372.7297");
+    }
 }

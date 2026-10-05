@@ -1,6 +1,7 @@
 package com.wealthview.core.projection.tax;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 
 import org.springframework.lang.Nullable;
 
@@ -226,16 +227,38 @@ public class CombinedTaxCalculator implements TaxCalculationStrategy {
             return BigDecimal.ZERO;
         }
 
-        // Determine whether itemized or standard deduction applies at the bracket ceiling
-        BigDecimal standardDeduction = federal.loadStandardDeduction(taxYear, status);
-        BigDecimal grossEstimate = bracketCeiling.add(standardDeduction);
+        return ceilingWithBestDeduction(bracketCeiling, federal.loadStandardDeduction(taxYear, status),
+                taxYear, status);
+    }
 
+    @Override
+    public BigDecimal computeGrossCeilingForRate(BigDecimal targetRate, int taxYear, FilingStatus status) {
+        BigDecimal bracketCeiling = federal.findBracketCeiling(targetRate, taxYear, status);
+        if (bracketCeiling.signum() <= 0) {
+            return BigDecimal.ZERO;
+        }
+        // Same itemized-vs-standard estimate at the ceiling as computeMaxIncomeForTargetRate, but with the
+        // household/birth-year AGE-AWARE standard deduction, and applied even when there is no state tax
+        // (property tax + mortgage interest alone can make itemizing win).
+        return ceilingWithBestDeduction(bracketCeiling, resolveFederalStandardDeduction(taxYear, status),
+                taxYear, status);
+    }
+
+    @Override
+    public Optional<BigDecimal> standardDeduction(int taxYear, FilingStatus status) {
+        return Optional.of(resolveFederalStandardDeduction(taxYear, status));
+    }
+
+    /**
+     * The bracket's taxable ceiling plus whichever of the itemized deduction (estimated at the gross
+     * income the standard deduction implies) or {@code standardDeduction} the filer would use there.
+     */
+    private BigDecimal ceilingWithBestDeduction(BigDecimal bracketCeiling, BigDecimal standardDeduction,
+                                                int taxYear, FilingStatus status) {
+        BigDecimal grossEstimate = bracketCeiling.add(standardDeduction);
         BigDecimal estStateTax = state.computeTax(grossEstimate, taxYear, status);
         BigDecimal estSalt = estStateTax.add(primaryResidencePropertyTax).min(saltCap(taxYear));
         BigDecimal estItemized = estSalt.add(primaryResidenceMortgageInterest);
-        BigDecimal chosenDeduction = estItemized.compareTo(standardDeduction) > 0
-                ? estItemized : standardDeduction;
-
-        return bracketCeiling.add(chosenDeduction);
+        return bracketCeiling.add(estItemized.max(standardDeduction));
     }
 }

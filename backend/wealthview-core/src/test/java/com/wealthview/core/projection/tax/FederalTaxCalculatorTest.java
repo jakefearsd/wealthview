@@ -565,4 +565,32 @@ class FederalTaxCalculatorTest {
 
         assertThat(brackets).isEmpty();
     }
+
+    @Test
+    void computeMaxIncomeForBracket_ageAware_addsAge65AdderPerQualifyingPerson() {
+        lenient().when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
+                .thenReturn(single2025Brackets());
+        lenient().when(standardDeductionRepository.findByTaxYearAndFilingStatus(2025, "single"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15750"), bd("2000"))));
+        lenient().when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025,
+                        "married_filing_jointly"))
+                .thenReturn(mfj2025Brackets());
+        lenient().when(standardDeductionRepository.findByTaxYearAndFilingStatus(2025, "married_filing_jointly"))
+                .thenReturn(Optional.of(
+                        new StandardDeductionEntity(2025, "married_filing_jointly", bd("31500"), bd("1600"))));
+
+        // 12% ceiling 48475 + 15750 = 64225 (age 64) ; + 2000 adder = 66225 (age 65)
+        assertThat(calculator.computeMaxIncomeForBracket(bd("0.12"), 2025, FilingStatus.SINGLE, 64, null))
+                .isEqualByComparingTo("64225");
+        assertThat(calculator.computeMaxIncomeForBracket(bd("0.12"), 2025, FilingStatus.SINGLE, 65, null))
+                .isEqualByComparingTo("66225");
+        // MFJ both 65+: 96950 + 31500 + 2 x 1600 = 131650
+        assertThat(calculator.computeMaxIncomeForBracket(bd("0.12"), 2025,
+                FilingStatus.MARRIED_FILING_JOINTLY, 67, 66)).isEqualByComparingTo("131650");
+        // Top bracket (no ceiling) and an unknown rate both return zero, like the age-less overload.
+        assertThat(calculator.computeMaxIncomeForBracket(bd("0.37"), 2025, FilingStatus.SINGLE, 65, null))
+                .isEqualByComparingTo("0");
+        assertThat(calculator.computeMaxIncomeForBracket(bd("0.15"), 2025, FilingStatus.SINGLE, 65, null))
+                .isEqualByComparingTo("0");
+    }
 }
