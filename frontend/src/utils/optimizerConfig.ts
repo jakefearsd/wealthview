@@ -56,7 +56,9 @@ export function defaultOptimizerConfig(): OptimizerConfig {
         spendingFlexibilityPct: 5,
         phaseBlendYears: 1,
         cashReserveYears: 2,
-        cashReturnRatePct: 4,
+        // D7 (Phase 1a): REAL return on the cash bucket -- matches the backend default
+        // (GuardrailProfileService.DEFAULT_CASH_RETURN_RATE = 0.015). 4% real was optimistic.
+        cashReturnRatePct: 1.5,
         trialCount: 5000,
         confidenceLevelPct: null,
         optimizeConversions: false,

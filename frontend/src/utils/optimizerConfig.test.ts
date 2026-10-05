@@ -14,7 +14,7 @@ describe('defaultOptimizerConfig', () => {
         expect(config.spendingFlexibilityPct).toBe(5);
         expect(config.phaseBlendYears).toBe(1);
         expect(config.cashReserveYears).toBe(2);
-        expect(config.cashReturnRatePct).toBe(4);
+        expect(config.cashReturnRatePct).toBe(1.5);
         expect(config.trialCount).toBe(5000);
         expect(config.confidenceLevelPct).toBeNull();
         expect(config.optimizeConversions).toBe(false);
@@ -24,6 +24,12 @@ describe('defaultOptimizerConfig', () => {
         expect(config.rmdBracketHeadroomPct).toBe(10);
         expect(config.dynSeqBracketRatePct).toBeNull();
         expect(config.phases).toHaveLength(3);
+    });
+
+    it('defaults the cash return to the backend real-terms default (1.5%), not 4%', () => {
+        const request = toRequest(defaultOptimizerConfig(), 'scenario-1');
+
+        expect(request.cash_return_rate).toBeCloseTo(0.015);
     });
 });
 
@@ -62,7 +68,7 @@ describe('fromProfile', () => {
         }));
 
         expect(config.cashReserveYears).toBe(2);
-        expect(config.cashReturnRatePct).toBe(4);
+        expect(config.cashReturnRatePct).toBe(1.5);
         expect(config.spendingFlexibilityPct).toBe(5);
         expect(config.phaseBlendYears).toBe(1);
         expect(config.portfolioFloor).toBe(0);
