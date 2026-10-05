@@ -4,7 +4,7 @@
 
 WealthView's data model comprises 42 JPA entities mapped onto 42 PostgreSQL tables across 9 domains. Almost all primary keys are UUID with `DEFAULT gen_random_uuid()`; the exceptions are `prices` (composite `(symbol, date)`), `system_config` (text `key`), and `mobile_app_versions` (text `platform`). Timestamps use `timestamptz`. Monetary amounts use `numeric(19,4)`.
 
-The schema is at **V080**, built from **89 migration files** — 80 versioned (`V001`–`V080`) plus 9 repeatable seeds (`R__…`) — in `backend/wealthview-persistence/src/main/resources/db/migration/`.
+The schema is at **V081**, built from **90 migration files** — 81 versioned (`V001`–`V081`) plus 9 repeatable seeds (`R__…`) — in `backend/wealthview-persistence/src/main/resources/db/migration/`.
 
 ## Entity Relationship Diagram
 
@@ -605,6 +605,8 @@ Monte-Carlo-optimized spending plan bound to exactly one scenario — the `Guard
 | traditional_exhaustion_buffer | integer DEFAULT 5 | Legacy exhaustion constraint (V044) |
 | rmd_bracket_headroom | numeric(5,4) DEFAULT 0.10 | Target-balance headroom replacing the exhaustion constraint (V045) |
 | gate_on_adaptive_rules | boolean NOT NULL DEFAULT true | Gate the sustainability search on the with-rules success metric (V076; default flipped to true by V077, existing rows deliberately left at false) |
+| optimize_conversions | boolean NOT NULL DEFAULT false | Whether the optimizer searched for Roth conversions; `reoptimize` re-uses it as saved (V081; backfilled to true where `conversion_schedule` is present) |
+| dynamic_sequencing_bracket_rate | numeric(5,4) NULL | Dynamic-sequencing target bracket the optimizer ran with; `reoptimize` re-uses it as saved (V081) |
 | scenario_hash | text NOT NULL | Hash of the scenario inputs the result was computed from |
 | is_stale | boolean NOT NULL DEFAULT false | True when the scenario changed after optimization |
 | created_at / updated_at | timestamptz NOT NULL | |
@@ -953,7 +955,7 @@ Force-update / version-check data for the React Native client — one row per pl
 
 ## Flyway Migration Inventory
 
-Flyway migrations live in `backend/wealthview-persistence/src/main/resources/db/migration/` and run automatically on application startup. There are **89 files**: 80 versioned (`V001`–`V080`) and 9 repeatable seeds.
+Flyway migrations live in `backend/wealthview-persistence/src/main/resources/db/migration/` and run automatically on application startup. There are **90 files**: 81 versioned (`V001`–`V081`) and 9 repeatable seeds.
 
 ### Versioned Migrations
 
@@ -1039,6 +1041,7 @@ Flyway migrations live in `backend/wealthview-persistence/src/main/resources/db/
 | V078      | Add `owner` to projection accounts (primary/spouse/joint)                       |
 | V079      | Add `owner` + `survivor_percent` to income sources                              |
 | V080      | Create `mortality_rates` (SSA period-life qx by sex and age)                    |
+| V081      | Add `optimize_conversions` and `dynamic_sequencing_bracket_rate` to guardrail profiles |
 
 ### Repeatable Migrations
 

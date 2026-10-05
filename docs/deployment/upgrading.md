@@ -207,7 +207,7 @@ manual SQL step.
 
 Files named `V<NNN>__<description>.sql` run exactly once, in version order.
 The current range is `V001__create_tenants_table.sql` through
-`V080__create_mortality_rates.sql`. Flyway records which versions have been
+`V081__guardrail_profile_conversion_settings.sql`. Flyway records which versions have been
 applied in the `flyway_schema_history` table.
 
 On each startup:

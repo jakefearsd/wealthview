@@ -458,4 +458,5 @@ class OptimizationContextBuilderTest {
 
         assertThat(setup.sim().earlyAccessAge()).isEqualTo(60);
     }
+
 }

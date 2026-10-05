@@ -146,9 +146,10 @@ into the projection). Each lot is tagged with its source account's owner.
   the 0/15/20% LTCG brackets from `ltcg_brackets`, **stacked on top of ordinary taxable income**,
   plus the 3.8% NIIT on `min(net investment income, MAGI − threshold)`. Net rental income joins the
   NIIT base (IRC 1411) but *not* the LTCG bracket tax — rental income is ordinary.
-* Secondary taxable sales (paying the withdrawal tax, replenishing the cash reserve) sell FIFO to
-  keep lots in sync, but their gain is deliberately excluded from taxation — a documented
-  second-order simplification, mirrored on both engines.
+* Secondary taxable sales (paying the withdrawal tax, replenishing the cash reserve) sell FIFO, and
+  their gain is taxed as LTCG in the year realized (D5, both engines): losses offset the year's
+  gains and LTCG income is floored at 0. See the tax-funding sale gains row under
+  [Tax Calculation](#tax-calculation).
 
 ### RMDs
 

@@ -295,7 +295,7 @@ The targets are aspirations, not constraints. The optimizer reports how much of 
 | Field | Default | Description |
 |-------|---------|-------------|
 | **Cash Reserve** | 2 years | *"Years of spending held in cash to avoid selling during downturns."* |
-| **Cash Rate** | 4% | *"Expected annual return on cash reserves (money market rate)."* |
+| **Cash Rate** | 1.5% (real) | *"Expected annual return on cash reserves (money market rate)."* |
 | **Trial Count** | 5,000 | Number of simulated market histories. Options: 1,000 / 2,500 / 5,000 / 10,000. |
 | **Confidence Level** | *(uses risk tolerance)* | A direct override, 50–99%. |
 | **Dynamic-Sequencing Bracket Rate (%)** | Off | *"Target tax bracket for dynamic withdrawal sequencing."* |

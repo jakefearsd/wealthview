@@ -26,6 +26,7 @@ import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025WithAge65Adder;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025Ltcg;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -321,33 +322,33 @@ class MultiPoolCapitalGainsTest {
         assertThat(r.taxLiability().subtract(bd("8131.4879"))).isEqualByComparingTo(bd("1232.6990"));
     }
 
-    // ---- D16 (Phase 1a): deterministic engine (CapitalGainsTaxCalculator) already deflates NIIT by calendar years ----
+    // ---- D16 (Phase 1a): deterministic engine via PoolStrategy exercises calendar-year deflation ----
 
     @Test
-    void capitalGainsTaxCalculator_niitThresholdDeflatesByCalendarYearsFromBase() {
-        // D16 (Phase 1a): the deterministic engine's CapitalGainsTaxCalculator already deflates the NIIT
-        // threshold by yearsFromBase (calendar years from the base year), which is the same clock the
-        // Monte Carlo LtcgTaxTable now uses after D16's fix. This test pins that the existing behavior
-        // is correct: yearsFromBase 0 (no deflation) vs yearsFromBase 10 (10 years of deflation) produce
-        // different NIIT charges when MAGI is between the deflated and undeflated thresholds.
-        //
-        // Fixture: ordinary income $140k + realized gain $40k = MAGI $180k.
-        // Undeflated NIIT threshold: $200k (excess 0, no NIIT).
-        // Deflated by 10 years at 2.5% inflation: $200k × (1/1.025)^10 ≈ $156.24k (excess ~$24k, NIIT ≈ $912).
-        var calc = capitalGainsCalc();
-        BigDecimal magi = bd("180000");
-        BigDecimal gain = bd("40000");
+    void executeWithdrawals_baseYearBeforeWithdrawalYear_niitThresholdDeflatedByCalendarYears() {
+        // D16 (Phase 1a) regression guard: the engine's PoolStrategy.MultiPool uses year - baseYear
+        // to compute calendar years from base, feeding it to CapitalGainsTaxCalculator. When
+        // baseYear (2015) != withdrawal year (2025), the NIIT threshold deflates by calendar years.
+        // Fixture: baseYear 2015, withdrawal year 2025 → 10 years of deflation.
+        // Deflated NIIT threshold: $200k × (1/1.025)^10 ≈ $156.24k (single filer).
+        // MAGI: ordinary $140k + realized gain $40k = $180k (between deflated $156.24k and undeflated $200k).
+        // Test verifies: with deflation, NIIT is charged; without deflation (baseYear == year), it is not.
+        var federal = federalTaxCalc();
+        var poolConfig = new PoolStrategy.PoolConfig(
+                FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST,
+                null, null, Map.of(), ZERO, capitalGainsCalc(), bd("0"), ZERO, ZERO,
+                2015,  // D16: baseYear BEFORE withdrawal year
+                federal);
+        var pool = new PoolStrategy.MultiPool(
+                PoolFixtures.grouped(taxableAcct("500000", "300000"), acct("0", "traditional"), acct("0", "roth")),
+                ZERO, poolConfig);
 
-        // yearsFromBase 0: no deflation, threshold stays $200k.
-        BigDecimal taxNoDeflation = calc.computeLtcgTax(bd("140000"), gain, YEAR, FilingStatus.SINGLE, 0,
-                bd("0.025"), magi);
-        // yearsFromBase 10: threshold deflates to ~$156k, triggering NIIT.
-        BigDecimal taxWith10YearDeflation = calc.computeLtcgTax(bd("140000"), gain, YEAR, FilingStatus.SINGLE, 10,
-                bd("0.025"), magi);
+        // Execute withdrawal in 2025 (10 calendar years after baseYear 2015).
+        // The pool computes yearsFromBase = 2025 - 2015 = 10 for NIIT deflation.
+        var r = pool.executeWithdrawals(bd("100000"), 2025, bd("140000"), ZERO, ZERO, AGE_RETIRED);
 
-        // With no deflation, MAGI $180k < $200k threshold → no NIIT, only bracket tax ($6000).
-        assertThat(taxNoDeflation).isEqualByComparingTo(bd("6000.00"));
-        // With 10-year deflation, MAGI $180k > ~$156k deflated threshold → NIIT applies.
-        assertThat(taxWith10YearDeflation).isGreaterThan(taxNoDeflation);
+        // With 10-year deflation, NIIT is charged (tax > $6000 bracket-only base).
+        // Without wiring fix (offset 0), tax would be exactly $6000.
+        assertThat(r.ltcgTax()).isGreaterThan(bd("6000.00"));
     }
 }

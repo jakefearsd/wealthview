@@ -40,7 +40,7 @@ The leaf module. Owns:
   value types (`LoanDetails`, `DepreciationSettings`)
 * **Spring Data repositories** — 42 interfaces, plus the `@NoRepositoryBean`
   `TenantScopedRepository<T>` base that declares the shared tenant-scoped finders
-* **Flyway migrations** — `V001` through `V080` versioned scripts plus nine repeatable
+* **Flyway migrations** — `V001` through `V081` versioned scripts plus nine repeatable
   seed migrations
 
 No business logic may live here. Entities are never exposed to the API layer.

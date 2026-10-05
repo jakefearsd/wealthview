@@ -1,7 +1,7 @@
 # Data Model
 
-WealthView's schema spans **42 JPA entities** across 8 business domains, managed by **89 Flyway
-migrations** (V001–V080 versioned + 9 repeatable seed scripts) and served by 43 Spring Data
+WealthView's schema spans **42 JPA entities** across 8 business domains, managed by **90 Flyway
+migrations** (V001–V081 versioned + 9 repeatable seed scripts) and served by 43 Spring Data
 repositories.
 
 This page is the **entity / ORM view**: the mapped classes, their base types, associations and fetch
@@ -374,6 +374,7 @@ Migrations live in
 | **V066–V072** | **Projection realism v2:** asset-class returns, security asset-class map + tenant override, per-account allocation, expected-return made optional, LTCG brackets, per-account cost basis |
 | **V073–V077** | Legacy expected-return backfill, age-65 standard deduction, IRMAA tiers, `gate_on_adaptive_rules` (V076 default false → **V077 default true**) |
 | **V078–V080** | **Household modelling:** `projection_accounts.owner`, `income_sources.owner` + `survivor_percent`, and `mortality_rates` (SSA qx) |
+| **V081** | `guardrail_spending_profiles.optimize_conversions` + `dynamic_sequencing_bracket_rate`, persisted so `reoptimize` re-uses them (backfilled from `conversion_schedule`) |
 
 Nine repeatable `R__seed_*.sql` scripts re-run whenever their checksum changes, so reference data is
 edited in place rather than by adding a new versioned migration.

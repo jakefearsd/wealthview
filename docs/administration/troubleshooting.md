@@ -99,7 +99,7 @@ docker compose exec db psql -U wv_app wealthview -c "
   LIMIT 10;"
 ```
 
-The schema is at V080 plus 9 repeatable seed migrations; repeatable (`R__`) migrations
+The schema is at V081 plus 9 repeatable seed migrations; repeatable (`R__`) migrations
 re-run whenever their checksum changes, which is normal.
 
 ### Production Config Validation Failure
