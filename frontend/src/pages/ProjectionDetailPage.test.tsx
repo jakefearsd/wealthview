@@ -191,4 +191,66 @@ describe('ProjectionDetailPage', () => {
 
         expect(screen.queryByTestId('projection-warnings-banner')).not.toBeInTheDocument();
     });
+
+    it('shows a Tax Space tab when the run returns tax_space, and renders it on click', async () => {
+        mockUseApiQuery.mockReturnValue({ data: mockScenario, loading: false, error: null, refetch: vi.fn() });
+        renderPage();
+        const { runProjection } = await import('../api/projections');
+        vi.mocked(runProjection).mockResolvedValue(makeResult({
+            tax_space: [{
+                year: 2046, age: 56, magi: 70000, marginal_ordinary_rate: 0.12,
+                bracket_room: [{ rate: 0.12, gross_ceiling: 126700, room: 56700 }],
+                ltcg_zero_room: 26700, ltcg_fifteen_room: 500000,
+                provisional_income: null, ss_base_threshold: null, ss_upper_threshold: null,
+                ss_inclusion_rate: null, niit_headroom: 180000,
+                irmaa_premium_year: null, irmaa_tier: null, irmaa_room_to_next_tier: null,
+                irmaa_next_tier_annual_cost: null,
+                effective_marginal_ordinary: 0.12, effective_marginal_ltcg: 0,
+            }],
+        }));
+
+        await userEvent.click(screen.getByRole('button', { name: /run projection/i }));
+        await userEvent.click(screen.getByRole('button', { name: /tax space/i }));
+
+        expect(screen.getByText('Tax Space by Year')).toBeInTheDocument();
+    });
+
+    it('hides the Tax Space tab when the run has no tax_space', async () => {
+        mockUseApiQuery.mockReturnValue({ data: mockScenario, loading: false, error: null, refetch: vi.fn() });
+        renderPage();
+        const { runProjection } = await import('../api/projections');
+        vi.mocked(runProjection).mockResolvedValue(makeResult());
+
+        await userEvent.click(screen.getByRole('button', { name: /run projection/i }));
+
+        expect(screen.queryByRole('button', { name: /tax space/i })).not.toBeInTheDocument();
+    });
+
+    it('shows the After-tax Legacy card when the run returns terminal_value', async () => {
+        mockUseApiQuery.mockReturnValue({ data: mockScenario, loading: false, error: null, refetch: vi.fn() });
+        renderPage();
+        const { runProjection } = await import('../api/projections');
+        vi.mocked(runProjection).mockResolvedValue(makeResult({
+            terminal_value: {
+                year: 2080, traditional: 400000, roth: 300000, taxable: 200000,
+                heir_tax_rate: 0.24, after_tax_legacy: 804000, at_second_death: false,
+            },
+        }));
+
+        await userEvent.click(screen.getByRole('button', { name: /run projection/i }));
+
+        expect(screen.getByText('After-tax Legacy')).toBeInTheDocument();
+        expect(screen.getByText('$804,000.00')).toBeInTheDocument();
+    });
+
+    it('omits the After-tax Legacy card when terminal_value is null', async () => {
+        mockUseApiQuery.mockReturnValue({ data: mockScenario, loading: false, error: null, refetch: vi.fn() });
+        renderPage();
+        const { runProjection } = await import('../api/projections');
+        vi.mocked(runProjection).mockResolvedValue(makeResult({ terminal_value: null }));
+
+        await userEvent.click(screen.getByRole('button', { name: /run projection/i }));
+
+        expect(screen.queryByText('After-tax Legacy')).not.toBeInTheDocument();
+    });
 });

@@ -273,11 +273,10 @@ describe('ScenarioForm', () => {
         expect(call.dividend_yield).toBeUndefined();
     });
 
-    // fee_rate and interest_yield are both simple params_json percent fields sharing the exact
-    // same 5-behavior contract (default display, hydrate from params_json, submit as a decimal,
-    // omit when blank, round-trip a genuine 0% override) -- table-driven instead of two
-    // hand-duplicated copies. See the report's deleted-test -> generated-case mapping for the
-    // 10 originally-named tests this table now generates.
+    // fee_rate, interest_yield, and heir_tax_rate are all simple params_json percent fields
+    // sharing the exact same 5-behavior contract (default display, hydrate from params_json,
+    // submit as a decimal, omit when blank, round-trip a genuine 0% override) -- table-driven
+    // instead of three hand-duplicated copies.
     describe.each([
         {
             label: 'Investment Fees (%)', paramKey: 'fee_rate' as const,
@@ -288,6 +287,11 @@ describe('ScenarioForm', () => {
             label: 'Bond Interest Yield (%)', paramKey: 'interest_yield' as const,
             defaultDisplay: '4', hydrateFraction: 0.06, hydrateDisplay: '6',
             submitPct: '5.5', submitFraction: 0.055,
+        },
+        {
+            label: 'Heir Tax Rate (%)', paramKey: 'heir_tax_rate' as const,
+            defaultDisplay: '24', hydrateFraction: 0.5, hydrateDisplay: '50',
+            submitPct: '30', submitFraction: 0.3,
         },
     ])('$paramKey percent field', ({ label, paramKey, defaultDisplay, hydrateFraction, hydrateDisplay, submitPct, submitFraction }) => {
         it(`defaults to ${defaultDisplay}% when no initial value is present`, () => {

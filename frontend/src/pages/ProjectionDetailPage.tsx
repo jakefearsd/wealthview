@@ -23,6 +23,7 @@ import IncomeStreamsChart from '../components/IncomeStreamsChart';
 import DataTableTab from '../components/DataTableTab';
 import IncomeTaxTab from '../components/IncomeTaxTab';
 import TaxShieldTab from '../components/TaxShieldTab';
+import TaxSpaceTab from '../components/TaxSpaceTab';
 import LoadingState from '../components/LoadingState';
 import EmptyState from '../components/EmptyState';
 import { useProjectionCache } from '../context/ProjectionCacheContext';
@@ -31,7 +32,7 @@ import { downloadBlob } from '../api/export';
 import Button from '../components/Button';
 import TabBar from '../components/TabBar';
 
-type TabId = 'chart' | 'flows' | 'table' | 'spending' | 'income_tax' | 'income_streams' | 'tax_shield';
+type TabId = 'chart' | 'flows' | 'table' | 'spending' | 'income_tax' | 'income_streams' | 'tax_shield' | 'tax_space';
 
 export default function ProjectionDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -110,6 +111,8 @@ export default function ProjectionDetailPage() {
         || y.state_tax !== null
     ) ?? false;
     const hasSurplusReinvested = result?.yearly_data.some(y => y.surplus_reinvested != null && y.surplus_reinvested > 0) ?? false;
+    const taxSpace = result?.tax_space ?? [];
+    const hasTaxSpace = taxSpace.length > 0;
 
     const toggleTaxYear = (year: number) => {
         setExpandedTaxYears(prev => {
@@ -309,13 +312,20 @@ export default function ProjectionDetailPage() {
                     <div style={{ color: '#888', fontSize: '0.75rem', marginBottom: '0.5rem' }}>
                         All values in today&apos;s dollars.
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
                         <SummaryCard
                             label="Final Balance"
                             value={formatCurrency(result.final_balance)}
                             valueColor={result.final_balance > 0 ? '#2e7d32' : '#d32f2f'}
                             description="Portfolio value at the end of your projection period."
                         />
+                        {result.terminal_value && (
+                            <SummaryCard
+                                label="After-tax Legacy"
+                                value={formatCurrency(result.terminal_value.after_tax_legacy)}
+                                description={`What heirs keep: traditional balance after a ${Math.round(result.terminal_value.heir_tax_rate * 100)}% heir tax rate, plus Roth and taxable at full value (cost basis steps up at death)${result.terminal_value.at_second_death ? ', valued at the second death' : ''}.`}
+                            />
+                        )}
                         <SummaryCard
                             label="Net Worth"
                             value={result.final_net_worth != null ? formatCurrency(result.final_net_worth) : '—'}
@@ -394,6 +404,7 @@ export default function ProjectionDetailPage() {
                                 { key: 'table' as TabId, label: 'Data Table' },
                                 ...(hasSpendingData ? [{ key: 'spending' as TabId, label: 'Spending Analysis' }] : []),
                                 ...(hasIncomeSourceData ? [{ key: 'income_tax' as TabId, label: 'Income & Tax' }] : []),
+                                ...(hasTaxSpace ? [{ key: 'tax_space' as TabId, label: 'Tax Space' }] : []),
                                 ...(scenario.income_sources.length > 0
                                     ? [{ key: 'income_streams' as TabId, label: 'Income Streams' }] : []),
                                 ...(taxShieldSummary && taxShieldSummary.totalDepreciation > 0
@@ -423,6 +434,10 @@ export default function ProjectionDetailPage() {
                                 expandedTaxYears={expandedTaxYears}
                                 onToggleTaxYear={toggleTaxYear}
                             />
+                        )}
+
+                        {activeTab === 'tax_space' && hasTaxSpace && (
+                            <TaxSpaceTab taxSpace={taxSpace} />
                         )}
 
                         {activeTab === 'income_streams' && scenario.income_sources.length > 0 && (

@@ -40,6 +40,8 @@ export interface ScenarioFormFields {
     feeRate: number | null;
     interestYield: number | null;
     includeDepressionYears: boolean;
+    /** Heirs' tax rate on inherited traditional balances, display percent (null = blank ⇒ server default 24%). */
+    heirTaxRate: number | null;
     spendingPlanSelection: string;
     spouseBirthYear: number | null;
     spouseBirthMonth: number | null;

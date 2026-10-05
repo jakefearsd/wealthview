@@ -124,6 +124,52 @@ export interface SpendingFeasibility {
     required_annual_spending: number;
 }
 
+/** One bracket's remaining room this year (Phase 1a tax space). Gross-income terms. */
+export interface BracketRoom {
+    rate: number;
+    gross_ceiling: number;
+    room: number;
+}
+
+/** Per-retired-year tax space (backend `TaxSpaceYear`; spec 1a §1.2). Rates are decimals. */
+export interface TaxSpaceYear {
+    year: number;
+    age: number;
+    magi: number;
+    marginal_ordinary_rate: number;
+    /** Current bracket first, then every higher bracket. */
+    bracket_room: BracketRoom[];
+    ltcg_zero_room: number;
+    ltcg_fifteen_room: number;
+    /** IRS provisional income (other income + half of benefits); null without Social Security. */
+    provisional_income: number | null;
+    ss_base_threshold: number | null;
+    ss_upper_threshold: number | null;
+    /** Extra taxable benefit per $1 of ordinary income: 0, 0.5 or 0.85; null without Social Security. */
+    ss_inclusion_rate: number | null;
+    /** Negative when MAGI is over the NIIT threshold. */
+    niit_headroom: number;
+    /** Premium year this year's MAGI sets (year + 2); null unless someone is 65+ by then. */
+    irmaa_premium_year: number | null;
+    irmaa_tier: number | null;
+    /** Null at the top tier. */
+    irmaa_room_to_next_tier: number | null;
+    irmaa_next_tier_annual_cost: number | null;
+    effective_marginal_ordinary: number;
+    effective_marginal_ltcg: number;
+}
+
+/** After-tax legacy value (backend `TerminalValue`; spec 1a §3). */
+export interface TerminalValue {
+    year: number;
+    traditional: number;
+    roth: number;
+    taxable: number;
+    heir_tax_rate: number;
+    after_tax_legacy: number;
+    at_second_death: boolean;
+}
+
 /**
  * Fields common to BOTH `GET /projections/{id}/run` and `POST /projections/compare` (backend:
  * `ProjectionResultResponse`, wrapped by `ProjectionRunResponse` for `/run` and by
@@ -151,6 +197,9 @@ export interface ProjectionCompareResult {
 export interface ProjectionResult extends ProjectionCompareResult {
     unclassified_symbols: string[] | null;
     warnings: string[] | null;
+    /** Phase 1a: omitted by the backend when empty. */
+    tax_space?: TaxSpaceYear[] | null;
+    terminal_value?: TerminalValue | null;
 }
 
 export interface CompareResponse {
@@ -195,6 +244,8 @@ export interface CreateScenarioRequest {
     /** Nominal coupon assumption for the bond portion of taxable accounts (decimal, default 0.04, range 0-0.10). */
     interest_yield?: number | null;
     include_depression_years?: boolean | null;
+    /** Heirs' tax rate on inherited traditional balances (decimal, 0-0.50). Omitted ⇒ server default 0.24. */
+    heir_tax_rate?: number | null;
     /** Phase 1a: primary's birth month (1-12). Null = unknown -> early access at the legacy age-60 year. Requires birth_year. */
     birth_month?: number | null;
     /** Phase 1a: spouse's birth month (1-12). Only meaningful when spouse_birth_year is set. */

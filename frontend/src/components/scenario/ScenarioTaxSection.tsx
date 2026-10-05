@@ -10,7 +10,7 @@ export interface ScenarioTaxSectionProps {
 
 /** Tax configuration: state selection plus the SALT/itemized inputs it unlocks. */
 export default function ScenarioTaxSection({ fields, setField }: ScenarioTaxSectionProps) {
-    const { state, primaryResidencePropertyTax, primaryResidenceMortgageInterest } = fields;
+    const { state, primaryResidencePropertyTax, primaryResidenceMortgageInterest, heirTaxRate } = fields;
 
     return (
         <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', marginBottom: '1rem' }}>
@@ -44,6 +44,20 @@ export default function ScenarioTaxSection({ fields, setField }: ScenarioTaxSect
                         </FormField>
                     </>
                 )}
+                <FormField
+                    label="Heir Tax Rate (%)"
+                    helpText="Tax rate your heirs would pay on inherited traditional (pre-tax) balances. Used for the After-tax Legacy figure (default 24%)."
+                >
+                    <input
+                        style={inputStyle}
+                        type="number"
+                        step="1"
+                        min="0"
+                        max="50"
+                        value={heirTaxRate ?? ''}
+                        onChange={e => setField('heirTaxRate', e.target.value === '' ? null : Number(e.target.value))}
+                    />
+                </FormField>
             </div>
         </div>
     );
