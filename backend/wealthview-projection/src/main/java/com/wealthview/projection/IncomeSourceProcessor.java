@@ -9,7 +9,6 @@ import java.util.UUID;
 
 import org.springframework.lang.Nullable;
 
-import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.RentalPropertyYearDetail;
 import com.wealthview.core.projection.household.HouseholdContext;
@@ -147,39 +146,7 @@ class IncomeSourceProcessor {
         Map<String, BigDecimal> incomeBySource = new HashMap<>();
         List<RentalPropertyYearDetail> rentalDetails = new ArrayList<>();
 
-        // Collect non-SS income first (needed for SS provisional income calc)
-        BigDecimal nonSSIncome = BigDecimal.ZERO;
         BigDecimal ssBenefit = BigDecimal.ZERO;
-
-        for (var source : sources) {
-            int sourceAge = IncomeYearMath.resolveSourceAge(source, age, household, taxYear);
-            if (!ProjectionIncomeSourceInput.isActiveForAge(source, sourceAge)) {
-                continue;
-            }
-
-            BigDecimal multiplier = transitionMultiplier(source, sourceAge);
-            BigDecimal amount = computeRealAmount(source, yearsFromBase, scenarioInflationRate)
-                    .multiply(multiplier).setScale(SCALE, ROUNDING);
-            if (source.incomeType() == IncomeSourceType.SOCIAL_SECURITY) {
-                ssBenefit = ssBenefit.add(amount);
-            } else {
-                nonSSIncome = nonSSIncome.add(amount);
-            }
-        }
-
-        // Combined Social Security taxability (audit B2 / T3-1): ALL Social Security sources share
-        // ONE provisional-income computation. Provisional = non-SS income + static other income +
-        // portfolio ordinary income realized this year (additionalProvisionalIncome) + 50% of the
-        // AGGREGATED benefit -- so MFJ spousal benefits combine and portfolio withdrawals/RMDs/
-        // conversions/gains drag SS into taxation.
-        BigDecimal combinedSsTaxable = ssBenefit.compareTo(BigDecimal.ZERO) > 0
-                ? ssTaxCalculator.computeTaxableAmount(
-                        ssBenefit,
-                        nonSSIncome.add(magi).add(additionalProvisionalIncome),
-                        filingStatus.value(),
-                        Math.max(0, taxYear - baseYear),
-                        scenarioInflationRate)
-                : BigDecimal.ZERO;
 
         for (var source : sources) {
             int sourceAge = IncomeYearMath.resolveSourceAge(source, age, household, taxYear);
@@ -202,6 +169,9 @@ class IncomeSourceProcessor {
             totalCashInflow = totalCashInflow.add(result.cashInflow());
             totalTaxableIncome = totalTaxableIncome.add(result.taxableIncome());
             incomeBySource.merge(sourceKey, result.cashInflow(), BigDecimal::add);
+            if (result instanceof SocialSecurityResult) {
+                ssBenefit = ssBenefit.add(result.cashInflow());
+            }
 
             if (result instanceof RentalResult r) {
                 rentalIncomeGross = rentalIncomeGross.add(amount);
@@ -222,6 +192,24 @@ class IncomeSourceProcessor {
                 seTax = seTax.add(r.seTax());
             }
         }
+
+        // Combined Social Security taxability (audit B2 / T3-1): ALL Social Security sources share ONE
+        // provisional-income computation. Provisional = non-SS TAXABLE income (Phase 1a Task 8: net
+        // rent after expenses/depreciation/loss rules, SE income after its half-SE-tax deduction,
+        // tax-free sources excluded -- the IRS worksheet's AGI-ex-SS, not gross cash) + static other
+        // income + portfolio ordinary income realized this year (additionalProvisionalIncome) + 50% of
+        // the AGGREGATED benefit -- so MFJ spousal benefits combine and portfolio withdrawals/RMDs/
+        // conversions/gains drag SS into taxation. Social Security results carry zero taxable income,
+        // so totalTaxableIncome here is exactly the non-SS taxable sum.
+        BigDecimal nonSsTaxableIncome = totalTaxableIncome;
+        BigDecimal combinedSsTaxable = ssBenefit.compareTo(BigDecimal.ZERO) > 0
+                ? ssTaxCalculator.computeTaxableAmount(
+                        ssBenefit,
+                        nonSsTaxableIncome.add(magi).add(additionalProvisionalIncome),
+                        filingStatus.value(),
+                        Math.max(0, taxYear - baseYear),
+                        scenarioInflationRate)
+                : BigDecimal.ZERO;
 
         // Social Security taxable income is the single combined figure, added once (its per-source
         // cash inflow was already folded into totalCashInflow / incomeBySource in the loop above).

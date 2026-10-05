@@ -719,6 +719,49 @@ class IncomeSourceProcessorTest {
         assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("24000"));
     }
 
+    // === Phase 1a Task 8: SS provisional income uses non-SS TAXABLE income ===
+
+    private static IncomeSourceProcessor realProcessor() {
+        return new IncomeSourceProcessor(new RentalLossCalculator(), new SocialSecurityTaxCalculator(),
+                new SelfEmploymentTaxCalculator());
+    }
+
+    @Test
+    void process_rentalAndSocialSecurity_provisionalIncomeUsesNetRentNotGrossRent() {
+        // Rental: gross 40,000, operating expenses 30,000 -> net taxable 10,000.
+        // SS 24,000 (half = 12,000). Single, no deflation (taxYear == baseYear).
+        //   Correct provisional = 10,000 + 12,000 = 22,000 <= 25,000 -> SS taxable 0.
+        //   Old (gross) provisional = 40,000 + 12,000 = 52,000 -> 4,500 + 18,000 x 0.85 = 19,800.
+        var rental = new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), "Rental", IncomeSourceType.RENTAL_PROPERTY,
+                new BigDecimal("40000"), 65, null, BigDecimal.ZERO, false, "rental_passive",
+                new BigDecimal("30000"), null, null, null, null, null);
+        var socialSecurity = makeSource(IncomeSourceType.SOCIAL_SECURITY, new BigDecimal("24000"),
+                65, null, BigDecimal.ZERO, "taxable");
+
+        var result = realProcessor().process(List.of(rental, socialSecurity), 67, 1, 2025,
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO, 2025);
+
+        assertThat(result.socialSecurityTaxable()).isEqualByComparingTo("0");
+        assertThat(result.totalTaxableIncome()).isEqualByComparingTo("10000");
+    }
+
+    @Test
+    void process_taxablePensionAndSocialSecurity_unchangedByTheFix() {
+        // Regression guard: a fully taxable pension's taxable == gross, so the result is the same as before.
+        // provisional = 30,000 + 12,000 = 42,000 -> 4,500 + 8,000 x 0.85 = 11,300 (cap 20,400).
+        var pension = makeSource(IncomeSourceType.PENSION, new BigDecimal("30000"), 65, null,
+                BigDecimal.ZERO, "taxable");
+        var socialSecurity = makeSource(IncomeSourceType.SOCIAL_SECURITY, new BigDecimal("24000"),
+                65, null, BigDecimal.ZERO, "taxable");
+
+        var result = realProcessor().process(List.of(pension, socialSecurity), 67, 1, 2025,
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO, 2025);
+
+        assertThat(result.socialSecurityTaxable()).isEqualByComparingTo("11300");
+        assertThat(result.totalTaxableIncome()).isEqualByComparingTo("41300");
+    }
+
     private static ProjectionIncomeSourceInput makeSourceWithOwner(
             IncomeSourceType incomeType, BigDecimal annualAmount, int startAge, Integer endAge, String owner) {
         return new ProjectionIncomeSourceInput(
