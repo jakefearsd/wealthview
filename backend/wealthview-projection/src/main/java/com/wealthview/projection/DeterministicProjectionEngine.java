@@ -21,6 +21,7 @@ import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionPropertyInput;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
+import com.wealthview.core.projection.dto.ProjectionRunDetail;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.core.projection.dto.SpendingPlan;
@@ -163,14 +164,24 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
               lowCardinalityKeyValues = {"component", "projection"})
     @Override
     public ProjectionResultResponse run(ProjectionInput input) {
+        // Self-invocation: runDetailed's own @Observed does not fire again (no proxy hop), and the
+        // runs counter increments exactly once, inside runDetailed.
+        return runDetailed(input).result();
+    }
+
+    @Observed(name = "wealthview.projection.run",
+              contextualName = "deterministic-projection",
+              lowCardinalityKeyValues = {"component", "projection"})
+    @Override
+    public ProjectionRunDetail runDetailed(ProjectionInput input) {
         MDC.put("operation", "projection");
         MDC.put("scenarioName", input.scenarioName() != null ? input.scenarioName() : "unnamed");
         try {
-            var result = runInternal(input);
+            var detail = runInternal(input);
             if (meterRegistry != null) {
                 meterRegistry.counter("wealthview.projection.runs", "type", "deterministic").increment();
             }
-            return result;
+            return detail;
         } finally {
             MDC.remove("operation");
             MDC.remove("scenarioName");
@@ -200,10 +211,11 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             List<ProjectionPropertyInput> properties,
             TaxCalculationStrategy taxStrategy,
             BigDecimal survivorSpendingFactor,
-            boolean communityProperty) {
+            boolean communityProperty,
+            BigDecimal heirTaxRate) {
     }
 
-    private ProjectionResultResponse runInternal(ProjectionInput input) {
+    private ProjectionRunDetail runInternal(ProjectionInput input) {
         var accounts = input.accounts();
         var params = paramsParser.parseParams(input.paramsJson());
 
@@ -228,7 +240,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         var ctx = new ProjectionRunContext(input, pool, resolved.strategy(),
                 resolved.currentYear(), resolved.birthYear(), resolved.retirementYear(), resolved.endYear(),
                 resolved.inflationRate(), resolved.spendingPlan(), resolved.incomeSources(),
-                resolved.properties(), taxStrategy, survivorSpendingFactor, communityProperty);
+                resolved.properties(), taxStrategy, survivorSpendingFactor, communityProperty,
+                paramsParser.heirTaxRate(params));
         return runProjection(ctx);
     }
 
@@ -324,7 +337,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private record YearStepResult(ProjectionYearDto yearDto, YearAccumulator nextAccumulator) {}
 
-    private ProjectionResultResponse runProjection(ProjectionRunContext ctx) {
+    private ProjectionRunDetail runProjection(ProjectionRunContext ctx) {
         var yearlyData = new ArrayList<ProjectionYearDto>();
         var acc = YearAccumulator.INITIAL;
 
@@ -355,8 +368,10 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
         var feasibility = feasibilityAnalyzer.computeFeasibility(yearlyData, ctx.spendingPlan());
         BigDecimal finalNetWorth = yearlyData.isEmpty() ? null : yearlyData.getLast().totalNetWorth();
-        return new ProjectionResultResponse(ctx.input().scenarioId(), yearlyData, finalBalance,
+        var result = new ProjectionResultResponse(ctx.input().scenarioId(), yearlyData, finalBalance,
                 acc.yearsInRetirement(), feasibility, finalNetWorth);
+        return new ProjectionRunDetail(result, List.of(), List.of(),
+                TerminalValueResolver.resolve(yearlyData, ctx.input().household(), ctx.heirTaxRate()));
     }
 
     private YearStepResult processYear(ProjectionRunContext ctx, int year, YearAccumulator acc) {

@@ -59,6 +59,7 @@ public final class ScenarioRequestBuilder {
     private Integer longevityConditionalAge;
     private Integer birthMonth;
     private Integer spouseBirthMonth;
+    private BigDecimal heirTaxRate;
     private List<CreateProjectionAccountRequest> accounts = List.of();
     private List<ScenarioIncomeSourceInput> incomeSources;
 
@@ -209,6 +210,11 @@ public final class ScenarioRequestBuilder {
         return this;
     }
 
+    public ScenarioRequestBuilder withHeirTaxRate(@Nullable BigDecimal heirTaxRate) {
+        this.heirTaxRate = heirTaxRate;
+        return this;
+    }
+
     public ScenarioRequestBuilder withAccounts(List<CreateProjectionAccountRequest> accounts) {
         this.accounts = accounts;
         return this;
@@ -227,6 +233,6 @@ public final class ScenarioRequestBuilder {
                 dividendYield, feeRate, includeDepressionYears, interestYield,
                 spouseBirthYear, primaryDeathAge, spouseDeathAge, survivorSpendingFactor, communityProperty,
                 stochasticMortality, primarySex, spouseSex, longevityConditionalAge, birthMonth, spouseBirthMonth,
-                accounts, null, null, incomeSources);
+                heirTaxRate, accounts, null, null, incomeSources);
     }
 }

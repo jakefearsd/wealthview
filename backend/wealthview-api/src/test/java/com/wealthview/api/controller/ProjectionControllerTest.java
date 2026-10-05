@@ -134,6 +134,27 @@ class ProjectionControllerTest {
                 .andExpect(jsonPath("$.message").value("birth_month must be between 1 and 12"));
     }
 
+    // Phase 1a: heir_tax_rate range validation lives in ScenarioParamsValidator and surfaces as a 400
+    // through GlobalExceptionHandler. The stub also proves heir_tax_rate binds from the snake_case body.
+    @Test
+    void create_heirTaxRateAboveMax_returns400() throws Exception {
+        when(scenarioCrudService.createScenario(eq(TENANT_ID), any())).thenAnswer(inv -> {
+            var request = inv.<ScenarioRequest>getArgument(1);
+            assertThat(request.heirTaxRate()).isEqualByComparingTo("0.51");
+            throw new IllegalArgumentException("heir_tax_rate must be between 0 and 0.50");
+        });
+
+        mockMvc.perform(post("/api/v1/projections")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Plan", "retirement_date": "2055-01-01", "end_age": 90,
+                                 "inflation_rate": 0.03, "heir_tax_rate": 0.51, "accounts": []}
+                                """))
+                .andExpect(errorEnvelope(HttpStatus.BAD_REQUEST))
+                .andExpect(jsonPath("$.message").value("heir_tax_rate must be between 0 and 0.50"));
+    }
+
     @Test
     void list_authenticated_returns200() throws Exception {
         when(scenarioCrudService.listScenarios(TENANT_ID))

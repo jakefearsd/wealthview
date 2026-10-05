@@ -141,4 +141,11 @@ public interface ScenarioParamsSource {
     /** Phase 1a: the spouse's birth month (1-12), mirroring {@link #birthMonth()}. Requires
      * {@link #spouseBirthYear()}. */
     Integer spouseBirthMonth();
+
+    /**
+     * Phase 1a: the ordinary tax rate assumed for heirs who inherit traditional (pre-tax) dollars,
+     * used to value the after-tax legacy. {@code null} resolves to {@code 0.24}
+     * ({@code ScenarioParamsParser.DEFAULT_HEIR_TAX_RATE}); valid range {@code [0, 0.50]}.
+     */
+    BigDecimal heirTaxRate();
 }

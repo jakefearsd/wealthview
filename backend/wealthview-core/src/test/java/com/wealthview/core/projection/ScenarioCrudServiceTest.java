@@ -1948,4 +1948,57 @@ class ScenarioCrudServiceTest {
         assertThat(saved.getParamsJson()).contains("\"birth_month\":3");
         assertThat(saved.getParamsJson()).contains("\"spouse_birth_month\":11");
     }
+
+    // === Phase 1a: heir_tax_rate (0 .. 0.50 inclusive) ===
+
+    @Test
+    void createScenario_heirTaxRateZero_persistsExplicitZero() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        var request = ScenarioRequestBuilder.builder().withHeirTaxRate(BigDecimal.ZERO).build();
+
+        service.createScenario(tenantId, request);
+
+        assertThat(captureSavedScenario().getParamsJson()).contains("\"heir_tax_rate\":0");
+    }
+
+    @Test
+    void createScenario_heirTaxRateAtMax_doesNotThrow() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        var request = ScenarioRequestBuilder.builder().withHeirTaxRate(new BigDecimal("0.50")).build();
+
+        var result = service.createScenario(tenantId, request);
+
+        assertThat(result.name()).isEqualTo("Plan");
+    }
+
+    @Test
+    void createScenario_heirTaxRateAboveMax_throwsIllegalArgument() {
+        var request = ScenarioRequestBuilder.builder().withHeirTaxRate(new BigDecimal("0.51")).build();
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("heir_tax_rate must be between 0 and 0.50");
+    }
+
+    @Test
+    void createScenario_heirTaxRateNegative_throwsIllegalArgument() {
+        var request = ScenarioRequestBuilder.builder().withHeirTaxRate(new BigDecimal("-0.01")).build();
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("heir_tax_rate");
+    }
+
+    @Test
+    void updateScenario_heirTaxRateAboveMax_throwsIllegalArgument() {
+        var request = ScenarioRequestBuilder.builder().withHeirTaxRate(new BigDecimal("0.51")).build();
+
+        assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("heir_tax_rate");
+    }
 }

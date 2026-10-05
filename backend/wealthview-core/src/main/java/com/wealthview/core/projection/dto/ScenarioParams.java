@@ -59,13 +59,14 @@ public record ScenarioParams(
         String spouseSex,
         Integer longevityConditionalAge,
         Integer birthMonth,
-        Integer spouseBirthMonth) {
+        Integer spouseBirthMonth,
+        BigDecimal heirTaxRate) {
 
     private static final Logger log = LoggerFactory.getLogger(ScenarioParams.class);
 
     public static final ScenarioParams EMPTY = new ScenarioParams(
             null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-            null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+            null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
     /**
      * Back-compat convenience for positional callers that predate birth months (Phase 1a): the
@@ -93,7 +94,7 @@ public record ScenarioParams(
                 primaryResidencePropertyTax, primaryResidenceMortgageInterest, dividendYield, feeRate,
                 includeDepressionYears, interestYield, spouseBirthYear, primaryDeathAge, spouseDeathAge,
                 survivorSpendingFactor, communityProperty, stochasticMortality, primarySex, spouseSex,
-                longevityConditionalAge, null, null);
+                longevityConditionalAge, null, null, null);
     }
 
     public static ScenarioParams from(ScenarioParamsSource source) {
@@ -108,7 +109,8 @@ public record ScenarioParams(
                 source.interestYield(), source.spouseBirthYear(), source.primaryDeathAge(),
                 source.spouseDeathAge(), source.survivorSpendingFactor(), source.communityProperty(),
                 source.stochasticMortality(), source.primarySex(), source.spouseSex(),
-                source.longevityConditionalAge(), source.birthMonth(), source.spouseBirthMonth());
+                source.longevityConditionalAge(), source.birthMonth(), source.spouseBirthMonth(),
+                source.heirTaxRate());
     }
 
     /**

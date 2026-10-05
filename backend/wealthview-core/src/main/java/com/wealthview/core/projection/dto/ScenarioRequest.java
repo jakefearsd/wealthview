@@ -46,6 +46,7 @@ public record ScenarioRequest(
         Integer longevityConditionalAge,
         Integer birthMonth,
         Integer spouseBirthMonth,
+        BigDecimal heirTaxRate,
         List<CreateProjectionAccountRequest> accounts,
         UUID spendingProfileId,
         Boolean useGuardrailProfile,
@@ -75,7 +76,7 @@ public record ScenarioRequest(
                 dynamicCeiling, dynamicFloor, filingStatus, otherIncome, annualRothConversion, withdrawalOrder,
                 dynamicSequencingBracketRate, rothConversionStrategy, targetBracketRate, rothConversionStartYear,
                 state, primaryResidencePropertyTax, primaryResidenceMortgageInterest, dividendYield, feeRate,
-                null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null,
                 accounts, spendingProfileId, useGuardrailProfile, incomeSources);
     }
 
@@ -103,7 +104,7 @@ public record ScenarioRequest(
                 dynamicCeiling, dynamicFloor, filingStatus, otherIncome, annualRothConversion, withdrawalOrder,
                 dynamicSequencingBracketRate, rothConversionStrategy, targetBracketRate, rothConversionStartYear,
                 state, primaryResidencePropertyTax, primaryResidenceMortgageInterest, dividendYield, feeRate,
-                includeDepressionYears, null, null, null, null, null, null, null, null, null, null, null, null,
+                includeDepressionYears, null, null, null, null, null, null, null, null, null, null, null, null, null,
                 accounts, spendingProfileId, useGuardrailProfile, incomeSources);
     }
 }

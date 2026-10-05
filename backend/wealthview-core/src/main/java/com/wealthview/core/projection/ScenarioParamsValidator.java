@@ -21,6 +21,7 @@ final class ScenarioParamsValidator {
     private static final int MAX_LONGEVITY_CONDITIONAL_AGE = 110;
     private static final int MIN_BIRTH_MONTH = 1;
     private static final int MAX_BIRTH_MONTH = 12;
+    private static final BigDecimal MAX_HEIR_TAX_RATE = new BigDecimal("0.50");
 
     private ScenarioParamsValidator() {
     }
@@ -30,6 +31,7 @@ final class ScenarioParamsValidator {
         validateHouseholdFields(request);
         validateStochasticMortalityFields(request);
         validateBirthMonths(request);
+        validateHeirTaxRate(request.heirTaxRate());
     }
 
     /**
@@ -137,6 +139,16 @@ final class ScenarioParamsValidator {
         if (birthMonth < MIN_BIRTH_MONTH || birthMonth > MAX_BIRTH_MONTH) {
             throw new IllegalArgumentException(fieldName + " must be between " + MIN_BIRTH_MONTH
                     + " and " + MAX_BIRTH_MONTH);
+        }
+    }
+
+    /** Phase 1a: the heirs' assumed ordinary tax rate (when present) must be within 0 to 0.50 inclusive. */
+    private static void validateHeirTaxRate(BigDecimal heirTaxRate) {
+        if (heirTaxRate == null) {
+            return;
+        }
+        if (heirTaxRate.signum() < 0 || heirTaxRate.compareTo(MAX_HEIR_TAX_RATE) > 0) {
+            throw new IllegalArgumentException("heir_tax_rate must be between 0 and 0.50");
         }
     }
 }

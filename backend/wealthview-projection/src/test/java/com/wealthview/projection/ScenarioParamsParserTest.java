@@ -297,4 +297,34 @@ class ScenarioParamsParserTest {
     void earlyAccessAge_emptyParams_returns60() {
         assertThat(parser.earlyAccessAge(ScenarioParams.EMPTY)).isEqualTo(60);
     }
+
+    @Test
+    void heirTaxRate_absentFromParams_defaultsToPoint24() {
+        assertThat(parser.heirTaxRate(ScenarioParams.EMPTY)).isEqualByComparingTo("0.24");
+    }
+
+    @Test
+    void heirTaxRate_presentInParsedParams_returnsParsedValue() {
+        var params = parser.parseParams("{\"heir_tax_rate\": 0.32}");
+
+        assertThat(parser.heirTaxRate(params)).isEqualByComparingTo("0.32");
+    }
+
+    @Test
+    void heirTaxRate_explicitZero_isNotTreatedAsAbsent() {
+        var params = parser.parseParams("{\"heir_tax_rate\": 0}");
+
+        assertThat(parser.heirTaxRate(params)).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void heirTaxRate_legacyParamsJsonWithoutTheKey_resolvesDefault() {
+        // A scenario saved before Phase 1a: no heir_tax_rate key at all.
+        var params = parser.parseParams("""
+                {"birth_year": 1965, "withdrawal_rate": 0.04, "filing_status": "single"}
+                """);
+
+        assertThat(params.heirTaxRate()).isNull();
+        assertThat(parser.heirTaxRate(params)).isEqualByComparingTo("0.24");
+    }
 }

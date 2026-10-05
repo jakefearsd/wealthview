@@ -292,4 +292,15 @@ class ScenarioParamsTest {
         assertThat(params.birthMonth()).isNull();
         assertThat(params.spouseBirthMonth()).isNull();
     }
+
+    @Test
+    void heirTaxRate_roundTripsThroughSnakeCaseKey() throws Exception {
+        var params = ScenarioParams.from(ScenarioRequestBuilder.builder()
+                .withHeirTaxRate(new BigDecimal("0.32")).build());
+
+        var json = params.toJson(mapper);
+
+        assertThat(mapper.readTree(json).get("heir_tax_rate").decimalValue()).isEqualByComparingTo("0.32");
+        assertThat(ScenarioParams.parseOrEmpty(mapper, json).heirTaxRate()).isEqualByComparingTo("0.32");
+    }
 }

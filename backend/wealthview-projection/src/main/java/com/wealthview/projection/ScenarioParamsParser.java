@@ -45,6 +45,13 @@ final class ScenarioParamsParser {
      */
     static final BigDecimal DEFAULT_INTEREST_YIELD = new BigDecimal("0.04");
 
+    /**
+     * Phase 1a: ordinary tax rate assumed for heirs inheriting traditional dollars when a scenario
+     * doesn't set {@code heir_tax_rate} -- a typical rate for heirs in their peak earning years who
+     * must empty an inherited IRA within ten years.
+     */
+    public static final BigDecimal DEFAULT_HEIR_TAX_RATE = new BigDecimal("0.24");
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     ScenarioParams parseParams(@Nullable String paramsJson) {
@@ -68,6 +75,11 @@ final class ScenarioParamsParser {
     /** Resolves the effective interest yield, defaulting to {@link #DEFAULT_INTEREST_YIELD} when unset. */
     BigDecimal interestYield(ScenarioParams params) {
         return params.interestYield() != null ? params.interestYield() : DEFAULT_INTEREST_YIELD;
+    }
+
+    /** Resolves the effective heir tax rate, defaulting to {@link #DEFAULT_HEIR_TAX_RATE} when unset. */
+    BigDecimal heirTaxRate(ScenarioParams params) {
+        return params.heirTaxRate() != null ? params.heirTaxRate() : DEFAULT_HEIR_TAX_RATE;
     }
 
     /**
