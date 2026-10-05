@@ -25,6 +25,8 @@ import com.wealthview.core.projection.dto.ProjectionRunDetail;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.core.projection.dto.SpendingPlan;
+import com.wealthview.core.projection.dto.TaxSpaceYear;
+import com.wealthview.core.projection.dto.YearTaxPicture;
 import com.wealthview.core.projection.household.PersonId;
 import com.wealthview.core.projection.strategy.WithdrawalStrategy;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
@@ -36,6 +38,7 @@ import com.wealthview.core.projection.tax.SelfEmploymentTaxCalculator;
 import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
 import com.wealthview.core.projection.tax.StateTaxCalculatorFactory;
 import com.wealthview.core.projection.tax.TaxCalculationStrategy;
+import com.wealthview.core.projection.tax.TaxSpaceCalculator;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.annotation.Observed;
 
@@ -53,6 +56,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private static final BigDecimal DEFAULT_WITHDRAWAL_RATE = new BigDecimal("0.04");
     /** Medicare (and thus IRMAA) eligibility age -- Wave-4 IRMAA item. */
     private static final int MEDICARE_AGE = 65;
+    /** IRMAA statutory MAGI lookback: year Y's MAGI sets premiums in Y+2 (spec §1.2 IRMAA group). */
+    private static final int IRMAA_LOOKBACK_YEARS = 2;
     /**
      * Household task 5: the survivor spending factor assumed when a household scenario omits it (spec
      * §1 default). Only ever consulted once a first-death transition fires, so single-person and
@@ -101,6 +106,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private final MeterRegistry meterRegistry;
     @Nullable
     private final CapitalMarketAssumptionsProvider capitalMarketAssumptions;
+    /** Phase 1a: null omits tax-space computation (taxSpace stays empty; pictures still emitted). */
+    @Nullable
+    private final TaxSpaceCalculator taxSpaceCalculator;
 
     /**
      * Test-friendly constructor that omits capital-gains taxation, IRMAA, the meter registry
@@ -133,19 +141,32 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 null, null);
     }
 
-    @Autowired
+    /** Constructor without the tax-space calculator: {@code runDetailed().taxSpace()} stays empty. */
     public DeterministicProjectionEngine(@Nullable FederalTaxCalculator taxCalculator,
                                           @Nullable StateTaxCalculatorFactory stateTaxCalculatorFactory,
                                           @Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator,
                                           @Nullable IrmaaSurchargeCalculator irmaaSurchargeCalculator,
                                           @Nullable MeterRegistry meterRegistry,
                                           @Nullable CapitalMarketAssumptionsProvider capitalMarketAssumptions) {
+        this(taxCalculator, stateTaxCalculatorFactory, capitalGainsTaxCalculator, irmaaSurchargeCalculator,
+                meterRegistry, capitalMarketAssumptions, null);
+    }
+
+    @Autowired
+    public DeterministicProjectionEngine(@Nullable FederalTaxCalculator taxCalculator,
+                                          @Nullable StateTaxCalculatorFactory stateTaxCalculatorFactory,
+                                          @Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator,
+                                          @Nullable IrmaaSurchargeCalculator irmaaSurchargeCalculator,
+                                          @Nullable MeterRegistry meterRegistry,
+                                          @Nullable CapitalMarketAssumptionsProvider capitalMarketAssumptions,
+                                          @Nullable TaxSpaceCalculator taxSpaceCalculator) {
         this.taxStrategyFactory = new TaxStrategyFactory(taxCalculator, stateTaxCalculatorFactory);
         this.federalTaxCalculator = taxCalculator;
         this.capitalGainsTaxCalculator = capitalGainsTaxCalculator;
         this.irmaaSurchargeCalculator = irmaaSurchargeCalculator;
         this.meterRegistry = meterRegistry;
         this.capitalMarketAssumptions = capitalMarketAssumptions;
+        this.taxSpaceCalculator = taxSpaceCalculator;
         var rentalLossCalculator = new RentalLossCalculator();
         var ssTaxCalculator = new SocialSecurityTaxCalculator();
         var seTaxCalculator = new SelfEmploymentTaxCalculator();
@@ -335,10 +356,12 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         static final YearAccumulator INITIAL = new YearAccumulator(0, BigDecimal.ZERO, BigDecimal.ZERO, null, null);
     }
 
-    private record YearStepResult(ProjectionYearDto yearDto, YearAccumulator nextAccumulator) {}
+    private record YearStepResult(ProjectionYearDto yearDto, YearAccumulator nextAccumulator,
+                                  @Nullable YearTaxPicture taxPicture) {}
 
     private ProjectionRunDetail runProjection(ProjectionRunContext ctx) {
         var yearlyData = new ArrayList<ProjectionYearDto>();
+        var taxPictures = new ArrayList<YearTaxPicture>();
         var acc = YearAccumulator.INITIAL;
 
         // Household task 5 (transition step 6 — truncation): when the SECOND (survivor's) death falls
@@ -356,6 +379,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         for (int year = ctx.currentYear(); year < loopEndYear; year++) {
             var step = processYear(ctx, year, acc);
             yearlyData.add(step.yearDto());
+            if (step.taxPicture() != null) {
+                taxPictures.add(step.taxPicture());
+            }
             acc = step.nextAccumulator();
         }
 
@@ -370,8 +396,17 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         BigDecimal finalNetWorth = yearlyData.isEmpty() ? null : yearlyData.getLast().totalNetWorth();
         var result = new ProjectionResultResponse(ctx.input().scenarioId(), yearlyData, finalBalance,
                 acc.yearsInRetirement(), feasibility, finalNetWorth);
-        return new ProjectionRunDetail(result, List.of(), List.of(),
+        return new ProjectionRunDetail(result, List.copyOf(taxPictures),
+                computeTaxSpace(taxPictures, ctx.taxStrategy()),
                 TerminalValueResolver.resolve(yearlyData, ctx.input().household(), ctx.heirTaxRate()));
+    }
+
+    private List<TaxSpaceYear> computeTaxSpace(List<YearTaxPicture> pictures,
+                                               @Nullable TaxCalculationStrategy taxStrategy) {
+        if (taxSpaceCalculator == null || taxStrategy == null) {
+            return List.of();
+        }
+        return pictures.stream().map(p -> taxSpaceCalculator.compute(p, taxStrategy)).toList();
     }
 
     private YearStepResult processYear(ProjectionRunContext ctx, int year, YearAccumulator acc) {
@@ -506,8 +541,45 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         BigDecimal magiThisYear = comp.effectiveOtherIncome().add(conversionAmount)
                 .add(wdFromTraditional).add(comp.realizedLtcgIncome()).add(comp.ordinaryInterestIncome());
 
+        YearTaxPicture taxPicture = retired
+                ? buildTaxPicture(ctx, year, age, comp, magiThisYear, selfEmploymentTax)
+                : null;
+
         return new YearStepResult(yearDto, new YearAccumulator(yearsInRetirement, previousWithdrawal, suspendedLoss,
-                magiThisYear, acc.magiYearMinus1()));
+                magiThisYear, acc.magiYearMinus1()), taxPicture);
+    }
+
+    /**
+     * Phase 1a (spec §1.1): the year's realized income/tax figures, captured for the tax-space
+     * calculator and its reconciliation guard. {@code chargedOrdinaryAndStateTax} is the ordinary +
+     * state slice of taxLiability -- the same split RetirementTaxAnnotator reconciles (LTCG, SE tax
+     * and the early-withdrawal penalty are the three additive federal components outside it).
+     * Ages follow the tax strategies' convention: the filer's age (primary while alive, else the
+     * survivor's) plus the spouse's only while both are alive AND filing jointly.
+     */
+    private static YearTaxPicture buildTaxPicture(ProjectionRunContext ctx, int year, int age,
+                                                  YearFinanceResolver.YearComputation comp,
+                                                  BigDecimal magi, BigDecimal selfEmploymentTax) {
+        var household = ctx.input().household();
+        var status = ctx.pool().getFilingStatus();
+        int filerAge = household != null ? household.filerAgeIn(year) : age;
+        Integer spouseAge = household != null && status == FilingStatus.MARRIED_FILING_JOINTLY
+                ? household.secondFilerAgeIn(year) : null;
+        int premiumYear = year + IRMAA_LOOKBACK_YEARS;
+        int medicareCountInPremiumYear = household != null
+                ? household.age65QualifyingCount(premiumYear)
+                : premiumYear - ctx.birthYear() >= MEDICARE_AGE ? 1 : 0;
+        var isResult = comp.isResult();
+        BigDecimal ssBenefit = isResult != null ? isResult.socialSecurityBenefit() : BigDecimal.ZERO;
+        BigDecimal netRental = isResult != null ? isResult.netRentalTaxableIncome() : BigDecimal.ZERO;
+        BigDecimal ssTaxable = comp.socialSecurityTaxable();
+        BigDecimal chargedOrdinaryAndState = comp.taxLiability().subtract(comp.ltcgTax())
+                .subtract(selfEmploymentTax).subtract(comp.earlyWithdrawalPenalty());
+        return new YearTaxPicture(year, status, filerAge, spouseAge,
+                comp.effectiveOtherIncome().subtract(ssTaxable), ssBenefit, ssTaxable,
+                comp.wdFromTraditional(), comp.conversionAmount(), comp.ordinaryInterestIncome(),
+                comp.realizedLtcgIncome(), magi, netRental, chargedOrdinaryAndState, comp.ltcgTax(),
+                Math.max(0, year - ctx.currentYear()), ctx.inflationRate(), medicareCountInPremiumYear);
     }
 
 }
