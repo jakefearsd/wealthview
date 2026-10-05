@@ -34,6 +34,11 @@ final class GuardrailResponseBuilder {
     /** Tolerance (dollars) for detecting a floor clamp (audit C6) past floating-point noise. */
     private static final double FLOOR_CLAMP_EPSILON = 1e-6;
 
+    /** One cent below the conversion's top dollar, so a conversion that exactly fills a bracket
+     * reports THAT bracket, not the next one ({@link OrdinaryTaxTable#rateAt} is the rate on the
+     * NEXT dollar). */
+    private static final double TOP_DOLLAR_EPSILON = 0.01;
+
     private final TrialPassRunner trialPassRunner;
 
     GuardrailResponseBuilder(TrialSimulator trialSimulator) {
@@ -363,10 +368,13 @@ final class GuardrailResponseBuilder {
             return null;
         }
         var convYears = new ArrayList<ConversionYearDetail>();
+        OrdinaryTaxTable[] ordinaryTables = ctx.taxIncome().ordinaryTaxTableByYear();
         for (int y = 0; y < ctx.sim().years(); y++) {
             int age = ctx.sim().retirementAge() + y;
             int calendarYear = ctx.sim().retirementYear() + y;
             if (convSchedule.conversionByYear()[y] > 0) {
+                double grossWithConversion = ctx.taxIncome().taxableIncomeByYear()[y]
+                        + convSchedule.conversionByYear()[y];
                 convYears.add(new ConversionYearDetail(
                         calendarYear, age,
                         toBD(convSchedule.conversionByYear()[y]),
@@ -375,9 +383,8 @@ final class GuardrailResponseBuilder {
                         toBD(convSchedule.rothBalance()[y]),
                         toBD(convSchedule.projectedRmd()[y]),
                         toBD(ctx.taxIncome().incomeByYear()[y]),
-                        toBD(ctx.taxIncome().taxableIncomeByYear()[y]
-                                + convSchedule.conversionByYear()[y]),
-                        null));
+                        toBD(grossWithConversion),
+                        bracketLabel(ordinaryTables != null ? ordinaryTables[y] : null, grossWithConversion)));
             }
         }
         return new RothConversionScheduleResponse(
@@ -407,6 +414,18 @@ final class GuardrailResponseBuilder {
             }
         }
         return "Retirement";
+    }
+
+    /** D4 (Phase 1a): the marginal federal bracket of a conversion's last dollar as a percent label,
+     * e.g. {@code "12%"}; {@code "0%"} when the conversion stays inside the standard deduction;
+     * {@code null} when the run has no per-year ordinary tax table. */
+    @Nullable
+    static String bracketLabel(@Nullable OrdinaryTaxTable table, double grossIncomeWithConversion) {
+        if (table == null) {
+            return null;
+        }
+        double rate = table.rateAt(Math.max(0, grossIncomeWithConversion - TOP_DOLLAR_EPSILON));
+        return Math.round(rate * 100) + "%";
     }
 
     private static double percentile(double[] sorted, double p) {
