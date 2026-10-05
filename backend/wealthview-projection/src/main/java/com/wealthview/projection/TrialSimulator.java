@@ -599,8 +599,8 @@ final class TrialSimulator {
             // Withdraw from pools + handle cash reserve. The taxable spending sale realizes a FIFO
             // long-term gain (returned via WithdrawalOutcome.realizedGain()); secondary taxable
             // sales — the withdrawal-tax payment and cash-reserve replenishment — sell FIFO to keep
-            // the lots in sync but their gain is deliberately discarded (untaxed), matching the
-            // deterministic MultiPool's second-order exclusion.
+            // the lots in sync and accumulate their gain on TrialPools for this year's LTCG (D5),
+            // matching the deterministic MultiPool's tax-funding-sale treatment.
             double cashBeforeWithdrawals = cashBalance;
             WithdrawalOutcome outcome = applyTrialWithdrawals(tp,
                     cashBalance, drawn, withdrawalTax, withdrawal, spending, hasPools,
@@ -820,7 +820,7 @@ final class TrialSimulator {
     /**
      * Seeds the cash-reserve bucket from the first year's spending, drawing it out of the pools in
      * order (taxable, traditional, roth). The taxable draw is mirrored on the lots to keep the value
-     * invariant; its gain is a pre-retirement carve-out left untaxed. Returns the initial cash
+     * invariant; its gain is taxed with year 0's LTCG (D5). Returns the initial cash
      * balance (0 when no cash reserve is configured). {@code seedFactor} is the survivor spending
      * factor at year 0 (task 6) -- 1.0 on every path except the stochastic corner where the first
      * death lands at retirement, so this is byte-identical to the pre-task-6 seed elsewhere.
@@ -834,7 +834,7 @@ final class TrialSimulator {
         double annualSpending = (floors[0] + discretionary[0]) * seedFactor;
         double cashBalance = annualSpending * config.cashReserveYears();
         double cashFromTaxable = Math.min(cashBalance, tp.taxable());
-        tp.sellTaxable(cashFromTaxable);
+        tp.sellTaxableForTax(cashFromTaxable);
         double remaining = cashBalance - cashFromTaxable;
         if (remaining > 0) {
             // Household task 6: draw from traditional (proportional across owners), then Roth for any
@@ -909,7 +909,8 @@ final class TrialSimulator {
 
     /**
      * Applies the long-term capital-gains tax on this year's realized spending gain plus qualified
-     * dividend, exactly (audit C5) via {@code ltcgTable}, evaluated at the ACTUAL full ordinary
+     * dividend plus (D5) the accumulated gain of every tax-funding/cash-reserve sale -- see
+     * {@link #ltcgTaxForYear} -- exactly (audit C5) via {@code ltcgTable}, evaluated at the ACTUAL full ordinary
      * stack for this trial-year ({@code ordinaryStack} = base income + actual capped Roth
      * conversion + actual traditional spending draw + forced RMD excess) -- fixing the old
      * {@code LtcgRateCalculator}'s omission of every same-year draw from the floor it probed,
@@ -930,17 +931,46 @@ final class TrialSimulator {
                                       double dividendIncome, LtcgTaxTable ltcgTable,
                                       double ordinaryStack, OrdinaryTaxTable ordinaryTable,
                                       double netRentalIncome) {
-        if (ltcgTable == null) {
-            return;
-        }
-        double ltcgIncome = realizedGain + dividendIncome;
-        if (ltcgIncome <= 0) {
-            return;
-        }
-        double ltcgTax = ltcgTable.taxAt(Math.max(0, ordinaryStack), ltcgIncome, netRentalIncome);
+        double ltcgTax = ltcgTaxForYear(tp, realizedGain, dividendIncome, ltcgTable, ordinaryStack,
+                netRentalIncome);
         if (ltcgTax > 0) {
             deductTaxFromPoolsGrossedUp(ltcgTax, tp, ordinaryTable, ordinaryStack);
         }
+        // The LTCG bill's own funding sale was priced inside ltcgTaxForYear; discard what that drain
+        // just accumulated so it is not carried into next year.
+        tp.drainTaxSaleGain();
+    }
+
+    /**
+     * D5: this trial-year's LTCG tax on the spending sale's {@code realizedGain} + qualified
+     * {@code dividendIncome} + every non-spending taxable sale's accumulated gain (drained from
+     * {@code tp}; a net loss floors LTCG income at zero), INCLUDING the gain of the sale that will
+     * fund this bill -- closed form {@code sale = tax / (1 - r)} from one measured chord {@code r}, with
+     * the tax re-priced at the jump's gain (no further polish passes: the hot-loop budget; the
+     * deterministic engine polishes up to 3 times). A
+     * {@code null} table returns 0 (the accumulator is still drained).
+     */
+    static double ltcgTaxForYear(TrialPools tp, double realizedGain, double dividendIncome,
+                                 @Nullable LtcgTaxTable ltcgTable, double ordinaryStack, double netRentalIncome) {
+        double ltcgIncome = Math.max(0, realizedGain + tp.drainTaxSaleGain() + dividendIncome);
+        if (ltcgTable == null || ltcgIncome <= 0) {
+            return 0;
+        }
+        double stack = Math.max(0, ordinaryStack);
+        double tax = ltcgTable.taxAt(stack, ltcgIncome, netRentalIncome);
+        double taxableAvail = Math.max(0, tp.taxable());
+        double sale0 = Math.min(tax, taxableAvail);
+        if (sale0 <= 0) {
+            return tax;
+        }
+        double gain0 = tp.peekTaxableSaleGain(sale0);
+        if (gain0 <= 0) {
+            return tax;
+        }
+        double taxPerSaleDollar = (ltcgTable.taxAt(stack, ltcgIncome + gain0, netRentalIncome) - tax) / sale0;
+        double warmSale = Math.min(tax / (1 - Math.min(Math.max(taxPerSaleDollar, 0), GROSS_UP_RATE_CAP)),
+                taxableAvail);
+        return ltcgTable.taxAt(stack, ltcgIncome + tp.peekTaxableSaleGain(warmSale), netRentalIncome);
     }
 
     /** Bundles {@link #simulateTrial}'s remaining per-year array-or-default lookups (dynamic-
@@ -1056,7 +1086,7 @@ final class TrialSimulator {
         }
         if (age < earlyAccessAge) {
             double taxPaid = Math.min(actualTax, Math.max(0, tp.taxable()));
-            tp.sellTaxable(taxPaid);   // conversion-tax sale synced; gain untaxed (second-order)
+            tp.sellTaxableForTax(taxPaid);   // D5: conversion-tax sale gain taxed with this year's LTCG
         } else {
             tp.deductTaxFromPools(actualTax);
         }

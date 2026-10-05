@@ -58,6 +58,11 @@ final class TrialPools {
      * {@link #pools}. */
     private final TaxableLots lots;
 
+    /** D5: realized FIFO gain of this trial-year's NON-spending taxable sales (tax cascades,
+     * pre-60 conversion-tax sale, cash-reserve seed/refill), drained once per year by
+     * {@link TrialSimulator#ltcgTaxForYear}. Negative for loss lots. */
+    private double taxSaleGain;
+
     // ArrayIsStoredDirectly: pools is a fresh 5-element array the caller (TrialPools.seed, or a
     // test constructing a fixture directly) hands off exclusively for this trial's exclusive
     // mutation -- the same "engine-internal, not attacker-controlled, one-per-trial" contract as
@@ -187,12 +192,33 @@ final class TrialPools {
      * Debits {@code amount} from the joint-taxable pool AND sells the same amount FIFO from
      * {@link #lots} in one lockstep call -- the recurring pattern (spending sale, tax-payment sale,
      * cash-reserve churn) that keeps the value invariant {@code lots.totalValue() ==
-     * pools[JOINT_TAXABLE]} intact by construction. Returns the realized FIFO gain; several callers
-     * deliberately discard it (second-order tax-payment/churn sales are untaxed by design).
+     * pools[JOINT_TAXABLE]} intact by construction. Returns the realized FIFO gain; spending-sale
+     * callers tax it directly, while tax-payment and cash-reserve sales use {@link #sellTaxableForTax}
+     * (D5).
      */
     double sellTaxable(double amount) {
         pools[JOINT_TAXABLE] -= amount;
         return lots.sellFifo(amount);
+    }
+
+    /** D5: {@link #sellTaxable} for a tax-payment or cash-reserve sale -- the realized gain is
+     * accumulated for this year's LTCG instead of being discarded. */
+    double sellTaxableForTax(double amount) {
+        double gain = sellTaxable(amount);
+        taxSaleGain += gain;
+        return gain;
+    }
+
+    /** D5: returns and resets the accumulated tax-sale gain. */
+    double drainTaxSaleGain() {
+        double drained = taxSaleGain;
+        taxSaleGain = 0;
+        return drained;
+    }
+
+    /** D5: the gain {@link #sellTaxable} WOULD realize for {@code amount}; mutates nothing. */
+    double peekTaxableSaleGain(double amount) {
+        return lots.peekFifoGain(amount);
     }
 
     /** Credits {@code amount} to the joint-taxable pool AND adds it as a fresh at-cost lot --
@@ -203,14 +229,14 @@ final class TrialPools {
     }
 
     /**
-     * Debits {@code amount} from the joint-taxable pool (via {@link #sellTaxable}, gain discarded --
-     * second-order churn), then spills any resulting negative balance into traditional
+     * Debits {@code amount} from the joint-taxable pool (via {@link #sellTaxableForTax}, gain
+     * accumulated for this year's LTCG -- D5), then spills any resulting negative balance into traditional
      * (proportional across owners, household task 6) and clamps taxable back to 0. Used by the
      * up-market cash-reserve replenishment draw, which can overdraw taxable when the target cash
      * level exceeds what taxable alone can fund.
      */
     void debitTaxableWithTraditionalSpillover(double amount) {
-        sellTaxable(amount);
+        sellTaxableForTax(amount);
         if (pools[JOINT_TAXABLE] < 0) {
             debitPair(TRAD_P, TRAD_S, -pools[JOINT_TAXABLE]);
             pools[JOINT_TAXABLE] = 0;
@@ -317,13 +343,13 @@ final class TrialPools {
     /**
      * Deducts a tax amount from pools in order taxable → traditional → roth via
      * {@link #deductCascade5}, mirroring the taxable-first FIFO-lot sale on {@link #lots} to preserve
-     * the value invariant (the realized gain is a second-order tax-payment sale, deliberately
-     * untaxed). No gross-up (that stays in {@link TrialSimulator}).
+     * the value invariant (the realized gain is accumulated for this year's LTCG -- D5). No gross-up
+     * (that stays in {@link TrialSimulator}).
      */
     void deductTaxFromPools(double tax) {
         double taxableSold = deductCascade5(tax);
         if (taxableSold > 0) {
-            lots.sellFifo(taxableSold);
+            taxSaleGain += lots.sellFifo(taxableSold);
         }
     }
 

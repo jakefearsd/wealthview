@@ -115,6 +115,9 @@ class TrialSimulatorReturnTest {
         // (40% embedded gain). Spend 500 -> a FIFO half-lot sale realizes gain 500 - 600*(500/1000)
         // = 200. LTCG rate 0.15 -> tax 30, paid taxable-first. Final = (1000 - 500) - 30 = 470
         // (vs 500 with no LTCG tax: the 30 is exactly the extra cash the capital-gains tax removes).
+        // D5 (Phase 1a): the 30 is itself paid by selling the remaining 500 value / 300 basis lot (40%
+        // gain), and that gain is taxed at 15% too: T = 30 / (1 - 0.15 * 0.4) = 31.9149 ->
+        // final = 500 - 31.9149 = 468.0851 (was 470).
         double[] flatNoReturn = {0.0};
         var config = TrialSimulator.SimulationConfig.builder(1000.0, 0.0, 0.0, "taxable_first")
                 .retirementAge(62)
@@ -126,7 +129,7 @@ class TrialSimulatorReturnTest {
         var result = simulator.simulateTrial(
                 new double[]{0}, new double[]{0}, new double[]{500}, new double[]{0}, 1, config);
 
-        assertThat(result.finalBalance()).isEqualTo(470.0, within(1e-6));
+        assertThat(result.finalBalance()).isEqualTo(468.0851063829787, within(1e-6));   // D5 (Phase 1a): was 470
     }
 
     @Test
@@ -134,6 +137,8 @@ class TrialSimulatorReturnTest {
         // 1 year, taxable +10%, dividend yield 2%, no withdrawal. The pool still grows to 1100
         // (dividend booked as residual), but the 2% dividend (20) is qualified-dividend income taxed
         // at the 0.15 LTCG rate -> 3 leaves the portfolio. Final = 1100 - 3 = 1097 (dividend drag).
+        // D5 (Phase 1a): the 3 is paid by selling the oldest lot (1080 value / 1000 basis, 7.407% gain),
+        // taxed at 15% too: 3 / (1 - 0.15 * 80/1080) = 3.0337 -> final 1096.9663 (was 1097).
         var config = TrialSimulator.SimulationConfig.builder(1000.0, 0.0, 0.0, "taxable_first")
                 .retirementAge(62)
                 .returns(new double[]{0.10}, new double[]{0.0}, new double[]{0.0})
@@ -145,7 +150,7 @@ class TrialSimulatorReturnTest {
         var result = simulator.simulateTrial(
                 new double[]{0}, new double[]{0}, new double[]{0}, new double[]{0}, 1, config);
 
-        assertThat(result.finalBalance()).isEqualTo(1097.0, within(1e-6));
+        assertThat(result.finalBalance()).isEqualTo(1096.9662921348315, within(1e-6));   // D5 (Phase 1a): was 1097
     }
 
     // === Audit C1: bond-sleeve interest is split from the qualified-dividend yield and taxed
@@ -191,7 +196,7 @@ class TrialSimulatorReturnTest {
         var result = simulator.simulateTrial(
                 new double[]{0}, new double[]{0}, new double[]{0}, new double[]{0}, 1, config);
 
-        assertThat(result.finalBalance()).isEqualTo(1097.0, within(1e-6));
+        assertThat(result.finalBalance()).isEqualTo(1096.9662921348315, within(1e-6));   // D5 (Phase 1a): was 1097
     }
 
     @Test
@@ -663,7 +668,9 @@ class TrialSimulatorReturnTest {
         // (1,219.512195) leaks, net 10,975.609756 reinvested -> taxable 100,975.609756. LTCG 750
         // drains taxable -> 100,225.609756. Final = 100,225.609756 + 287,804.878049 =
         // 388,030.487805 (pre-fix: 388,780.487805, the 750 LTCG never charged).
-        assertThat(result.finalBalance()).isEqualTo(388_030.487805, within(1e-4));
+        // D5 (Phase 1a): the 750 is paid by selling the oldest lot (90k value / 45k basis, 50% gain), whose
+        // gain is taxed at 15% too: T = 750 / (1 - 0.15 * 0.5) = 810.81 -> 387,969.676994 (was 388,030.487805).
+        assertThat(result.finalBalance()).isEqualTo(387_969.676994, within(1e-4));
     }
 
     // === T18a-4: 10% IRC 72(t) early-withdrawal penalty on pre-59½ traditional distributions ===
