@@ -23,6 +23,7 @@ import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -760,6 +761,35 @@ class IncomeSourceProcessorTest {
 
         assertThat(result.socialSecurityTaxable()).isEqualByComparingTo("11300");
         assertThat(result.totalTaxableIncome()).isEqualByComparingTo("41300");
+    }
+
+    // --- Phase 1a: gross combined Social Security benefit for the tax-space picture ---
+
+    @Test
+    void process_socialSecuritySource_reportsGrossCombinedBenefit() {
+        var ss = makeSource(IncomeSourceType.SOCIAL_SECURITY, new BigDecimal("30000"), 62, null,
+                BigDecimal.ZERO, "taxable");
+        when(ssTaxCalculator.computeTaxableAmount(any(), any(), any(), anyInt(), any()))
+                .thenReturn(new BigDecimal("5000"));
+
+        var result = processor.process(
+                List.of(ss), 70, 1, 2030,
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO, 0);
+
+        assertThat(result.socialSecurityBenefit()).isEqualByComparingTo("30000");
+        assertThat(result.socialSecurityTaxable()).isEqualByComparingTo("5000");
+    }
+
+    @Test
+    void process_noSocialSecuritySource_reportsZeroBenefit() {
+        var pension = makeSource(IncomeSourceType.PENSION, new BigDecimal("20000"), 60, null,
+                BigDecimal.ZERO, "taxable");
+
+        var result = processor.process(
+                List.of(pension), 70, 1, 2030,
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO, 0);
+
+        assertThat(result.socialSecurityBenefit()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
     private static ProjectionIncomeSourceInput makeSourceWithOwner(

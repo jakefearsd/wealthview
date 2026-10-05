@@ -45,6 +45,10 @@ class IncomeSourceProcessor {
      * separately here so callers can thread it into the NIIT Net Investment Income base without
      * re-deriving it from {@code rentalPropertyDetails}). May be negative when a net rental LOSS
      * was allowed against non-passive income. Zero when no rental sources are active.
+     *
+     * <p>{@code socialSecurityBenefit} (Phase 1a) is the GROSS combined Social Security benefit paid
+     * this year (all SS sources summed), alongside the taxable share {@code socialSecurityTaxable}.
+     * Zero when no Social Security source is active.
      */
     record IncomeSourceYearResult(
             BigDecimal totalCashInflow,
@@ -58,7 +62,8 @@ class IncomeSourceProcessor {
             BigDecimal selfEmploymentTax,
             Map<String, BigDecimal> incomeBySource,
             List<RentalPropertyYearDetail> rentalPropertyDetails,
-            BigDecimal netRentalTaxableIncome
+            BigDecimal netRentalTaxableIncome,
+            BigDecimal socialSecurityBenefit
     ) {}
 
     /**
@@ -131,7 +136,7 @@ class IncomeSourceProcessor {
             return new IncomeSourceYearResult(
                     BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
                     BigDecimal.ZERO, BigDecimal.ZERO, priorSuspendedLoss, BigDecimal.ZERO, BigDecimal.ZERO,
-                    Map.of(), List.of(), BigDecimal.ZERO);
+                    Map.of(), List.of(), BigDecimal.ZERO, BigDecimal.ZERO);
         }
 
         BigDecimal totalCashInflow = BigDecimal.ZERO;
@@ -219,7 +224,8 @@ class IncomeSourceProcessor {
                 totalCashInflow, totalTaxableIncome,
                 rentalIncomeGross, rentalExpensesTotal, depreciationTotal,
                 rentalLossApplied, suspendedLoss, combinedSsTaxable, seTax,
-                Map.copyOf(incomeBySource), List.copyOf(rentalDetails), netRentalTaxableIncome);
+                Map.copyOf(incomeBySource), List.copyOf(rentalDetails), netRentalTaxableIncome,
+                ssBenefit);
     }
 
     // --- Per-type result records ---
