@@ -61,7 +61,7 @@ export default function ScenarioHouseholdSection({ fields, setField, onSpouseBir
                     <>
                         <FormField
                             label="Spouse Birth Month"
-                            helpText="Optional. Makes the spouse's 59½ and Medicare dates exact. Blank uses whole-year ages."
+                            helpText="Optional. Stored for upcoming Medicare timing. Early-withdrawal (59½) timing currently follows your (primary) birth month."
                         >
                             <select
                                 style={inputStyle}

@@ -31,7 +31,7 @@ function irmaa(y: TaxSpaceYear): string {
 
 const EXPLAINERS: [string, string][] = [
     ['MAGI', 'Modified adjusted gross income — the figure ACA credits, IRMAA and the NIIT key off.'],
-    ['Bracket / Room to top', 'Your ordinary-income bracket and how much more income fits before the next one.'],
+    ['Bracket / Room to top', 'Your marginal ordinary-income bracket and how much more income fits before the top of the current bracket (named under the amount; below the standard deduction the bracket shows 0% while the room runs to the top of the 10% bracket).'],
     ['0% capital-gains room', 'Long-term gains or qualified dividends you could still realize at a 0% federal rate.'],
     ['SS zone', 'How much extra Social Security becomes taxable for each extra $1 of ordinary income.'],
     ['NIIT headroom', 'Distance to the 3.8% net investment income tax threshold (negative = over it).'],
@@ -76,7 +76,14 @@ export default function TaxSpaceTab({ taxSpace }: TaxSpaceTabProps) {
                                 <td style={td}>{y.age}</td>
                                 <td style={td}>{money(y.magi)}</td>
                                 <td style={td}>{pct(y.marginal_ordinary_rate)}</td>
-                                <td style={td}>{money(y.bracket_room[0]?.room)}</td>
+                                <td style={td}>
+                                    {money(y.bracket_room[0]?.room)}
+                                    {y.bracket_room[0] && (
+                                        <span style={{ display: 'block', fontSize: '0.75rem', color: '#888' }}>
+                                            to top of {pct(y.bracket_room[0].rate)}
+                                        </span>
+                                    )}
+                                </td>
                                 <td style={td}>{money(y.ltcg_zero_room)}</td>
                                 <td style={td}>{ssZone(y.ss_inclusion_rate)}</td>
                                 <td style={{ ...td, color: y.niit_headroom < 0 ? '#d32f2f' : undefined }}>

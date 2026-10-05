@@ -45,8 +45,29 @@ describe('TaxSpaceTab', () => {
         expect(within(row).getByText('$70,000')).toBeInTheDocument();
         expect(within(row).getAllByText('12.0%').length).toBeGreaterThanOrEqual(2);
         expect(within(row).getByText('$56,700')).toBeInTheDocument();
+        expect(within(row).getByText('to top of 12.0%')).toBeInTheDocument();
         expect(within(row).getByText('$26,700')).toBeInTheDocument();
         expect(within(row).getByText('$180,000')).toBeInTheDocument();
+    });
+
+    it('names the bracket the room is measured to when income sits below the deduction (0% marginal, 10% room)', () => {
+        render(<TaxSpaceTab taxSpace={[makeYear({
+            magi: 8000,
+            marginal_ordinary_rate: 0,
+            bracket_room: [{ rate: 0.10, gross_ceiling: 29200, room: 21200 }],
+        })]} />);
+
+        const row = screen.getByRole('row', { name: /2031/ });
+        expect(within(row).getAllByText('0.0%').length).toBeGreaterThanOrEqual(1);
+        expect(within(row).getByText('$21,200')).toBeInTheDocument();
+        expect(within(row).getByText('to top of 10.0%')).toBeInTheDocument();
+    });
+
+    it('omits the room suffix when there is no bracket room data', () => {
+        render(<TaxSpaceTab taxSpace={[makeYear({ bracket_room: [] })]} />);
+
+        const row = screen.getByRole('row', { name: /2031/ });
+        expect(within(row).queryByText(/to top of/)).not.toBeInTheDocument();
     });
 
     it('shows dashes when Social Security and IRMAA do not apply', () => {

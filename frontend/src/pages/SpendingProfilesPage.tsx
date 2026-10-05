@@ -325,7 +325,7 @@ export default function SpendingProfilesPage() {
                                         />
                                         <StatTile
                                             label="Cash Buffer"
-                                            value={`${g.cash_reserve_years ?? 2}yr reserve, ${((g.cash_return_rate ?? 0.04) * 100).toFixed(1)}% cash rate`}
+                                            value={`${g.cash_reserve_years ?? 2}yr reserve, ${((g.cash_return_rate ?? 0.015) * 100).toFixed(1)}% cash rate`}
                                         />
                                         <StatTile
                                             label="Balance Range (P10-P50)"
