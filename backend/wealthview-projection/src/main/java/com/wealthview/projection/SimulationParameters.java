@@ -2,6 +2,8 @@ package com.wealthview.projection;
 
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.household.AgeMilestones;
+
 /**
  * MC simulation run parameters — how many trials, over what time horizon, with what returns.
  *
@@ -58,7 +60,9 @@ record SimulationParameters(
         // precomputed survivor regimes for the SEPARATE stochastic evaluation pass
         // ({@link StochasticMortalityEvaluator}). {@code null} unless the run opted into stochastic
         // mortality; the recommendation flow never reads it, so the fixed-death engine is byte-identical.
-        @Nullable StochasticEvalArrays stochasticEval
+        @Nullable StochasticEvalArrays stochasticEval,
+        // Phase 1a: first penalty-free age, resolved once from the birth month (AgeMilestones).
+        int earlyAccessAge
 ) {
 
     /**
@@ -70,6 +74,7 @@ record SimulationParameters(
     static SimulationParameters emptyHorizon(int retirementYear, int retirementAge, int endAge,
                                              int years, int rmdStartAge) {
         return new SimulationParameters(retirementYear, retirementAge, endAge, years, 0, 0, 0,
-                null, null, null, null, rmdStartAge, 0, 0, 0, 0, 1, 1.0, null, null, null);
+                null, null, null, null, rmdStartAge, 0, 0, 0, 0, 1, 1.0, null, null, null,
+                AgeMilestones.LEGACY_EARLY_ACCESS_AGE);
     }
 }

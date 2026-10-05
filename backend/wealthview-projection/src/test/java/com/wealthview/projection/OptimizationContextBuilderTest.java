@@ -440,4 +440,22 @@ class OptimizationContextBuilderTest {
                 .withInterestYield(interestYield)
                 .build();   // household task 6: single-person
     }
+
+    @Test
+    void build_birthMonthMarch_resolvesEarlyAccessAge59() {
+        var input = GuardrailOptimizationInputBuilder.builder().withBirthMonth(3).build();
+
+        var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        assertThat(setup.sim().earlyAccessAge()).isEqualTo(59);
+    }
+
+    @Test
+    void build_birthMonthAbsent_resolvesLegacyEarlyAccessAge60() {
+        var input = GuardrailOptimizationInputBuilder.builder().withBirthMonth(null).build();
+
+        var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        assertThat(setup.sim().earlyAccessAge()).isEqualTo(60);
+    }
 }

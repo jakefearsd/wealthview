@@ -37,7 +37,9 @@ record RothConversionConfig(
         double dynamicSequencingBracketRate,
         int years,
         int rmdStartAge,
-        RentalAdjustmentCalculator rentalAdjustmentCalculator) {
+        RentalAdjustmentCalculator rentalAdjustmentCalculator,
+        // Phase 1a: first penalty-free age (AgeMilestones; legacy 60).
+        int earlyAccessAge) {
 
     RothConversionConfig {
         otherIncomeByYear = Arrays.copyOf(otherIncomeByYear, otherIncomeByYear.length);

@@ -1106,7 +1106,7 @@ class RothConversionOptimizerTest {
 
     @Test
     void optimize_ageAbove60_noAffordabilityConstraint() {
-        // Retiree at age 62 (above EARLY_WITHDRAWAL_AGE=60) — affordability constraint
+        // Retiree at age 62 (above the legacy early-access age 60, no birth month) — affordability constraint
         // does NOT apply. Even with small taxable balance, conversions proceed because
         // the deductCascade can use traditional/roth to pay tax post-60.
         var optimizer = testBuilder()

@@ -2,6 +2,8 @@ package com.wealthview.projection;
 
 import org.junit.jupiter.api.Test;
 
+import com.wealthview.core.projection.household.AgeMilestones;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
@@ -39,7 +41,7 @@ class TrialSimulatorStochasticTest {
                 cashReserveYears, 0.0, true,
                 taxRet, tradRet, rothRet, rmdStartAge,
                 initTaxableBasis, ltcg, 0.0, null, null, 0.0, 1.0, household,
-                regimes, survivorFactor);
+                regimes, survivorFactor, AgeMilestones.LEGACY_EARLY_ACCESS_AGE);
     }
 
     /** A survivor regime carrying only per-year income + a flat ordinary table (the LTCG/DS/rental

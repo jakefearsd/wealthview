@@ -105,6 +105,10 @@ final class SustainabilitySearch {
             return setup.sim().retirementAge();
         }
 
+        int earlyAccessAge() {
+            return setup.sim().earlyAccessAge();
+        }
+
         int years() {
             return setup.sim().years();
         }
@@ -475,7 +479,7 @@ final class SustainabilitySearch {
                 .taxTables(poolSetup.simPools() ? ctx.taxCtx().ordinaryTaxTableByYear() : null,
                         poolSetup.simPools() ? ctx.taxCtx().ordinaryBaseIncomeByYear() : null)
                 .conversions(ctx.conversionByYear(), ctx.conversionTaxByYear())
-                .ages(ctx.retirementAge(), ctx.rmdStartAge())
+                .ages(ctx.retirementAge(), ctx.rmdStartAge(), ctx.earlyAccessAge())
                 .dsBracketCeilingByYear(ctx.dsBracketCeilingByYear())
                 .cashReserve(ctx.cashReserveYears(), ctx.cashReturnRate())
                 .returns(ctx.taxableReturns(), ctx.traditionalReturns(), ctx.rothReturns())

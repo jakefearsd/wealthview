@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import com.wealthview.core.projection.household.AgeMilestones;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
@@ -48,7 +49,7 @@ class ConversionSimulatorWithdrawalOrderTest {
     private static final double ESSENTIAL_FLOOR = 40_000;
     private static final double TAX_RATE = 0.20;
     private static final int BIRTH_YEAR = 1960; // RMD start age 75
-    private static final int RETIREMENT_AGE = 65; // >= RetirementAges.EARLY_WITHDRAWAL_AGE, < 75
+    private static final int RETIREMENT_AGE = 65; // >= the legacy early-access age (60), < 75
 
     private FederalTaxCalculator flatRateTaxCalculator() {
         var calc = mock(FederalTaxCalculator.class);
@@ -75,7 +76,7 @@ class ConversionSimulatorWithdrawalOrderTest {
                 FilingStatus.SINGLE, flatRateTaxCalculator(),
                 withdrawalOrder, 0.10, 0.0,
                 endAge - RETIREMENT_AGE, RmdCalculator.rmdStartAge(BIRTH_YEAR),
-                rentalCalc);
+                rentalCalc, AgeMilestones.LEGACY_EARLY_ACCESS_AGE);
 
         return new ConversionSimulator(config, 0.0).simulateForFraction(0.0);
     }

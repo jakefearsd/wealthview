@@ -572,6 +572,56 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         assertThat(year1.earlyWithdrawalPenalty()).isNull();
     }
 
+    // Phase 1a: birth month. Born March -> reaches 59 1/2 in the year they turn 59 -> that
+    // year is penalty-free. Born September -> 59 1/2 lands in the age-60 year -> unchanged.
+
+    private ProjectionInput age59TraditionalFirstInput(String birthMonthJson) {
+        int birthYear = LocalDate.now().getYear() - 59;
+        return createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d,%s "withdrawal_rate": 0.04, "filing_status": "single",
+                 "withdrawal_order": "traditional_first"}
+                """.formatted(birthYear, birthMonthJson),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("200000", "0", "0.00", "taxable")));
+    }
+
+    @Test
+    void run_age59BornMarch_noEarlyWithdrawalPenalty() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        var year1 = engineTax.run(age59TraditionalFirstInput(" \"birth_month\": 3,")).yearlyData().getFirst();
+
+        assertThat(year1.age()).isEqualTo(59);
+        assertThat(year1.withdrawalFromTraditional()).isGreaterThan(BigDecimal.ZERO);
+        assertThat(year1.earlyWithdrawalPenalty()).isNull();
+    }
+
+    @Test
+    void run_age59BornSeptember_stillPaysEarlyWithdrawalPenalty() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        var year1 = engineTax.run(age59TraditionalFirstInput(" \"birth_month\": 9,")).yearlyData().getFirst();
+
+        assertThat(year1.earlyWithdrawalPenalty())
+                .isEqualByComparingTo(year1.withdrawalFromTraditional().multiply(bd("0.10")));
+    }
+
+    @Test
+    void run_age59NoBirthMonth_stillPaysEarlyWithdrawalPenalty() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        var year1 = engineTax.run(age59TraditionalFirstInput("")).yearlyData().getFirst();
+
+        assertThat(year1.earlyWithdrawalPenalty())
+                .isEqualByComparingTo(year1.withdrawalFromTraditional().multiply(bd("0.10")));
+    }
+
     // === RMD forcing (main projection) ===
 
     @Test

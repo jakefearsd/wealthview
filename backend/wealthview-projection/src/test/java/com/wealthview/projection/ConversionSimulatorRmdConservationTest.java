@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import com.wealthview.core.projection.household.AgeMilestones;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
@@ -49,7 +50,7 @@ class ConversionSimulatorRmdConservationTest {
                 FilingStatus.SINGLE, flatRateTaxCalculator(),
                 "taxable_first", 0.10, 0.0,
                 endAge - RETIREMENT_AGE, RmdCalculator.rmdStartAge(BIRTH_YEAR),
-                rentalCalc);
+                rentalCalc, AgeMilestones.LEGACY_EARLY_ACCESS_AGE);
 
         var simulator = new ConversionSimulator(config, 0.0);
         return simulator.simulateForFraction(0.0);

@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import com.wealthview.core.projection.household.AgeMilestones;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
@@ -66,7 +67,8 @@ final class RothConversionOptimizer {
                             List<ProjectionIncomeSourceInput> incomeSources,
                             RentalLossCalculator rentalLossCalculator,
                             double rmdBracketHeadroom,
-                            double dynamicSequencingBracketRate) {
+                            double dynamicSequencingBracketRate,
+                            int earlyAccessAge) {
         var rentalAdjustmentCalculator = new RentalAdjustmentCalculator(
                 incomeSources, rentalLossCalculator, birthYear, retirementAge);
         this.config = new RothConversionConfig(
@@ -77,7 +79,7 @@ final class RothConversionOptimizer {
                 essentialFloor, filingStatus, taxCalculator,
                 withdrawalOrder, rmdBracketHeadroom, dynamicSequencingBracketRate,
                 endAge - retirementAge, RmdCalculator.rmdStartAge(birthYear),
-                rentalAdjustmentCalculator);
+                rentalAdjustmentCalculator, earlyAccessAge);
         this.targetTraditionalBalance = computeTargetTraditionalBalance();
         this.simulator = new ConversionSimulator(config, targetTraditionalBalance);
         this.fractionSearch = new FractionSearch(simulator, targetTraditionalBalance,
@@ -221,6 +223,7 @@ final class RothConversionOptimizer {
         private double essentialFloor;
         private double rmdBracketHeadroom;
         private double dynamicSequencingBracketRate = 0.0;
+        private int earlyAccessAge = AgeMilestones.LEGACY_EARLY_ACCESS_AGE;
         private FilingStatus filingStatus;
         private FederalTaxCalculator taxCalculator;
         private String withdrawalOrder;
@@ -282,6 +285,11 @@ final class RothConversionOptimizer {
             return this;
         }
 
+        Builder earlyAccessAge(int earlyAccessAge) {
+            this.earlyAccessAge = earlyAccessAge;
+            return this;
+        }
+
         RothConversionOptimizer build() {
             return new RothConversionOptimizer(
                     traditional, roth, taxable,
@@ -290,7 +298,7 @@ final class RothConversionOptimizer {
                     conversionBracketRate, rmdTargetBracketRate, returnMean,
                     essentialFloor, filingStatus, taxCalculator,
                     withdrawalOrder, incomeSources, rentalLossCalculator,
-                    rmdBracketHeadroom, dynamicSequencingBracketRate);
+                    rmdBracketHeadroom, dynamicSequencingBracketRate, earlyAccessAge);
         }
     }
 }

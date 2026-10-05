@@ -2,6 +2,7 @@ package com.wealthview.projection;
 
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.household.AgeMilestones;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 
 /**
@@ -221,7 +222,9 @@ final class TrialSimulator {
             // own survivor regime from its own {@code household.transitionYearIndex()}, scaling floor +
             // discretionary by {@code survivorFactor} from that index forward.
             @Nullable SurvivorRegime[] survivorRegimes,
-            double survivorFactor
+            double survivorFactor,
+            // Phase 1a: first penalty-free age (AgeMilestones; legacy 60).
+            int earlyAccessAge
     ) {
         /**
          * Entry point for building a config fluently. The four arguments are the pool base every
@@ -240,7 +243,7 @@ final class TrialSimulator {
          * documented per feature: null tax/conversion/rental arrays (mechanism inactive), no cash
          * reserve, no tracking, {@code rmdStartAge = Integer.MAX_VALUE} (no RMDs), zero dividend
          * and interest yield, {@code taxableEquityShare = 1.0} (pre-C1 all-equity path), no
-         * household, no survivor regimes, {@code survivorFactor = 1.0}.
+         * household, no survivor regimes, {@code survivorFactor = 1.0}, early-access age 60.
          */
         // TooManyFields: one field per SimulationConfig component is the nature of a builder
         // for a 27-component record; splitting the builder would defeat its purpose.
@@ -279,6 +282,7 @@ final class TrialSimulator {
             private HouseholdSim household;
             private SurvivorRegime[] survivorRegimes;
             private double survivorFactor = 1.0;
+            private int earlyAccessAge = AgeMilestones.LEGACY_EARLY_ACCESS_AGE;
 
             private Builder(double initTaxable, double initTraditional, double initRoth,
                             String withdrawalOrder) {
@@ -381,6 +385,11 @@ final class TrialSimulator {
                 return this;
             }
 
+            Builder earlyAccessAge(int earlyAccessAge) {
+                this.earlyAccessAge = earlyAccessAge;
+                return this;
+            }
+
             SimulationConfig build() {
                 return new SimulationConfig(initTaxable, initTraditional, initRoth, withdrawalOrder,
                         ordinaryTaxTableByYear, ordinaryBaseIncomeByYear,
@@ -389,7 +398,7 @@ final class TrialSimulator {
                         trackYearBalances, taxableReturns, traditionalReturns, rothReturns,
                         rmdStartAge, initTaxableBasis, ltcgTaxTableByYear, dividendYield,
                         adaptation, rentalIncomeByYear, interestYield, taxableEquityShare,
-                        household, survivorRegimes, survivorFactor);
+                        household, survivorRegimes, survivorFactor, earlyAccessAge);
             }
         }
     }
@@ -539,7 +548,8 @@ final class TrialSimulator {
             // actualConv is the traditional-balance-CAPPED amount actually converted (0 when no
             // conversion runs); every later ordinary pricing call stacks on it too.
             double actualConv = applyTrialConversion(tp, config.conversionByYear(),
-                    config.conversionTaxByYear(), y, age, table, baseWithInterest + rmdForced);
+                    config.conversionTaxByYear(), y, age, config.earlyAccessAge(), table,
+                    baseWithInterest + rmdForced);
 
             // Audit C9: with-rules pass adapts the year's total spending toward the displayed
             // corridor from the trial's own portfolio state (cutting discretionary in down markets,
@@ -568,7 +578,7 @@ final class TrialSimulator {
             // LTCG table, rental income) into one call to keep this NCSS-capped hot method lean --
             // regime-aware (task 6): its LTCG/DS/rental reads come from the survivor regime once
             // spliced, the conversion schedule (survivor-invariant) always from the config.
-            boolean preAge595 = hasConversions && age < RetirementAges.EARLY_WITHDRAWAL_AGE;
+            boolean preAge595 = hasConversions && age < config.earlyAccessAge();
             var aux = resolveYearAuxInputs(config, view.regime(), y);
             var drawn = splitWithdrawal(tp.taxable(), tp.traditionalTotal(),
                     tp.rothTotal(),
@@ -599,7 +609,7 @@ final class TrialSimulator {
             cashBalance = outcome.cashBalance();
             double cashDrawn = Math.max(0, cashBeforeWithdrawals - cashBalance);
 
-            applyEarlyWithdrawalPenalty(tp, outcome.traditionalDrawn(), age);
+            applyEarlyWithdrawalPenalty(tp, outcome.traditionalDrawn(), age, config.earlyAccessAge());
 
             // The base-income-tax deduction is NOT part of drawn/cashDrawn (it drains via
             // deductTaxFromPoolsGrossedUp below, like withdrawalTax), so this metric already measures
@@ -754,16 +764,17 @@ final class TrialSimulator {
 
 
     /**
-     * T18a-4: 10% IRC 72(t) additional tax on traditional distributions before age 59½ (whole-year
-     * proxy: {@link RetirementAges#EARLY_WITHDRAWAL_AGE} = 60, already used above by
+     * T18a-4: 10% IRC 72(t) additional tax on traditional distributions before age 59½ (the 59 1/2
+     * calendar year from {@code AgeMilestones}, legacy 60 -- already used above by
      * {@code preAge595} to steer clear of traditional draws). Flat 10% on the ACTUAL dollars
      * debited from traditional for this year's spending draw ({@code traditionalDrawn} -- branch-
      * agnostic across the cash-reserve down-year scaling and the plain up-market draw); Roth
      * conversions are OUT OF SCOPE. Funded via the simple (non-grossed-up) tax cascade -- hot-loop
      * cheap, matching the Roth-conversion-tax drain's own no-gross-up design.
      */
-    private static void applyEarlyWithdrawalPenalty(TrialPools tp, double traditionalDrawn, int age) {
-        if (age < RetirementAges.EARLY_WITHDRAWAL_AGE && traditionalDrawn > 0) {
+    private static void applyEarlyWithdrawalPenalty(TrialPools tp, double traditionalDrawn, int age,
+                                                    int earlyAccessAge) {
+        if (age < earlyAccessAge && traditionalDrawn > 0) {
             tp.deductTaxFromPools(traditionalDrawn * EARLY_WITHDRAWAL_PENALTY_RATE);
         }
     }
@@ -1024,7 +1035,8 @@ final class TrialSimulator {
      */
     private static double applyTrialConversion(TrialPools tp, double[] conversionByYear,
                                                 double[] conversionTaxByYear, int y, int age,
-                                                OrdinaryTaxTable table, double base) {
+                                                int earlyAccessAge, OrdinaryTaxTable table,
+                                                double base) {
         double tradTotal = tp.traditionalTotal();
         if (conversionByYear == null || conversionByYear[y] <= 0 || tradTotal <= 0) {
             return 0;
@@ -1042,7 +1054,7 @@ final class TrialSimulator {
                     ? conversionTaxByYear[y] * (actualConv / conversionByYear[y])
                     : conversionTaxByYear[y];
         }
-        if (age < RetirementAges.EARLY_WITHDRAWAL_AGE) {
+        if (age < earlyAccessAge) {
             double taxPaid = Math.min(actualTax, Math.max(0, tp.taxable()));
             tp.sellTaxable(taxPaid);   // conversion-tax sale synced; gain untaxed (second-order)
         } else {

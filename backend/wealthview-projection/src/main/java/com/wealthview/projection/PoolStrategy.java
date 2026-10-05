@@ -15,6 +15,7 @@ import com.wealthview.core.projection.dto.LotOwner;
 import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
+import com.wealthview.core.projection.household.AgeMilestones;
 import com.wealthview.core.projection.household.PersonId;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
@@ -426,7 +427,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
      * <p>{@code earlyWithdrawalPenalty} (T18a-4) is the 10% IRC 72(t) additional tax on this year's
      * traditional-sourced DISTRIBUTIONS (spend draw + RMD force-out + the audit-C2 tax-funding
      * gross-up slice -- everything {@code fromTraditional} above counts) when {@code age} is below
-     * {@link RetirementAges#EARLY_WITHDRAWAL_AGE}. It is ALREADY folded into {@code taxLiability}
+     * the pool's early-access age ({@code AgeMilestones}). It is ALREADY folded into {@code taxLiability}
      * (additive) and funded from the pools; broken out here so the engine can surface it as its own
      * DTO field. Roth conversions are OUT OF SCOPE -- converted dollars move internally to Roth,
      * they are not withdrawn to the household.
@@ -479,7 +480,28 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             BigDecimal interestYield,
             BigDecimal feeRate,
             int baseYear,
-            FederalTaxCalculator federalTaxCalculator) {
+            FederalTaxCalculator federalTaxCalculator,
+            // Phase 1a: first penalty-free age (59 when born Jan-Jun, else 60). See AgeMilestones.
+            int earlyAccessAge) {
+
+        /**
+         * Back-compat constructor for callers that predate the early-access age (Phase 1a): supplies
+         * the legacy whole-year age (60), so the penalty and dynamic-sequencing rules behave exactly
+         * as before.
+         */
+        PoolConfig(FilingStatus filingStatus, BigDecimal otherIncome, BigDecimal annualRothConversion,
+                   String rothConversionStrategy, BigDecimal targetBracketRate,
+                   Integer rothConversionStartYear, WithdrawalOrder withdrawalOrder,
+                   TaxCalculationStrategy taxCalculator, BigDecimal dynamicSequencingBracketRate,
+                   Map<AssetClass, Double> geoMeans, BigDecimal inflationRate,
+                   CapitalGainsTaxCalculator capitalGainsTaxCalculator, BigDecimal dividendYield,
+                   BigDecimal interestYield, BigDecimal feeRate, int baseYear,
+                   FederalTaxCalculator federalTaxCalculator) {
+            this(filingStatus, otherIncome, annualRothConversion, rothConversionStrategy, targetBracketRate,
+                    rothConversionStartYear, withdrawalOrder, taxCalculator, dynamicSequencingBracketRate,
+                    geoMeans, inflationRate, capitalGainsTaxCalculator, dividendYield, interestYield, feeRate,
+                    baseYear, federalTaxCalculator, AgeMilestones.LEGACY_EARLY_ACCESS_AGE);
+        }
 
         /**
          * Back-compat constructor for callers that predate allocation-driven returns: uses an
@@ -496,7 +518,8 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                    TaxCalculationStrategy taxCalculator, BigDecimal dynamicSequencingBracketRate) {
             this(filingStatus, otherIncome, annualRothConversion, rothConversionStrategy, targetBracketRate,
                     rothConversionStartYear, withdrawalOrder, taxCalculator, dynamicSequencingBracketRate,
-                    Map.of(), BigDecimal.ZERO, null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0, null);
+                    Map.of(), BigDecimal.ZERO, null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0, null,
+                    AgeMilestones.LEGACY_EARLY_ACCESS_AGE);
         }
 
         /**
@@ -511,7 +534,8 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                    Map<AssetClass, Double> geoMeans, BigDecimal inflationRate) {
             this(filingStatus, otherIncome, annualRothConversion, rothConversionStrategy, targetBracketRate,
                     rothConversionStartYear, withdrawalOrder, taxCalculator, dynamicSequencingBracketRate,
-                    geoMeans, inflationRate, null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0, null);
+                    geoMeans, inflationRate, null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0, null,
+                    AgeMilestones.LEGACY_EARLY_ACCESS_AGE);
         }
 
         /**
@@ -534,7 +558,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
 
         /** Fluent builder. Defaults are the same no-op anchors the back-compat constructors above
          * document: empty capital-market map, zero inflation, no LTCG calculator, zero dividend/
-         * interest/fee, base year 0, no federal-deduction source. */
+         * interest/fee, base year 0, no federal-deduction source, early-access age 60. */
         static final class Builder {
             private final FilingStatus filingStatus;
             private final BigDecimal otherIncome;
@@ -553,6 +577,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             private BigDecimal feeRate = BigDecimal.ZERO;
             private int baseYear;
             private FederalTaxCalculator federalTaxCalculator;
+            private int earlyAccessAge = AgeMilestones.LEGACY_EARLY_ACCESS_AGE;
 
             private Builder(FilingStatus filingStatus, BigDecimal otherIncome, BigDecimal annualRothConversion,
                             String rothConversionStrategy, BigDecimal targetBracketRate,
@@ -605,11 +630,16 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                 return this;
             }
 
+            Builder earlyAccessAge(int earlyAccessAge) {
+                this.earlyAccessAge = earlyAccessAge;
+                return this;
+            }
+
             PoolConfig build() {
                 return new PoolConfig(filingStatus, otherIncome, annualRothConversion, rothConversionStrategy,
                         targetBracketRate, rothConversionStartYear, withdrawalOrder, taxCalculator,
                         dynamicSequencingBracketRate, geoMeans, inflationRate, capitalGainsTaxCalculator,
-                        dividendYield, interestYield, feeRate, baseYear, federalTaxCalculator);
+                        dividendYield, interestYield, feeRate, baseYear, federalTaxCalculator, earlyAccessAge);
             }
         }
     }
@@ -886,6 +916,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
         private final BigDecimal taxableEquityShare;
         private final BigDecimal inflationRate;
         private final int baseYear;
+        private final int earlyAccessAge;
         /**
          * Source of the federal standard deduction, used ONLY to net the LTCG stacking floor down
          * to the same base the ordinary tax computed on (see {@link #resolveOrdinaryDeduction}). Null
@@ -947,6 +978,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             this.interestYield = config.interestYield();
             this.inflationRate = config.inflationRate();
             this.baseYear = config.baseYear();
+            this.earlyAccessAge = config.earlyAccessAge();
             this.federalTaxCalculator = config.federalTaxCalculator();
         }
 
@@ -1109,7 +1141,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
 
             if (!noSpendDraw) {
                 var withdrawalContext = new WithdrawalOrderStrategy.WithdrawalContext(
-                        effectiveOtherIncome, conversionAmount, rmdAmount, age, year);
+                        effectiveOtherIncome, conversionAmount, rmdAmount, age, year, earlyAccessAge);
                 WithdrawalOrderStrategy strategy = WithdrawalOrderStrategy.forOrder(
                         withdrawalOrder, dynamicSequencingBracketRate, taxCalculator, filingStatus,
                         withdrawalContext);
@@ -1199,7 +1231,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                     ? deductFromPools(totalWithdrawalTax) : TaxSourceResult.ZERO;
 
             // T18a-4: 10% IRC 72(t) additional tax on traditional DISTRIBUTIONS before age 59½
-            // (whole-year proxy: age < RetirementAges.EARLY_WITHDRAWAL_AGE, the SAME proxy the
+            // (age < earlyAccessAge from AgeMilestones -- the 59 1/2 calendar year, legacy 60 -- the SAME threshold the
             // withdrawal-order strategies already use to steer clear of early traditional draws).
             // Applies to the year's FULL traditional-sourced distribution captured by
             // traditionalOrdinaryIncome (spend draw + RMD force-out + the C2 tax-funding gross-up
@@ -1208,7 +1240,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             // re-run through growTraditionalGrossUp's fixed point -- re-stacking the penalty's own
             // funding draw as further taxable/penalizable income is a documented, out-of-scope
             // second-order effect, the same category as ltcgTax/extraPoolFundedTax above.
-            BigDecimal earlyWithdrawalPenalty = age < RetirementAges.EARLY_WITHDRAWAL_AGE
+            BigDecimal earlyWithdrawalPenalty = age < earlyAccessAge
                     ? traditionalOrdinaryIncome.multiply(EARLY_WITHDRAWAL_PENALTY_RATE)
                     : BigDecimal.ZERO;
             if (earlyWithdrawalPenalty.compareTo(BigDecimal.ZERO) > 0) {

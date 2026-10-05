@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.household.AgeMilestones;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.tax.CombinedTaxResult;
 import com.wealthview.core.projection.tax.FederalOnlyTaxStrategy;
@@ -785,7 +786,7 @@ class MultiPoolDeepTest {
                 FlatTaxStubs.flatTaxStrategy("0.10"));
 
         var result = pool.executeWithdrawals(bd("10000"), YEAR, ZERO, ZERO, ZERO,
-                RetirementAges.EARLY_WITHDRAWAL_AGE, ZERO, ZERO, ZERO);
+                AgeMilestones.LEGACY_EARLY_ACCESS_AGE, ZERO, ZERO, ZERO);
 
         assertThat(result.earlyWithdrawalPenalty()).isEqualByComparingTo(ZERO);
         assertThat(result.taxLiability()).isEqualByComparingTo(bd("1000")); // ordinary tax only
@@ -819,6 +820,60 @@ class MultiPoolDeepTest {
         // Ordinary conversion tax only (50000 * 20% = 10000) -- no penalty component exists on
         // ConversionResult at all.
         assertThat(r.taxLiability()).isEqualByComparingTo(bd("10000"));
+    }
+
+    // Phase 1a: birth month moves the first penalty-free year to the 59 1/2 calendar year.
+
+    private PoolStrategy.MultiPool poolWithEarlyAccessAge(WithdrawalOrder order, int earlyAccessAge,
+                                                         BigDecimal dsBracketRate) {
+        var config = PoolStrategy.PoolConfig.builder(FilingStatus.SINGLE, ZERO, ZERO, "fixed",
+                        null, null, order, FlatTaxStubs.flatTaxStrategy("0.10"), dsBracketRate)
+                .earlyAccessAge(earlyAccessAge)
+                .build();
+        return new PoolStrategy.MultiPool(grouped("50000", "100000", "0", "0", "0", "0"), ZERO, config);
+    }
+
+    @Test
+    void executeWithdrawals_age59WithEarlyAccessAge59_noPenalty() {
+        var pool = poolWithEarlyAccessAge(WithdrawalOrder.TRADITIONAL_FIRST, 59, null);
+
+        var result = pool.executeWithdrawals(bd("10000"), YEAR, ZERO, ZERO, ZERO, 59, ZERO, ZERO, ZERO);
+
+        assertThat(result.fromTraditional()).isEqualByComparingTo(bd("10000"));
+        assertThat(result.earlyWithdrawalPenalty()).isEqualByComparingTo(ZERO);
+    }
+
+    @Test
+    void executeWithdrawals_age59WithLegacyEarlyAccessAge_appliesPenalty() {
+        var pool = poolWithEarlyAccessAge(WithdrawalOrder.TRADITIONAL_FIRST,
+                AgeMilestones.LEGACY_EARLY_ACCESS_AGE, null);
+
+        var result = pool.executeWithdrawals(bd("10000"), YEAR, ZERO, ZERO, ZERO, 59, ZERO, ZERO, ZERO);
+
+        assertThat(result.earlyWithdrawalPenalty()).isEqualByComparingTo(bd("1000"));
+    }
+
+    @Test
+    void executeWithdrawals_dynamicSequencingAge59WithEarlyAccessAge59_drawsTraditionalInBracket() {
+        var pool = poolWithEarlyAccessAge(WithdrawalOrder.DYNAMIC_SEQUENCING, 59, new BigDecimal("0.12"));
+
+        var result = pool.executeWithdrawals(bd("10000"), YEAR, ZERO, ZERO, ZERO, 59, ZERO, ZERO, ZERO);
+
+        // Flat stub bracket ceiling is 100,000 -> the whole 10,000 fits; pre-fix (age-60 proxy)
+        // dynamic sequencing would have forced taxable-only at 59.
+        assertThat(result.fromTraditional()).isEqualByComparingTo(bd("10000"));
+        assertThat(result.fromTaxable()).isEqualByComparingTo(ZERO);
+    }
+
+    @Test
+    void executeWithdrawals_dynamicSequencingAge59WithLegacyEarlyAccessAge_drawsTaxableOnly() {
+        var pool = poolWithEarlyAccessAge(WithdrawalOrder.DYNAMIC_SEQUENCING,
+                AgeMilestones.LEGACY_EARLY_ACCESS_AGE, new BigDecimal("0.12"));
+
+        var result = pool.executeWithdrawals(bd("10000"), YEAR, ZERO, ZERO, ZERO, 59, ZERO, ZERO, ZERO);
+
+        assertThat(result.fromTraditional()).isEqualByComparingTo(ZERO);
+        assertThat(result.fromTaxable()).isEqualByComparingTo(bd("10000"));
     }
 
     // === Audit C2: tax paid FROM the traditional pool must gross up (the draw is itself taxable) ===

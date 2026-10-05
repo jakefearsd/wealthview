@@ -64,7 +64,7 @@ final class StochasticMortalityEvaluator {
                 .taxTables(poolSetup.simPools() ? arrays.jointOrdinaryTables() : null,
                         poolSetup.simPools() ? arrays.jointOrdinaryBase() : null)
                 .conversions(conversionByYear, conversionTaxByYear)
-                .ages(sim.retirementAge(), sim.rmdStartAge())
+                .ages(sim.retirementAge(), sim.rmdStartAge(), sim.earlyAccessAge())
                 .dsBracketCeilingByYear(arrays.jointDsCeiling())
                 .cashReserve(portfolio.cashReserveYears(), portfolio.cashReturnRate())
                 .returns(sim.taxableReturns(), sim.traditionalReturns(), sim.rothReturns())

@@ -5,6 +5,8 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
+import com.wealthview.core.projection.household.AgeMilestones;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SustainabilitySearchTest {
@@ -111,7 +113,7 @@ class SustainabilitySearchTest {
         var portfolio = new PortfolioSetup(0.0, 0.0, 0.0, 0.0, null, 0, 0.0, 0.0, 0.0, 0.0);
         var sim = new SimulationParameters(0, retirementAge, 0, years, trialCount, confidenceLevel, 0.0,
                 paths, taxableReturns, traditionalReturns, rothReturns, Integer.MAX_VALUE,
-                0.0, 0.0, 0.0, 0.0, 1.0, 1.0, null, null, null);
+                0.0, 0.0, 0.0, 0.0, 1.0, 1.0, null, null, null, AgeMilestones.LEGACY_EARLY_ACCESS_AGE);
         var taxIncome = new TaxIncomeContext(null, 0.0, income, null, surplusTax, null, null, null,
                 null, null, null, null, null);
         return new OptimizationSetup(portfolio, sim, taxIncome);

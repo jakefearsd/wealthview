@@ -2,6 +2,8 @@ package com.wealthview.projection;
 
 import org.junit.jupiter.api.Test;
 
+import com.wealthview.core.projection.household.AgeMilestones;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class TrialSimulatorConfigBuilderTest {
@@ -25,7 +27,7 @@ class TrialSimulatorConfigBuilderTest {
                 100.0, 50.0, 25.0, "taxable_first",
                 null, null, null, null, 62, null, 0, 0.0, false,
                 taxable, traditional, roth, Integer.MAX_VALUE,
-                0.0, null, 0.0, null, null, 0.0, 1.0, null, null, 1.0);
+                0.0, null, 0.0, null, null, 0.0, 1.0, null, null, 1.0, AgeMilestones.LEGACY_EARLY_ACCESS_AGE);
 
         assertThat(built).isEqualTo(canonical);
     }
@@ -62,13 +64,14 @@ class TrialSimulatorConfigBuilderTest {
                 .taxableEquityShare(0.7)
                 .household(null)
                 .survivorRegimes(regimes, 0.75)
+                .earlyAccessAge(59)
                 .build();
 
         var canonical = new TrialSimulator.SimulationConfig(
                 100.0, 50.0, 25.0, "traditional_first",
                 taxTables, baseIncome, conversions, conversionTax, 65, dsCeilings,
                 2, 0.03, true, taxable, traditional, roth, 73,
-                80.0, ltcgTables, 0.015, null, rental, 0.04, 0.7, null, regimes, 0.75);
+                80.0, ltcgTables, 0.015, null, rental, 0.04, 0.7, null, regimes, 0.75, 59);
 
         assertThat(built).isEqualTo(canonical);
     }

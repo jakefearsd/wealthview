@@ -2,6 +2,8 @@ package com.wealthview.projection;
 
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.household.AgeMilestones;
+
 /**
  * Assembles each trial's {@link TrialSimulator.SimulationConfig} from the knobs that stay fixed
  * for one Monte Carlo pass (all {@code trialCount} trials sharing the same pool setup, tax
@@ -29,6 +31,7 @@ final class TrialConfigFactory {
     private final double[] conversionTaxByYear;
     private final int retirementAge;
     private final int rmdStartAge;
+    private final int earlyAccessAge;
     private final double[] dsBracketCeilingByYear;
     private final int cashReserveYears;
     private final double cashReturnRate;
@@ -54,6 +57,7 @@ final class TrialConfigFactory {
         this.conversionTaxByYear = b.conversionTaxByYear;
         this.retirementAge = b.retirementAge;
         this.rmdStartAge = b.rmdStartAge;
+        this.earlyAccessAge = b.earlyAccessAge;
         this.dsBracketCeilingByYear = b.dsBracketCeilingByYear;
         this.cashReserveYears = b.cashReserveYears;
         this.cashReturnRate = b.cashReturnRate;
@@ -99,6 +103,7 @@ final class TrialConfigFactory {
                 .conversions(conversionByYear, conversionTaxByYear)
                 .retirementAge(retirementAge)
                 .rmdStartAge(rmdStartAge)
+                .earlyAccessAge(earlyAccessAge)
                 .dsBracketCeilingByYear(dsBracketCeilingByYear)
                 .cashReserve(cashReserveYears, cashReturnRate)
                 .trackYearBalances(trackYearBalances)
@@ -135,6 +140,7 @@ final class TrialConfigFactory {
         private double[] conversionTaxByYear;
         private int retirementAge;
         private int rmdStartAge = Integer.MAX_VALUE;
+        private int earlyAccessAge = AgeMilestones.LEGACY_EARLY_ACCESS_AGE;
         private double[] dsBracketCeilingByYear;
         private int cashReserveYears;
         private double cashReturnRate;
@@ -181,13 +187,14 @@ final class TrialConfigFactory {
             return this;
         }
 
-        /** Combined setter (task 12 / CPD): every one of the three call sites sets these two age
-         * knobs together, so one call replaces the two separate {@code retirementAge}/{@code
-         * rmdStartAge} setters {@link TrialSimulator.SimulationConfig.Builder} carries -- this also
-         * keeps the two builders' method shapes from lining up token-for-token. */
-        Builder ages(int retirementAge, int rmdStartAge) {
+        /** Combined setter (task 12 / CPD): every one of the three call sites sets these age knobs
+         * together, so one call replaces the separate {@code retirementAge}/{@code rmdStartAge}/
+         * {@code earlyAccessAge} setters {@link TrialSimulator.SimulationConfig.Builder} carries --
+         * this also keeps the two builders' method shapes from lining up token-for-token. */
+        Builder ages(int retirementAge, int rmdStartAge, int earlyAccessAge) {
             this.retirementAge = retirementAge;
             this.rmdStartAge = rmdStartAge;
+            this.earlyAccessAge = earlyAccessAge;
             return this;
         }
 

@@ -305,6 +305,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 .feeRate(paramsParser.feeRate(params))
                 .baseYear(baseYear)
                 .federalTaxCalculator(federalTaxCalculator)
+                .earlyAccessAge(paramsParser.earlyAccessAge(params))
                 .build();
         return PoolStrategy.create(accounts, config);
     }

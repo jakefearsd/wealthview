@@ -57,6 +57,7 @@ final class ConversionSimulator {
     private final int endAge;
     private final int birthYear;
     private final int rmdStartAge;
+    private final int earlyAccessAge;
     private final int years;
     /**
      * Resolved once from the configured wire token: every caller supplies an enum token
@@ -79,6 +80,7 @@ final class ConversionSimulator {
         this.endAge = config.endAge();
         this.birthYear = config.birthYear();
         this.rmdStartAge = config.rmdStartAge();
+        this.earlyAccessAge = config.earlyAccessAge();
         this.years = config.years();
         this.withdrawalOrder = WithdrawalOrder.fromString(config.withdrawalOrder());
         this.filingStatus = config.filingStatus();
@@ -181,7 +183,7 @@ final class ConversionSimulator {
                 traditional -= conversionAmount;
                 roth += conversionAmount;
 
-                if (age < RetirementAges.EARLY_WITHDRAWAL_AGE) {
+                if (age < earlyAccessAge) {
                     taxable -= conversionTax;
                     if (taxable < 0) {
                         taxable = 0;
@@ -258,7 +260,7 @@ final class ConversionSimulator {
                                   int calendarYear);
     }
 
-    /** Before age 59.5: draw only from taxable to avoid early withdrawal penalties. */
+    /** Before the early-access age (59 1/2 calendar year): draw only from taxable, avoiding penalties. */
     private record EarlyWithdrawalStrategy() implements SpendingWithdrawalStrategy {
         @Override
         public WithdrawalResult withdraw(double taxable, double traditional, double roth,
@@ -371,7 +373,7 @@ final class ConversionSimulator {
     }
 
     private SpendingWithdrawalStrategy selectWithdrawalStrategy(int age) {
-        if (age < RetirementAges.EARLY_WITHDRAWAL_AGE) {
+        if (age < earlyAccessAge) {
             return new EarlyWithdrawalStrategy();
         }
         if (withdrawalOrder == WithdrawalOrder.DYNAMIC_SEQUENCING && dynamicSequencingBracketRate > 0) {
@@ -401,13 +403,13 @@ final class ConversionSimulator {
     /**
      * Constrains the conversion amount so the tax on the conversion can be paid
      * from the taxable account without depleting funds needed for essential spending.
-     * Only applies before age 59.5 (RetirementAges.EARLY_WITHDRAWAL_AGE), when penalty-free
+     * Only applies before the early-access age (the 59 1/2 calendar year, AgeMilestones), when penalty-free
      * traditional/Roth withdrawals are unavailable.
      */
     private double constrainConversionByAffordability(
             double maxConversion, double effectiveIncome, double taxable,
             double baseOtherIncome, int age, int calendarYear) {
-        if (age >= RetirementAges.EARLY_WITHDRAWAL_AGE) {
+        if (age >= earlyAccessAge) {
             return maxConversion;
         }
         double tentativeTax = computeIncrementalTax(

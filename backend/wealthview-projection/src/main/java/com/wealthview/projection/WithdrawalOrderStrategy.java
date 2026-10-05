@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 import com.wealthview.core.projection.dto.PoolType;
+import com.wealthview.core.projection.household.AgeMilestones;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.TaxCalculationStrategy;
@@ -30,9 +31,19 @@ sealed interface WithdrawalOrderStrategy
     /**
      * Per-withdrawal context (income, conversion, RMD, age and year) consumed by the
      * dynamic-sequencing order. Collapses what would otherwise be a long parameter list.
+     * {@code earlyAccessAge} (Phase 1a) is the first age at which traditional draws are
+     * penalty-free; see {@code AgeMilestones}.
      */
     record WithdrawalContext(BigDecimal effectiveOtherIncome, BigDecimal conversionAmount,
-                             BigDecimal rmdAmount, int age, int year) {}
+                             BigDecimal rmdAmount, int age, int year, int earlyAccessAge) {
+
+        /** Pre-Phase-1a shape: legacy whole-year early-access age (60). */
+        WithdrawalContext(BigDecimal effectiveOtherIncome, BigDecimal conversionAmount,
+                          BigDecimal rmdAmount, int age, int year) {
+            this(effectiveOtherIncome, conversionAmount, rmdAmount, age, year,
+                    AgeMilestones.LEGACY_EARLY_ACCESS_AGE);
+        }
+    }
 
     /**
      * Returns the allocation of a withdrawal across pools, or {@code null} if the total
@@ -75,8 +86,9 @@ sealed interface WithdrawalOrderStrategy
 
         @Override
         public Result execute(BigDecimal need, BigDecimal taxable, BigDecimal traditional, BigDecimal roth) {
-            if (context.age() < RetirementAges.EARLY_WITHDRAWAL_AGE) {
-                // Before 59.5 (using 60 as proxy): taxable only to avoid early withdrawal penalties
+            if (context.age() < context.earlyAccessAge()) {
+                // Before 59.5 (the calendar year of 59.5 from AgeMilestones): taxable only to avoid
+                // early withdrawal penalties
                 return new Result(need.min(taxable), BigDecimal.ZERO, BigDecimal.ZERO);
             } else if (bracketRate != null && taxCalc != null) {
                 BigDecimal bracketCeiling = taxCalc.computeMaxIncomeForTargetRate(

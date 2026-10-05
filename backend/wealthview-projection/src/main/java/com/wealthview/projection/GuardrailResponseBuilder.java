@@ -212,7 +212,7 @@ final class GuardrailResponseBuilder {
                 .taxTables(poolSetup.simPools() ? ctx.taxIncome().ordinaryTaxTableByYear() : null,
                         poolSetup.simPools() ? ctx.taxIncome().rentalAwareTaxableIncome() : null)
                 .conversions(conversionByYear, conversionTaxByYear)
-                .ages(ctx.sim().retirementAge(), ctx.sim().rmdStartAge())
+                .ages(ctx.sim().retirementAge(), ctx.sim().rmdStartAge(), ctx.sim().earlyAccessAge())
                 .dsBracketCeilingByYear(ctx.taxIncome().dsBracketCeilingByYear())
                 .cashReserve(ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate())
                 .returns(ctx.sim().taxableReturns(), ctx.sim().traditionalReturns(), ctx.sim().rothReturns())

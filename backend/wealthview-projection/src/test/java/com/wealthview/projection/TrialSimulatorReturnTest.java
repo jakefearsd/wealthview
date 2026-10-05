@@ -2,6 +2,8 @@ package com.wealthview.projection;
 
 import org.junit.jupiter.api.Test;
 
+import com.wealthview.core.projection.household.AgeMilestones;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
@@ -696,12 +698,80 @@ class TrialSimulatorReturnTest {
     void simulateTrial_traditionalDrawAtAge60_noPenaltyAppliesExactlyOneThousandMoreThanBelow60() {
         var result = simulator.simulateTrial(
                 new double[]{0.0}, new double[]{0.0}, new double[]{10_000.0}, new double[]{0.0}, 1,
-                penaltyTestConfig(RetirementAges.EARLY_WITHDRAWAL_AGE));
+                penaltyTestConfig(AgeMilestones.LEGACY_EARLY_ACCESS_AGE));
 
         // Same fixture, retirement (and thus the trial's only) age is exactly the proxy threshold
         // -- no penalty. Only the $1,000 ordinary tax leaves the portfolio: final = 139,000, i.e.
         // exactly $1,000 (one penalty's worth) more than the below-60 case above.
         assertThat(result.finalBalance()).isEqualTo(139_000.0, within(1e-6));
+    }
+
+    // Phase 1a: SimulationConfig.earlyAccessAge (from birth month) replaces the age-60 proxy.
+
+    @Test
+    void simulateTrial_age59WithEarlyAccessAge59_noPenalty() {
+        var config = TrialSimulator.SimulationConfig.builder(50_000.0, 100_000.0, 0.0, "traditional_first")
+                .taxTables(new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.10)}, new double[]{0.0})
+                .retirementAge(59)
+                .earlyAccessAge(59)
+                .returns(new double[]{0.0}, new double[]{0.0}, new double[]{0.0})
+                .rmdStartAge(75)
+                .taxableBasis(50_000.0)
+                .build();
+
+        var result = simulator.simulateTrial(
+                new double[]{0.0}, new double[]{0.0}, new double[]{10_000.0}, new double[]{0.0}, 1, config);
+
+        // Only the $1,000 ordinary tax leaves: 139,000 (same as the at-60 case).
+        assertThat(result.finalBalance()).isEqualTo(139_000.0, within(1e-6));
+    }
+
+    @Test
+    void simulateTrial_age59WithDefaultEarlyAccessAge_appliesPenalty() {
+        var result = simulator.simulateTrial(
+                new double[]{0.0}, new double[]{0.0}, new double[]{10_000.0}, new double[]{0.0}, 1,
+                penaltyTestConfig(59));
+
+        assertThat(result.finalBalance()).isEqualTo(138_000.0, within(1e-6));
+    }
+
+    @Test
+    void simulateTrial_conversionScheduleAge59WithEarlyAccessAge59_mayDrawTraditional() {
+        // A non-null (zero) conversion schedule switches on the pre-59 1/2 taxable-only rule. With
+        // earlyAccessAge 59 the age-59 year is past it, so traditional_first draws traditional.
+        var config = TrialSimulator.SimulationConfig.builder(50_000.0, 100_000.0, 0.0, "traditional_first")
+                .taxTables(new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.10)}, new double[]{0.0})
+                .conversions(new double[]{0.0}, new double[]{0.0})
+                .retirementAge(59)
+                .earlyAccessAge(59)
+                .returns(new double[]{0.0}, new double[]{0.0}, new double[]{0.0})
+                .rmdStartAge(75)
+                .taxableBasis(50_000.0)
+                .build();
+
+        var result = simulator.simulateTrial(
+                new double[]{0.0}, new double[]{0.0}, new double[]{10_000.0}, new double[]{0.0}, 1, config);
+
+        // Traditional pays 10,000 + 1,000 tax funded from taxable: 49,000 + 90,000 = 139,000.
+        assertThat(result.finalBalance()).isEqualTo(139_000.0, within(1e-6));
+    }
+
+    @Test
+    void simulateTrial_conversionScheduleAge59WithDefaultEarlyAccessAge_drawsTaxableOnly() {
+        var config = TrialSimulator.SimulationConfig.builder(50_000.0, 100_000.0, 0.0, "traditional_first")
+                .taxTables(new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.10)}, new double[]{0.0})
+                .conversions(new double[]{0.0}, new double[]{0.0})
+                .retirementAge(59)
+                .returns(new double[]{0.0}, new double[]{0.0}, new double[]{0.0})
+                .rmdStartAge(75)
+                .taxableBasis(50_000.0)
+                .build();
+
+        var result = simulator.simulateTrial(
+                new double[]{0.0}, new double[]{0.0}, new double[]{10_000.0}, new double[]{0.0}, 1, config);
+
+        // Taxable-only at basis = value: no gain, no ordinary tax, no penalty -> 140,000.
+        assertThat(result.finalBalance()).isEqualTo(140_000.0, within(1e-6));
     }
 
     // === A4 fix: tax on outside income must be a funded outflow every year, not just surplus years ===

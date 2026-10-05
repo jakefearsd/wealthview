@@ -68,6 +68,7 @@ final class JointConversionSearch {
                 .rentals(input.incomeSources(), new RentalLossCalculator())
                 .dynamicSequencingBracketRate(input.dynamicSequencingBracketRate() != null
                         ? input.dynamicSequencingBracketRate().doubleValue() : 0.0)
+                .earlyAccessAge(ctx.sim().earlyAccessAge())
                 .build();
 
         boolean useDynamicSequencing = PoolStrategy.WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING

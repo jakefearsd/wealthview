@@ -13,6 +13,7 @@ import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import com.wealthview.core.projection.household.AgeMilestones;
 import com.wealthview.core.projection.household.HouseholdContext;
 import com.wealthview.core.projection.household.PersonId;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
@@ -78,6 +79,7 @@ final class OptimizationContextBuilder {
         int endAge = input.endAge();
         int years = endAge - retirementAge;
         int rmdStartAge = RmdCalculator.rmdStartAge(input.birthYear());
+        int earlyAccessAge = AgeMilestones.earlyAccessAge(input.birthMonth());
 
         if (years <= 0) {
             return OptimizationSetup.emptyHorizon(retirementYear, retirementAge, endAge, years,
@@ -213,7 +215,7 @@ final class OptimizationContextBuilder {
                         returnPaths.taxableReturns(), returnPaths.traditionalReturns(),
                         returnPaths.rothReturns(), rmdStartAge, dividendYield, feeRate, returnMean,
                         interestYield, taxableEquityShare, household.survivorFactor(), household.sim(),
-                        mortalityDraws, stochasticEval),
+                        mortalityDraws, stochasticEval, earlyAccessAge),
                 new TaxIncomeContext(filingStatus, essentialFloor,
                         incomeByYear, taxableIncomeByYear, surplusTaxByYear,
                         incomeData, rentalAwareTaxableIncome, adjustedFloors, ordinaryTaxTables,
