@@ -360,6 +360,11 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
      */
     FilingStatus getFilingStatus();
 
+    /** D5: true when a tax-funding taxable sale earlier this year realized a gain (or loss) that the
+     * year's withdrawal cycle has not yet taxed -- lets a not-yet-retired conversion year run the
+     * zero-need withdrawal cycle so that gain is taxed in the year it was realized. */
+    boolean hasPendingTaxSaleGain();
+
     /**
      * Whether income sources should be processed every year (true) or only when retired (false).
      */
@@ -829,6 +834,8 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
          * the JUMP -- the polish loop still converges to the true fixed point afterwards.
          */
         private static final BigDecimal GROSS_UP_WARM_START_RATE_CAP = new BigDecimal("0.50");
+        /** D5: polish passes after the closed-form warm start in {@link #settleTaxSaleGain}. */
+        private static final int MAX_TAX_SALE_GAIN_ITERATIONS = 3;
         /** IRC 72(t) -- 10% additional tax on early (pre-59½) traditional-account distributions,
          * a statutory constant (T18a-4). */
         private static final BigDecimal EARLY_WITHDRAWAL_PENALTY_RATE = new BigDecimal("0.10");
@@ -865,6 +872,10 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
          * {@link #qualifiedDividendIncome} above.
          */
         private BigDecimal ordinaryInterestIncome = BigDecimal.ZERO;
+        /** D5: FIFO gain realized this year by {@link #deductFromPools}'s taxable slice (conversion-tax
+         * sales) that {@link #executeWithdrawals} has not yet folded into the year's LTCG income. May be
+         * negative (loss lots). Captured by the memento so the Social Security fixed point restores it. */
+        private BigDecimal pendingTaxSaleGain = BigDecimal.ZERO;
 
         private final OwnerPool tradContrib;
         private final OwnerPool rothContrib;
@@ -1157,7 +1168,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
 
             // Selling the taxable draw FIFO realizes a long-term capital gain (oldest lots first).
             // The traditional/Roth spend draws split proportionally by owner balance (task 4).
-            BigDecimal realizedGain = lots.sellFifo(fromTaxable);
+            BigDecimal spendSaleGain = lots.sellFifo(fromTaxable);
             traditional.debitProportional(fromTraditional);
             roth.debitProportional(fromRoth);
 
@@ -1167,13 +1178,63 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             // this year's traditional-sourced ordinary income alongside the spend draw's own
             // traditional portion -- no further pool mutation for RMD purposes happens here.
             BigDecimal rmdForced = rmdAmount != null ? rmdAmount.max(BigDecimal.ZERO) : BigDecimal.ZERO;
-            BigDecimal traditionalOrdinaryIncome = fromTraditional.add(rmdForced);
+            BigDecimal traditionalSpendIncome = fromTraditional.add(rmdForced);
 
-            // Realized LTCG + qualified-dividend INCOME, floored at zero (a net realized loss's
-            // small AGI offset is out of scope for this model). Computed BEFORE the ordinary-tax
-            // bundle because it feeds two places: the state base of that bundle for states that tax
-            // capital gains as ordinary income (audit C3), and AGI-ex-SS for the Social Security
-            // provisional-income convergence (audit B2).
+            // D5: gains realized earlier this year by conversion-tax sales (deductFromPools) join this
+            // year's realized gain, and the bill's OWN funding sale is solved as a fixed point.
+            BigDecimal baseRealizedGain = spendSaleGain.add(pendingTaxSaleGain);
+            pendingTaxSaleGain = BigDecimal.ZERO;
+            TaxBill bill = settleTaxSaleGain(new BillInputs(year, effectiveOtherIncome, conversionAmount,
+                    traditionalSpendIncome, baseRealizedGain, alreadyChargedBaseTax, extraPoolFundedTax,
+                    federallyTaxedSocialSecurity, netRentalIncome, age, lots.totalValue(), traditional.total()));
+
+            // The converged gross-up draw is itself a traditional distribution: fold it into the
+            // reported ordinary income so it (a) feeds the audit-B2 Social Security provisional-
+            // income loop the same way the spend draw/RMD excess already do (see
+            // YearFinanceResolver#realizedPortfolioTaxable, fed by this field) and (b) makes
+            // RetirementTaxAnnotator's independent federal/state recompute agree with taxLiability.
+            BigDecimal traditionalOrdinaryIncome = traditionalSpendIncome.add(bill.grossUp().traditionalGrossUp());
+
+            // One drain for tax + penalty: the cascade order is identical to the former two
+            // back-to-back drains (taxable first, then traditional, then Roth).
+            TaxSourceResult withdrawalTaxSource = bill.total().compareTo(BigDecimal.ZERO) > 0
+                    ? deductFromPools(bill.total()) : TaxSourceResult.ZERO;
+            // deductFromPools just booked the funding sale's gain again; settleTaxSaleGain already
+            // priced it, so drop it rather than taxing it twice.
+            pendingTaxSaleGain = BigDecimal.ZERO;
+
+            // T18a-5a: the aggregate includes the forced RMD excess (rmdForced) on top of the raw
+            // spend-draw allocation, so it reconciles exactly with fromTaxable + traditionalOrdinaryIncome
+            // (which already counts rmdForced) + fromRoth -- see the WithdrawalTaxResult javadoc.
+            return new WithdrawalTaxResult(
+                    fromTaxable.add(fromTraditional).add(fromRoth).add(rmdForced),
+                    bill.total(),
+                    fromTaxable, traditionalOrdinaryIncome, fromRoth, withdrawalTaxSource, bill.ltcgTax(),
+                    bill.realizedLtcgIncome(), bill.earlyWithdrawalPenalty(), ordinaryInterestIncome);
+        }
+
+        /** D5: everything the year's withdrawal-cycle bill depends on EXCEPT the gain of the taxable
+         * sale that funds it. {@code taxableAvail}/{@code traditionalAvail} are frozen post-spend-draw,
+         * pre-drain snapshots (the C2 gross-up contract). */
+        private record BillInputs(int year, BigDecimal effectiveOtherIncome, BigDecimal conversionAmount,
+                                  BigDecimal traditionalSpendIncome, BigDecimal baseRealizedGain,
+                                  BigDecimal alreadyChargedBaseTax, BigDecimal extraPoolFundedTax,
+                                  BigDecimal federallyTaxedSocialSecurity, BigDecimal netRentalIncome, int age,
+                                  BigDecimal taxableAvail, BigDecimal traditionalAvail) {}
+
+        /** D5: one evaluation of the year's full bill (ordinary bundle + LTCG incl. the gross-up
+         * re-stack + C2 gross-up + the 10% early-withdrawal penalty) at a candidate tax-funding-sale
+         * gain. {@code ltcgTax} already includes the re-stack delta. */
+        private record TaxBill(BigDecimal total, BigDecimal ltcgTax, BigDecimal realizedLtcgIncome,
+                               GrossUpResult grossUp, BigDecimal earlyWithdrawalPenalty) {}
+
+        private TaxBill computeBill(BillInputs in, BigDecimal taxSaleGain) {
+            BigDecimal realizedGain = in.baseRealizedGain().add(taxSaleGain);
+            // Realized LTCG + qualified-dividend INCOME, floored at zero: a net realized loss offsets
+            // the year's gains/dividends but never yields a negative tax (its small AGI offset stays
+            // out of scope). Computed BEFORE the ordinary-tax bundle because it feeds two places: the
+            // state base of that bundle for states that tax capital gains as ordinary income (audit
+            // C3), and AGI-ex-SS for the Social Security provisional-income convergence (audit B2).
             BigDecimal realizedLtcgIncome = realizedGain.add(qualifiedDividendIncome).max(BigDecimal.ZERO);
 
             // Audit C1: this year's ordinary-interest income (the taxable pool's bond+cash sleeve,
@@ -1184,10 +1245,11 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             // already take: the full taxableIncome bundle below (which feeds the Social Security
             // provisional-income convergence via realizedPortfolioTaxable -- see
             // YearFinanceResolver -- and the state base for capital-gains-as-ordinary states).
-            BigDecimal taxableIncome = traditionalOrdinaryIncome.add(effectiveOtherIncome).add(conversionAmount)
-                    .add(ordinaryInterestIncome);
-            var ordinaryTax = computeOrdinaryTax(taxableIncome, year, effectiveOtherIncome,
-                    conversionAmount, alreadyChargedBaseTax, realizedLtcgIncome, federallyTaxedSocialSecurity);
+            BigDecimal taxableIncome = in.traditionalSpendIncome().add(in.effectiveOtherIncome())
+                    .add(in.conversionAmount()).add(ordinaryInterestIncome);
+            var ordinaryTax = computeOrdinaryTax(taxableIncome, in.year(), in.effectiveOtherIncome(),
+                    in.conversionAmount(), in.alreadyChargedBaseTax(), realizedLtcgIncome,
+                    in.federallyTaxedSocialSecurity());
             CombinedTaxResult detailed = ordinaryTax.detailed();
 
             // Long-term capital-gains tax on the realized FIFO gain + this year's qualified dividend,
@@ -1196,19 +1258,18 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             // runs -- both in retirement and, since T18a-2, in a still-working RMD-age year. LTCG is a
             // federal tax, so it belongs in the federal-tax breakdown -- it folds into taxLiability and
             // drains the pools via the same cascade as the ordinary withdrawal tax, AND is returned
-            // separately (below) so the engine can fold it into the year's federalTax field. It is
+            // separately so the engine can fold it into the year's federalTax field. It is
             // deliberately NOT added to lastTaxBreakdown here: for retired years RetirementTaxAnnotator
             // recomputes (and overwrites) the DTO's federal/state breakdown from scratch downstream of
             // this call, so that is where the fold actually has to happen -- see
             // RetirementTaxAnnotator#annotate.
-            BigDecimal ltcgTax = computeLtcgTax(realizedGain, taxableIncome, year, detailed, netRentalIncome);
+            BigDecimal ltcgTax = computeLtcgTax(realizedGain, taxableIncome, in.year(), detailed,
+                    in.netRentalIncome());
 
             // C2: a tax payment sourced from the traditional pool is ITSELF an ordinary-income
             // distribution once withdrawn -- converge the traditional-funded slice of the bill to
             // a fixed point (see growTraditionalGrossUp) BEFORE physically draining the pools, so
             // the extra draw is debited, taxed, and reported as ordinary income all in one pass.
-            // taxableAvail/traditionalAvail are frozen here (post spend-draw, post RMD force-out,
-            // pre-tax-cascade) -- the fixed-point search below never mutates the pools.
             // NOTE: growTraditionalGrossUp's internal recomputes call computeOrdinaryTax, which
             // ALREADY updates lastTaxBreakdown as a side effect (with its own conditional-recording
             // logic -- see that method's javadoc) on every call it makes, including the LAST one when
@@ -1216,9 +1277,10 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             // iterate (no traditional slice to gross up), lastTaxBreakdown is untouched by this method
             // and stays exactly what the pre-loop computeOrdinaryTax call above already left it as --
             // byte-identical to pre-C2 behavior.
-            var grossUp = growTraditionalGrossUp(taxableIncome, year, effectiveOtherIncome, conversionAmount,
-                    alreadyChargedBaseTax, realizedLtcgIncome, federallyTaxedSocialSecurity, ltcgTax,
-                    extraPoolFundedTax, ordinaryTax, lots.totalValue(), traditional.total());
+            var grossUp = growTraditionalGrossUp(taxableIncome, in.year(), in.effectiveOtherIncome(),
+                    in.conversionAmount(), in.alreadyChargedBaseTax(), realizedLtcgIncome,
+                    in.federallyTaxedSocialSecurity(), ltcgTax, in.extraPoolFundedTax(), ordinaryTax,
+                    in.taxableAvail(), in.traditionalAvail());
             // Phase 1a reconciliation: LTCG stacks on the FULL year's ordinary income, including the
             // C2 gross-up slice. Re-price once on the final base; the (non-negative) delta joins the
             // pool-funded tax. Its own funding draw is not re-stacked -- the same documented
@@ -1226,46 +1288,65 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             BigDecimal ltcgRestackDelta = BigDecimal.ZERO;
             if (grossUp.traditionalGrossUp().signum() > 0 && realizedLtcgIncome.signum() > 0) {
                 BigDecimal restackedLtcgTax = computeLtcgTax(realizedGain,
-                        taxableIncome.add(grossUp.traditionalGrossUp()), year, detailed, netRentalIncome);
+                        taxableIncome.add(grossUp.traditionalGrossUp()), in.year(), detailed,
+                        in.netRentalIncome());
                 ltcgRestackDelta = restackedLtcgTax.subtract(ltcgTax).max(BigDecimal.ZERO);
                 ltcgTax = ltcgTax.add(ltcgRestackDelta);
             }
-            BigDecimal totalWithdrawalTax = grossUp.tax().add(ltcgRestackDelta);
-            // The converged gross-up draw is itself a traditional distribution: fold it into the
-            // reported ordinary income so it (a) feeds the audit-B2 Social Security provisional-
-            // income loop the same way the spend draw/RMD excess already do (see
-            // YearFinanceResolver#realizedPortfolioTaxable, fed by this field) and (b) makes
-            // RetirementTaxAnnotator's independent federal/state recompute agree with taxLiability.
-            traditionalOrdinaryIncome = traditionalOrdinaryIncome.add(grossUp.traditionalGrossUp());
 
-            TaxSourceResult withdrawalTaxSource = totalWithdrawalTax.compareTo(BigDecimal.ZERO) > 0
-                    ? deductFromPools(totalWithdrawalTax) : TaxSourceResult.ZERO;
-
-            // T18a-4: 10% IRC 72(t) additional tax on traditional DISTRIBUTIONS before age 59½
-            // (age < earlyAccessAge from AgeMilestones -- the 59 1/2 calendar year, legacy 60 -- the SAME threshold the
-            // withdrawal-order strategies already use to steer clear of early traditional draws).
-            // Applies to the year's FULL traditional-sourced distribution captured by
-            // traditionalOrdinaryIncome (spend draw + RMD force-out + the C2 tax-funding gross-up
-            // slice) -- Roth conversions are OUT OF SCOPE (the converted dollars move internally to
-            // Roth, not withdrawn to the household). Funded via its own simple pool drain, NOT
-            // re-run through growTraditionalGrossUp's fixed point -- re-stacking the penalty's own
-            // funding draw as further taxable/penalizable income is a documented, out-of-scope
-            // second-order effect, the same category as ltcgTax/extraPoolFundedTax above.
-            BigDecimal earlyWithdrawalPenalty = age < earlyAccessAge
-                    ? traditionalOrdinaryIncome.multiply(EARLY_WITHDRAWAL_PENALTY_RATE)
+            // T18a-4: 10% IRC 72(t) additional tax on traditional DISTRIBUTIONS before early-access
+            // age (age < earlyAccessAge from AgeMilestones -- the 59 1/2 calendar year, legacy 60 -- the
+            // SAME threshold the withdrawal-order strategies already use to steer clear of early
+            // traditional draws). Applies to the year's FULL traditional-sourced distribution (spend
+            // draw + RMD force-out + the C2 tax-funding gross-up slice) -- Roth conversions are OUT OF
+            // SCOPE (the converted dollars move internally to Roth, not withdrawn to the household).
+            // It is NOT part of the C2 gross-up's own fixed point (re-stacking the penalty's funding
+            // draw as further taxable/penalizable income is a documented, out-of-scope second-order
+            // effect), but D5 prices the taxable sale that funds it via settleTaxSaleGain.
+            BigDecimal penalty = in.age() < earlyAccessAge
+                    ? in.traditionalSpendIncome().add(grossUp.traditionalGrossUp())
+                            .multiply(EARLY_WITHDRAWAL_PENALTY_RATE)
                     : BigDecimal.ZERO;
-            if (earlyWithdrawalPenalty.compareTo(BigDecimal.ZERO) > 0) {
-                withdrawalTaxSource = withdrawalTaxSource.add(deductFromPools(earlyWithdrawalPenalty));
-            }
+            return new TaxBill(grossUp.tax().add(ltcgRestackDelta).add(penalty), ltcgTax, realizedLtcgIncome,
+                    grossUp, penalty);
+        }
 
-            // T18a-5a: the aggregate includes the forced RMD excess (rmdForced) on top of the raw
-            // spend-draw allocation, so it reconciles exactly with fromTaxable + traditionalOrdinaryIncome
-            // (which already counts rmdForced) + fromRoth -- see the WithdrawalTaxResult javadoc.
-            return new WithdrawalTaxResult(
-                    fromTaxable.add(fromTraditional).add(fromRoth).add(rmdForced),
-                    totalWithdrawalTax.add(earlyWithdrawalPenalty),
-                    fromTaxable, traditionalOrdinaryIncome, fromRoth, withdrawalTaxSource, ltcgTax,
-                    realizedLtcgIncome, earlyWithdrawalPenalty, ordinaryInterestIncome);
+        /**
+         * D5: solves {@code bill = Bill(gainOf(min(bill, taxableAvail)))} -- the taxable sale that pays
+         * the year's bill realizes a gain, which raises the bill. Same convergence shape as
+         * {@link #growTraditionalGrossUp}: one naive pass, a closed-form warm jump off the measured
+         * tax-per-sale-dollar chord ({@code sale = bill0 / (1 - r)}), then at most
+         * {@link #MAX_TAX_SALE_GAIN_ITERATIONS} polish passes to a $1 gain tolerance. Never mutates a
+         * pool ({@code peekFifoGain} only); the LAST {@code computeBill} call is always at the returned
+         * gain, so {@code lastTaxBreakdown} reflects the settled bill. No embedded gain => returns the
+         * gain-0 bill, byte-identical to pre-D5.
+         */
+        private TaxBill settleTaxSaleGain(BillInputs in) {
+            TaxBill bill = computeBill(in, BigDecimal.ZERO);
+            BigDecimal sale0 = bill.total().min(in.taxableAvail());
+            BigDecimal gain = lots.peekFifoGain(sale0);
+            if (gain.abs().compareTo(GROSS_UP_TOLERANCE) < 0) {
+                return bill;
+            }
+            TaxBill atGain = computeBill(in, gain);
+            BigDecimal taxPerSaleDollar = atGain.total().subtract(bill.total())
+                    .divide(sale0, SCALE + 4, ROUNDING)
+                    .max(BigDecimal.ZERO)
+                    .min(GROSS_UP_WARM_START_RATE_CAP);
+            BigDecimal warmSale = bill.total()
+                    .divide(BigDecimal.ONE.subtract(taxPerSaleDollar), SCALE + 4, ROUNDING)
+                    .min(in.taxableAvail());
+            BigDecimal settledGain = lots.peekFifoGain(warmSale);
+            TaxBill current = computeBill(in, settledGain);
+            for (int i = 0; i < MAX_TAX_SALE_GAIN_ITERATIONS; i++) {
+                BigDecimal impliedGain = lots.peekFifoGain(current.total().min(in.taxableAvail()));
+                if (impliedGain.subtract(settledGain).abs().compareTo(GROSS_UP_TOLERANCE) < 0) {
+                    break;
+                }
+                settledGain = impliedGain;
+                current = computeBill(in, settledGain);
+            }
+            return current;
         }
 
         /** The year's ordinary-income tax bundle: the net pool-funded tax plus the detailed result. */
@@ -1387,12 +1468,11 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
          * touched during the search.
          *
          * <p>Only the ORDINARY tax bundle is re-stacked each pass; {@code ltcgTax} and {@code
-         * extraPoolFundedTax} are added on top unchanged (re-stacking LTCG against a higher ordinary
-         * floor as the gross-up grows is a documented, out-of-scope second-order effect, the same
-         * category as the taxable-slice realized-gain discard in {@link #deductFromPools}). The Roth
+         * extraPoolFundedTax} are added on top unchanged inside the search (the caller re-prices LTCG
+         * once against the final ordinary floor -- see {@link #computeBill}). The Roth
          * slice of a tax payment is never grossed up (Roth withdrawals are tax-free) and the taxable
-         * slice keeps its existing untaxed-sale treatment -- this method only ever grows the
-         * TRADITIONAL slice.
+         * slice's realized gain is priced by {@link #settleTaxSaleGain} (D5) -- this method only ever
+         * grows the TRADITIONAL slice.
          *
          * <p>The physical drain happens once, afterward, via the caller's own {@link
          * #deductFromPools} call on the returned {@code tax} -- this method never mutates a pool.
@@ -1481,7 +1561,8 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
         record MultiPoolMemento(List<BigDecimal[]> lots, Map<PersonId, BigDecimal> traditional,
                                 Map<PersonId, BigDecimal> roth, BigDecimal qualifiedDividendIncome,
                                 BigDecimal ordinaryInterestIncome,
-                                Optional<CombinedTaxResult> lastTaxBreakdown) implements Memento {}
+                                Optional<CombinedTaxResult> lastTaxBreakdown,
+                                BigDecimal pendingTaxSaleGain) implements Memento {}
 
         @Override
         public Memento snapshot() {
@@ -1489,7 +1570,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             // maps, deep-copied so the SS-convergence loop can restore the same starting state
             // repeatedly). BigDecimal is immutable, so copying the map is enough.
             return new MultiPoolMemento(lots.snapshot(), traditional.snapshot(), roth.snapshot(),
-                    qualifiedDividendIncome, ordinaryInterestIncome, lastTaxBreakdown);
+                    qualifiedDividendIncome, ordinaryInterestIncome, lastTaxBreakdown, pendingTaxSaleGain);
         }
 
         @Override
@@ -1501,6 +1582,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                 this.qualifiedDividendIncome = m.qualifiedDividendIncome();
                 this.ordinaryInterestIncome = m.ordinaryInterestIncome();
                 this.lastTaxBreakdown = m.lastTaxBreakdown();
+                this.pendingTaxSaleGain = m.pendingTaxSaleGain();
             }
         }
 
@@ -1720,6 +1802,11 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
         }
 
         @Override
+        public boolean hasPendingTaxSaleGain() {
+            return pendingTaxSaleGain.signum() != 0;
+        }
+
+        @Override
         public boolean processIncomeSourcesEveryYear() {
             return true;
         }
@@ -1752,10 +1839,11 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             }
             BigDecimal remaining = amount;
 
-            // Pay from taxable first, selling lots FIFO. The gain realized by this tax-payment sale
-            // is deliberately not itself taxed (a second-order effect out of scope for this model).
+            // Pay from taxable first, selling lots FIFO. D5: the realized gain pends until the year's
+            // withdrawal cycle taxes it (executeWithdrawals folds it in, or prices it via
+            // settleTaxSaleGain when this drain IS that cycle's bill).
             BigDecimal fromTax = remaining.min(lots.totalValue());
-            lots.sellFifo(fromTax);
+            pendingTaxSaleGain = pendingTaxSaleGain.add(lots.sellFifo(fromTax));
             remaining = remaining.subtract(fromTax);
 
             // Traditional and Roth slices of the bill split proportionally by owner balance (task 4);

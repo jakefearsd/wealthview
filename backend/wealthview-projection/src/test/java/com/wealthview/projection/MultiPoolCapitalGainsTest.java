@@ -115,13 +115,16 @@ class MultiPoolCapitalGainsTest {
         // remaining $3,350 of the 0% bracket (48350 − 45000) then spills into 15%:
         //   3350 × 0% + (40000 − 3350) × 15% = 36650 × 0.15 = 5497.50
         // MAGI stays gross (100000, unaffected by the deduction) < $200k NIIT threshold → no NIIT.
+        // D5 (Phase 1a): the 5497.50 bill is itself paid by selling 40%-gain lots (remaining 400k value /
+        // 240k basis), and that sale's gain is taxed at 15% too: T = 5497.50 + 0.15 * 0.4 * T
+        // -> T = 5497.50 / 0.94 = 5848.4043 (was 5497.50).
         var r = pool.executeWithdrawals(bd("100000"), YEAR, bd("60000"), ZERO, ZERO, AGE_RETIRED);
 
         assertThat(r.fromTaxable()).isEqualByComparingTo(bd("100000"));
-        assertThat(r.taxLiability()).isEqualByComparingTo(bd("5497.50"));
+        assertThat(r.taxLiability()).isEqualByComparingTo(bd("5848.4043"));   // D5 (Phase 1a): was 5497.50
         // No ordinary tax calculator wired in this fixture, so taxLiability is LTCG tax alone --
         // r.ltcgTax() (the field the engine folds into the federalTax breakdown) matches it exactly.
-        assertThat(r.ltcgTax()).isEqualByComparingTo(bd("5497.50"));
+        assertThat(r.ltcgTax()).isEqualByComparingTo(bd("5848.4043"));        // D5 (Phase 1a): was 5497.50
     }
 
     /**
@@ -137,7 +140,11 @@ class MultiPoolCapitalGainsTest {
      * LESS LTCG tax: {@code (40000 - 25350) * 0.15 = 2197.50} -- a concrete, oracle-verified
      * DIRECTION difference from the sibling test's $5,497.50 under the standard deduction, not
      * merely a null-vs-non-null check. A regression to the standard-deduction fallback would produce
-     * $5,497.50 here instead, failing this assertion.
+     * a figure near $5,848 here instead, failing this assertion.
+     *
+     * <p>D5 (Phase 1a): the year's bill (ordinary 2,521.50 + LTCG 2,197.50) is paid by selling 40%-gain
+     * lots whose gain is taxed at 15% as well: ltcgTax = 2,197.50 + 0.15 * 0.4 * S with
+     * S = 4,719.00 / 0.94 -> 2,498.7128 (was 2,197.50).
      */
     @Test
     void executeWithdrawals_itemizingYear_stackingFloorNetsItemizedDeductionNotStandard() {
@@ -154,7 +161,7 @@ class MultiPoolCapitalGainsTest {
 
         var r = p.executeWithdrawals(bd("100000"), YEAR, bd("60000"), ZERO, ZERO, AGE_RETIRED);
 
-        assertThat(r.ltcgTax()).isEqualByComparingTo(bd("2197.50"));
+        assertThat(r.ltcgTax()).isEqualByComparingTo(bd("2498.7128"));   // D5 (Phase 1a): was 2197.50
     }
 
     /**
@@ -163,6 +170,9 @@ class MultiPoolCapitalGainsTest {
      * 66-year-old filer whose 2025 deduction is 15,000 + 2,000 (age-65 adder) = 17,000:
      * floor = 60,000 - 17,000 = 43,000 -> 0% room = 48,350 - 43,000 = 5,350 ->
      * LTCG tax = (40,000 - 5,350) x 0.15 = 5,197.50. The age-unaware floor (15,000) gives 5,497.50.
+     * D5 (Phase 1a): the bill (ordinary 4,921.50 + LTCG 5,197.50) is paid by selling 40%-gain lots whose
+     * gain is also taxed at 15%: ltcgTax = 5,197.50 + 0.15 * 0.4 * (10,119.00 / 0.94) = 5,843.3936. The
+     * age-aware vs age-unaware distinction still shows (age-unaware would give ~5,848.4).
      */
     @Test
     void executeWithdrawals_filerOver65_stackingFloorNetsAgeAwareStandardDeduction() {
@@ -182,7 +192,7 @@ class MultiPoolCapitalGainsTest {
 
         var r = p.executeWithdrawals(bd("100000"), YEAR, bd("60000"), ZERO, ZERO, 66);
 
-        assertThat(r.ltcgTax()).isEqualByComparingTo(bd("5197.50"));
+        assertThat(r.ltcgTax()).isEqualByComparingTo(bd("5843.3936"));   // D5 (Phase 1a): was 5197.50
     }
 
     /**
@@ -255,15 +265,17 @@ class MultiPoolCapitalGainsTest {
 
         // Roth-first draw: no taxable sale (realized gain 0), but the $2000 dividend is LTCG income.
         // Ordinary $60k → dividend taxed at 15% = 300 (the drag = value × yield × ltcgRate).
+        // D5 (Phase 1a): the 300 is paid by selling the oldest lot (104,000 value / 100,000 basis, 3.846%
+        // gain), whose gain is taxed at 15% too: T = 300 / (1 - 0.15 * 4000/104000) = 301.7408 (was 300).
         var r = pool.executeWithdrawals(bd("50000"), YEAR, bd("60000"), ZERO, ZERO, AGE_RETIRED);
         assertThat(r.fromTaxable()).isEqualByComparingTo(ZERO);
-        assertThat(r.taxLiability()).isEqualByComparingTo(bd("300"));
+        assertThat(r.taxLiability()).isEqualByComparingTo(bd("301.7408"));   // D5 (Phase 1a): was 300
 
-        // The dividend tax drained the taxable pool from 106000 to 105700 (only the $300 drag).
+        // The dividend tax drained the taxable pool from 106000 to 105698.2592 (only the 301.7408 drag).
         var dto = pool.buildYearDto(new PoolStrategy.YearDtoContext(YEAR, AGE_RETIRED, bd("300000"),
                 ZERO, g.total(), bd("50000"), true, ZERO, r.taxLiability(), g,
                 r.fromTaxable(), r.fromTraditional(), r.fromRoth(), r.taxSource(), ZERO, ZERO, ZERO));
-        assertThat(dto.taxableBalance()).isEqualByComparingTo(bd("105700"));
+        assertThat(dto.taxableBalance()).isEqualByComparingTo(bd("105698.2592"));   // D5 (Phase 1a): was 105700
     }
 
     // ---- T18a-3: net rental income joins the NIIT Net Investment Income base ----
@@ -275,13 +287,15 @@ class MultiPoolCapitalGainsTest {
         // the 15% bracket (ordinary 250000 already past the 48350/533400 band) = 6000.00.
         // magi = 250000 + 40000 = 290000; excess over the 200000 threshold = 90000. Without a rental
         // figure, NII is just the 40000 gain -> niit = 40000 * 0.038 = 1520.00.
+        // D5 (Phase 1a): the 7520.00 bill is paid by selling 40%-gain lots whose gain bears 15% + 3.8%
+        // NIIT: T = 7520 / (1 - 0.188 * 0.4) = 8131.4879 (was 7520.00).
         var pool = pool(taxableAcct("500000", "300000"), acct("0", "traditional"), acct("0", "roth"),
                 "0", "0", WithdrawalOrder.TAXABLE_FIRST, capitalGainsCalc());
 
         var r = pool.executeWithdrawals(bd("100000"), YEAR, bd("250000"), ZERO, ZERO, AGE_RETIRED,
                 ZERO, ZERO, ZERO, ZERO);
 
-        assertThat(r.taxLiability()).isEqualByComparingTo(bd("7520.00")); // 6000 bracket + 1520 NIIT
+        assertThat(r.taxLiability()).isEqualByComparingTo(bd("8131.4879")); // D5 (Phase 1a): was 7520.00 (6000 bracket + 1520 NIIT)
         assertThat(r.ltcgTax()).isEqualByComparingTo(r.taxLiability());
     }
 
@@ -292,15 +306,18 @@ class MultiPoolCapitalGainsTest {
         // under the 90000 magi-over-threshold excess): NII = 40000 gain + 30000 rental = 70000 ->
         // niit = 70000 * 0.038 = 2660.00. The bracket tax (6000.00) is UNCHANGED -- rental income is
         // ordinary income, not LTCG, so it never touches the 0/15/20% bracket walk.
+        // D5 (Phase 1a): the 8660.00 bill's funding-sale gain bears the same 18.8% -> T = 8660 / 0.9248 =
+        // 9364.1869 (was 8660.00); the rental-driven delta grosses up by the same factor.
         var pool = pool(taxableAcct("500000", "300000"), acct("0", "traditional"), acct("0", "roth"),
                 "0", "0", WithdrawalOrder.TAXABLE_FIRST, capitalGainsCalc());
 
         var r = pool.executeWithdrawals(bd("100000"), YEAR, bd("250000"), ZERO, ZERO, AGE_RETIRED,
                 ZERO, ZERO, ZERO, bd("30000"));
 
-        assertThat(r.taxLiability()).isEqualByComparingTo(bd("8660.00")); // 6000 bracket + 2660 NIIT
+        assertThat(r.taxLiability()).isEqualByComparingTo(bd("9364.1869")); // D5 (Phase 1a): was 8660.00 (6000 bracket + 2660 NIIT)
         assertThat(r.ltcgTax()).isEqualByComparingTo(r.taxLiability());
-        // Isolate the delta to exactly the rental-driven NIIT growth (30000 * 3.8% = 1140.00).
-        assertThat(r.taxLiability().subtract(bd("7520.00"))).isEqualByComparingTo(bd("1140.00"));
+        // Isolate the delta to exactly the rental-driven NIIT growth (30000 * 3.8% = 1140.00), grossed up
+        // by the funding-sale factor 1 / 0.9248 (D5 Phase 1a: was 1140.00).
+        assertThat(r.taxLiability().subtract(bd("8131.4879"))).isEqualByComparingTo(bd("1232.6990"));
     }
 }

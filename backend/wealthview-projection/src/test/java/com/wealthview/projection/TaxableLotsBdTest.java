@@ -207,4 +207,34 @@ class TaxableLotsBdTest {
 
         assertThat(lots.totalBasis()).isEqualByComparingTo(bd("80")); // 60 + 40*0.5 => joint rate applied
     }
+
+    @Test
+    void peekFifoGain_partialOldestLot_matchesSellFifoWithoutMutating() {
+        var lots = new TaxableLotsBd();
+        lots.addLot(new BigDecimal("100000"), new BigDecimal("200000"));   // 50% embedded gain
+        lots.addLot(new BigDecimal("50000"));                              // at cost
+
+        BigDecimal peeked = lots.peekFifoGain(new BigDecimal("7014"));
+
+        assertThat(peeked).isEqualByComparingTo("3507.0000");
+        assertThat(lots.totalValue()).isEqualByComparingTo("250000");
+        assertThat(lots.totalBasis()).isEqualByComparingTo("150000");
+        assertThat(lots.sellFifo(new BigDecimal("7014"))).isEqualByComparingTo(peeked);
+    }
+
+    @Test
+    void peekFifoGain_lossLot_returnsNegativeGain() {
+        var lots = new TaxableLotsBd();
+        lots.addLot(new BigDecimal("300000"), new BigDecimal("200000"));   // basis above value
+
+        assertThat(lots.peekFifoGain(new BigDecimal("7014"))).isEqualByComparingTo("-3507.0000");
+    }
+
+    @Test
+    void peekFifoGain_amountAboveTotal_cappedAtTotalValue() {
+        var lots = new TaxableLotsBd();
+        lots.addLot(new BigDecimal("600"), new BigDecimal("1000"));
+
+        assertThat(lots.peekFifoGain(new BigDecimal("5000"))).isEqualByComparingTo("400.0000");
+    }
 }

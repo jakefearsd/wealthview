@@ -143,4 +143,17 @@ class TaxableLotsTest {
 
         assertThat(lots.totalBasis()).isEqualTo(300.0, within(1e-9)); // stepped fully -> proves retag
     }
+
+    @Test
+    void peekFifoGain_spanningLots_matchesSellFifoWithoutMutating() {
+        var lots = new TaxableLots();
+        lots.addLot(100); lots.grow(1.0);   // A: basis 100, value 200
+        lots.addLot(100);                    // B: basis 100, value 100
+
+        double peeked = lots.peekFifoGain(250);
+
+        assertThat(peeked).isEqualTo(100.0, within(1e-9));
+        assertThat(lots.totalValue()).isEqualTo(300.0, within(1e-9));
+        assertThat(lots.sellFifo(250)).isEqualTo(peeked, within(1e-9));
+    }
 }

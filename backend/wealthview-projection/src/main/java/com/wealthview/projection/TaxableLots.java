@@ -130,6 +130,28 @@ final class TaxableLots {
         return gain;
     }
 
+    /** D5: the realized gain {@link #sellFifo} WOULD return for {@code amount}, without mutating any
+     * lot (Monte Carlo twin of {@code TaxableLotsBd#peekFifoGain}). Negative for loss lots. */
+    double peekFifoGain(double amount) {
+        double remaining = Math.min(amount, totalValue());
+        double gain = 0;
+        for (double[] lot : lots) {
+            if (remaining <= 1e-12) {
+                break;
+            }
+            double basis = lot[0];
+            double value = lot[1];
+            if (value <= remaining + 1e-12) {
+                gain += value - basis;
+                remaining -= value;
+            } else {
+                gain += remaining - basis * (remaining / value);
+                remaining = 0;
+            }
+        }
+        return gain;
+    }
+
     /** HP3 Part C (asymmetry note): a hot-loop safety valve with no {@link TaxableLotsBd} (det
      * engine) counterpart -- see that class's javadoc for why the asymmetry is intentional, not a
      * gap. Bounded (fires only above {@code cap}) and unreachable at realistic horizons. */

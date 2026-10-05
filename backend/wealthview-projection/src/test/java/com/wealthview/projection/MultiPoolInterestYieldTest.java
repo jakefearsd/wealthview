@@ -108,12 +108,14 @@ class MultiPoolInterestYieldTest {
         var r = pool.executeWithdrawals(bd("50000"), YEAR, bd("60000"), ZERO, ZERO, AGE_RETIRED);
         assertThat(r.fromTaxable()).isEqualByComparingTo(ZERO);
         // Bit-identical to the pre-C1 pin: $2000 dividend (100% of the yield) taxed at 15% = $300.
-        assertThat(r.taxLiability()).isEqualByComparingTo(bd("300"));
+        // D5 (Phase 1a): the $300 is paid by selling the oldest lot (104,000 value / 100,000 basis); its
+        // 3.846% gain is taxed at 15% too: 300 / (1 - 0.15 * 4000/104000) = 301.7408 (was 300).
+        assertThat(r.taxLiability()).isEqualByComparingTo(bd("301.7408"));
 
         var dto = pool.buildYearDto(new PoolStrategy.YearDtoContext(YEAR, AGE_RETIRED, bd("300000"),
                 ZERO, g.total(), bd("50000"), true, ZERO, r.taxLiability(), g,
                 r.fromTaxable(), r.fromTraditional(), r.fromRoth(), r.taxSource(), ZERO, ZERO, ZERO));
-        assertThat(dto.taxableBalance()).isEqualByComparingTo(bd("105700"));
+        assertThat(dto.taxableBalance()).isEqualByComparingTo(bd("105698.2592"));   // D5 (Phase 1a): was 105700
     }
 
     // ---- 60/40 split reduces qualified-dividend/LTCG income vs the ALL_US pin above ----
@@ -136,7 +138,9 @@ class MultiPoolInterestYieldTest {
 
         var r = pool.executeWithdrawals(bd("50000"), YEAR, bd("60000"), ZERO, ZERO, AGE_RETIRED);
         assertThat(r.fromTaxable()).isEqualByComparingTo(ZERO);
-        assertThat(r.taxLiability()).isEqualByComparingTo(bd("180"));
+        // D5 (Phase 1a): the $180 is paid by selling the oldest lot (103,200 value / 100,000 basis); its
+        // 3.101% gain is taxed at 15% too: 180 / (1 - 0.15 * 3200/103200) = 180.8411 (was 180).
+        assertThat(r.taxLiability()).isEqualByComparingTo(bd("180.8411"));
 
         // Taxable balance drains by exactly the $180 LTCG drag: 106000 - 180 = 105820 (vs 105700
         // under ALL_US -- less tax leaves the pool because less income was qualified-dividend-taxed
@@ -144,7 +148,7 @@ class MultiPoolInterestYieldTest {
         var dto = pool.buildYearDto(new PoolStrategy.YearDtoContext(YEAR, AGE_RETIRED, bd("300000"),
                 ZERO, g.total(), bd("50000"), true, ZERO, r.taxLiability(), g,
                 r.fromTaxable(), r.fromTraditional(), r.fromRoth(), r.taxSource(), ZERO, ZERO, ZERO));
-        assertThat(dto.taxableBalance()).isEqualByComparingTo(bd("105820"));
+        assertThat(dto.taxableBalance()).isEqualByComparingTo(bd("105819.1589"));   // D5 (Phase 1a): was 105820
     }
 
     // ---- ordinary interest income joins the ordinary tax bundle, not the LTCG bundle ----

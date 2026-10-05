@@ -504,7 +504,14 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
      * lower by the same amount. Proves the state adjustment reaches the funding cascade
      * (T8 review), not just the displayed breakdown.
      *
-     * <p>Hand-computed fixture (returns 0.00, inflation 0, no conversion, no RMD at 66):
+     * <p>D5 (Phase 1a): the taxable account's return is set equal to the default 1.8% dividend yield so
+     * its lots neither gain nor lose value (growth net of the distribution is zero; {@code fee_rate} is
+     * pinned to 0 so no fee drag breaks that). With a zero return the net growth is negative and leaves
+     * an embedded LOSS, and the loss realized by the lots sold
+     * to pay each run's (different) tax bill would offset the dividends by a run-dependent amount --
+     * perturbing the Social Security taxability and state base this fixture pins as identical.
+     *
+     * <p>Hand-computed fixture (traditional return 0.00, inflation 0, no conversion, no RMD at 66):
      * <ul>
      *   <li>draw = 4% x $800K = $32,000, all traditional (traditional_first; taxable untouched)</li>
      *   <li>dividend = $300K x 1.8% default yield = $5,400 = the year's realized LTCG income
@@ -525,11 +532,11 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
-                 "withdrawal_order": "traditional_first", "state": "CA"}
+                 "withdrawal_order": "traditional_first", "state": "CA", "fee_rate": 0}
                 """.formatted(retiredAt66BirthYear()),
                 List.of(
                         acct("500000", "0", "0.00", "traditional"),
-                        acct("300000", "0", "0.00", "taxable")),
+                        acct("300000", "0", "0.018", "taxable")),   // D5: was 0.00 -- see javadoc
                 null, List.of(socialSecuritySource("30000", 62)));
 
         // CA-like state: taxes capital gains as ordinary income AND exempts Social Security.

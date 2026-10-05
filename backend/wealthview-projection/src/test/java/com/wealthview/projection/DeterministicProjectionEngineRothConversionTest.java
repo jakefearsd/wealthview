@@ -4,18 +4,25 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
+import com.wealthview.core.projection.dto.AssetAllocation;
 import com.wealthview.core.projection.dto.GuardrailSpendingInput;
 import com.wealthview.core.projection.dto.GuardrailYearlySpending;
+import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
+import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
+import com.wealthview.core.projection.tax.FederalTaxCalculator;
+import com.wealthview.persistence.repository.LtcgBracketRepository;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
+import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025Ltcg;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.acct;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.createGuardrailInput;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.createInput;
@@ -25,6 +32,8 @@ import static com.wealthview.projection.testutil.ProjectionTestFixtures.property
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.retiredAt66BirthYear;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.socialSecuritySource;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
+import static org.mockito.Mockito.mock;
 
 class DeterministicProjectionEngineRothConversionTest extends DeterministicProjectionEngineTestSupport {
 
@@ -538,5 +547,36 @@ class DeterministicProjectionEngineRothConversionTest extends DeterministicProje
         assertThat(result.spendingFeasibility()).isNotNull();
         assertThat(result.spendingFeasibility().spendingFeasible()).isTrue();
         assertThat(result.spendingFeasibility().firstShortfallYear()).isNull();
+    }
+
+    @Test
+    void run_preRetirementConversionPaidFromGainLots_saleGainTaxedInSameYear() {
+        // Accumulation year (age 40, retires in 20 years): no spend draw and no RMD, so before D5
+        // executeWithdrawals never ran and the conversion-tax sale's gain went untaxed. Now the
+        // pending gain forces the zero-need withdrawal cycle: 9,214.00 conversion tax sells 50%-gain
+        // lots -> 4,607 gain at 15% plus its own funding sale -> 747.08 capital-gains tax. Fee, dividend
+        // and interest yields are zeroed so year-1 lot values stay exactly at the seeded 50% gain.
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var ltcgRepo = mock(LtcgBracketRepository.class);
+        stubSingle2025Ltcg(ltcgRepo);
+        var engineTax = new DeterministicProjectionEngine(
+                new FederalTaxCalculator(taxBracketRepository, standardDeductionRepository), null,
+                new CapitalGainsTaxCalculator(ltcgRepo));
+        var input = createInput(
+                LocalDate.now().plusYears(20), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "annual_roth_conversion": 80000,
+                 "fee_rate": 0, "dividend_yield": 0, "interest_yield": 0}
+                """.formatted(LocalDate.now().getYear() - 40),
+                List.of(
+                        new HypotheticalAccountInput(bd("200000"), BigDecimal.ZERO, AssetAllocation.ALL_US,
+                                Optional.of(BigDecimal.ZERO), bd("100000"), "taxable"),
+                        acct("500000.0000", "0", "0", "traditional")));
+
+        var result = engineTax.run(input);
+
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.rothConversionAmount()).isEqualByComparingTo(bd("80000"));
+        assertThat(year1.capitalGainsTax()).isCloseTo(bd("747.08"), within(bd("0.01")));
     }
 }

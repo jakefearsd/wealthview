@@ -223,14 +223,15 @@ final class YearFinanceResolver {
             realizedLtcgIncome = retirementResult.realizedLtcgIncome();
             earlyWithdrawalPenalty = retirementResult.earlyWithdrawalPenalty();
             ordinaryInterestIncome = retirementResult.ordinaryInterestIncome();
-        } else if (rmdForced.compareTo(BigDecimal.ZERO) > 0) {
+        } else if (rmdForced.compareTo(BigDecimal.ZERO) > 0 || pool.hasPendingTaxSaleGain()) {
             // T18a-2: RMDs apply from the SECURE-2.0 age regardless of retirement status (a
             // still-working owner still owes tax on a forced traditional distribution) -- but a
             // not-yet-retired year has no spend-draw need and none of RetirementWithdrawalProcessor's
             // spending-plan/withdrawal-strategy machinery applies. Run executeWithdrawals directly
             // with a zero spend need so ONLY the forced RMD (and any taxable-pool dividend/LTCG) is
             // taxed -- mirrors the retired, fully-income-covered case (audit A2) that already taxes
-            // a forced RMD past a zero portfolio need.
+            // a forced RMD past a zero portfolio need. D5: also runs when a conversion-tax sale
+            // realized a gain this year, so the gain is taxed in the year it was realized.
             var withdrawalResult = pool.executeWithdrawals(BigDecimal.ZERO, yc.year(),
                     incomeResult.effectiveOtherIncome(), conversionAmount, rmdForced, yc.age(),
                     BigDecimal.ZERO, BigDecimal.ZERO, socialSecurityTaxable, netRentalIncome);

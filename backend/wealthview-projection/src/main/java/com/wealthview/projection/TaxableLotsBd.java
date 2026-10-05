@@ -218,4 +218,29 @@ final class TaxableLotsBd {
         }
         return gain.setScale(SCALE, ROUNDING);
     }
+
+    /** D5: the realized gain {@link #sellFifo} WOULD return for {@code amount}, without mutating any
+     * lot -- lets the tax-funding fixed point in {@code PoolStrategy.MultiPool} price the gain of the
+     * sale that pays a bill before the sale happens. Negative for loss lots. */
+    BigDecimal peekFifoGain(BigDecimal amount) {
+        BigDecimal remaining = amount.min(totalValue()).max(BigDecimal.ZERO);
+        BigDecimal gain = BigDecimal.ZERO;
+        for (BigDecimal[] lot : lots) {
+            if (remaining.signum() <= 0) {
+                break;
+            }
+            BigDecimal basis = lot[0];
+            BigDecimal value = lot[1];
+            if (value.compareTo(remaining) <= 0) {
+                gain = gain.add(value.subtract(basis));
+                remaining = remaining.subtract(value);
+            } else {
+                BigDecimal soldBasis = basis.multiply(remaining)
+                        .divide(value, DIV_SCALE, ROUNDING).setScale(SCALE, ROUNDING);
+                gain = gain.add(remaining.subtract(soldBasis));
+                remaining = BigDecimal.ZERO;
+            }
+        }
+        return gain.setScale(SCALE, ROUNDING);
+    }
 }

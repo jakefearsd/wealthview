@@ -200,6 +200,8 @@ class MultiPoolAccumulationBasisTest {
 
         var r = pool.executeWithdrawals(bd("50000"), YEAR, bd("60000"), ZERO, ZERO, AGE_RETIRED);
         assertThat(r.fromTaxable()).isEqualByComparingTo(ZERO);
-        assertThat(r.taxLiability()).isEqualByComparingTo(bd("300"));   // $2000 dividend @ 15%
+        // D5 (Phase 1a): the $300 dividend tax is paid by selling the oldest lot (104,000 value / 100,000
+        // basis), whose 3.846% gain is taxed at 15% too: 300 / (1 - 0.15 * 4000/104000) = 301.7408 (was 300).
+        assertThat(r.taxLiability()).isEqualByComparingTo(bd("301.7408"));   // $2000 dividend @ 15%, grossed up
     }
 }
