@@ -195,13 +195,21 @@ public class AuthService {
             throw new DuplicateEntityException("Email already registered");
         }
 
+        // A tenant created by a super admin has no users, so nobody could invite others or manage
+        // members. The first registrant into an empty tenant therefore becomes its admin; everyone
+        // after that is a member.
+        var tenant = inviteCode.getTenant();
+        var isFirstUser = !userRepository.existsByTenant_Id(tenant.getId());
         var user = new UserEntity(
-                inviteCode.getTenant(),
+                tenant,
                 request.email(),
                 passwordEncoder.encode(request.password()),
-                "member"
+                isFirstUser ? "admin" : "member"
         );
         user = userRepository.save(user);
+        if (isFirstUser) {
+            log.info("First user {} registered as admin of empty tenant {}", user.getId(), tenant.getId());
+        }
 
         inviteCode.setConsumedBy(user);
         inviteCode.setConsumedAt(OffsetDateTime.now());

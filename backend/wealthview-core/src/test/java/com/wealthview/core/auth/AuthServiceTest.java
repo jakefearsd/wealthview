@@ -247,6 +247,7 @@ class AuthServiceTest {
                 OffsetDateTime.now().plusDays(7));
 
         when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
+        when(userRepository.existsByTenant_Id(tenant.getId())).thenReturn(true);
         when(inviteCodeRepository.findByCode("VALID")).thenReturn(Optional.of(invite));
         when(passwordEncoder.encode("mytestpass")).thenReturn("encoded");
         when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> {
@@ -259,6 +260,44 @@ class AuthServiceTest {
         var response = register(new RegisterRequest("new@example.com", "mytestpass", "VALID"));
 
         assertThat(response.email()).isEqualTo("new@example.com");
+        assertThat(response.role()).isEqualTo("member");
+    }
+
+    @Test
+    void register_firstUserInTenant_becomesAdmin() {
+        var invite = new InviteCodeEntity(tenant, "FIRST", user, OffsetDateTime.now().plusDays(7));
+        when(userRepository.existsByEmail("first@example.com")).thenReturn(false);
+        when(userRepository.existsByTenant_Id(tenant.getId())).thenReturn(false);
+        when(inviteCodeRepository.findByCode("FIRST")).thenReturn(Optional.of(invite));
+        when(passwordEncoder.encode("mytestpass")).thenReturn("encoded");
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> {
+            UserEntity saved = inv.getArgument(0);
+            TestEntityHelper.setId(saved, UUID.randomUUID());
+            return saved;
+        });
+        when(inviteCodeRepository.save(any(InviteCodeEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var response = register(new RegisterRequest("first@example.com", "mytestpass", "FIRST"));
+
+        assertThat(response.role()).isEqualTo("admin");
+    }
+
+    @Test
+    void register_tenantAlreadyHasUsers_becomesMember() {
+        var invite = new InviteCodeEntity(tenant, "LATER", user, OffsetDateTime.now().plusDays(7));
+        when(userRepository.existsByEmail("later@example.com")).thenReturn(false);
+        when(userRepository.existsByTenant_Id(tenant.getId())).thenReturn(true);
+        when(inviteCodeRepository.findByCode("LATER")).thenReturn(Optional.of(invite));
+        when(passwordEncoder.encode("mytestpass")).thenReturn("encoded");
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> {
+            UserEntity saved = inv.getArgument(0);
+            TestEntityHelper.setId(saved, UUID.randomUUID());
+            return saved;
+        });
+        when(inviteCodeRepository.save(any(InviteCodeEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var response = register(new RegisterRequest("later@example.com", "mytestpass", "LATER"));
+
         assertThat(response.role()).isEqualTo("member");
     }
 
@@ -847,6 +886,7 @@ class AuthServiceTest {
                 OffsetDateTime.now().plusDays(7));
         when(inviteCodeRepository.findByCode("INVITE-GOLDEN")).thenReturn(Optional.of(inviteCode));
         when(userRepository.existsByEmail("newcomer@example.com")).thenReturn(false);
+        when(userRepository.existsByTenant_Id(tenant.getId())).thenReturn(true);
         when(passwordEncoder.encode("Str0ng-Unguessable-Pass")).thenReturn("encoded-hash");
         when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> {
             var u = (UserEntity) inv.getArgument(0);

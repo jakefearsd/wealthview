@@ -18,4 +18,6 @@ public interface UserRepository extends TenantScopedRepository<UserEntity> {
     boolean existsByEmail(String email);
 
     long countByTenant_Id(UUID tenantId);
+
+    boolean existsByTenant_Id(UUID tenantId);
 }
