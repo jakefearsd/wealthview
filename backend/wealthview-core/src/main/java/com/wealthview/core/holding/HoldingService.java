@@ -1,12 +1,14 @@
 package com.wealthview.core.holding;
 
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +26,9 @@ import com.wealthview.persistence.repository.HoldingRepository;
 public class HoldingService {
 
     private static final Logger log = LoggerFactory.getLogger(HoldingService.class);
+
+    /** Stable listing order: without it row order follows the heap and jumps after every update. */
+    private static final Comparator<HoldingEntity> BY_SYMBOL = Comparator.comparing(HoldingEntity::getSymbol);
 
     private final HoldingRepository holdingRepository;
     private final AccountRepository accountRepository;
@@ -49,6 +54,7 @@ public class HoldingService {
         var prices = latestPriceLookup.latestFor(symbols);
 
         return holdings.stream()
+                .sorted(BY_SYMBOL)
                 .map(h -> HoldingResponse.from(h, prices.get(h.getSymbol())))
                 .toList();
     }
@@ -63,10 +69,12 @@ public class HoldingService {
     @Transactional(readOnly = true)
     public List<HoldingResponse> listByTenant(UUID tenantId) {
         return holdingRepository.findByTenant_Id(tenantId).stream()
+                .sorted(BY_SYMBOL)
                 .map(HoldingResponse::from)
                 .toList();
     }
 
+    @CacheEvict(value = "accountBalances", key = "#tenantId")
     @Transactional
     public HoldingResponse createManual(UUID tenantId, HoldingRequest request) {
         var account = accountRepository.findByTenant_IdAndId(tenantId, request.accountId())
@@ -84,6 +92,7 @@ public class HoldingService {
         return HoldingResponse.from(holding);
     }
 
+    @CacheEvict(value = "accountBalances", key = "#tenantId")
     @Transactional
     public HoldingResponse update(UUID tenantId, UUID holdingId, HoldingRequest request) {
         var holding = holdingRepository.findByIdAndTenant_Id(holdingId, tenantId)

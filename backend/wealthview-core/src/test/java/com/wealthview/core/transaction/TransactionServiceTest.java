@@ -16,6 +16,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.exception.EntityNotFoundException;
@@ -309,11 +311,43 @@ class TransactionServiceTest {
     }
 
     @Test
+    void listByAccount_sortsNewestFirstWithCreatedAtTiebreak() {
+        var pageable = PageRequest.of(2, 10);
+        when(transactionRepository.findByAccount_IdAndTenant_Id(eq(accountId), eq(tenantId), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        transactionService.listByAccount(tenantId, accountId, pageable);
+
+        var captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(transactionRepository).findByAccount_IdAndTenant_Id(eq(accountId), eq(tenantId), captor.capture());
+        assertThat(captor.getValue().getPageNumber()).isEqualTo(2);
+        assertThat(captor.getValue().getPageSize()).isEqualTo(10);
+        assertThat(captor.getValue().getSort()).containsExactly(
+                Sort.Order.desc("date"), Sort.Order.desc("createdAt"));
+    }
+
+    @Test
+    void listByAccountAndSymbol_sortsNewestFirstWithCreatedAtTiebreak() {
+        var pageable = PageRequest.of(0, 5);
+        when(transactionRepository.findByAccount_IdAndTenant_IdAndSymbol(
+                eq(accountId), eq(tenantId), eq("MSFT"), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        transactionService.listByAccountAndSymbol(tenantId, accountId, "MSFT", pageable);
+
+        var captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(transactionRepository).findByAccount_IdAndTenant_IdAndSymbol(
+                eq(accountId), eq(tenantId), eq("MSFT"), captor.capture());
+        assertThat(captor.getValue().getSort()).containsExactly(
+                Sort.Order.desc("date"), Sort.Order.desc("createdAt"));
+    }
+
+    @Test
     void listByAccount_mapsPageToResponses() {
         var txn = new TransactionEntity(account, tenant, LocalDate.of(2025, 1, 1), BUY, "AAPL",
                 new BigDecimal("1"), new BigDecimal("100"));
         var pageable = PageRequest.of(0, 10);
-        when(transactionRepository.findByAccount_IdAndTenant_Id(accountId, tenantId, pageable))
+        when(transactionRepository.findByAccount_IdAndTenant_Id(eq(accountId), eq(tenantId), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(txn), pageable, 1));
 
         var result = transactionService.listByAccount(tenantId, accountId, pageable);
@@ -328,7 +362,8 @@ class TransactionServiceTest {
         var txn = new TransactionEntity(account, tenant, LocalDate.of(2025, 1, 1), SELL, "MSFT",
                 new BigDecimal("2"), new BigDecimal("500"));
         var pageable = PageRequest.of(0, 5);
-        when(transactionRepository.findByAccount_IdAndTenant_IdAndSymbol(accountId, tenantId, "MSFT", pageable))
+        when(transactionRepository.findByAccount_IdAndTenant_IdAndSymbol(
+                eq(accountId), eq(tenantId), eq("MSFT"), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(txn), pageable, 1));
 
         var result = transactionService.listByAccountAndSymbol(tenantId, accountId, "MSFT", pageable);

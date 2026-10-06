@@ -7,7 +7,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +29,7 @@ import com.wealthview.persistence.repository.TransactionRepository;
 public class TransactionService {
 
     private static final Logger log = LoggerFactory.getLogger(TransactionService.class);
+    private static final Sort NEWEST_FIRST = Sort.by(Sort.Direction.DESC, "date", "createdAt");
 
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
@@ -93,15 +96,24 @@ public class TransactionService {
 
     @Transactional(readOnly = true)
     public PageResponse<TransactionResponse> listByAccount(UUID tenantId, UUID accountId, Pageable pageable) {
-        var page = transactionRepository.findByAccount_IdAndTenant_Id(accountId, tenantId, pageable);
+        var page = transactionRepository.findByAccount_IdAndTenant_Id(accountId, tenantId, newestFirst(pageable));
         return PageResponse.from(page, TransactionResponse::from);
     }
 
     @Transactional(readOnly = true)
     public PageResponse<TransactionResponse> listByAccountAndSymbol(UUID tenantId, UUID accountId,
                                                                      String symbol, Pageable pageable) {
-        var page = transactionRepository.findByAccount_IdAndTenant_IdAndSymbol(accountId, tenantId, symbol, pageable);
+        var page = transactionRepository.findByAccount_IdAndTenant_IdAndSymbol(
+                accountId, tenantId, symbol, newestFirst(pageable));
         return PageResponse.from(page, TransactionResponse::from);
+    }
+
+    /** Newest first: transaction date, then creation time as the tie-break for same-day entries. */
+    private static Pageable newestFirst(Pageable pageable) {
+        if (pageable.isUnpaged()) {
+            return Pageable.unpaged(NEWEST_FIRST);
+        }
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), NEWEST_FIRST);
     }
 
     @CacheEvict(value = "accountBalances", key = "#tenantId")

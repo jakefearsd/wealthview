@@ -1,12 +1,16 @@
 package com.wealthview.core.holding;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.cache.annotation.CacheEvict;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -69,6 +73,44 @@ class HoldingServiceTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).symbol()).isEqualTo("AAPL");
+    }
+
+    @Test
+    void listByAccount_returnsHoldingsOrderedBySymbol() {
+        var msft = new HoldingEntity(account, tenant, "MSFT", new BigDecimal("1"), new BigDecimal("100"));
+        var aapl = new HoldingEntity(account, tenant, "AAPL", new BigDecimal("1"), new BigDecimal("100"));
+        var vti = new HoldingEntity(account, tenant, "VTI", new BigDecimal("1"), new BigDecimal("100"));
+        when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId))
+                .thenReturn(List.of(msft, vti, aapl));
+
+        var result = holdingService.listByAccount(tenantId, accountId);
+
+        assertThat(result).extracting("symbol").containsExactly("AAPL", "MSFT", "VTI");
+    }
+
+    @Test
+    void listByTenant_returnsHoldingsOrderedBySymbol() {
+        var msft = new HoldingEntity(account, tenant, "MSFT", new BigDecimal("1"), new BigDecimal("100"));
+        var aapl = new HoldingEntity(account, tenant, "AAPL", new BigDecimal("1"), new BigDecimal("100"));
+        when(holdingRepository.findByTenant_Id(tenantId)).thenReturn(List.of(msft, aapl));
+
+        var result = holdingService.listByTenant(tenantId);
+
+        assertThat(result).extracting("symbol").containsExactly("AAPL", "MSFT");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"createManual", "update"})
+    void manualHoldingWrites_evictAccountBalancesCache(String methodName) {
+        var method = Arrays.stream(HoldingService.class.getDeclaredMethods())
+                .filter(m -> m.getName().equals(methodName))
+                .findFirst().orElseThrow();
+
+        var evict = method.getAnnotation(CacheEvict.class);
+
+        assertThat(evict).isNotNull();
+        assertThat(evict.value()).containsExactly("accountBalances");
+        assertThat(evict.key()).isEqualTo("#tenantId");
     }
 
     @Test

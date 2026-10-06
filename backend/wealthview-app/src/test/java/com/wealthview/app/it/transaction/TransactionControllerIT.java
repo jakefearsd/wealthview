@@ -58,6 +58,21 @@ class TransactionControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void list_returnsNewestTransactionDateFirst() {
+        for (var date : java.util.List.of("2024-03-01", "2024-01-01", "2024-02-01")) {
+            api.postForEntity("/api/v1/accounts/" + accountId + "/transactions",
+                    Map.of("date", date, "type", "buy", "symbol", "AAPL", "quantity", 1, "amount", 100));
+        }
+
+        var response = api.getForEntity("/api/v1/accounts/" + accountId + "/transactions");
+
+        var content = (java.util.List<Map<String, Object>>) response.getBody().get("data");
+        assertThat(content).extracting(t -> t.get("date"))
+                .containsExactly("2024-03-01", "2024-02-01", "2024-01-01");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void list_returnsTransactionsForAccount() {
         data.createBuyTransaction(accountId, "AAPL", 10, 1500);
         data.createBuyTransaction(accountId, "GOOG", 5, 7000);
