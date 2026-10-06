@@ -186,6 +186,21 @@ describe('computeTaxShieldSummary', () => {
         expect(summary.estimatedTaxSavings).toBeCloseTo(100);
     });
 
+    it('includes traditional withdrawals in the effective-rate base, matching the tax metrics card', () => {
+        const data = [
+            makeYear({
+                year: 2025, retired: true, rental_loss_applied: 1000,
+                tax_liability: 5000, income_streams_total: 40000, roth_conversion_amount: 10000,
+                withdrawal_from_traditional: 50000,
+            }),
+        ];
+
+        const summary = computeTaxShieldSummary(data);
+
+        // base = 40000 + 10000 + 50000 = 100000 -> 5% effective rate; savings = 1000 * 5% = 50
+        expect(summary.estimatedTaxSavings).toBeCloseTo(50);
+    });
+
     it('shelters the smaller of loss and Roth conversion amount', () => {
         const data = [
             makeYear({ year: 2025, retired: true, rental_loss_applied: 8000, roth_conversion_amount: 5000 }),
@@ -354,6 +369,15 @@ describe('computePlanOutcome', () => {
         expect(outcome.label).toBe('Plan Outcome');
         expect(outcome.value).toBe('Fully Sustainable');
         expect(outcome.color).toBe('#2e7d32');
+    });
+
+    it('omits the age rather than printing "age null" when the shortfall age is unknown', () => {
+        const outcome = computePlanOutcome(
+            makeFeasibility({ spending_feasible: false, first_shortfall_age: null }),
+            null,
+        );
+
+        expect(outcome.value).toBe('Underfunded');
     });
 
     it('reports underfunded with the first shortfall age when infeasible', () => {

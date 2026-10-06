@@ -36,7 +36,9 @@ export default function MilestoneStrip({ result, retirementYear }: MilestoneStri
         outcomeColor = '#2e7d32';
     } else {
         outcomeLabel = "Plan Outcome";
-        outcomeValue = `Underfunded at age ${feasibility.first_shortfall_age}`;
+        outcomeValue = feasibility.first_shortfall_age != null
+            ? `Underfunded at age ${feasibility.first_shortfall_age}`
+            : 'Underfunded';
         outcomeColor = '#d32f2f';
     }
 

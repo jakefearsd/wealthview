@@ -56,6 +56,17 @@ export function computeCumulativeContributions(data: ProjectionYear[]): number[]
     return result;
 }
 
+/**
+ * Income the year's tax_liability was levied on: income streams, Roth conversions and traditional
+ * withdrawals. Both the tax-shield estimate and the tax metrics card use it as the effective-rate
+ * denominator, so the two screens cannot disagree.
+ */
+function taxableIncome(y: ProjectionYear): number {
+    return (y.income_streams_total ?? 0)
+        + (y.roth_conversion_amount ?? 0)
+        + (y.withdrawal_from_traditional ?? 0);
+}
+
 export interface PropertyTaxShield {
     name: string;
     taxTreatment: string;
@@ -95,8 +106,8 @@ export function computeTaxShieldSummary(data: ProjectionYear[]): TaxShieldSummar
 
         // Estimated tax savings using effective rate (approximate)
         if (loss > 0 && y.tax_liability != null && y.tax_liability > 0) {
-            const taxableIncome = (y.income_streams_total || 0) + (y.roth_conversion_amount || 0);
-            const effectiveRate = taxableIncome > 0 ? y.tax_liability / taxableIncome : 0;
+            const income = taxableIncome(y);
+            const effectiveRate = income > 0 ? y.tax_liability / income : 0;
             estimatedTaxSavings += loss * effectiveRate;
         }
 
@@ -164,11 +175,9 @@ export function computeTaxMetrics(data: ProjectionYear[]): TaxMetrics | null {
             itemizedCount++;
         }
 
-        const taxableIncome = (y.income_streams_total ?? 0)
-            + (y.roth_conversion_amount ?? 0)
-            + (y.withdrawal_from_traditional ?? 0);
-        if (taxableIncome > 0) {
-            rates.push(((y.tax_liability ?? 0) / taxableIncome) * 100);
+        const income = taxableIncome(y);
+        if (income > 0) {
+            rates.push(((y.tax_liability ?? 0) / income) * 100);
         }
     }
 
@@ -246,7 +255,9 @@ export function computePlanOutcome(
     }
     return {
         label: 'Plan Outcome',
-        value: `Underfunded at age ${feasibility.first_shortfall_age}`,
+        value: feasibility.first_shortfall_age != null
+            ? `Underfunded at age ${feasibility.first_shortfall_age}`
+            : 'Underfunded',
         color: '#d32f2f',
         description: `Sustains ${formatCurrency(feasibility.sustainable_annual_spending)}/yr of ${formatCurrency(feasibility.required_annual_spending)}/yr needed`,
     };

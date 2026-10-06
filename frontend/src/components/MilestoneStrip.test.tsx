@@ -57,4 +57,14 @@ describe('MilestoneStrip', () => {
         render(<MilestoneStrip result={result(feasibility) as any} retirementYear={2035} />);
         expect(screen.getByText(/Underfunded at age 78/)).toBeInTheDocument();
     });
+
+    it('does not print "age null" when the shortfall age is unknown', () => {
+        vi.mocked(findPeakBalance).mockReturnValue({ balance: 1_000_000, year: 2040 });
+        vi.mocked(findDepletionYear).mockReturnValue(null);
+        const feasibility = { spending_feasible: false, first_shortfall_age: null };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        render(<MilestoneStrip result={result(feasibility) as any} retirementYear={2035} />);
+        expect(screen.getByText('Underfunded')).toBeInTheDocument();
+        expect(screen.queryByText(/age null/)).not.toBeInTheDocument();
+    });
 });
