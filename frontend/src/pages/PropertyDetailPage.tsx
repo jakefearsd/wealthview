@@ -9,8 +9,10 @@ import { useCrudForm } from '../hooks/useCrudForm';
 import { useAuth } from '../context/AuthContext';
 import { hasWriteAccess } from '../utils/permissions';
 import { trailingTwelveMonthRange } from '../utils/dateRange';
-import { formatCurrency, toPercent } from '../utils/format';
+import { formatCurrency, formatDate, toPercent, yearOf } from '../utils/format';
 import { cardStyle } from '../utils/styles';
+import ErrorState from '../components/ErrorState';
+import LoadingState from '../components/LoadingState';
 import PropertyAnalyticsSection from '../components/PropertyAnalyticsSection';
 import PropertyValuationSection from '../components/PropertyValuationSection';
 import PropertyCashFlowSection from '../components/PropertyCashFlowSection';
@@ -49,6 +51,8 @@ const initialFormData: PropertyFormData = {
     costSegStudyYear: '',
 };
 
+const PROPERTY_NOT_FOUND = 'Property not found';
+
 const CATEGORY_LABELS: Record<string, string> = {
     mortgage: 'Mortgage',
     tax: 'Tax',
@@ -68,10 +72,19 @@ export default function PropertyDetailPage() {
     const [analyticsYear, setAnalyticsYear] = useState<number | undefined>(undefined);
     const [showEditForm, setShowEditForm] = useState(false);
 
-    const { data: property, refetch: refetchProperty } = useApiQuery(() => getProperty(id!));
+    const { data: property, loading: propertyLoading, error: propertyError, refetch: refetchProperty } = useApiQuery(
+        () => getProperty(id!).catch((err: unknown) => {
+            // useApiQuery only surfaces a message, so name the 404 here to let the page say so.
+            if ((err as { response?: { status?: number } } | null)?.response?.status === 404) {
+                throw new Error(PROPERTY_NOT_FOUND);
+            }
+            throw err;
+        }),
+        [id],
+    );
     const { data: cashFlow, refetch: refetchCashFlow } = useApiQuery(() => getCashFlow(id!, range.from, range.to));
     const { data: valuations, refetch: refetchValuations } = useApiQuery(() => getValuationHistory(id!));
-    const { data: analytics } = useApiQuery(() => getPropertyAnalytics(id!, analyticsYear), [analyticsYear]);
+    const { data: analytics, refetch: refetchAnalytics } = useApiQuery(() => getPropertyAnalytics(id!, analyticsYear), [analyticsYear]);
     const { data: allIncomeSources } = useApiQuery(listIncomeSources);
     const { data: expenses, refetch: refetchExpenses } = useApiQuery(() => listPropertyExpenses(id!));
 
@@ -82,8 +95,12 @@ export default function PropertyDetailPage() {
 
     const onEditSuccess = useCallback(() => {
         setShowEditForm(false);
+        // An edit can change value, loan, land value and depreciation settings, all of which feed these views.
         refetchProperty();
-    }, [refetchProperty]);
+        refetchAnalytics();
+        refetchCashFlow();
+        refetchValuations();
+    }, [refetchProperty, refetchAnalytics, refetchCashFlow, refetchValuations]);
 
     const updateFn = useCallback(async (_id: string, data: PropertyFormData): Promise<Property> => {
         return updateProperty(id!, buildRequest(data));
@@ -146,12 +163,13 @@ export default function PropertyDetailPage() {
             onSuccess: () => {
                 refetchCashFlow();
                 refetchExpenses();
+                refetchAnalytics();
             },
         },
     );
 
-    async function handleAddExpense(data: PropertyExpenseRequest): Promise<void> {
-        await addExpense.mutate(data);
+    async function handleAddExpense(data: PropertyExpenseRequest): Promise<boolean> {
+        return (await addExpense.mutate(data)) !== null;
     }
 
     const deleteExpense = useApiMutation(
@@ -162,6 +180,7 @@ export default function PropertyDetailPage() {
             onSuccess: () => {
                 refetchCashFlow();
                 refetchExpenses();
+                refetchAnalytics();
             },
         },
     );
@@ -225,7 +244,7 @@ export default function PropertyDetailPage() {
     const purchaseDate = property?.purchase_date;
     const analyticsYearOptions = useMemo(() => {
         if (!purchaseDate) return [];
-        const purchaseYear = new Date(purchaseDate).getFullYear();
+        const purchaseYear = yearOf(purchaseDate);
         const currentYear = new Date().getFullYear();
         const years: number[] = [];
         for (let y = purchaseYear; y <= currentYear; y++) {
@@ -233,6 +252,13 @@ export default function PropertyDetailPage() {
         }
         return years;
     }, [purchaseDate]);
+
+    // Anything that changes the depreciation schedule; a new value after an edit re-fetches it.
+    const depreciationInputsKey = property
+        ? [property.purchase_price, property.land_value, property.useful_life_years, property.in_service_date,
+            property.bonus_depreciation_rate, property.cost_seg_study_year,
+            JSON.stringify(property.cost_seg_allocations ?? null)].join('|')
+        : '';
 
     const badgeStyle = (color: string, bg: string) => ({
         display: 'inline-block',
@@ -243,6 +269,23 @@ export default function PropertyDetailPage() {
         fontSize: '0.75rem',
         fontWeight: 600 as const,
     });
+
+    if (!property) {
+        if (propertyLoading) return <LoadingState message="Loading property..." />;
+        if (propertyError) {
+            return (
+                <div>
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <Link to="/properties" style={{ color: '#1976d2', textDecoration: 'none' }}>Properties</Link>
+                    </div>
+                    <ErrorState
+                        message={propertyError}
+                        onRetry={propertyError === PROPERTY_NOT_FOUND ? undefined : refetchProperty}
+                    />
+                </div>
+            );
+        }
+    }
 
     return (
         <div>
@@ -293,7 +336,7 @@ export default function PropertyDetailPage() {
                             </div>
                             <div style={{ fontWeight: 600 }}>{formatCurrency(property.mortgage_balance)}</div>
                         </div>
-                        <div><div style={{ color: '#666', fontSize: '0.85rem' }}>Equity</div><div style={{ fontWeight: 600, color: '#2e7d32' }}>{formatCurrency(property.equity)}</div></div>
+                        <div><div style={{ color: '#666', fontSize: '0.85rem' }}>Equity</div><div style={{ fontWeight: 600, color: property.equity >= 0 ? '#2e7d32' : '#d32f2f' }}>{formatCurrency(property.equity)}</div></div>
                     </div>
 
                     {property.has_loan_details && (
@@ -303,7 +346,7 @@ export default function PropertyDetailPage() {
                                 <div><span style={{ color: '#666' }}>Amount:</span> {formatCurrency(property.loan_amount!)}</div>
                                 <div><span style={{ color: '#666' }}>Rate:</span> {((property.annual_interest_rate ?? 0) * 100).toFixed(2)}%</div>
                                 <div><span style={{ color: '#666' }}>Term:</span> {property.loan_term_months} months</div>
-                                <div><span style={{ color: '#666' }}>Start:</span> {property.loan_start_date}</div>
+                                <div><span style={{ color: '#666' }}>Start:</span> {formatDate(property.loan_start_date)}</div>
                             </div>
                         </div>
                     )}
@@ -347,6 +390,7 @@ export default function PropertyDetailPage() {
                     onYearChange={handleAnalyticsYearChange}
                     propertyId={id!}
                     depreciationMethod={property?.depreciation_method || 'none'}
+                    depreciationInputsKey={depreciationInputsKey}
                 />
             )}
 
@@ -396,7 +440,7 @@ export default function PropertyDetailPage() {
                         <tbody>
                             {expenses.map((exp) => (
                                 <tr key={exp.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                    <td style={{ padding: '0.5rem' }}>{exp.date}</td>
+                                    <td style={{ padding: '0.5rem' }}>{formatDate(exp.date)}</td>
                                     <td style={{ padding: '0.5rem' }}>{CATEGORY_LABELS[exp.category] ?? exp.category}</td>
                                     <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(exp.amount)}</td>
                                     <td style={{ padding: '0.5rem' }}>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatDate } from '../utils/format';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
 import HelpText from './HelpText';
 import InfoSection from './InfoSection';
@@ -14,6 +14,8 @@ interface PropertyAnalyticsSectionProps {
     onYearChange: (value: string) => void;
     propertyId: string;
     depreciationMethod: string;
+    /** Changes whenever an input to the depreciation schedule changes, so the schedule is re-fetched. */
+    depreciationInputsKey?: string;
 }
 
 export default function PropertyAnalyticsSection({
@@ -23,6 +25,7 @@ export default function PropertyAnalyticsSection({
     onYearChange,
     propertyId,
     depreciationMethod,
+    depreciationInputsKey,
 }: PropertyAnalyticsSectionProps) {
     const [depreciationSchedule, setDepreciationSchedule] = useState<DepreciationScheduleResponse | null>(null);
 
@@ -34,7 +37,7 @@ export default function PropertyAnalyticsSection({
         getDepreciationSchedule(propertyId)
             .then(setDepreciationSchedule)
             .catch(() => setDepreciationSchedule(null));
-    }, [propertyId, depreciationMethod]);
+    }, [propertyId, depreciationMethod, depreciationInputsKey]);
 
     const currentYear = new Date().getFullYear();
 
@@ -100,7 +103,7 @@ export default function PropertyAnalyticsSection({
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', fontSize: '0.85rem' }}>
                             <div><span style={{ color: '#666' }}>Principal Paid:</span> {formatCurrency(analytics.mortgage_progress.principal_paid)}</div>
                             <div><span style={{ color: '#666' }}>Balance:</span> {formatCurrency(analytics.mortgage_progress.current_balance)}</div>
-                            <div><span style={{ color: '#666' }}>Payoff Date:</span> {analytics.mortgage_progress.estimated_payoff_date}</div>
+                            <div><span style={{ color: '#666' }}>Payoff Date:</span> {formatDate(analytics.mortgage_progress.estimated_payoff_date)}</div>
                             <div><span style={{ color: '#666' }}>Remaining:</span> {analytics.mortgage_progress.months_remaining} months</div>
                         </div>
                     </div>

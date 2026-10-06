@@ -17,7 +17,7 @@ const EXPENSE_CATEGORIES = [
 interface PropertyCashFlowSectionProps {
     cashFlow: MonthlyCashFlowEntry[] | null;
     canWrite: boolean;
-    onAddExpense: (data: { date: string; amount: number; category: string; description?: string; frequency?: string }) => Promise<void>;
+    onAddExpense: (data: { date: string; amount: number; category: string; description?: string; frequency?: string }) => Promise<boolean>;
 }
 
 export default function PropertyCashFlowSection({

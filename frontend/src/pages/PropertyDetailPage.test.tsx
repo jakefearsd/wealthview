@@ -24,6 +24,9 @@ vi.mock('../utils/format', () => ({
     formatWholeCurrency: (v: number) => `$${Math.round(v).toLocaleString()}`,
     formatCompactCurrency: (v: number) => `$${v.toLocaleString()}`,
     formatPercent: (v: number) => `${v}%`,
+    formatDate: (v: string | null | undefined) => v ?? '--',
+    yearOf: (v: string) => Number(v.slice(0, 4)),
+    todayIso: () => '2026-01-01',
 }));
 
 vi.mock('../utils/styles', () => ({
@@ -34,7 +37,9 @@ vi.mock('../utils/styles', () => ({
 }));
 
 vi.mock('../components/PropertyTransactionForm', () => ({
-    default: () => <div data-testid="transaction-form" />,
+    default: ({ onSubmit }: { onSubmit: (d: { date: string; amount: number; category: string }) => Promise<boolean> }) => (
+        <button onClick={() => void onSubmit({ date: '2026-01-05', amount: 25, category: 'tax' })}>mock-add-expense</button>
+    ),
 }));
 
 vi.mock('../components/HelpText', () => ({
@@ -73,23 +78,49 @@ vi.mock('react-hot-toast', () => ({
 
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useAuth } from '../context/AuthContext';
-import { refreshValuation, selectZpid, getDepreciationSchedule } from '../api/properties';
+import { refreshValuation, selectZpid, getDepreciationSchedule, updateProperty, addPropertyExpense, deletePropertyExpense, getProperty } from '../api/properties';
 import PropertyDetailPage from './PropertyDetailPage';
 import { authAs } from '../testutil/auth';
 
 const mockUseApiQuery = vi.mocked(useApiQuery);
 const mockUseAuth = vi.mocked(useAuth);
 
+const refetches = {
+    property: vi.fn(),
+    cashFlow: vi.fn(),
+    valuations: vi.fn(),
+    analytics: vi.fn(),
+    incomeSources: vi.fn(),
+    expenses: vi.fn(),
+};
 const defaultReturn = { data: null, loading: false, error: null, refetch: vi.fn() };
+// Captures the fetcher the page hands to the property query so tests can exercise its error mapping.
+let propertyFetcher: (() => Promise<unknown>) | undefined;
 
-function setupMocks(overrides: { property?: unknown; analytics?: unknown }) {
+interface QueryOverrides {
+    property?: unknown;
+    analytics?: unknown;
+    expenses?: unknown;
+    propertyLoading?: boolean;
+    propertyError?: string | null;
+}
+
+function setupMocks(overrides: QueryOverrides) {
     let callCount = 0;
-    mockUseApiQuery.mockImplementation(() => {
-        callCount++;
-        // Call order: 1=property, 2=cashFlow, 3=valuations, 4=analytics
-        if (callCount === 1) return { ...defaultReturn, data: overrides.property ?? null } as ReturnType<typeof useApiQuery>;
-        if (callCount === 4) return { ...defaultReturn, data: overrides.analytics ?? null } as ReturnType<typeof useApiQuery>;
-        return defaultReturn as ReturnType<typeof useApiQuery>;
+    mockUseApiQuery.mockImplementation((fetchFn) => {
+        // Call order per render: 0=property, 1=cashFlow, 2=valuations, 3=analytics, 4=incomeSources, 5=expenses
+        const index = callCount++ % 6;
+        const base = { ...defaultReturn };
+        if (index === 0) {
+            propertyFetcher = fetchFn as () => Promise<unknown>;
+            return { ...base, refetch: refetches.property, data: overrides.property ?? null,
+                loading: overrides.propertyLoading ?? false, error: overrides.propertyError ?? null } as ReturnType<typeof useApiQuery>;
+        }
+        if (index === 1) return { ...base, refetch: refetches.cashFlow } as ReturnType<typeof useApiQuery>;
+        if (index === 2) return { ...base, refetch: refetches.valuations } as ReturnType<typeof useApiQuery>;
+        if (index === 3) return { ...base, refetch: refetches.analytics, data: overrides.analytics ?? null } as ReturnType<typeof useApiQuery>;
+        if (index === 4) return { ...base, refetch: refetches.incomeSources } as ReturnType<typeof useApiQuery>;
+        return { ...base, refetch: refetches.expenses, data: overrides.expenses ?? null } as ReturnType<typeof useApiQuery>;
     });
 }
 
@@ -365,5 +396,132 @@ describe('PropertyDetailPage', () => {
         fireEvent.click(screen.getByRole('button', { name: /^Edit$/i }));
 
         expect(screen.getByDisplayValue('27.5')).toBeInTheDocument();
+    });
+
+    // === staleness after edits (S4) ===
+
+    it('refreshes analytics, cash flow, valuations and the property after a successful edit', async () => {
+        setupMocks({ property: mockProperty, analytics: investmentAnalytics });
+        vi.mocked(updateProperty).mockResolvedValue(mockProperty as never);
+        renderPage();
+
+        fireEvent.click(screen.getByRole('button', { name: /^Edit$/i }));
+        fireEvent.click(screen.getByRole('button', { name: /^Save$/i }));
+
+        await waitFor(() => expect(refetches.property).toHaveBeenCalled());
+        expect(refetches.analytics).toHaveBeenCalled();
+        expect(refetches.cashFlow).toHaveBeenCalled();
+        expect(refetches.valuations).toHaveBeenCalled();
+    });
+
+    it('refreshes analytics after an expense is added', async () => {
+        setupMocks({ property: mockProperty, analytics: investmentAnalytics });
+        vi.mocked(addPropertyExpense).mockResolvedValue({} as never);
+        renderPage();
+
+        fireEvent.click(screen.getByRole('button', { name: 'mock-add-expense' }));
+
+        await waitFor(() => expect(refetches.analytics).toHaveBeenCalled());
+        expect(refetches.cashFlow).toHaveBeenCalled();
+        expect(refetches.expenses).toHaveBeenCalled();
+    });
+
+    it('refreshes analytics after an expense is deleted', async () => {
+        setupMocks({
+            property: mockProperty,
+            analytics: investmentAnalytics,
+            expenses: [{ id: 'e1', date: '2026-02-01', category: 'tax', amount: 10, frequency: 'monthly', description: null }],
+        });
+        vi.mocked(deletePropertyExpense).mockResolvedValue(undefined as never);
+        vi.spyOn(window, 'confirm').mockReturnValue(true);
+        renderPage();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+        await waitFor(() => expect(refetches.analytics).toHaveBeenCalled());
+        expect(refetches.cashFlow).toHaveBeenCalled();
+    });
+
+    it('refetches the depreciation schedule when the land value changes', () => {
+        const dep = { ...mockProperty, depreciation_method: 'straight_line', land_value: 40000, useful_life_years: 27.5 };
+        setupMocks({ property: dep, analytics: investmentAnalytics });
+        renderPage();
+        expect(getDepreciationSchedule).toHaveBeenCalledTimes(1);
+
+        setupMocks({ property: { ...dep, land_value: 60000 }, analytics: investmentAnalytics });
+        fireEvent.click(screen.getByRole('button', { name: /^Edit$/i }));
+
+        expect(getDepreciationSchedule).toHaveBeenCalledTimes(2);
+    });
+
+    it('refreshes nothing when adding an expense fails', async () => {
+        setupMocks({ property: mockProperty, analytics: investmentAnalytics });
+        vi.mocked(addPropertyExpense).mockRejectedValue(new Error('boom'));
+        renderPage();
+
+        fireEvent.click(screen.getByRole('button', { name: 'mock-add-expense' }));
+
+        await waitFor(() => expect(toastError).toHaveBeenCalled());
+        expect(refetches.analytics).not.toHaveBeenCalled();
+    });
+
+    // === loading / error / not found (S13) ===
+
+    it('shows a loading state while the property is loading', () => {
+        setupMocks({ propertyLoading: true });
+        renderPage();
+
+        expect(screen.getByText('Loading property...')).toBeInTheDocument();
+    });
+
+    it('shows the error and a retry for a failed property load', () => {
+        setupMocks({ propertyError: 'Network Error' });
+        renderPage();
+
+        expect(screen.getByText('Network Error')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+        expect(refetches.property).toHaveBeenCalled();
+    });
+
+    it('shows "Property not found" when the property query reports a 404', async () => {
+        setupMocks({ propertyError: 'Property not found' });
+        renderPage();
+
+        expect(screen.getByText('Property not found')).toBeInTheDocument();
+        vi.mocked(getProperty).mockRejectedValue({ response: { status: 404, data: { message: 'x' } } });
+        await expect(propertyFetcher?.()).rejects.toThrow('Property not found');
+    });
+
+    it('passes other property load failures through untouched', async () => {
+        setupMocks({ propertyLoading: true });
+        renderPage();
+        const failure = { response: { status: 500 } };
+        vi.mocked(getProperty).mockRejectedValue(failure);
+
+        await expect(propertyFetcher?.()).rejects.toBe(failure);
+    });
+
+    // === formatting (S20) ===
+
+    it('colours negative equity red', () => {
+        setupMocks({ property: { ...mockProperty, equity: -5000 }, analytics: investmentAnalytics });
+        renderPage();
+
+        expect(screen.getByText('$-5,000')).toHaveStyle({ color: '#d32f2f' });
+    });
+
+    it('colours positive equity green', () => {
+        setupMocks({ property: { ...mockProperty, equity: 123456 }, analytics: investmentAnalytics });
+        renderPage();
+
+        expect(screen.getByText('$123,456')).toHaveStyle({ color: '#2e7d32' });
+    });
+
+    it('starts the analytics year options at the purchase year for a 1 January purchase', () => {
+        setupMocks({ property: { ...mockProperty, purchase_date: '2020-01-01' }, analytics: investmentAnalytics });
+        renderPage();
+
+        expect(screen.getByRole('option', { name: '2020' })).toBeInTheDocument();
+        expect(screen.queryByRole('option', { name: '2019' })).not.toBeInTheDocument();
     });
 });

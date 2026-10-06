@@ -7,6 +7,7 @@ vi.mock('../api/properties', () => ({
 
 vi.mock('../utils/format', () => ({
     formatCurrency: (v: number) => `$${v.toLocaleString()}`,
+    formatDate: (v: string | null | undefined) => v ?? '--',
 }));
 
 vi.mock('../utils/styles', () => ({
@@ -94,5 +95,23 @@ describe('PropertyAnalyticsSection', () => {
             />
         );
         expect(getDepreciationSchedule).toHaveBeenCalledWith('p-1');
+    });
+
+    it('refetches the depreciation schedule when its inputs key changes', () => {
+        const props = {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            analytics: analytics as any,
+            analyticsYear: 2026,
+            analyticsYearOptions: [2026],
+            onYearChange: vi.fn(),
+            propertyId: 'p-1',
+            depreciationMethod: 'straight_line',
+        };
+        const { rerender } = render(<PropertyAnalyticsSection {...props} depreciationInputsKey="land-40000" />);
+        expect(getDepreciationSchedule).toHaveBeenCalledTimes(1);
+
+        rerender(<PropertyAnalyticsSection {...props} depreciationInputsKey="land-60000" />);
+
+        expect(getDepreciationSchedule).toHaveBeenCalledTimes(2);
     });
 });
