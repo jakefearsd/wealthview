@@ -13,13 +13,13 @@ interface Props {
 
 function validate(date: string, type: string, amount: number, quantity: number | undefined): string | null {
     if (date === '') return 'Date is required.';
+    // Any finite amount: broker imports carry signed amounts, so a negative one must stay editable.
     if (!Number.isFinite(amount)) return 'Amount must be a number.';
-    if (quantity !== undefined && (!Number.isFinite(quantity) || quantity < 0)) {
-        return 'Quantity must be zero or more.';
-    }
-    // The server rejects a buy or sell without a positive quantity (TransactionRequest#isQuantityValidForType).
-    if ((type === 'buy' || type === 'sell') && !(quantity !== undefined && quantity > 0)) {
-        return 'Buys and sells need a quantity above zero.';
+    if (quantity !== undefined && !Number.isFinite(quantity)) return 'Quantity must be a number.';
+    // The server needs a positive quantity on a buy or sell only when one is given; blank stays allowed so
+    // imported and legacy rows without a quantity remain editable.
+    if ((type === 'buy' || type === 'sell') && quantity !== undefined && quantity <= 0) {
+        return 'Quantity must be above zero for a buy or sell.';
     }
     return null;
 }
@@ -71,7 +71,7 @@ export default function TransactionForm({ accountId, onSuccess, onCancel, initia
                     <option value="withdrawal">Withdrawal</option>
                 </select>
                 <input placeholder="Symbol" aria-label="Symbol" value={txnSymbol} onChange={(e) => setTxnSymbol(e.target.value)} style={{ padding: '0.4rem' }} />
-                <input placeholder="Quantity" aria-label="Quantity" type="number" min="0" step="any" value={txnQuantity} onChange={(e) => setTxnQuantity(e.target.value)} style={{ padding: '0.4rem' }} />
+                <input placeholder="Quantity" aria-label="Quantity" type="number" step="any" value={txnQuantity} onChange={(e) => setTxnQuantity(e.target.value)} style={{ padding: '0.4rem' }} />
                 <CurrencyInput placeholder="Amount" aria-label="Amount" value={txnAmount} onChange={setTxnAmount} style={{ padding: '0.4rem' }} />
             </div>
             {dirty && validationError && (

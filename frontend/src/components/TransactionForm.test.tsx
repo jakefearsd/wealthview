@@ -138,21 +138,32 @@ describe('TransactionForm', () => {
         expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
     });
 
-    it('requires a quantity above zero for a buy, matching the server rule', () => {
+    it('rejects a zero quantity for a buy, matching the server rule', () => {
         render(<TransactionForm accountId="acc-1" onSuccess={vi.fn()} onCancel={vi.fn()} />);
         fillValid({ quantity: '0' });
 
-        expect(screen.getByRole('alert')).toHaveTextContent('Buys and sells need a quantity above zero.');
+        expect(screen.getByRole('alert')).toHaveTextContent('Quantity must be above zero for a buy or sell.');
         expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
     });
 
-    it('requires a quantity for a sell', () => {
+    it('rejects a negative quantity for a sell', () => {
         render(<TransactionForm accountId="acc-1" onSuccess={vi.fn()} onCancel={vi.fn()} />);
-        fillValid({ quantity: '' });
+        fillValid({ quantity: '-3' });
         fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'sell' } });
 
-        expect(screen.getByRole('alert')).toHaveTextContent('Buys and sells need a quantity above zero.');
+        expect(screen.getByRole('alert')).toHaveTextContent('Quantity must be above zero for a buy or sell.');
         expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    });
+
+    it('allows a buy or sell with the quantity left blank', () => {
+        render(<TransactionForm accountId="acc-1" onSuccess={vi.fn()} onCancel={vi.fn()} />);
+        fillValid({ quantity: '' });
+
+        expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+
+        fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'sell' } });
+
+        expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
     });
 
     it('allows a dividend without a quantity', () => {
@@ -163,11 +174,15 @@ describe('TransactionForm', () => {
         expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
     });
 
-    it('rejects a negative quantity', () => {
+    it('accepts a negative amount, as broker imports carry signed amounts', async () => {
+        vi.mocked(createTransaction).mockResolvedValue({} as never);
         render(<TransactionForm accountId="acc-1" onSuccess={vi.fn()} onCancel={vi.fn()} />);
-        fillValid({ quantity: '-3' });
+        fillValid({ amount: '-500' });
 
-        expect(screen.getByRole('alert')).toHaveTextContent('Quantity must be zero or more.');
-        expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+        fireEvent.click(screen.getByText('Save'));
+
+        await waitFor(() => expect(createTransaction).toHaveBeenCalledWith(
+            'acc-1', expect.objectContaining({ amount: -500 })));
     });
 });
