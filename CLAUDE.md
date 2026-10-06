@@ -351,7 +351,7 @@ Cross-platform code that mobile also consumes lives in the `shared/` workspace
 - **May skip:** Simple presentational components with no logic.
 - TDD encouraged but not mandatory on the frontend. Focus test energy on the backend.
 - **Coverage is measured and gated** — `npm run test:coverage` enforces ratchet floors in
-  `frontend/vite.config.ts` (statements 83, branches 75, functions 74, lines 86). Raise a
+  `frontend/vite.config.ts` (statements 87, branches 79, functions 80, lines 89). Raise a
   floor when you raise coverage; never lower one to make a build pass. `coverage.include`
   is set deliberately: without it, v8 only counts files a test happened to import, so an
   entirely untested component would be invisible rather than 0%.
