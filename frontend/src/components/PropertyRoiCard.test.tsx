@@ -66,6 +66,16 @@ describe('PropertyRoiCard', () => {
         });
     });
 
+    it('labels the assumption controls', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        render(<PropertyRoiCard propertyId="p-1" incomeSource={incomeSource as any} />);
+
+        for (const label of ['Period', 'Investment Return %', 'Rent Growth %', 'Expense Inflation %']) {
+            expect(screen.getByLabelText(label)).toBeInTheDocument();
+        }
+        await waitFor(() => expect(getRoiAnalysis).toHaveBeenCalled());
+    });
+
     it('renders the hold vs sell summary after fetch', async () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         render(<PropertyRoiCard propertyId="p-1" incomeSource={incomeSource as any} />);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useId } from 'react';
 import { getRoiAnalysis } from '../api/properties';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { formatCurrency } from '../utils/format';
@@ -33,6 +33,7 @@ function deduction(amount: number): string {
 }
 
 export default function PropertyRoiCard({ propertyId, incomeSource }: PropertyRoiCardProps) {
+    const uid = useId();
     const [years, setYears] = useState(10);
     const [investmentReturn, setInvestmentReturn] = useState('7');
     const [rentGrowth, setRentGrowth] = useState('3');
@@ -73,6 +74,7 @@ export default function PropertyRoiCard({ propertyId, incomeSource }: PropertyRo
     };
 
     const labelStyle = {
+        display: 'block',
         fontSize: '0.75rem',
         color: '#666',
         marginBottom: '0.2rem',
@@ -106,22 +108,22 @@ export default function PropertyRoiCard({ propertyId, incomeSource }: PropertyRo
 
             <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
                 <div>
-                    <div style={labelStyle}>Period</div>
-                    <select value={years} onChange={e => setYears(Number(e.target.value))} style={{ ...inputStyle, width: '80px' }}>
+                    <label htmlFor={`${uid}-period`} style={labelStyle}>Period</label>
+                    <select id={`${uid}-period`} value={years} onChange={e => setYears(Number(e.target.value))} style={{ ...inputStyle, width: '80px' }}>
                         {YEAR_OPTIONS.map(y => <option key={y} value={y}>{y} years</option>)}
                     </select>
                 </div>
                 <div>
-                    <div style={labelStyle}>Investment Return %</div>
-                    <input type="number" value={investmentReturn} onChange={e => setInvestmentReturn(e.target.value)} style={inputStyle} step="0.5" min="0" max="20" />
+                    <label htmlFor={`${uid}-return`} style={labelStyle}>Investment Return %</label>
+                    <input id={`${uid}-return`} type="number" value={investmentReturn} onChange={e => setInvestmentReturn(e.target.value)} style={inputStyle} step="0.5" min="0" max="20" />
                 </div>
                 <div>
-                    <div style={labelStyle}>Rent Growth %</div>
-                    <input type="number" value={rentGrowth} onChange={e => setRentGrowth(e.target.value)} style={inputStyle} step="0.5" min="0" max="10" />
+                    <label htmlFor={`${uid}-growth`} style={labelStyle}>Rent Growth %</label>
+                    <input id={`${uid}-growth`} type="number" value={rentGrowth} onChange={e => setRentGrowth(e.target.value)} style={inputStyle} step="0.5" min="0" max="10" />
                 </div>
                 <div>
-                    <div style={labelStyle}>Expense Inflation %</div>
-                    <input type="number" value={expenseInflation} onChange={e => setExpenseInflation(e.target.value)} style={inputStyle} step="0.5" min="0" max="10" />
+                    <label htmlFor={`${uid}-inflation`} style={labelStyle}>Expense Inflation %</label>
+                    <input id={`${uid}-inflation`} type="number" value={expenseInflation} onChange={e => setExpenseInflation(e.target.value)} style={inputStyle} step="0.5" min="0" max="10" />
                 </div>
             </div>
 

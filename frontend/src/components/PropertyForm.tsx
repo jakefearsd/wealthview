@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { inputStyle, labelStyle } from '../utils/styles';
 import CurrencyInput from './CurrencyInput';
 import { clampBonusRate } from '../utils/propertyRequest';
@@ -56,6 +57,7 @@ function clampBonusInput(raw: string): string {
 }
 
 export default function PropertyForm({ heading, submitLabel, values, onChange, purchasePriceNum, onSubmit, onCancel, submitting = false }: Props) {
+    const uid = useId();
     const landValueNum = parseFloat(values.landValue) || 0;
     const usefulLifeNum = parseFloat(values.usefulLifeYears) || 0;
     const depreciableBasis = purchasePriceNum - landValueNum;
@@ -92,28 +94,28 @@ export default function PropertyForm({ heading, submitLabel, values, onChange, p
             <h3 style={{ marginBottom: '1rem' }}>{heading}</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                    <label style={labelStyle}>Address</label>
-                    <input placeholder="123 Main St" value={values.address} onChange={(e) => onChange({ address: e.target.value })} style={inputStyle} />
+                    <label htmlFor={`${uid}-f1`} style={labelStyle}>Address</label>
+                    <input id={`${uid}-f1`} placeholder="123 Main St" value={values.address} onChange={(e) => onChange({ address: e.target.value })} style={inputStyle} />
                 </div>
                 <div>
-                    <label style={labelStyle}>Purchase Price</label>
-                    <CurrencyInput value={values.purchasePrice} onChange={(v) => onChange({ purchasePrice: v })} style={inputStyle} />
+                    <label htmlFor={`${uid}-f2`} style={labelStyle}>Purchase Price</label>
+                    <CurrencyInput id={`${uid}-f2`} value={values.purchasePrice} onChange={(v) => onChange({ purchasePrice: v })} style={inputStyle} />
                 </div>
                 <div>
-                    <label style={labelStyle}>Purchase Date</label>
-                    <input type="date" value={values.purchaseDate} onChange={(e) => onChange({ purchaseDate: e.target.value })} style={inputStyle} />
+                    <label htmlFor={`${uid}-f3`} style={labelStyle}>Purchase Date</label>
+                    <input id={`${uid}-f3`} type="date" value={values.purchaseDate} onChange={(e) => onChange({ purchaseDate: e.target.value })} style={inputStyle} />
                 </div>
                 <div>
-                    <label style={labelStyle}>Current Value</label>
-                    <CurrencyInput value={values.currentValue} onChange={(v) => onChange({ currentValue: v })} style={inputStyle} />
+                    <label htmlFor={`${uid}-f4`} style={labelStyle}>Current Value</label>
+                    <CurrencyInput id={`${uid}-f4`} value={values.currentValue} onChange={(v) => onChange({ currentValue: v })} style={inputStyle} />
                 </div>
                 <div>
-                    <label style={labelStyle}>Mortgage Balance</label>
-                    <CurrencyInput value={values.mortgageBalance} onChange={(v) => onChange({ mortgageBalance: v })} style={inputStyle} />
+                    <label htmlFor={`${uid}-f5`} style={labelStyle}>Mortgage Balance</label>
+                    <CurrencyInput id={`${uid}-f5`} value={values.mortgageBalance} onChange={(v) => onChange({ mortgageBalance: v })} style={inputStyle} />
                 </div>
                 <div>
-                    <label style={labelStyle}>Property Type</label>
-                    <select value={values.propertyType} onChange={(e) => onChange({ propertyType: e.target.value })} style={inputStyle}>
+                    <label htmlFor={`${uid}-f6`} style={labelStyle}>Property Type</label>
+                    <select id={`${uid}-f6`} value={values.propertyType} onChange={(e) => onChange({ propertyType: e.target.value })} style={inputStyle}>
                         <option value="primary_residence">Primary Residence</option>
                         <option value="investment">Investment</option>
                         <option value="vacation">Vacation</option>
@@ -135,20 +137,20 @@ export default function PropertyForm({ heading, submitLabel, values, onChange, p
                     <h4 style={{ marginBottom: '0.75rem', fontSize: '0.95rem' }}>Loan Details</h4>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div>
-                            <label style={labelStyle}>Loan Amount</label>
-                            <CurrencyInput value={values.loanAmount} onChange={(v) => onChange({ loanAmount: v })} style={inputStyle} />
+                            <label htmlFor={`${uid}-f7`} style={labelStyle}>Loan Amount</label>
+                            <CurrencyInput id={`${uid}-f7`} value={values.loanAmount} onChange={(v) => onChange({ loanAmount: v })} style={inputStyle} />
                         </div>
                         <div>
-                            <label style={labelStyle}>Annual Interest Rate (%)</label>
-                            <input type="number" step="0.01" value={values.annualInterestRate} onChange={(e) => onChange({ annualInterestRate: e.target.value })} style={inputStyle} />
+                            <label htmlFor={`${uid}-f8`} style={labelStyle}>Annual Interest Rate (%)</label>
+                            <input id={`${uid}-f8`} type="number" step="0.01" value={values.annualInterestRate} onChange={(e) => onChange({ annualInterestRate: e.target.value })} style={inputStyle} />
                         </div>
                         <div>
-                            <label style={labelStyle}>Loan Term (months)</label>
-                            <input type="number" value={values.loanTermMonths} onChange={(e) => onChange({ loanTermMonths: e.target.value })} style={inputStyle} />
+                            <label htmlFor={`${uid}-f9`} style={labelStyle}>Loan Term (months)</label>
+                            <input id={`${uid}-f9`} type="number" value={values.loanTermMonths} onChange={(e) => onChange({ loanTermMonths: e.target.value })} style={inputStyle} />
                         </div>
                         <div>
-                            <label style={labelStyle}>Loan Start Date</label>
-                            <input type="date" value={values.loanStartDate} onChange={(e) => onChange({ loanStartDate: e.target.value })} style={inputStyle} />
+                            <label htmlFor={`${uid}-f10`} style={labelStyle}>Loan Start Date</label>
+                            <input id={`${uid}-f10`} type="date" value={values.loanStartDate} onChange={(e) => onChange({ loanStartDate: e.target.value })} style={inputStyle} />
                         </div>
                     </div>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem', fontSize: '0.9rem' }}>
@@ -172,20 +174,20 @@ export default function PropertyForm({ heading, submitLabel, values, onChange, p
                     <h4 style={{ marginBottom: '0.75rem', fontSize: '0.95rem' }}>Financial Assumptions</h4>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div>
-                            <label style={labelStyle}>Annual Appreciation Rate (%)</label>
-                            <input type="number" step="0.1" placeholder="e.g. 3.0" value={values.annualAppreciationRate} onChange={(e) => onChange({ annualAppreciationRate: e.target.value })} style={inputStyle} />
+                            <label htmlFor={`${uid}-f11`} style={labelStyle}>Annual Appreciation Rate (%)</label>
+                            <input id={`${uid}-f11`} type="number" step="0.1" placeholder="e.g. 3.0" value={values.annualAppreciationRate} onChange={(e) => onChange({ annualAppreciationRate: e.target.value })} style={inputStyle} />
                         </div>
                         <div>
-                            <label style={labelStyle}>Annual Property Tax ($)</label>
-                            <CurrencyInput value={values.annualPropertyTax} onChange={(v) => onChange({ annualPropertyTax: v })} style={inputStyle} />
+                            <label htmlFor={`${uid}-f12`} style={labelStyle}>Annual Property Tax ($)</label>
+                            <CurrencyInput id={`${uid}-f12`} value={values.annualPropertyTax} onChange={(v) => onChange({ annualPropertyTax: v })} style={inputStyle} />
                         </div>
                         <div>
-                            <label style={labelStyle}>Annual Insurance Cost ($)</label>
-                            <CurrencyInput value={values.annualInsuranceCost} onChange={(v) => onChange({ annualInsuranceCost: v })} style={inputStyle} />
+                            <label htmlFor={`${uid}-f13`} style={labelStyle}>Annual Insurance Cost ($)</label>
+                            <CurrencyInput id={`${uid}-f13`} value={values.annualInsuranceCost} onChange={(v) => onChange({ annualInsuranceCost: v })} style={inputStyle} />
                         </div>
                         <div>
-                            <label style={labelStyle}>Annual Maintenance Cost ($)</label>
-                            <CurrencyInput value={values.annualMaintenanceCost} onChange={(v) => onChange({ annualMaintenanceCost: v })} style={inputStyle} />
+                            <label htmlFor={`${uid}-f14`} style={labelStyle}>Annual Maintenance Cost ($)</label>
+                            <CurrencyInput id={`${uid}-f14`} value={values.annualMaintenanceCost} onChange={(v) => onChange({ annualMaintenanceCost: v })} style={inputStyle} />
                         </div>
                     </div>
                 </div>
@@ -205,8 +207,8 @@ export default function PropertyForm({ heading, submitLabel, values, onChange, p
                     <h4 style={{ marginBottom: '0.75rem', fontSize: '0.95rem' }}>Depreciation</h4>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div>
-                            <label style={labelStyle}>Depreciation Method</label>
-                            <select value={values.depreciationMethod} onChange={(e) => {
+                            <label htmlFor={`${uid}-f15`} style={labelStyle}>Depreciation Method</label>
+                            <select id={`${uid}-f15`} value={values.depreciationMethod} onChange={(e) => {
                                 const newMethod = e.target.value;
                                 const patch: Partial<PropertyFormValues> = { depreciationMethod: newMethod };
                                 if (newMethod !== 'none' && !values.inServiceDate && values.purchaseDate) {
@@ -224,20 +226,20 @@ export default function PropertyForm({ heading, submitLabel, values, onChange, p
                         <>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
                                 <div>
-                                    <label style={labelStyle}>In-Service Date</label>
-                                    <input type="date" value={values.inServiceDate} onChange={(e) => onChange({ inServiceDate: e.target.value })} style={inputStyle} />
+                                    <label htmlFor={`${uid}-f16`} style={labelStyle}>In-Service Date</label>
+                                    <input id={`${uid}-f16`} type="date" value={values.inServiceDate} onChange={(e) => onChange({ inServiceDate: e.target.value })} style={inputStyle} />
                                     {values.inServiceDate === values.purchaseDate && values.purchaseDate && (
                                         <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.25rem' }}>Defaulted to purchase date</div>
                                     )}
                                 </div>
                                 <div>
-                                    <label style={labelStyle}>Land Value ($)</label>
-                                    <CurrencyInput value={values.landValue} onChange={(v) => onChange({ landValue: v })} style={inputStyle} />
+                                    <label htmlFor={`${uid}-f17`} style={labelStyle}>Land Value ($)</label>
+                                    <CurrencyInput id={`${uid}-f17`} value={values.landValue} onChange={(v) => onChange({ landValue: v })} style={inputStyle} />
                                 </div>
                                 {!isCostSeg && (
                                     <div>
-                                        <label style={labelStyle}>Useful Life (years)</label>
-                                        <input type="number" step="0.5" value={values.usefulLifeYears} onChange={(e) => onChange({ usefulLifeYears: e.target.value })} style={inputStyle} />
+                                        <label htmlFor={`${uid}-f18`} style={labelStyle}>Useful Life (years)</label>
+                                        <input id={`${uid}-f18`} type="number" step="0.5" value={values.usefulLifeYears} onChange={(e) => onChange({ usefulLifeYears: e.target.value })} style={inputStyle} />
                                         {values.usefulLifeYears !== '' && parseFloat(values.usefulLifeYears) <= 0 && (
                                             <div style={{ fontSize: '0.8rem', color: '#d32f2f', marginTop: '0.25rem' }}>Useful life must be greater than 0</div>
                                         )}
@@ -254,34 +256,34 @@ export default function PropertyForm({ heading, submitLabel, values, onChange, p
                                     </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                         <div>
-                                            <label style={labelStyle}>5-Year Property ($)</label>
-                                            <CurrencyInput value={values.costSegAllocations.fiveYr} onChange={v => autoFillStructural({ ...values.costSegAllocations, fiveYr: v })} style={inputStyle} />
+                                            <label htmlFor={`${uid}-f19`} style={labelStyle}>5-Year Property ($)</label>
+                                            <CurrencyInput id={`${uid}-f19`} value={values.costSegAllocations.fiveYr} onChange={v => autoFillStructural({ ...values.costSegAllocations, fiveYr: v })} style={inputStyle} />
                                             <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.15rem' }}>Appliances, carpeting, fixtures</div>
                                         </div>
                                         <div>
-                                            <label style={labelStyle}>7-Year Property ($)</label>
-                                            <CurrencyInput value={values.costSegAllocations.sevenYr} onChange={v => autoFillStructural({ ...values.costSegAllocations, sevenYr: v })} style={inputStyle} />
+                                            <label htmlFor={`${uid}-f20`} style={labelStyle}>7-Year Property ($)</label>
+                                            <CurrencyInput id={`${uid}-f20`} value={values.costSegAllocations.sevenYr} onChange={v => autoFillStructural({ ...values.costSegAllocations, sevenYr: v })} style={inputStyle} />
                                             <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.15rem' }}>Office furniture, equipment</div>
                                         </div>
                                         <div>
-                                            <label style={labelStyle}>15-Year Property ($)</label>
-                                            <CurrencyInput value={values.costSegAllocations.fifteenYr} onChange={v => autoFillStructural({ ...values.costSegAllocations, fifteenYr: v })} style={inputStyle} />
+                                            <label htmlFor={`${uid}-f21`} style={labelStyle}>15-Year Property ($)</label>
+                                            <CurrencyInput id={`${uid}-f21`} value={values.costSegAllocations.fifteenYr} onChange={v => autoFillStructural({ ...values.costSegAllocations, fifteenYr: v })} style={inputStyle} />
                                             <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.15rem' }}>Land improvements, landscaping, fencing</div>
                                         </div>
                                         <div>
-                                            <label style={labelStyle}>27.5-Year Structural ($)</label>
-                                            <CurrencyInput value={values.costSegAllocations.twentySevenYr} onChange={v => updateAllocations({ ...values.costSegAllocations, twentySevenYr: v })} style={inputStyle} />
+                                            <label htmlFor={`${uid}-f22`} style={labelStyle}>27.5-Year Structural ($)</label>
+                                            <CurrencyInput id={`${uid}-f22`} value={values.costSegAllocations.twentySevenYr} onChange={v => updateAllocations({ ...values.costSegAllocations, twentySevenYr: v })} style={inputStyle} />
                                             <div style={{ fontSize: '0.75rem', color: '#1976d2', marginTop: '0.15rem' }}>Auto-computed as remainder — edit to override</div>
                                         </div>
                                     </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
                                         <div>
-                                            <label style={labelStyle}>Bonus Depreciation Rate (%)</label>
-                                            <input type="number" step="1" min="0" max="100" value={values.bonusDepreciationRate} onChange={(e) => onChange({ bonusDepreciationRate: clampBonusInput(e.target.value) })} style={inputStyle} />
+                                            <label htmlFor={`${uid}-f23`} style={labelStyle}>Bonus Depreciation Rate (%)</label>
+                                            <input id={`${uid}-f23`} type="number" step="1" min="0" max="100" value={values.bonusDepreciationRate} onChange={(e) => onChange({ bonusDepreciationRate: clampBonusInput(e.target.value) })} style={inputStyle} />
                                         </div>
                                         <div>
-                                            <label style={labelStyle}>Study Year (optional)</label>
-                                            <input type="number" placeholder="e.g. 2024" value={values.costSegStudyYear} onChange={(e) => onChange({ costSegStudyYear: e.target.value })} style={inputStyle} />
+                                            <label htmlFor={`${uid}-f24`} style={labelStyle}>Study Year (optional)</label>
+                                            <input id={`${uid}-f24`} type="number" placeholder="e.g. 2024" value={values.costSegStudyYear} onChange={(e) => onChange({ costSegStudyYear: e.target.value })} style={inputStyle} />
                                             <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.15rem' }}>If later than in-service year, triggers 481(a) catch-up</div>
                                         </div>
                                     </div>

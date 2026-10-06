@@ -3,8 +3,8 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('./CurrencyInput', () => ({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    default: ({ value, onChange, style }: any) => (
-        <input data-testid="currency-input" value={value ?? ''} style={style} onChange={(e) => onChange(e.target.value)} />
+    default: ({ value, onChange, style, id }: any) => (
+        <input id={id} data-testid="currency-input" value={value ?? ''} style={style} onChange={(e) => onChange(e.target.value)} />
     ),
 }));
 
@@ -58,6 +58,24 @@ describe('PropertyForm', () => {
         );
         expect(screen.getByText('New Property')).toBeInTheDocument();
         expect(screen.getByDisplayValue('123 Oak')).toBeInTheDocument();
+    });
+
+    it('associates every field label with its control', () => {
+        render(
+            <PropertyForm
+                heading="New Property"
+                submitLabel="Create"
+                values={{ ...values, depreciationMethod: 'straight_line', showLoanDetails: true, showDepreciation: true }}
+                onChange={vi.fn()}
+                purchasePriceNum={400000}
+                onSubmit={vi.fn()}
+                onCancel={vi.fn()}
+            />
+        );
+        for (const label of ['Address', 'Purchase Price', 'Purchase Date', 'Current Value', 'Mortgage Balance',
+            'Property Type', 'Loan Amount', 'Annual Interest Rate (%)', 'Depreciation Method', 'Useful Life (years)']) {
+            expect(screen.getByLabelText(label)).toBeInTheDocument();
+        }
     });
 
     it('emits a single-field patch when address changes', () => {
