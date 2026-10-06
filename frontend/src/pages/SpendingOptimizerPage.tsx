@@ -325,6 +325,7 @@ export default function SpendingOptimizerPage() {
                                     <span style={adornmentStyle}>$</span>
                                     <CurrencyInput
                                         style={adornedInputStyle}
+                                        aria-label="Essential Spending Floor (per year)"
                                         value={config.essentialFloor || ''}
                                         onChange={v => updateConfig('essentialFloor', v === '' ? 0 : Number(v))}
                                     />
@@ -335,6 +336,7 @@ export default function SpendingOptimizerPage() {
                                     <span style={adornmentStyle}>$</span>
                                     <CurrencyInput
                                         style={adornedInputStyle}
+                                        aria-label="Terminal Balance Target"
                                         value={config.terminalTarget || ''}
                                         onChange={v => updateConfig('terminalTarget', v === '' ? 0 : Number(v))}
                                     />
@@ -345,6 +347,7 @@ export default function SpendingOptimizerPage() {
                                     <span style={adornmentStyle}>$</span>
                                     <CurrencyInput
                                         style={adornedInputStyle}
+                                        aria-label="Portfolio Safety Net"
                                         value={config.portfolioFloor || ''}
                                         onChange={v => updateConfig('portfolioFloor', v === '' ? 0 : Number(v))}
                                     />
@@ -364,7 +367,7 @@ export default function SpendingOptimizerPage() {
                             </FormField>
                             <FormField label="Spending Flexibility" helpText="Maximum annual spending change">
                                 <div style={adornmentWrapStyle}>
-                                    <input style={adornedInputStyle} type="number" step="1" min="0" max="50"
+                                    <input aria-label="Spending Flexibility" style={adornedInputStyle} type="number" step="1" min="0" max="50"
                                         value={config.spendingFlexibilityPct || ''}
                                         onChange={e => updateConfig('spendingFlexibilityPct', Number(e.target.value))} />
                                     <span style={adornmentSuffixStyle}>%/yr</span>
@@ -414,7 +417,7 @@ export default function SpendingOptimizerPage() {
                                     </FormField>
                                     <FormField label="Cash Rate" helpText="Expected annual return on cash reserves (money market rate)">
                                         <div style={adornmentWrapStyle}>
-                                            <input style={adornedInputStyle} type="number" step="0.1" value={config.cashReturnRatePct || ''}
+                                            <input aria-label="Cash Rate" style={adornedInputStyle} type="number" step="0.1" value={config.cashReturnRatePct || ''}
                                                 onChange={e => updateConfig('cashReturnRatePct', Number(e.target.value))} />
                                             <span style={adornmentSuffixStyle}>%</span>
                                         </div>
@@ -430,7 +433,7 @@ export default function SpendingOptimizerPage() {
                                     </FormField>
                                     <FormField label="Confidence Level" helpText="Override for risk tolerance">
                                         <div style={adornmentWrapStyle}>
-                                            <input style={adornedInputStyle} type="number" step="1" min="50" max="99"
+                                            <input aria-label="Confidence Level" style={adornedInputStyle} type="number" step="1" min="50" max="99"
                                                 value={config.confidenceLevelPct ?? ''}
                                                 placeholder="Uses risk tolerance"
                                                 onChange={e => updateConfig('confidenceLevelPct', e.target.value ? Number(e.target.value) : null)} />
@@ -439,7 +442,7 @@ export default function SpendingOptimizerPage() {
                                     </FormField>
                                     <FormField label="Dynamic-Sequencing Bracket Rate (%)" helpText="Target tax bracket for dynamic withdrawal sequencing">
                                         <div style={adornmentWrapStyle}>
-                                            <input style={adornedInputStyle} type="number" step="1" min="0" max="37"
+                                            <input aria-label="Dynamic-Sequencing Bracket Rate (%)" style={adornedInputStyle} type="number" step="1" min="0" max="37"
                                                 value={config.dynSeqBracketRatePct ?? ''}
                                                 placeholder="Off"
                                                 onChange={e => updateConfig('dynSeqBracketRatePct', e.target.value ? Number(e.target.value) : null)} />
@@ -502,7 +505,7 @@ export default function SpendingOptimizerPage() {
                                     </FormField>
                                     <FormField label="RMD Bracket Headroom" helpText="Reserve headroom for market growth years. Higher = more conservative.">
                                         <div style={adornmentWrapStyle}>
-                                            <input style={adornedInputStyle} type="number" step="1" min="5" max="25"
+                                            <input aria-label="RMD Bracket Headroom" style={adornedInputStyle} type="number" step="1" min="5" max="25"
                                                 value={config.rmdBracketHeadroomPct || ''}
                                                 onChange={e => updateConfig('rmdBracketHeadroomPct', Number(e.target.value))} />
                                             <span style={adornmentSuffixStyle}>%</span>

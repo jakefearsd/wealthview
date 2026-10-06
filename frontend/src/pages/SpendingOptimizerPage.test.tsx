@@ -171,6 +171,26 @@ describe('SpendingOptimizerPage', () => {
         expect(screen.getByText('Confidence Level')).toBeInTheDocument();
     });
 
+    it('gives every adorned numeric input an accessible name', async () => {
+        const user = userEvent.setup();
+        renderPage();
+        await waitFor(() => {
+            expect(screen.getByText('Advanced Settings')).toBeInTheDocument();
+        });
+        await user.click(screen.getByText('Advanced Settings'));
+
+        expect(screen.getByRole('textbox', { name: 'Essential Spending Floor (per year)' })).toBeInTheDocument();
+        expect(screen.getByRole('textbox', { name: 'Terminal Balance Target' })).toBeInTheDocument();
+        expect(screen.getByRole('textbox', { name: 'Portfolio Safety Net' })).toBeInTheDocument();
+        for (const name of ['Spending Flexibility', 'Cash Rate', 'Confidence Level',
+            'Dynamic-Sequencing Bracket Rate (%)']) {
+            expect(screen.getByRole('spinbutton', { name })).toBeInTheDocument();
+        }
+        for (const input of [...screen.getAllByRole('textbox'), ...screen.getAllByRole('spinbutton')]) {
+            expect(input).toHaveAccessibleName();
+        }
+    });
+
     it('shows default phases with target spending in configure state', async () => {
         renderPage();
 
