@@ -77,6 +77,20 @@ describe('ProjectionComparePage', () => {
         expect(screen.getByText('Loading scenarios...')).toBeInTheDocument();
     });
 
+    it('shows an error with retry, not empty dropdowns, when scenarios fail to load', async () => {
+        const refetch = vi.fn();
+        mockUseApiQuery.mockReturnValue({ data: null, loading: false, error: 'Boom', refetch });
+        renderPage();
+        const user = userEvent.setup();
+
+        expect(screen.getByText('Boom')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Compare' })).not.toBeInTheDocument();
+
+        await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+        expect(refetch).toHaveBeenCalled();
+    });
+
     it('renders dropdowns and compare button', () => {
         renderPage();
 

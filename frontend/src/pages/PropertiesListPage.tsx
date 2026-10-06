@@ -141,7 +141,7 @@ export default function PropertiesListPage() {
                 />
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 420px), 1fr))', gap: '1rem' }}>
                 {properties?.map((p) => (
                     <div key={p.id} style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                         <Link to={`/properties/${p.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>

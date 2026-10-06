@@ -6,6 +6,7 @@ import { useApiMutation } from '../hooks/useApiMutation';
 import { formatCurrency, formatCompactCurrency } from '../utils/format';
 import { cardStyle, inputStyle, labelStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
 import LoadingState from '../components/LoadingState';
+import ErrorState from '../components/ErrorState';
 import { findPeakBalance, findDepletionYear } from '../utils/projectionCalcs';
 import toast from 'react-hot-toast';
 import type { CompareResponse } from '../types/projection';
@@ -17,7 +18,7 @@ import {
 const COLORS = ['#1976d2', '#2e7d32', '#9c27b0'];
 
 export default function ProjectionComparePage() {
-    const { data: scenarios, loading } = useApiQuery(listScenarios);
+    const { data: scenarios, loading, error, refetch } = useApiQuery(listScenarios);
     const [selectedIds, setSelectedIds] = useState<(string | '')[]>(['', '', '']);
     const [result, setResult] = useState<CompareResponse | null>(null);
 
@@ -45,6 +46,7 @@ export default function ProjectionComparePage() {
     }
 
     if (loading) return <LoadingState message="Loading scenarios..." />;
+    if (error) return <ErrorState message={error} onRetry={refetch} />;
 
     const tickFormatter = (v: number) => formatCompactCurrency(v);
 
