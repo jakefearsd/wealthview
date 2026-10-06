@@ -194,7 +194,7 @@ export default function OptimizerResultsView({
                         <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.5rem' }}>Outcome Range (Final Portfolio Balance)</div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div>
-                                <div style={{ fontSize: '0.75rem', color: '#ef5350' }}>Pessimistic (p10)</div>
+                                <div style={{ fontSize: '0.75rem', color: '#c62828' }}>Pessimistic (p10)</div>
                                 <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{fmt(lastYear.portfolio_balance_p10)}</div>
                             </div>
                             <div style={{ flex: 1, margin: '0 0.75rem' }}>
@@ -345,7 +345,7 @@ export default function OptimizerResultsView({
                                 <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(y.portfolio_withdrawal)}</td>
                                 <td style={{
                                     ...tdStyle, textAlign: 'right',
-                                    color: y.portfolio_balance_p10 != null && y.portfolio_balance_p10 <= 0 ? '#ef5350' : '#666',
+                                    color: y.portfolio_balance_p10 != null && y.portfolio_balance_p10 <= 0 ? '#c62828' : '#666',
                                 }}>
                                     {fmtShort(y.portfolio_balance_p10)}
                                 </td>

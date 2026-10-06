@@ -56,7 +56,7 @@ export default function PortfolioFanChart({ yearlySpending }: Props) {
                                     <div style={{ color: '#6366f1' }}>
                                         25th Percentile: {formatDollarTooltip(d.p25 ?? 0)}
                                     </div>
-                                    <div style={{ color: '#ef5350' }}>
+                                    <div style={{ color: '#c62828' }}>
                                         10th Percentile: {formatDollarTooltip(d.p10 ?? 0)}
                                     </div>
                                 </>
