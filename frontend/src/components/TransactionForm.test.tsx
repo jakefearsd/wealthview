@@ -112,6 +112,7 @@ describe('TransactionForm', () => {
         render(<TransactionForm accountId="acc-1" onSuccess={vi.fn()} onCancel={vi.fn()} />);
 
         fillValid({ symbol: '   ', quantity: '' });
+        fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'deposit' } });
         fireEvent.click(screen.getByText('Save'));
 
         await waitFor(() => expect(createTransaction).toHaveBeenCalledWith(
@@ -135,6 +136,31 @@ describe('TransactionForm', () => {
 
         expect(screen.getByRole('alert')).toHaveTextContent('Amount must be a number.');
         expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    });
+
+    it('requires a quantity above zero for a buy, matching the server rule', () => {
+        render(<TransactionForm accountId="acc-1" onSuccess={vi.fn()} onCancel={vi.fn()} />);
+        fillValid({ quantity: '0' });
+
+        expect(screen.getByRole('alert')).toHaveTextContent('Buys and sells need a quantity above zero.');
+        expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    });
+
+    it('requires a quantity for a sell', () => {
+        render(<TransactionForm accountId="acc-1" onSuccess={vi.fn()} onCancel={vi.fn()} />);
+        fillValid({ quantity: '' });
+        fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'sell' } });
+
+        expect(screen.getByRole('alert')).toHaveTextContent('Buys and sells need a quantity above zero.');
+        expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    });
+
+    it('allows a dividend without a quantity', () => {
+        render(<TransactionForm accountId="acc-1" onSuccess={vi.fn()} onCancel={vi.fn()} />);
+        fillValid({ quantity: '' });
+        fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'dividend' } });
+
+        expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
     });
 
     it('rejects a negative quantity', () => {

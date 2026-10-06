@@ -11,11 +11,15 @@ interface Props {
     initialValues?: Transaction;
 }
 
-function validate(date: string, amount: number, quantity: number | undefined): string | null {
+function validate(date: string, type: string, amount: number, quantity: number | undefined): string | null {
     if (date === '') return 'Date is required.';
     if (!Number.isFinite(amount)) return 'Amount must be a number.';
     if (quantity !== undefined && (!Number.isFinite(quantity) || quantity < 0)) {
         return 'Quantity must be zero or more.';
+    }
+    // The server rejects a buy or sell without a positive quantity (TransactionRequest#isQuantityValidForType).
+    if ((type === 'buy' || type === 'sell') && !(quantity !== undefined && quantity > 0)) {
+        return 'Buys and sells need a quantity above zero.';
     }
     return null;
 }
@@ -39,7 +43,7 @@ export default function TransactionForm({ accountId, onSuccess, onCancel, initia
 
     const parsedAmount = parseFloat(txnAmount);
     const parsedQuantity = txnQuantity.trim() === '' ? undefined : parseFloat(txnQuantity);
-    const validationError = validate(txnDate, parsedAmount, parsedQuantity);
+    const validationError = validate(txnDate, txnType, parsedAmount, parsedQuantity);
     const dirty = txnDate !== '' || txnAmount !== '' || txnQuantity !== '' || txnSymbol !== '';
 
     function handleSubmit() {
