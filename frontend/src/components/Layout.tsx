@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router';
+import { NavLink, Outlet, useLocation } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { hasAdminAccess } from '../utils/permissions';
 import ErrorBoundary from './ErrorBoundary';
@@ -26,6 +26,7 @@ const navLinkStyle = ({ isActive }: { isActive: boolean }) => ({
 
 export default function Layout() {
     const { email, role, logout } = useAuth();
+    const { pathname } = useLocation();
 
     return (
         <div style={{ display: 'flex', minHeight: '100vh' }}>
@@ -70,8 +71,8 @@ export default function Layout() {
                     </button>
                 </div>
             </nav>
-            <main style={{ flex: 1, padding: '2rem', background: '#f5f5f5' }}>
-                <ErrorBoundary>
+            <main style={{ flex: 1, minWidth: 0, padding: '2rem', background: '#f5f5f5' }}>
+                <ErrorBoundary resetKey={pathname}>
                     <Outlet />
                 </ErrorBoundary>
             </main>

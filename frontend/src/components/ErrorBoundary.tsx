@@ -3,6 +3,8 @@ import Button from './Button';
 
 interface Props {
     children: ReactNode;
+    /** When this value changes (e.g. the route), a caught error is cleared and children re-render. */
+    resetKey?: string;
 }
 
 interface State {
@@ -18,6 +20,12 @@ export default class ErrorBoundary extends Component<Props, State> {
 
     static getDerivedStateFromError(error: Error): State {
         return { hasError: true, error };
+    }
+
+    componentDidUpdate(prevProps: Props) {
+        if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
+            this.setState({ hasError: false, error: null });
+        }
     }
 
     componentDidCatch(error: Error, info: ErrorInfo) {

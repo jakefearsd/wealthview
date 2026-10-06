@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router';
 
 vi.mock('../context/AuthContext', () => ({
@@ -27,6 +27,10 @@ function authAs(role: string | null): AuthValue {
     } as unknown as AuthValue;
 }
 
+function Boom(): never {
+    throw new Error('boom');
+}
+
 function renderLayout(entry = '/') {
     return render(
         <MemoryRouter initialEntries={[entry]}>
@@ -34,6 +38,7 @@ function renderLayout(entry = '/') {
                 <Route element={<Layout />}>
                     <Route path="/" element={<div>Dashboard body</div>} />
                     <Route path="/accounts" element={<div>Accounts body</div>} />
+                    <Route path="/projections" element={<Boom />} />
                 </Route>
             </Routes>
         </MemoryRouter>,
@@ -127,5 +132,38 @@ describe('Layout', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
 
         expect(logout).toHaveBeenCalledTimes(1);
+    });
+
+    // === layout containment and error recovery ===
+
+    it('lets the main area shrink so wide content scrolls inside it instead of widening the page', () => {
+        renderLayout();
+
+        expect(screen.getByRole('main')).toHaveStyle({ minWidth: '0' });
+    });
+
+    describe('when a page throws while rendering', () => {
+        const originalConsoleError = console.error;
+        beforeEach(() => {
+            console.error = vi.fn();
+        });
+        afterEach(() => {
+            console.error = originalConsoleError;
+        });
+
+        it('shows the error fallback for the broken page', () => {
+            renderLayout('/projections');
+
+            expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+        });
+
+        it('recovers when the user navigates to another page', () => {
+            renderLayout('/projections');
+
+            fireEvent.click(screen.getByRole('link', { name: 'Accounts' }));
+
+            expect(screen.getByText('Accounts body')).toBeInTheDocument();
+            expect(screen.queryByText('Something went wrong')).not.toBeInTheDocument();
+        });
     });
 });

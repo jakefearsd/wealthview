@@ -35,4 +35,43 @@ describe('ErrorBoundary', () => {
         expect(screen.getByRole('button', { name: 'Reload Page' })).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'Go to Dashboard' })).toBeInTheDocument();
     });
+
+    it('clears the error and re-renders children when resetKey changes', () => {
+        let broken = true;
+        function Flaky() {
+            if (broken) throw new Error('boom');
+            return <div>recovered</div>;
+        }
+        const { rerender } = render(
+            <ErrorBoundary resetKey="/a">
+                <Flaky />
+            </ErrorBoundary>
+        );
+        expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+
+        broken = false;
+        rerender(
+            <ErrorBoundary resetKey="/b">
+                <Flaky />
+            </ErrorBoundary>
+        );
+
+        expect(screen.getByText('recovered')).toBeInTheDocument();
+    });
+
+    it('stays in the error state when resetKey is unchanged', () => {
+        const { rerender } = render(
+            <ErrorBoundary resetKey="/a">
+                <ThrowingChild />
+            </ErrorBoundary>
+        );
+
+        rerender(
+            <ErrorBoundary resetKey="/a">
+                <ThrowingChild />
+            </ErrorBoundary>
+        );
+
+        expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+    });
 });
