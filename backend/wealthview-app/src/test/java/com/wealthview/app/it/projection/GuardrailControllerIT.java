@@ -71,6 +71,19 @@ class GuardrailControllerIT extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void optimize_emptyPhaseList_returns200() {
+        // The optimizer page sends phases: [] once every phase is removed; the search then finds
+        // one uniform spending level.
+        var id = scenarioId();
+        var body = optimizeBody();
+        body.put("phases", java.util.List.of());
+
+        var response = api.postForEntity(optimizeUrl(id), body);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
     void optimize_thenGetGuardrail_returnsTheSameProfile() {
         var id = optimizedScenarioId();
 

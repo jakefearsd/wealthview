@@ -10,7 +10,6 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
 
 /**
  * {@code trialCount} and {@code confidenceLevel} are bounded (T18a-5c): too few trials make the
@@ -29,7 +28,7 @@ public record GuardrailOptimizationRequest(
         @DecimalMin("-1") @DecimalMax("1") BigDecimal returnMean,
         @Min(100) @Max(50000) Integer trialCount,
         @DecimalMin("0.5") @DecimalMax("0.999") BigDecimal confidenceLevel,
-        @Size(min = 1) List<@Valid GuardrailPhaseInput> phases,
+        List<@Valid GuardrailPhaseInput> phases,
         @DecimalMin("0") BigDecimal portfolioFloor,
         @DecimalMin("0") @DecimalMax("1") BigDecimal maxAnnualAdjustmentRate,
         @Min(0) @Max(30) Integer phaseBlendYears,

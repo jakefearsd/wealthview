@@ -139,7 +139,12 @@ class GuardrailControllerTest {
     }
 
     @Test
-    void optimize_emptyPhases_returns400() throws Exception {
+    void optimize_emptyPhases_returns200() throws Exception {
+        // No phases is a supported mode (the search finds one uniform spending level), and the
+        // optimizer page sends phases: [] once the user removes every phase.
+        when(guardrailProfileService.optimize(eq(TENANT_ID), eq(SCENARIO_ID),
+                any(GuardrailOptimizationRequest.class)))
+                .thenReturn(sampleResponse());
         var body = """
                 {"scenario_id": "%s", "name": "Plan", "essential_floor": 30000, "terminal_balance_target": 0,
                  "phases": []}
@@ -149,7 +154,7 @@ class GuardrailControllerTest {
                         .with(authenticatedAdmin())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -208,7 +213,7 @@ class GuardrailControllerTest {
 
         var request = new GuardrailOptimizationRequest(
                 SCENARIO_ID, "Plan", new BigDecimal("30000"),
-                BigDecimal.ZERO, null, null, null, List.of(new GuardrailPhaseInput("Early", 62, 72, 3)),
+                BigDecimal.ZERO, null, null, null, List.of(),
                 null, null, null, null,
                 null, null,
                 null, null, null, null, null, null);
@@ -296,7 +301,7 @@ class GuardrailControllerTest {
 
         var request = new GuardrailOptimizationRequest(
                 SCENARIO_ID, "Plan", new BigDecimal("30000"),
-                BigDecimal.ZERO, null, 5000, new BigDecimal("0.95"), List.of(new GuardrailPhaseInput("Early", 62, 72, 3)),
+                BigDecimal.ZERO, null, 5000, new BigDecimal("0.95"), List.of(),
                 null, null, null, null,
                 null, null,
                 null, null, null, null, null, null);
@@ -424,7 +429,7 @@ class GuardrailControllerTest {
 
         var request = new GuardrailOptimizationRequest(
                 SCENARIO_ID, "Plan", new BigDecimal("30000"),
-                BigDecimal.ZERO, null, null, null, List.of(new GuardrailPhaseInput("Early", 62, 72, 3)),
+                BigDecimal.ZERO, null, null, null, List.of(),
                 null, null, null, null,
                 null, null,
                 null, null, null, null, null, null);
