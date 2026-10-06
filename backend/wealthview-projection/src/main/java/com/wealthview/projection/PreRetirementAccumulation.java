@@ -18,11 +18,19 @@ import com.wealthview.core.projection.dto.ProjectionAccountInput;
  * <p>The optimizer's trials begin in the retirement year. It used to start them from TODAY's
  * balances, so a 29-year-old retiring in 33 years with $45,500/yr of contributions was judged on a
  * ~$30,000 portfolio while the deterministic projection had $3.87M at retirement. This rolls every
- * account forward from {@link GuardrailOptimizationInput#baseYear()} to the retirement year exactly
- * as the deterministic engine's accumulation years do: each year the annual contribution is added,
- * then the whole balance grows at the account's real, fee-adjusted return
- * ({@link PoolStrategy#realReturnFor}); taxable contributions enter at cost and accumulation growth
- * stays unrealized (audit C8), so cost basis rises by the contributions only.
+ * account forward from {@link GuardrailOptimizationInput#baseYear()} to the retirement year in the
+ * same order as the deterministic engine's accumulation years: each year the annual contribution is
+ * added, then the balance grows at the account's real, fee-adjusted return
+ * ({@link PoolStrategy#realReturnFor}, the per-account rate the deterministic engine blends into its
+ * pool returns). Taxable contributions enter at cost and accumulation growth stays unrealized
+ * (audit C8), so cost basis rises by the contributions only.
+ *
+ * <p>This is not an exact replay of the deterministic balances. Each account grows here at its OWN
+ * return, while the deterministic engine grows each pool at one return fixed at the start, weighted
+ * by the accounts' opening balances (by their contributions when every opening balance is zero).
+ * The two agree when a pool's accounts share a return. In a pool that mixes allocations, for example
+ * a funded 40/60 401(k) next to a new all-stock IRA that receives the contributions, the balances at
+ * retirement can differ materially.
  *
  * <p>The accumulation path is the EXPECTED (deterministic) path: the trials' market dispersion
  * still starts at retirement. Pre-retirement events the deterministic engine also models (a
