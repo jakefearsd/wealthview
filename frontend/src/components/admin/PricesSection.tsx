@@ -127,7 +127,7 @@ function FinnhubTab() {
                             ))}
                             {statuses?.length === 0 && (
                                 <tr>
-                                    <td colSpan={4} style={{ padding: '1rem', color: '#999', textAlign: 'center' }}>
+                                    <td colSpan={4} style={{ padding: '1rem', color: '#666', textAlign: 'center' }}>
                                         No price data found
                                     </td>
                                 </tr>
@@ -302,7 +302,7 @@ function YahooTab() {
                     </>
                 )}
                 {preview && preview.length === 0 && (
-                    <div style={{ color: '#999', fontSize: '0.9rem' }}>No prices returned for those symbols and date range.</div>
+                    <div style={{ color: '#666', fontSize: '0.9rem' }}>No prices returned for those symbols and date range.</div>
                 )}
             </div>
         </div>

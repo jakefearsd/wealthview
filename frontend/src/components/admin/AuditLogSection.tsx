@@ -65,7 +65,7 @@ export default function AuditLogSection() {
                                     </tr>
                                 ))}
                                 {entries.length === 0 && (
-                                    <tr><td colSpan={4} style={{ padding: '1rem', color: '#999', textAlign: 'center' }}>No audit log entries</td></tr>
+                                    <tr><td colSpan={4} style={{ padding: '1rem', color: '#666', textAlign: 'center' }}>No audit log entries</td></tr>
                                 )}
                             </tbody>
                         </table>

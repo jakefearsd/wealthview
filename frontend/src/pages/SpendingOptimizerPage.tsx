@@ -306,7 +306,7 @@ export default function SpendingOptimizerPage() {
                         )}
                     </div>
                 )}
-                <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.25rem' }}>
+                <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
                     These values come from the projection scenario. Edit the scenario to change them.
                 </div>
             </div>
@@ -397,7 +397,7 @@ export default function SpendingOptimizerPage() {
                         {/* Advanced Settings */}
                         <div style={{ borderTop: '1px solid #eee', marginTop: '1.5rem', paddingTop: '1rem' }}>
                             <button type="button" onClick={() => setShowAdvanced(!showAdvanced)}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888', fontSize: '0.85rem', padding: 0 }}>
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', fontSize: '0.85rem', padding: 0 }}>
                                 <span style={{ display: 'inline-block', transition: 'transform 0.15s', transform: showAdvanced ? 'rotate(90deg)' : 'none' }}>&rsaquo;</span>
                                 {' '}Advanced Settings
                             </button>

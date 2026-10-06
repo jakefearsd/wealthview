@@ -9,7 +9,7 @@ interface MilestoneStripProps {
 }
 
 const itemStyle = { textAlign: 'center' as const, flex: 1 };
-const labelStyle = { fontSize: '0.75rem', color: '#999', marginBottom: '0.25rem' };
+const labelStyle = { fontSize: '0.75rem', color: '#666', marginBottom: '0.25rem' };
 const valueStyle = { fontSize: '0.95rem', fontWeight: 600 as const };
 
 export default function MilestoneStrip({ result, retirementYear }: MilestoneStripProps) {

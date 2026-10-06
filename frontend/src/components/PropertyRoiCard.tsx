@@ -101,7 +101,7 @@ export default function PropertyRoiCard({ propertyId, incomeSource }: PropertyRo
                         {formatCurrency(incomeSource.annual_amount)}/year ({formatCurrency(incomeSource.annual_amount / 12)}/month)
                     </div>
                 </div>
-                {loading && <span style={{ fontSize: '0.8rem', color: '#999' }}>Calculating...</span>}
+                {loading && <span style={{ fontSize: '0.8rem', color: '#666' }}>Calculating...</span>}
             </div>
 
             <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>

@@ -370,7 +370,7 @@ export default function PropertyDetailPage() {
                             </div>
                         ))
                     ) : (
-                        <div style={{ color: '#999', fontSize: '0.9rem' }}>
+                        <div style={{ color: '#666', fontSize: '0.9rem' }}>
                             No income source linked. <Link to="/income-sources" style={{ color: '#1976d2', textDecoration: 'none' }}>Create one on the Income Sources page.</Link>
                         </div>
                     )}

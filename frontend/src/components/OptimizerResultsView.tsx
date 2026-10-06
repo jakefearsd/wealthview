@@ -41,7 +41,7 @@ export default function OptimizerResultsView({
         letterSpacing: '0.03em',
     };
     const metricLabelStyle: React.CSSProperties = {
-        fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem',
+        fontSize: '0.8rem', color: '#666', marginBottom: '0.25rem',
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem',
     };
 
@@ -132,19 +132,19 @@ export default function OptimizerResultsView({
                     background: failureRateColors[diagnostics.failureRateSeverity],
                     border: `1px solid ${failureRateBorder[diagnostics.failureRateSeverity]}`,
                 }}>
-                    <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>Failure Rate</div>
+                    <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.25rem' }}>Failure Rate</div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{pct(result.failure_rate)}</div>
                 </div>
                 <div style={{ ...cardStyle, textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>10th Percentile Final</div>
+                    <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.25rem' }}>10th Percentile Final</div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{fmt(result.percentile10_final)}</div>
                 </div>
                 <div style={{ ...cardStyle, textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>25th Percentile Final</div>
+                    <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.25rem' }}>25th Percentile Final</div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{fmt(result.yearly_spending[result.yearly_spending.length - 1]?.portfolio_balance_p25 ?? 0)}</div>
                 </div>
                 <div style={{ ...cardStyle, textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>Median Final Balance</div>
+                    <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.25rem' }}>Median Final Balance</div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{fmt(result.median_final_balance)}</div>
                 </div>
             </div>
@@ -159,20 +159,20 @@ export default function OptimizerResultsView({
                     </p>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                         <div style={{ ...cardStyle, textAlign: 'center', background: '#e8f5e9', border: '1px solid #a5d6a7' }}>
-                            <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>Lifetime Success</div>
+                            <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.25rem' }}>Lifetime Success</div>
                             <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>
                                 {pct(result.stochastic_mortality.lifetime_success_probability, 0)}
                             </div>
-                            <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
+                            <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
                                 Never falls short while either spouse is alive
                             </div>
                         </div>
                         <div style={{ ...cardStyle, textAlign: 'center', background: '#e3f2fd', border: '1px solid #90caf9' }}>
-                            <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>Longevity-Conditional Success</div>
+                            <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.25rem' }}>Longevity-Conditional Success</div>
                             <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>
                                 {pct(result.stochastic_mortality.longevity_conditional.probability, 0)}
                             </div>
-                            <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
+                            <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
                                 If the survivor lives to age {result.stochastic_mortality.longevity_conditional.age}
                                 {' '}({pct(result.stochastic_mortality.longevity_conditional.trial_fraction, 0)} of trials)
                             </div>
@@ -191,7 +191,7 @@ export default function OptimizerResultsView({
                 const lastYear = result.yearly_spending[result.yearly_spending.length - 1];
                 return lastYear && (lastYear.portfolio_balance_p10 != null || lastYear.portfolio_balance_median != null) ? (
                     <div data-testid="outcome-range-card" style={{ ...cardStyle, marginBottom: '1.5rem' }}>
-                        <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.5rem' }}>Outcome Range (Final Portfolio Balance)</div>
+                        <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.5rem' }}>Outcome Range (Final Portfolio Balance)</div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div>
                                 <div style={{ fontSize: '0.75rem', color: '#ef5350' }}>Pessimistic (p10)</div>
@@ -200,8 +200,8 @@ export default function OptimizerResultsView({
                             <div style={{ flex: 1, margin: '0 0.75rem' }}>
                                 <div style={{ height: '4px', background: 'linear-gradient(to right, #ef5350, #ff9800, #4caf50, #1976d2)', borderRadius: '2px' }} />
                                 <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '0.25rem' }}>
-                                    <span style={{ fontSize: '0.7rem', color: '#888' }}>p25: {fmt(lastYear.portfolio_balance_p25)}</span>
-                                    <span style={{ fontSize: '0.7rem', color: '#888' }}>p50: {fmt(lastYear.portfolio_balance_median)}</span>
+                                    <span style={{ fontSize: '0.7rem', color: '#666' }}>p25: {fmt(lastYear.portfolio_balance_p25)}</span>
+                                    <span style={{ fontSize: '0.7rem', color: '#666' }}>p50: {fmt(lastYear.portfolio_balance_median)}</span>
                                 </div>
                             </div>
                             <div style={{ textAlign: 'right' }}>
@@ -209,7 +209,7 @@ export default function OptimizerResultsView({
                                 <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{fmt(result.median_final_balance)}</div>
                             </div>
                         </div>
-                        <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
+                        <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
                             Final year portfolio balance at age {lastYear.age}
                         </div>
                     </div>
@@ -263,7 +263,7 @@ export default function OptimizerResultsView({
                                     return (
                                         <tr key={p.phaseIndex} style={trHoverStyle}>
                                             <td style={tdStyle}>{p.phaseName}</td>
-                                            <td style={{ ...tdStyle, color: '#888' }}>{ageRange}</td>
+                                            <td style={{ ...tdStyle, color: '#666' }}>{ageRange}</td>
                                             <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(p.targetSpending)}</td>
                                             <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(p.avgRecommended)}</td>
                                             <td style={tdStyle}>
@@ -328,9 +328,9 @@ export default function OptimizerResultsView({
                             <th rowSpan={2} style={{ ...thStyle, textAlign: 'right', verticalAlign: 'bottom' }}>Corridor</th>
                         </tr>
                         <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                            <th style={{ ...thStyle, textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p10</th>
-                            <th style={{ ...thStyle, textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p25</th>
-                            <th style={{ ...thStyle, textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p50</th>
+                            <th style={{ ...thStyle, textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#666' }}>p10</th>
+                            <th style={{ ...thStyle, textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#666' }}>p25</th>
+                            <th style={{ ...thStyle, textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#666' }}>p50</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -345,17 +345,17 @@ export default function OptimizerResultsView({
                                 <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(y.portfolio_withdrawal)}</td>
                                 <td style={{
                                     ...tdStyle, textAlign: 'right',
-                                    color: y.portfolio_balance_p10 != null && y.portfolio_balance_p10 <= 0 ? '#ef5350' : '#888',
+                                    color: y.portfolio_balance_p10 != null && y.portfolio_balance_p10 <= 0 ? '#ef5350' : '#666',
                                 }}>
                                     {fmtShort(y.portfolio_balance_p10)}
                                 </td>
-                                <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>
+                                <td style={{ ...tdStyle, textAlign: 'right', color: '#666' }}>
                                     {fmtShort(y.portfolio_balance_p25)}
                                 </td>
-                                <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>
+                                <td style={{ ...tdStyle, textAlign: 'right', color: '#666' }}>
                                     {fmtShort(y.portfolio_balance_median)}
                                 </td>
-                                <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>
+                                <td style={{ ...tdStyle, textAlign: 'right', color: '#666' }}>
                                     {fmt(y.corridor_low)} &ndash; {fmt(y.corridor_high)}
                                 </td>
                             </tr>

@@ -25,7 +25,7 @@ export default function EmptyState({ title, message, action }: Props) {
             </div>
             {message && (
                 <div style={{
-                    color: '#9ca3af',
+                    color: '#6b7280',
                     fontSize: '0.9rem',
                     marginBottom: action ? '1rem' : 0,
                 }}>

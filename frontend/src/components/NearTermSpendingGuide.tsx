@@ -68,7 +68,7 @@ function SpendingByPortfolio({ year, recommended }: { year: GuardrailYearlySpend
                 }}>
                     <div>
                         <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#555' }}>Recommended (p25)</div>
-                        <div style={{ fontSize: '0.7rem', color: '#888' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#666' }}>
                             Portfolio at {fmt(p25Bal)}
                         </div>
                     </div>
@@ -84,7 +84,7 @@ function SpendingByPortfolio({ year, recommended }: { year: GuardrailYearlySpend
                 }}>
                     <div>
                         <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#555' }}>Expected path (p50)</div>
-                        <div style={{ fontSize: '0.7rem', color: '#888' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#666' }}>
                             Portfolio at {fmt(medianBal)}
                             {p50UsesHeuristic && <span> &middot; 4% of portfolio</span>}
                         </div>
@@ -109,15 +109,15 @@ function CompactSpendingByPortfolio({ year, recommended }: { year: GuardrailYear
         <div data-testid="spending-by-portfolio" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '0.5rem' }}>
             {year.portfolio_balance_p25 != null && (
                 <div style={{ background: '#fff8f8', borderRadius: '4px', padding: '0.35rem 0.5rem', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.65rem', color: '#888' }}>Recommended (p25)</div>
-                    <div style={{ fontSize: '0.7rem', color: '#888' }}>{fmt(p25Bal)}</div>
+                    <div style={{ fontSize: '0.65rem', color: '#666' }}>Recommended (p25)</div>
+                    <div style={{ fontSize: '0.7rem', color: '#666' }}>{fmt(p25Bal)}</div>
                     <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#c62828' }}>{fmt(recommended)}</div>
                 </div>
             )}
             {year.portfolio_balance_median != null && (
                 <div style={{ background: '#f5f9ff', borderRadius: '4px', padding: '0.35rem 0.5rem', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.65rem', color: '#888' }}>Expected (p50)</div>
-                    <div style={{ fontSize: '0.7rem', color: '#888' }}>{fmt(medianBal)}</div>
+                    <div style={{ fontSize: '0.65rem', color: '#666' }}>Expected (p50)</div>
+                    <div style={{ fontSize: '0.7rem', color: '#666' }}>{fmt(medianBal)}</div>
                     <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1565c0' }}>{fmt(p50Spending)}</div>
                 </div>
             )}
@@ -173,12 +173,12 @@ export default function NearTermSpendingGuide({ yearlySpending, retirementDate }
                                             Age {year.age} &middot; {year.year}
                                         </span>
                                     </div>
-                                    <span style={{ fontSize: '0.75rem', color: '#888' }}>{year.phase_name}</span>
+                                    <span style={{ fontSize: '0.75rem', color: '#666' }}>{year.phase_name}</span>
                                 </div>
 
                                 <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#1a1a1a', marginBottom: '0.5rem' }}>
                                     {fmt(year.recommended)}
-                                    <span style={{ fontSize: '0.85rem', fontWeight: 400, color: '#888', marginLeft: '0.5rem' }}>
+                                    <span style={{ fontSize: '0.85rem', fontWeight: 400, color: '#666', marginLeft: '0.5rem' }}>
                                         recommended
                                     </span>
                                 </div>
@@ -188,19 +188,19 @@ export default function NearTermSpendingGuide({ yearlySpending, retirementDate }
                                     gap: '0.75rem', marginBottom: '1rem',
                                 }}>
                                     <div>
-                                        <div style={{ fontSize: '0.7rem', color: '#888', textTransform: 'uppercase' }}>Essential</div>
+                                        <div style={{ fontSize: '0.7rem', color: '#666', textTransform: 'uppercase' }}>Essential</div>
                                         <div style={{ fontSize: '0.95rem', fontWeight: 600 }}>{fmt(year.essential_floor)}</div>
                                     </div>
                                     <div>
-                                        <div style={{ fontSize: '0.7rem', color: '#888', textTransform: 'uppercase' }}>Discretionary</div>
+                                        <div style={{ fontSize: '0.7rem', color: '#666', textTransform: 'uppercase' }}>Discretionary</div>
                                         <div style={{ fontSize: '0.95rem', fontWeight: 600 }}>{fmt(year.discretionary)}</div>
                                     </div>
                                     <div>
-                                        <div style={{ fontSize: '0.7rem', color: '#888', textTransform: 'uppercase' }}>Income</div>
+                                        <div style={{ fontSize: '0.7rem', color: '#666', textTransform: 'uppercase' }}>Income</div>
                                         <div style={{ fontSize: '0.95rem', fontWeight: 600 }}>{fmt(year.income_offset)}</div>
                                     </div>
                                     <div>
-                                        <div style={{ fontSize: '0.7rem', color: '#888', textTransform: 'uppercase' }}>Portfolio Draw</div>
+                                        <div style={{ fontSize: '0.7rem', color: '#666', textTransform: 'uppercase' }}>Portfolio Draw</div>
                                         <div style={{ fontSize: '0.95rem', fontWeight: 600 }}>{fmt(year.portfolio_withdrawal)}</div>
                                     </div>
                                 </div>
@@ -227,7 +227,7 @@ export default function NearTermSpendingGuide({ yearlySpending, retirementDate }
                                         Age {year.age} &middot; {year.year}
                                     </span>
                                 </div>
-                                <span style={{ fontSize: '0.75rem', color: '#888' }}>{year.phase_name}</span>
+                                <span style={{ fontSize: '0.75rem', color: '#666' }}>{year.phase_name}</span>
                             </div>
 
                             {phaseChanged && prevYear && (
@@ -240,7 +240,7 @@ export default function NearTermSpendingGuide({ yearlySpending, retirementDate }
                                 <span style={{ fontSize: '1.2rem', fontWeight: 700, color: '#1a1a1a' }}>
                                     {fmt(year.recommended)}
                                 </span>
-                                <span style={{ fontSize: '0.85rem', color: '#888', marginLeft: '0.25rem' }}>recommended</span>
+                                <span style={{ fontSize: '0.85rem', color: '#666', marginLeft: '0.25rem' }}>recommended</span>
                                 {delta && (
                                     <span style={{ marginLeft: '0.5rem' }}>
                                         <DeltaBadge delta={delta} />

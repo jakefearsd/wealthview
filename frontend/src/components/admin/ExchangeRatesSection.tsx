@@ -89,7 +89,7 @@ export default function ExchangeRatesSection() {
                     <h3 style={{ marginBottom: '1rem' }}>Add Exchange Rate</h3>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                         <div>
-                            <div style={{ fontSize: '0.75rem', color: '#999', marginBottom: '0.25rem' }}>Currency Code</div>
+                            <div style={{ fontSize: '0.75rem', color: '#666', marginBottom: '0.25rem' }}>Currency Code</div>
                             <input
                                 placeholder="EUR"
                                 value={newCode}
@@ -99,7 +99,7 @@ export default function ExchangeRatesSection() {
                             />
                         </div>
                         <div>
-                            <div style={{ fontSize: '0.75rem', color: '#999', marginBottom: '0.25rem' }}>1 {newCode || '???'} = ? USD</div>
+                            <div style={{ fontSize: '0.75rem', color: '#666', marginBottom: '0.25rem' }}>1 {newCode || '???'} = ? USD</div>
                             <input
                                 placeholder="1.08"
                                 value={newRate}
@@ -124,14 +124,14 @@ export default function ExchangeRatesSection() {
 
             <div style={cardStyle}>
                 {rates.length === 0 ? (
-                    <div style={{ color: '#999' }}>No exchange rates configured. All accounts use USD.</div>
+                    <div style={{ color: '#666' }}>No exchange rates configured. All accounts use USD.</div>
                 ) : (
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                             <tr style={{ borderBottom: '2px solid #eee' }}>
-                                <th style={{ textAlign: 'left', padding: '0.5rem', fontSize: '0.85rem', color: '#999' }}>Currency</th>
-                                <th style={{ textAlign: 'left', padding: '0.5rem', fontSize: '0.85rem', color: '#999' }}>Rate to USD</th>
-                                <th style={{ textAlign: 'left', padding: '0.5rem', fontSize: '0.85rem', color: '#999' }}>Last Updated</th>
+                                <th style={{ textAlign: 'left', padding: '0.5rem', fontSize: '0.85rem', color: '#666' }}>Currency</th>
+                                <th style={{ textAlign: 'left', padding: '0.5rem', fontSize: '0.85rem', color: '#666' }}>Rate to USD</th>
+                                <th style={{ textAlign: 'left', padding: '0.5rem', fontSize: '0.85rem', color: '#666' }}>Last Updated</th>
                                 <th style={{ padding: '0.5rem' }}></th>
                             </tr>
                         </thead>
@@ -164,7 +164,7 @@ export default function ExchangeRatesSection() {
                                             </span>
                                         )}
                                     </td>
-                                    <td style={{ padding: '0.5rem', color: '#999', fontSize: '0.85rem' }}>
+                                    <td style={{ padding: '0.5rem', color: '#666', fontSize: '0.85rem' }}>
                                         {formatDate(rate.updated_at)}
                                     </td>
                                     <td style={{ padding: '0.5rem', textAlign: 'right' }}>

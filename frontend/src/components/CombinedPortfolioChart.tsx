@@ -66,16 +66,16 @@ export default function CombinedPortfolioChart() {
             </div>
 
             {loading ? (
-                <div style={{ color: '#999', textAlign: 'center', padding: '2rem 0' }}>Loading...</div>
+                <div style={{ color: '#666', textAlign: 'center', padding: '2rem 0' }}>Loading...</div>
             ) : error ? (
                 <ErrorState message={error} onRetry={refetch} />
             ) : !data || data.data_points.length === 0 ? (
-                <div style={{ color: '#999', textAlign: 'center', padding: '2rem 0' }}>
+                <div style={{ color: '#666', textAlign: 'center', padding: '2rem 0' }}>
                     No portfolio history data available.
                 </div>
             ) : (
                 <>
-                    <div style={{ color: '#999', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                    <div style={{ color: '#666', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
                         {data.investment_account_count > 0 && data.property_count > 0
                             ? `${data.investment_account_count} investment account${data.investment_account_count > 1 ? 's' : ''} + ${data.property_count} propert${data.property_count > 1 ? 'ies' : 'y'}`
                             : data.investment_account_count > 0

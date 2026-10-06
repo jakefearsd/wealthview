@@ -22,7 +22,7 @@ export default function TraditionalBalanceChart({ years, exhaustionAge }: Props)
 
 
     if (data.length === 0) {
-        return <p style={{ color: '#888' }}>No balance trajectory data available.</p>;
+        return <p style={{ color: '#666' }}>No balance trajectory data available.</p>;
     }
 
     return (

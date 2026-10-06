@@ -24,7 +24,7 @@ const phaseNameInputStyle: React.CSSProperties = {
 
 const smallLabelStyle: React.CSSProperties = {
     fontSize: '0.75rem',
-    color: '#888',
+    color: '#666',
     marginRight: '0.25rem',
 };
 
@@ -139,7 +139,7 @@ export default function PhaseEditor({ phases, onPhasesChange }: PhaseEditorProps
                         border: dragOverIndex === i ? '2px dashed #1976d2' : '1px solid #eee',
                         cursor: 'grab', transition: 'background 0.15s, border 0.15s',
                     }}>
-                    <span style={{ cursor: 'grab', color: '#999', fontSize: '1.1rem', userSelect: 'none', padding: '0 0.15rem' }}
+                    <span style={{ cursor: 'grab', color: '#666', fontSize: '1.1rem', userSelect: 'none', padding: '0 0.15rem' }}
                         title="Drag to reorder">&#x2630;</span>
                     <input style={phaseNameInputStyle} type="text" value={phase.name}
                         onChange={e => updatePhase(i, 'name', e.target.value)}

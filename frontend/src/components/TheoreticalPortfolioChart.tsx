@@ -76,7 +76,7 @@ export default function TheoreticalPortfolioChart({ accountId, accountType }: Pr
         return (
             <div style={chartCardStyle}>
                 <h3 style={{ marginBottom: '1rem' }}>Theoretical Portfolio History</h3>
-                <div style={{ color: '#999', textAlign: 'center', padding: '2rem 0' }}>
+                <div style={{ color: '#666', textAlign: 'center', padding: '2rem 0' }}>
                     Portfolio history is not available for bank accounts.
                 </div>
             </div>
@@ -102,16 +102,16 @@ export default function TheoreticalPortfolioChart({ accountId, accountType }: Pr
             </div>
 
             {loading ? (
-                <div style={{ color: '#999', textAlign: 'center', padding: '2rem 0' }}>Loading...</div>
+                <div style={{ color: '#666', textAlign: 'center', padding: '2rem 0' }}>Loading...</div>
             ) : error ? (
                 <ErrorState message={error} onRetry={refetch} />
             ) : !data || data.data_points.length === 0 ? (
-                <div style={{ color: '#999', textAlign: 'center', padding: '2rem 0' }}>
+                <div style={{ color: '#666', textAlign: 'center', padding: '2rem 0' }}>
                     No price data available for current holdings.
                 </div>
             ) : (
                 <>
-                    <div style={{ color: '#999', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                    <div style={{ color: '#666', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
                         What your current holdings ({data.symbols.join(', ')}) would have been worth from {formatIsoDate(chartData[0].date)} to {formatIsoDate(chartData[chartData.length - 1].date)}
                     </div>
                     {data.has_money_market_holdings && (

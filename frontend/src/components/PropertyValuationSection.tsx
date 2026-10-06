@@ -97,7 +97,7 @@ export default function PropertyValuationSection({
             )}
 
             {valuationChartData.length === 0 && canWrite && (
-                <div style={{ ...cardStyle, marginBottom: '2rem', textAlign: 'center', color: '#999' }}>
+                <div style={{ ...cardStyle, marginBottom: '2rem', textAlign: 'center', color: '#666' }}>
                     <p>No valuation history yet.</p>
                     <Button
                         onClick={onRefreshValuation}
@@ -161,7 +161,7 @@ function CandidateDialog({ candidates, onSelectZpid, onDismiss }: CandidateDialo
                         >
                             <div>
                                 <div style={{ fontWeight: 600 }}>{c.address}</div>
-                                <div style={{ fontSize: '0.8rem', color: '#888' }}>ZPID: {c.zpid}</div>
+                                <div style={{ fontSize: '0.8rem', color: '#666' }}>ZPID: {c.zpid}</div>
                             </div>
                             <div style={{ fontWeight: 600, color: '#2e7d32', fontSize: '1.1rem' }}>
                                 {formatCurrency(c.zestimate)}

@@ -418,7 +418,7 @@ export default function IncomeSourcesPage() {
                                     </div>
                                     <div style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '1rem', color: '#1b5e20' }}>
                                         {formatCurrency(s.annual_amount)}
-                                        <span style={{ fontSize: '0.8rem', fontWeight: 400, color: '#888' }}> {s.one_time ? '(one-time)' : '/ year'}</span>
+                                        <span style={{ fontSize: '0.8rem', fontWeight: 400, color: '#666' }}> {s.one_time ? '(one-time)' : '/ year'}</span>
                                     </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
                                         <StatTile
@@ -461,7 +461,7 @@ export default function IncomeSourcesPage() {
                     <li>Your provisional income estimate to understand Social Security taxability</li>
                     <li>Optimal Roth conversion strategy in years when rental losses shield income from taxes</li>
                 </ul>
-                <div style={{ marginTop: '0.75rem', fontStyle: 'italic', color: '#888' }}>
+                <div style={{ marginTop: '0.75rem', fontStyle: 'italic', color: '#666' }}>
                     WealthView provides planning estimates only, not tax advice. All tax calculations are approximations.
                 </div>
             </InfoSection>

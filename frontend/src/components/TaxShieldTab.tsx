@@ -14,7 +14,7 @@ export default function TaxShieldTab({ summary }: TaxShieldTabProps) {
     return (
         <div style={{ padding: '1rem' }}>
             <h3 style={{ marginBottom: '0.25rem' }}>Depreciation Tax Shield Summary</h3>
-            <p style={{ fontSize: '0.85rem', color: '#888', marginBottom: '1rem' }}>
+            <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '1rem' }}>
                 Values marked (approx.) are estimates based on effective tax rates.
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>

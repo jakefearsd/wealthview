@@ -259,7 +259,7 @@ export default function PropertyIncomeChart({
     const [trailingData, depSchedule, property] = data ?? [null, null, null];
 
     if (loading) {
-        return <div style={{ ...cardStyle, textAlign: 'center', padding: '1.5rem', color: '#999' }}>Loading property data...</div>;
+        return <div style={{ ...cardStyle, textAlign: 'center', padding: '1.5rem', color: '#666' }}>Loading property data...</div>;
     }
 
     const hasDepreciation = depSchedule?.schedule && depSchedule.schedule.length > 0;
@@ -300,7 +300,7 @@ export default function PropertyIncomeChart({
 function TrailingView({ data, monthlyRent, propertyId }: { data: MonthlyCashFlowDetailEntry[] | null; monthlyRent: number; propertyId: string }) {
     if (!data || data.length === 0) {
         return (
-            <div style={{ textAlign: 'center', padding: '1.5rem', color: '#999', fontSize: '0.9rem' }}>
+            <div style={{ textAlign: 'center', padding: '1.5rem', color: '#666', fontSize: '0.9rem' }}>
                 No income or expense data logged on this property yet.
                 <br />
                 <span style={{ fontSize: '0.8rem' }}>Add records on the <Link to={`/properties/${propertyId}`} style={{ color: '#1976d2' }}>property detail page</Link> to see the breakdown here.</span>
@@ -435,7 +435,7 @@ function ForwardView({
             </ResponsiveContainer>
 
             {hasDepreciation && (
-                <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.5rem', fontStyle: 'italic' }}>
+                <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.5rem', fontStyle: 'italic' }}>
                     Depreciation is a non-cash tax deduction that reduces taxable income but does not affect cash flow.
                     Years where depreciation exceeds net income create a tax loss that can shield other income from taxes.
                 </div>

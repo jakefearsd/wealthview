@@ -269,7 +269,7 @@ export default function SpendingProfilesPage() {
                                 </div>
                             </div>
                             <div style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '1rem', color: '#b71c1c' }}>
-                                {formatCurrency(totalBase)}<span style={{ fontSize: '0.8rem', fontWeight: 400, color: '#888' }}> / year</span>
+                                {formatCurrency(totalBase)}<span style={{ fontSize: '0.8rem', fontWeight: 400, color: '#666' }}> / year</span>
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
                                 <StatTile label="Essential" value={formatCurrency(p.essential_expenses)} valueStyle={{ fontWeight: 500 }} />
@@ -282,7 +282,7 @@ export default function SpendingProfilesPage() {
                                     {p.spending_tiers.map((t, idx) => (
                                         <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0', fontSize: '0.85rem' }}>
                                             <span style={{ color: '#555', fontWeight: 500 }}>{t.name || `Phase ${idx + 1}`}</span>
-                                            <span style={{ color: '#888' }}>
+                                            <span style={{ color: '#666' }}>
                                                 Ages {t.start_age}-{t.end_age ?? '\u221E'} &middot; {formatCurrency(t.essential_expenses + t.discretionary_expenses)}/yr
                                             </span>
                                         </div>
@@ -339,7 +339,7 @@ export default function SpendingProfilesPage() {
                                     </div>
                                     <div style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '1rem', color: '#7c3aed' }}>
                                         {formatCurrency(minSpend)} &ndash; {formatCurrency(maxSpend)}
-                                        <span style={{ fontSize: '0.8rem', fontWeight: 400, color: '#888' }}> / year range</span>
+                                        <span style={{ fontSize: '0.8rem', fontWeight: 400, color: '#666' }}> / year range</span>
                                     </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
                                         <StatTile label="Essential Floor" value={formatCurrency(g.essential_floor)} valueStyle={{ fontWeight: 500 }} />
@@ -368,7 +368,7 @@ export default function SpendingProfilesPage() {
                                             {g.phases.map((p, idx) => (
                                                 <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0', fontSize: '0.85rem' }}>
                                                     <span style={{ color: '#555', fontWeight: 500 }}>{p.name || `Phase ${idx + 1}`}</span>
-                                                    <span style={{ color: '#888' }}>
+                                                    <span style={{ color: '#666' }}>
                                                         Ages {p.start_age}-{p.end_age ?? '\u221E'}
                                                         {p.target_spending != null ? ` \u00b7 ${formatCurrency(p.target_spending)}/yr target` : ` \u00b7 Priority: ${p.priority_weight === 3 ? 'High' : p.priority_weight === 2 ? 'Medium' : 'Low'}`}
                                                     </span>

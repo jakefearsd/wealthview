@@ -175,7 +175,7 @@ export default function InviteCodesSection() {
                         })}
                         {(!codes || codes.length === 0) && (
                             <tr>
-                                <td colSpan={7} style={{ padding: '1rem', color: '#999', textAlign: 'center' }}>
+                                <td colSpan={7} style={{ padding: '1rem', color: '#666', textAlign: 'center' }}>
                                     No invite codes
                                 </td>
                             </tr>

@@ -26,7 +26,7 @@ export default function PortfolioFanChart({ yearlySpending }: Props) {
 
 
     if (data.length === 0) {
-        return <p style={{ color: '#888' }}>No portfolio balance data available.</p>;
+        return <p style={{ color: '#666' }}>No portfolio balance data available.</p>;
     }
 
     return (
@@ -120,7 +120,7 @@ export default function PortfolioFanChart({ yearlySpending }: Props) {
                     />
                 </ComposedChart>
             </ResponsiveContainer>
-            <p style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.5rem' }}>
+            <p style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.5rem' }}>
                 Percentile bands are per-year statistics, not a single portfolio&apos;s path.
             </p>
         </div>

@@ -76,7 +76,7 @@ export default function DashboardPage() {
                             </PieChart>
                         </ResponsiveContainer>
                     ) : (
-                        <div style={{ color: '#999', textAlign: 'center', padding: '3rem' }}>No allocation data</div>
+                        <div style={{ color: '#666', textAlign: 'center', padding: '3rem' }}>No allocation data</div>
                     )}
                 </div>
             </div>

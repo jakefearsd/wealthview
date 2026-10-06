@@ -232,7 +232,7 @@ export default function ProjectionDetailPage() {
                                                 <td style={{ ...tdStyle, textAlign: 'right' }}>
                                                     {formatCurrency(is.annual_amount)}
                                                     {is.income_type === 'rental_property' && (
-                                                        <span style={{ fontSize: '0.75rem', color: '#999', marginLeft: '0.25rem' }}>(gross)</span>
+                                                        <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: '0.25rem' }}>(gross)</span>
                                                     )}
                                                 </td>
                                                 <td style={{ ...tdStyle, textAlign: 'right', color: '#666' }}>
@@ -240,7 +240,7 @@ export default function ProjectionDetailPage() {
                                                 </td>
                                                 <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>
                                                     {is.income_type === 'rental_property' && is.annual_net_cash_flow != null
-                                                        ? <>{formatCurrency(is.annual_net_cash_flow)}<span style={{ fontSize: '0.75rem', color: '#999', fontWeight: 400, marginLeft: '0.25rem' }}>(net)</span></>
+                                                        ? <>{formatCurrency(is.annual_net_cash_flow)}<span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 400, marginLeft: '0.25rem' }}>(net)</span></>
                                                         : formatCurrency(is.effective_amount)
                                                     }
                                                 </td>
@@ -321,7 +321,7 @@ export default function ProjectionDetailPage() {
                         </div>
                     )}
 
-                    <div style={{ color: '#888', fontSize: '0.75rem', marginBottom: '0.5rem' }}>
+                    <div style={{ color: '#666', fontSize: '0.75rem', marginBottom: '0.5rem' }}>
                         All values in today&apos;s dollars.
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>

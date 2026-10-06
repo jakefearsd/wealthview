@@ -213,7 +213,7 @@ export default function UsersSection() {
                         {((isSuperAdmin && (!users || users.length === 0)) ||
                           (!isSuperAdmin && (!tenantUsers || tenantUsers.length === 0))) && (
                             <tr>
-                                <td colSpan={6} style={{ padding: '1rem', color: '#999', textAlign: 'center' }}>
+                                <td colSpan={6} style={{ padding: '1rem', color: '#666', textAlign: 'center' }}>
                                     No users found
                                 </td>
                             </tr>

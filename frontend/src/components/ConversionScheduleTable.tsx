@@ -19,7 +19,7 @@ const localTdStyle: React.CSSProperties = {
 
 export default function ConversionScheduleTable({ years }: Props) {
     if (years.length === 0) {
-        return <p style={{ color: '#888' }}>No conversion schedule data available.</p>;
+        return <p style={{ color: '#666' }}>No conversion schedule data available.</p>;
     }
 
     return (
@@ -50,19 +50,19 @@ export default function ConversionScheduleTable({ years }: Props) {
                             <td style={{
                                 ...localTdStyle,
                                 fontWeight: y.conversion_amount > 0 ? 600 : 400,
-                                color: y.conversion_amount > 0 ? '#1976d2' : '#888',
+                                color: y.conversion_amount > 0 ? '#1976d2' : '#666',
                             }}>
                                 {y.conversion_amount > 0 ? fmt(y.conversion_amount) : '--'}
                             </td>
-                            <td style={{ ...localTdStyle, color: y.estimated_tax > 0 ? '#d32f2f' : '#888' }}>
+                            <td style={{ ...localTdStyle, color: y.estimated_tax > 0 ? '#d32f2f' : '#666' }}>
                                 {y.estimated_tax > 0 ? fmt(y.estimated_tax) : '--'}
                             </td>
                             <td style={localTdStyle}>{fmtShort(y.traditional_balance_after)}</td>
                             <td style={localTdStyle}>{fmtShort(y.roth_balance_after)}</td>
-                            <td style={{ ...localTdStyle, color: '#888' }}>
+                            <td style={{ ...localTdStyle, color: '#666' }}>
                                 {y.projected_rmd > 0 ? fmt(y.projected_rmd) : '--'}
                             </td>
-                            <td style={{ ...localTdStyle, color: '#888' }}>
+                            <td style={{ ...localTdStyle, color: '#666' }}>
                                 {y.other_income > 0 ? fmt(y.other_income) : '--'}
                             </td>
                             <td style={localTdStyle}>{fmt(y.total_taxable_income)}</td>

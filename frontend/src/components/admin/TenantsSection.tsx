@@ -112,7 +112,7 @@ export default function TenantsSection() {
                             </tr>
                         ))}
                         {tenants?.length === 0 && (
-                            <tr><td colSpan={6} style={{ padding: '1rem', color: '#999', textAlign: 'center' }}>No tenants</td></tr>
+                            <tr><td colSpan={6} style={{ padding: '1rem', color: '#666', textAlign: 'center' }}>No tenants</td></tr>
                         )}
                     </tbody>
                 </table>

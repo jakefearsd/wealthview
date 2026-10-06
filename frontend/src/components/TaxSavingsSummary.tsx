@@ -16,7 +16,7 @@ export default function TaxSavingsSummary({ schedule }: Props) {
         <div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                 <div style={{ ...cardStyle, textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.25rem' }}>
                         Lifetime Tax With Conversions
                     </div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>
@@ -24,7 +24,7 @@ export default function TaxSavingsSummary({ schedule }: Props) {
                     </div>
                 </div>
                 <div style={{ ...cardStyle, textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.25rem' }}>
                         Without Conversions
                     </div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>
@@ -32,7 +32,7 @@ export default function TaxSavingsSummary({ schedule }: Props) {
                     </div>
                 </div>
                 <div style={{ ...cardStyle, textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.25rem' }}>
                         Estimated Savings
                     </div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 700, color: savingsColor }}>

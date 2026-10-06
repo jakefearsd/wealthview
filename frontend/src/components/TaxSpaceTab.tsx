@@ -82,7 +82,7 @@ export default function TaxSpaceTab({ taxSpace }: TaxSpaceTabProps) {
                                 <td style={td}>
                                     {money(y.bracket_room[0]?.room)}
                                     {y.bracket_room[0] && (
-                                        <span style={{ display: 'block', fontSize: '0.75rem', color: '#888' }}>
+                                        <span style={{ display: 'block', fontSize: '0.75rem', color: '#666' }}>
                                             to top of {pct(y.bracket_room[0].rate)}
                                         </span>
                                     )}
@@ -105,7 +105,7 @@ export default function TaxSpaceTab({ taxSpace }: TaxSpaceTabProps) {
                     <li key={term}><strong>{term}:</strong> {text}</li>
                 ))}
             </ul>
-            <p style={{ fontSize: '0.8rem', color: '#888' }}>
+            <p style={{ fontSize: '0.8rem', color: '#666' }}>
                 WealthView provides planning estimates only, not tax advice. All tax calculations are approximations.
             </p>
         </div>

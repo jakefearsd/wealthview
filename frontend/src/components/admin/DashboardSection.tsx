@@ -149,7 +149,7 @@ export default function DashboardSection() {
                             ))}
                             {(!activity || activity.length === 0) && (
                                 <tr>
-                                    <td colSpan={4} style={{ padding: '1rem', color: '#999', textAlign: 'center' }}>
+                                    <td colSpan={4} style={{ padding: '1rem', color: '#666', textAlign: 'center' }}>
                                         No login activity recorded
                                     </td>
                                 </tr>

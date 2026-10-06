@@ -14,7 +14,7 @@ describe('StatTile', () => {
         render(<StatTile label="Essential" value="$40,000" />);
 
         const label = screen.getByText('Essential');
-        expect(label).toHaveStyle({ color: '#999', fontSize: '0.75rem' });
+        expect(label).toHaveStyle({ color: '#666', fontSize: '0.75rem' });
     });
 
     it('defaults the value color to #444', () => {

@@ -93,11 +93,11 @@ export default function ProjectionsPage() {
                                 </LinkButton>
                             </div>
                             <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.75rem', fontSize: '0.9rem', color: '#444' }}>
-                                <div><span style={{ color: '#999' }}>Retire:</span> {formatDate(s.retirement_date)}</div>
-                                <div><span style={{ color: '#999' }}>End Age:</span> {s.end_age}</div>
-                                <div><span style={{ color: '#999' }}>Inflation:</span> {(s.inflation_rate * 100).toFixed(1)}%</div>
+                                <div><span style={{ color: '#666' }}>Retire:</span> {formatDate(s.retirement_date)}</div>
+                                <div><span style={{ color: '#666' }}>End Age:</span> {s.end_age}</div>
+                                <div><span style={{ color: '#666' }}>Inflation:</span> {(s.inflation_rate * 100).toFixed(1)}%</div>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: '#999' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: '#666' }}>
                                 <span>Created {formatDate(s.created_at)}</span>
                                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                                     <Link

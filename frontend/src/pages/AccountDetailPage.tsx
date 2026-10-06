@@ -175,25 +175,25 @@ export default function AccountDetailPage() {
                         </thead>
                         <tbody>
                             {holdings?.map((h) => {
-                                const glColor = h.gain_loss != null ? (h.gain_loss >= 0 ? '#2e7d32' : '#c62828') : '#888';
+                                const glColor = h.gain_loss != null ? (h.gain_loss >= 0 ? '#2e7d32' : '#c62828') : '#666';
                                 return (
                                 <tr key={h.id} style={trHoverStyle}>
                                     <td style={tdStyle}>
                                         <Link to={`/holdings/${h.id}`} style={{ color: '#1976d2', textDecoration: 'none' }}>
                                             {h.symbol}
                                         </Link>
-                                        {h.is_money_market && <span style={{ color: '#999', fontSize: '0.8rem', marginLeft: '0.25rem' }}>(MM)</span>}
+                                        {h.is_money_market && <span style={{ color: '#666', fontSize: '0.8rem', marginLeft: '0.25rem' }}>(MM)</span>}
                                     </td>
                                     {editingHoldingId === h.id ? (
                                         <>
                                             <td style={{ ...tdStyle, textAlign: 'right' }}>
                                                 <input type="number" min="0" step="any" aria-label={`Quantity for ${h.symbol}`} value={editQty} onChange={(e) => setEditQty(e.target.value)} style={{ width: '80px', padding: '0.25rem', textAlign: 'right' }} />
                                             </td>
-                                            <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>{h.current_price != null ? money(h.current_price) : '—'}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right', color: '#666' }}>{h.current_price != null ? money(h.current_price) : '—'}</td>
                                             <td style={{ ...tdStyle, textAlign: 'right' }}>
                                                 <CurrencyInput aria-label={`Cost basis for ${h.symbol}`} value={editCostBasis} onChange={setEditCostBasis} style={{ width: '100px', padding: '0.25rem', textAlign: 'right' }} />
                                             </td>
-                                            <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>{h.market_value != null ? money(h.market_value) : '—'}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right', color: '#666' }}>{h.market_value != null ? money(h.market_value) : '—'}</td>
                                             <td style={{ ...tdStyle, textAlign: 'right', color: glColor }}>{h.gain_loss != null ? money(h.gain_loss) : '—'}</td>
                                             <td style={{ ...tdStyle, textAlign: 'center' }}>
                                                 <button onClick={() => handleSaveHolding(h.id, h.symbol)} disabled={!holdingEditValid} title={holdingEditValid ? undefined : 'Quantity and cost basis must be numbers of zero or more'} style={{ background: 'none', border: 'none', color: '#2e7d32', cursor: holdingEditValid ? 'pointer' : 'not-allowed', opacity: holdingEditValid ? 1 : 0.5, marginRight: '0.25rem' }}>Save</button>
@@ -203,7 +203,7 @@ export default function AccountDetailPage() {
                                     ) : (
                                         <>
                                             <td style={{ ...tdStyle, textAlign: 'right' }}>{h.quantity}</td>
-                                            <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>{h.current_price != null ? money(h.current_price) : '—'}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right', color: '#666' }}>{h.current_price != null ? money(h.current_price) : '—'}</td>
                                             <td style={{ ...tdStyle, textAlign: 'right' }}>{money(h.cost_basis)}</td>
                                             <td style={{ ...tdStyle, textAlign: 'right' }}>{h.market_value != null ? money(h.market_value) : '—'}</td>
                                             <td style={{ ...tdStyle, textAlign: 'right', color: glColor }}>{h.gain_loss != null ? money(h.gain_loss) : '—'}</td>

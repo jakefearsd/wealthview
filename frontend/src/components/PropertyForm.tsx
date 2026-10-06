@@ -227,7 +227,7 @@ export default function PropertyForm({ heading, submitLabel, values, onChange, p
                                     <label style={labelStyle}>In-Service Date</label>
                                     <input type="date" value={values.inServiceDate} onChange={(e) => onChange({ inServiceDate: e.target.value })} style={inputStyle} />
                                     {values.inServiceDate === values.purchaseDate && values.purchaseDate && (
-                                        <div style={{ fontSize: '0.8rem', color: '#888', marginTop: '0.25rem' }}>Defaulted to purchase date</div>
+                                        <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.25rem' }}>Defaulted to purchase date</div>
                                     )}
                                 </div>
                                 <div>
@@ -256,17 +256,17 @@ export default function PropertyForm({ heading, submitLabel, values, onChange, p
                                         <div>
                                             <label style={labelStyle}>5-Year Property ($)</label>
                                             <CurrencyInput value={values.costSegAllocations.fiveYr} onChange={v => autoFillStructural({ ...values.costSegAllocations, fiveYr: v })} style={inputStyle} />
-                                            <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.15rem' }}>Appliances, carpeting, fixtures</div>
+                                            <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.15rem' }}>Appliances, carpeting, fixtures</div>
                                         </div>
                                         <div>
                                             <label style={labelStyle}>7-Year Property ($)</label>
                                             <CurrencyInput value={values.costSegAllocations.sevenYr} onChange={v => autoFillStructural({ ...values.costSegAllocations, sevenYr: v })} style={inputStyle} />
-                                            <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.15rem' }}>Office furniture, equipment</div>
+                                            <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.15rem' }}>Office furniture, equipment</div>
                                         </div>
                                         <div>
                                             <label style={labelStyle}>15-Year Property ($)</label>
                                             <CurrencyInput value={values.costSegAllocations.fifteenYr} onChange={v => autoFillStructural({ ...values.costSegAllocations, fifteenYr: v })} style={inputStyle} />
-                                            <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.15rem' }}>Land improvements, landscaping, fencing</div>
+                                            <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.15rem' }}>Land improvements, landscaping, fencing</div>
                                         </div>
                                         <div>
                                             <label style={labelStyle}>27.5-Year Structural ($)</label>
@@ -282,7 +282,7 @@ export default function PropertyForm({ heading, submitLabel, values, onChange, p
                                         <div>
                                             <label style={labelStyle}>Study Year (optional)</label>
                                             <input type="number" placeholder="e.g. 2024" value={values.costSegStudyYear} onChange={(e) => onChange({ costSegStudyYear: e.target.value })} style={inputStyle} />
-                                            <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.15rem' }}>If later than in-service year, triggers 481(a) catch-up</div>
+                                            <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.15rem' }}>If later than in-service year, triggers 481(a) catch-up</div>
                                         </div>
                                     </div>
                                     <div style={{ marginTop: '1rem', padding: '0.75rem', background: costSegMismatch ? '#fff3e0' : '#e8f5e9', borderRadius: '6px', fontSize: '0.9rem' }}>

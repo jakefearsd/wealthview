@@ -11,7 +11,7 @@ interface StatTileProps {
     valueStyle?: CSSProperties;
 }
 
-const labelStyle: CSSProperties = { color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' };
+const labelStyle: CSSProperties = { color: '#666', fontSize: '0.75rem', marginBottom: '0.15rem' };
 
 /**
  * Label-over-value stat tile: a small muted label line above a value line.

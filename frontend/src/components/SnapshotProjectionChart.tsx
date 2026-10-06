@@ -58,18 +58,18 @@ export default function SnapshotProjectionChart() {
             </div>
 
             {loading ? (
-                <div style={{ color: '#999', textAlign: 'center', padding: '2rem 0' }}>Loading...</div>
+                <div style={{ color: '#666', textAlign: 'center', padding: '2rem 0' }}>Loading...</div>
             ) : error ? (
                 <div style={{ color: '#c62828', textAlign: 'center', padding: '2rem 0' }}>
                     Failed to load projection: {error}
                 </div>
             ) : !data || data.data_points.length === 0 ? (
-                <div style={{ color: '#999', textAlign: 'center', padding: '2rem 0' }}>
+                <div style={{ color: '#666', textAlign: 'center', padding: '2rem 0' }}>
                     No projection data available.
                 </div>
             ) : (
                 <>
-                    <div style={{ color: '#999', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                    <div style={{ color: '#666', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
                         Based on 10-year historical returns ({cagrPct}% avg CAGR)
                         {data.investment_account_count > 0 && ` \u2022 ${data.investment_account_count} account${data.investment_account_count > 1 ? 's' : ''}`}
                         {data.property_count > 0 && ` \u2022 ${data.property_count} propert${data.property_count > 1 ? 'ies' : 'y'}`}
