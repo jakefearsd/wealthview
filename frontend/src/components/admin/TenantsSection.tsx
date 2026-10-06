@@ -6,6 +6,7 @@ import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../uti
 import { formatDate } from '../../utils/format';
 import Button from '../Button';
 import ErrorState from '../ErrorState';
+import VisuallyHidden from '../VisuallyHidden';
 
 export default function TenantsSection() {
     const { data: tenants, loading, error, refetch } = useApiQuery(listTenantDetails);
@@ -73,7 +74,7 @@ export default function TenantsSection() {
                             <th style={{ ...thStyle, textAlign: 'right' }}>Accounts</th>
                             <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
                             <th style={thStyle}>Created</th>
-                            <th style={thStyle}></th>
+                            <th style={thStyle}><VisuallyHidden>Actions</VisuallyHidden></th>
                         </tr>
                     </thead>
                     <tbody>

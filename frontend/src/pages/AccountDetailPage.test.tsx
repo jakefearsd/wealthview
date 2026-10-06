@@ -155,6 +155,23 @@ describe('AccountDetailPage', () => {
         expect(screen.getByText('Fidelity Brokerage')).toBeInTheDocument();
     });
 
+    it('labels the action columns for assistive technology', () => {
+        setupMocks();
+
+        renderPage();
+
+        expect(screen.getAllByRole('columnheader', { name: 'Actions' }).length).toBeGreaterThan(0);
+    });
+
+    it('omits the action column header from a viewer', () => {
+        mockUseAuth.mockReturnValue(authAs('viewer'));
+        setupMocks();
+
+        renderPage();
+
+        expect(screen.queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
+    });
+
     it('renders the holdings list', () => {
         setupMocks();
         renderPage();

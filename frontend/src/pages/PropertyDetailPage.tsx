@@ -20,6 +20,7 @@ import PropertyRoiCard from '../components/PropertyRoiCard';
 import PropertyForm, { type PropertyFormValues } from '../components/PropertyForm';
 import { buildRequest, allocationsToState, validatePropertyForm } from '../utils/propertyRequest';
 import toast from 'react-hot-toast';
+import VisuallyHidden from '../components/VisuallyHidden';
 
 type PropertyFormData = PropertyFormValues;
 
@@ -436,7 +437,7 @@ export default function PropertyDetailPage() {
                                 <th style={{ padding: '0.5rem', textAlign: 'right' }}>Amount</th>
                                 <th style={{ padding: '0.5rem' }}>Frequency</th>
                                 <th style={{ padding: '0.5rem' }}>Description</th>
-                                {canWrite && <th style={{ padding: '0.5rem', width: '1px' }}></th>}
+                                {canWrite && <th style={{ padding: '0.5rem', width: '1px' }}><VisuallyHidden>Actions</VisuallyHidden></th>}
                             </tr>
                         </thead>
                         <tbody>

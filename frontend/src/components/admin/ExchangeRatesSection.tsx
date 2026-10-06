@@ -7,6 +7,7 @@ import { extractErrorMessage } from '../../utils/errorMessage';
 import { formatDate } from '../../utils/format';
 import Button from '../Button';
 import toast from 'react-hot-toast';
+import VisuallyHidden from '../VisuallyHidden';
 
 export default function ExchangeRatesSection() {
     const [editingCode, setEditingCode] = useState<string | null>(null);
@@ -132,7 +133,7 @@ export default function ExchangeRatesSection() {
                                 <th style={{ textAlign: 'left', padding: '0.5rem', fontSize: '0.85rem', color: '#666' }}>Currency</th>
                                 <th style={{ textAlign: 'left', padding: '0.5rem', fontSize: '0.85rem', color: '#666' }}>Rate to USD</th>
                                 <th style={{ textAlign: 'left', padding: '0.5rem', fontSize: '0.85rem', color: '#666' }}>Last Updated</th>
-                                <th style={{ padding: '0.5rem' }}></th>
+                                <th style={{ padding: '0.5rem' }}><VisuallyHidden>Actions</VisuallyHidden></th>
                             </tr>
                         </thead>
                         <tbody>

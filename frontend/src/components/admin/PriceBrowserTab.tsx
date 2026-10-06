@@ -8,6 +8,7 @@ import Button from '../Button';
 import LinkButton from '../LinkButton';
 import toast from 'react-hot-toast';
 import { scrollRegionProps } from '../../utils/scrollRegion';
+import VisuallyHidden from '../VisuallyHidden';
 
 interface PriceRecord {
     symbol: string;
@@ -146,7 +147,7 @@ export default function PriceBrowserTab() {
                                     <th style={thStyle}>Date</th>
                                     <th style={{ ...thStyle, textAlign: 'right' }}>Close Price</th>
                                     <th style={thStyle}>Source</th>
-                                    <th style={{ ...thStyle, textAlign: 'center' }}></th>
+                                    <th style={{ ...thStyle, textAlign: 'center' }}><VisuallyHidden>Actions</VisuallyHidden></th>
                                 </tr>
                             </thead>
                             <tbody>

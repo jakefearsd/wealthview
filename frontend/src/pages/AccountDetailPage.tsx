@@ -18,6 +18,7 @@ import TheoreticalPortfolioChart from '../components/TheoreticalPortfolioChart';
 import TransactionForm from '../components/TransactionForm';
 import Button from '../components/Button';
 import type { Transaction } from '../types/transaction';
+import VisuallyHidden from '../components/VisuallyHidden';
 
 const TXN_PAGE_SIZE = 50;
 
@@ -170,7 +171,7 @@ export default function AccountDetailPage() {
                                 <th style={{ ...thStyle, textAlign: 'right' }}>Cost Basis</th>
                                 <th style={{ ...thStyle, textAlign: 'right' }}>Market Value</th>
                                 <th style={{ ...thStyle, textAlign: 'right' }}>Gain/Loss</th>
-                                {canWrite && <th style={thStyle}></th>}
+                                {canWrite && <th style={thStyle}><VisuallyHidden>Actions</VisuallyHidden></th>}
                             </tr>
                         </thead>
                         <tbody>
@@ -279,7 +280,7 @@ export default function AccountDetailPage() {
                             <th style={thStyle}>Symbol</th>
                             <th style={{ ...thStyle, textAlign: 'right' }}>Qty</th>
                             <th style={{ ...thStyle, textAlign: 'right' }}>Amount</th>
-                            {canWrite && <th style={thStyle}></th>}
+                            {canWrite && <th style={thStyle}><VisuallyHidden>Actions</VisuallyHidden></th>}
                         </tr>
                     </thead>
                     <tbody>
