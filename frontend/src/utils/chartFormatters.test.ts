@@ -32,6 +32,14 @@ describe('formatDollarTooltip', () => {
     it('truncates fractional cents to whole dollars', () => {
         expect(formatDollarTooltip(99.99)).toBe('$100');
     });
+
+    it('puts the minus sign before the dollar sign for negatives', () => {
+        expect(formatDollarTooltip(-5000)).toBe('-$5,000');
+    });
+
+    it('does not print "-$0" for values that round to zero', () => {
+        expect(formatDollarTooltip(-0.4)).toBe('$0');
+    });
 });
 
 describe('formatPercentAxis', () => {

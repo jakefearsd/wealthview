@@ -2,8 +2,12 @@
 // axis tick values are always numbers, never null/undefined) — alias instead of reimplementing.
 export { formatCompactCurrency as formatDollarAxis } from '@wealthview/shared';
 
-export const formatDollarTooltip = (value: number): string =>
-    `$${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+/** Whole-dollar tooltip amount with the sign ahead of the symbol: -5000 -> "-$5,000". */
+export const formatDollarTooltip = (value: number): string => {
+    const whole = Math.round(Math.abs(value));
+    const sign = value < 0 && whole > 0 ? '-' : '';
+    return `${sign}$${whole.toLocaleString('en-US')}`;
+};
 
 export const formatPercentAxis = (value: number): string => `${value}%`;
 
