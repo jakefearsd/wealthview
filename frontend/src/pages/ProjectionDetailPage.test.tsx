@@ -155,11 +155,11 @@ describe('ProjectionDetailPage', () => {
         expect(screen.getByTestId('chart-balance')).toBeInTheDocument();
 
         // Click flows tab
-        await userEvent.click(screen.getByRole('button', { name: /annual flows/i }));
+        await userEvent.click(screen.getByRole('tab', { name: /annual flows/i }));
         expect(screen.getByTestId('chart-flows')).toBeInTheDocument();
 
         // Click data table tab
-        await userEvent.click(screen.getByRole('button', { name: /data table/i }));
+        await userEvent.click(screen.getByRole('tab', { name: /data table/i }));
         expect(screen.getByText('Year')).toBeInTheDocument();
     });
 
@@ -210,7 +210,7 @@ describe('ProjectionDetailPage', () => {
         }));
 
         await userEvent.click(screen.getByRole('button', { name: /run projection/i }));
-        await userEvent.click(screen.getByRole('button', { name: /tax space/i }));
+        await userEvent.click(screen.getByRole('tab', { name: /tax space/i }));
 
         expect(screen.getByText('Tax Space by Year')).toBeInTheDocument();
     });
