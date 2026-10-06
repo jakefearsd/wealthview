@@ -81,6 +81,13 @@ tax-accuracy fixes in both projection engines. One schema change (V081).
   balance instead of $7.47M). A zero-balance pool now uses its accounts' return
   weighted by contribution (or equally), and a pool with no accounts uses the
   household's overall return, in both the projection and the Monte Carlo.
+- **The spending optimizer now starts retirement from the balances you will
+  have then.** Monte Carlo trials began in the retirement year from today's
+  balances, ignoring the contributions and growth before retirement, so a
+  29-year-old saving $45,500/yr was judged on a $25k portfolio while the
+  projection showed $3.87M. Accounts are now rolled forward to retirement the
+  same way the projection does (contributions, then growth) before the trials
+  begin. Market variation is still simulated from retirement onward only.
 
 ## [1.2.8] — 2026-10-04
 

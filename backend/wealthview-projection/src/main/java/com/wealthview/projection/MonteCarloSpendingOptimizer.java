@@ -147,13 +147,16 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
      * production entry point and only ever returns {@link OptimizeResult#response}; this is exposed
      * so task 7/8 can consume the summary directly without building the API response DTO here.
      */
-    OptimizeResult optimizeInternal(GuardrailOptimizationInput input) {
+    OptimizeResult optimizeInternal(GuardrailOptimizationInput request) {
         MDC.put("operation", "mc-optimize");
         if (meterRegistry != null) {
             meterRegistry.counter("wealthview.projection.runs", "type", "monte_carlo").increment();
         }
         try {
-            RealReturnMatrix matrix = matrix(input.includeDepressionYears());
+            RealReturnMatrix matrix = matrix(request.includeDepressionYears());
+            // API #22: trials start at retirement, so seed them with the accounts as they will stand
+            // then (contributions + growth from the base year), not today's balances.
+            var input = PreRetirementAccumulation.seedAtRetirement(request, matrix);
             var ctx = contextBuilder.build(input, matrix);
             if (ctx.sim().years() <= 0) {
                 return new OptimizeResult(emptyResult(input), null);
@@ -261,8 +264,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
      * from ONE {@link #optimizeInternal} call.
      */
     @Nullable
-    StochasticMortalityEvaluation evaluateStochasticMortality(GuardrailOptimizationInput input) {
-        RealReturnMatrix matrix = matrix(input.includeDepressionYears());
+    StochasticMortalityEvaluation evaluateStochasticMortality(GuardrailOptimizationInput request) {
+        RealReturnMatrix matrix = matrix(request.includeDepressionYears());
+        var input = PreRetirementAccumulation.seedAtRetirement(request, matrix);
         var ctx = contextBuilder.build(input, matrix);
         if (ctx.sim().years() <= 0) {
             return null;

@@ -174,6 +174,22 @@ public record GuardrailOptimizationInput(
     }
 
     /**
+     * A copy of this input with {@code accounts} replaced and every other component unchanged --
+     * used to seed the Monte Carlo optimizer with the accounts as they stand at retirement.
+     */
+    public GuardrailOptimizationInput withAccounts(List<ProjectionAccountInput> newAccounts) {
+        return new GuardrailOptimizationInput(retirementDate, birthYear, endAge, inflationRate, newAccounts,
+                incomeSources, essentialFloor, terminalBalanceTarget, returnMean, trialCount, confidenceLevel,
+                phases, seed, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears, cashReserveYears,
+                cashReturnRate, filingStatus, withdrawalOrder, optimizeConversions, conversionBracketRate,
+                rmdTargetBracketRate, traditionalExhaustionBuffer, rmdBracketHeadroom,
+                dynamicSequencingBracketRate, dividendYield, feeRate, baseYear, includeDepressionYears,
+                interestYield, gateOnAdaptiveRules, spouseBirthYear, primaryDeathAge, spouseDeathAge,
+                survivorSpendingFactor, communityProperty, stochasticMortality, primarySex, spouseSex,
+                longevityConditionalAge, mortalityTable, birthMonth);
+    }
+
+    /**
      * Entry point for naming components instead of counting positions. Only the components a run
      * actually uses need setting; every unset component defaults to the same no-op anchor the
      * back-compat constructor above documents -- {@code null}/{@code 0}/{@code false}, plus

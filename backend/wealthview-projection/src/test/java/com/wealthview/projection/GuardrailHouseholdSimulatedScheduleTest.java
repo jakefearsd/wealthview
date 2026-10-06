@@ -97,8 +97,9 @@ class GuardrailHouseholdSimulatedScheduleTest {
 
         double preDisc = yearly.get(0).discretionary().doubleValue();
         double postDisc = yearly.get(TRANSITION_IDX).discretionary().doubleValue();
-        // The displayed schedule is unchanged from pre-HP2: pre-transition 5685.4123, post ×0.75.
-        assertThat(preDisc).isEqualTo(5685.4123, within(0.01));
+        // Pre-transition 22665.6513, post ×0.75. (5685.4123 before API #22: the fixture's base year
+        // is 2025, so the optimizer now seeds 2030 with five years of growth on these balances.)
+        assertThat(preDisc).isEqualTo(22665.6513, within(0.01));
         assertThat(postDisc).isEqualTo(preDisc * SURVIVOR_FACTOR, within(0.01));
 
         // The whole point: the reported success rate reflects the SCALED (displayed) draws. Only
@@ -113,10 +114,10 @@ class GuardrailHouseholdSimulatedScheduleTest {
         // move up from their pre-HP2 values).
         assertThat(result.medianFinalBalance().doubleValue())
                 .isGreaterThan(480002.94)                       // pre-HP2 median
-                .isEqualTo(493270.3721, within(0.5));
+                .isEqualTo(703014.0480, within(0.5));           // 493270.3721 before API #22
         assertThat(result.percentile10Final().doubleValue())
                 .isGreaterThan(0.0)                             // pre-HP2 p10 was 0
-                .isEqualTo(8181.0855, within(0.5));
+                .isEqualTo(35539.0519, within(0.5));            // 8181.0855 before API #22
     }
 
     /**
@@ -134,8 +135,8 @@ class GuardrailHouseholdSimulatedScheduleTest {
         // Tolerance absorbs the 4-dp rounding of both reported values; still nowhere near a
         // double-scale (0.5625).
         assertThat(postDisc / preDisc).isEqualTo(SURVIVOR_FACTOR, within(1e-5));
-        // Exact single-scale value (double-scale would be 3198.0444).
-        assertThat(postDisc).isEqualTo(4264.0592, within(0.01));
+        // Exact single-scale value (double-scale would be 12749.4289; 4264.0592 before API #22).
+        assertThat(postDisc).isEqualTo(16999.2385, within(0.01));
 
         // Every post-transition year carries the same single-scaled level (uniform phase, no
         // smoothing); every pre-transition year carries the un-scaled level.

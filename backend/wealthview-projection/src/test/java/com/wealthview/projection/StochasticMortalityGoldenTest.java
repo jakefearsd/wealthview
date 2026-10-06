@@ -51,18 +51,24 @@ import static org.assertj.core.api.Assertions.within;
  * is genuinely stressed — otherwise the guaranteed SS+pension income ($90k) trivially covers spending
  * and every trial succeeds, making the pin (and the sanity relationships) meaningless.
  *
+ * <p>API #22 (2026-10-05): the fixture's base year is 2025, so the optimizer now seeds the 2030
+ * retirement with five years of growth on these balances, as the deterministic engine does. The
+ * success rates below moved up accordingly (lifetime 0.9315 → 0.944, fixed-death 0.909 → 0.927,
+ * conditional 0.8427 → 0.8708); the death-age distributions are unchanged and every sanity
+ * relationship still holds.
+ *
  * <p><b>Hand-verification (against the SSA qx table + the fixed-death A run).</b>
  * <ul>
- *   <li>{@code lifetimeSuccessProbability} = 0.9315 (1863/2000) ≥ the A fixed-death (85/90) success
- *       0.909 (1818/2000): stochastic trials that die BEFORE the fixed 85/90 horizon fund a shorter
+ *   <li>{@code lifetimeSuccessProbability} = 0.944 (1888/2000) ≥ the A fixed-death (85/90) success
+ *       0.927 (1854/2000): stochastic trials that die BEFORE the fixed 85/90 horizon fund a shorter
  *       plan, so early death raises success — the brief's first sanity check, satisfied with a
- *       +45-trial margin. (At a much higher floor the longevity tail — survivors to 97+ — flips this;
+ *       +34-trial margin. (At a much higher floor the longevity tail — survivors to 97+ — flips this;
  *       $180k sits comfortably in the early-death-dominated regime.)</li>
  *   <li>{@code secondDeathAge} median 88 sits ~3 years above the female-alone median death age of 85
  *       (SSA female alive at 64 → mean LE 20.0y / median death 85), exactly as expected since the
  *       survivor is the MAX of the two sampled ages — the brief's "near female cohort life
  *       expectancy" check.</li>
- *   <li>{@code longevityConditional.probability} 0.8427 (300/356) ≤ lifetime 0.9315: conditioning on
+ *   <li>{@code longevityConditional.probability} 0.8708 (310/356) ≤ lifetime 0.944: conditioning on
  *       the survivor reaching 95+ selects the longest-lived, hardest-to-fund trials — the brief's
  *       third sanity check.</li>
  *   <li>{@code longevityConditional.trialFraction} 0.178 (356/2000) matches the analytic
@@ -93,11 +99,11 @@ class StochasticMortalityGoldenTest {
         var summary = optimizer.optimizeInternal(household(SSA_TABLE)).stochasticMortality();
 
         assertThat(summary).isNotNull();
-        // Lifetime (unconditional) success: 1863 of 2000 trials.
-        assertThat(summary.lifetimeSuccessProbability()).isCloseTo(0.9315, within(1e-9));
-        // Longevity-conditional (survivor reaches 95): 300 of 356 qualifying trials succeed.
+        // Lifetime (unconditional) success: 1888 of 2000 trials.
+        assertThat(summary.lifetimeSuccessProbability()).isCloseTo(0.944, within(1e-9));
+        // Longevity-conditional (survivor reaches 95): 310 of 356 qualifying trials succeed.
         assertThat(summary.longevityConditional().age()).isEqualTo(95);
-        assertThat(summary.longevityConditional().probability()).isCloseTo(0.8426966292134831, within(1e-9));
+        assertThat(summary.longevityConditional().probability()).isCloseTo(0.8707865168539326, within(1e-9));
         assertThat(summary.longevityConditional().trialFraction()).isCloseTo(0.178, within(1e-9));
         // Raw sampled death-age distributions (whole years).
         assertThat(summary.firstDeathAge())
@@ -111,8 +117,8 @@ class StochasticMortalityGoldenTest {
         double fixedDeathSuccess = optimizer.optimize(household(null)).successProbability().doubleValue();
         var summary = optimizer.optimizeInternal(household(SSA_TABLE)).stochasticMortality();
 
-        // Sub-project A fixed-death (85/90) headline success is the toggle-off anchor: 1818/2000.
-        assertThat(fixedDeathSuccess).isCloseTo(0.909, within(1e-9));
+        // Sub-project A fixed-death (85/90) headline success is the toggle-off anchor: 1854/2000.
+        assertThat(fixedDeathSuccess).isCloseTo(0.927, within(1e-9));
         // Early-death trials help -> stochastic lifetime success is at least the fixed-death rate.
         assertThat(summary.lifetimeSuccessProbability()).isGreaterThanOrEqualTo(fixedDeathSuccess);
         // Conditioning on a long-lived survivor is strictly harder than the unconditional rate.

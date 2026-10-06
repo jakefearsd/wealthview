@@ -565,7 +565,7 @@ final class OptimizationContextBuilder {
      * deterministic engine uses (see {@link ScenarioParamsParser#DEFAULT_FEE_RATE}) when the
      * scenario's {@code params_json} doesn't set one (audit B1).
      */
-    private static double resolveFeeRate(GuardrailOptimizationInput input) {
+    static double resolveFeeRate(GuardrailOptimizationInput input) {
         return input.feeRate() != null
                 ? input.feeRate().doubleValue() : ScenarioParamsParser.DEFAULT_FEE_RATE.doubleValue();
     }
