@@ -31,7 +31,7 @@ export default function DataExportPage() {
                     disabled={loading !== null}
                     style={{
                         padding: '0.5rem 1rem',
-                        background: '#4a9eff',
+                        background: '#1976d2',
                         color: '#fff',
                         border: 'none',
                         borderRadius: '4px',

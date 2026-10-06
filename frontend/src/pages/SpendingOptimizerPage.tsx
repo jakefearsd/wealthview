@@ -232,7 +232,7 @@ export default function SpendingOptimizerPage() {
     return (
         <div>
             <div style={{ marginBottom: '1rem' }}>
-                <Link to={`/projections/${id}`} style={{ color: '#1976d2', textDecoration: 'none', fontSize: '0.85rem' }}>
+                <Link to={`/projections/${id}`} style={{ color: '#1565c0', textDecoration: 'none', fontSize: '0.85rem' }}>
                     &larr; Back to {scenario.name}
                 </Link>
             </div>
@@ -263,7 +263,7 @@ export default function SpendingOptimizerPage() {
             }}>
                 <div style={{ marginBottom: '0.35rem' }}>
                     <strong style={{ color: '#666' }}>Scenario:</strong>{' '}
-                    <Link to={`/projections/${id}`} style={{ color: '#1976d2', textDecoration: 'none' }}>{scenario.name}</Link>
+                    <Link to={`/projections/${id}`} style={{ color: '#1565c0', textDecoration: 'none' }}>{scenario.name}</Link>
                 </div>
                 <div style={{ display: 'flex', gap: '1.5rem', color: '#555', flexWrap: 'wrap', marginBottom: '0.35rem' }}>
                     <span><strong style={{ color: '#666' }}>Inflation:</strong> {(scenario.inflation_rate * 100).toFixed(1)}%</span>

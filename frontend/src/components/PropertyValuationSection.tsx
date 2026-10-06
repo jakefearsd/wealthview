@@ -6,6 +6,10 @@ import Button from './Button';
 import { useModalDialog } from '../hooks/useModalDialog';
 import type { PropertyValuation, ZillowSearchResult } from '../types/property';
 
+// Button's disabled pattern (opacity 0.5) over a light grey leaves white text at ~1.1:1, so the
+// in-flight state paints dark grey text on light grey at full opacity (4.97:1).
+const REFRESHING_STYLE = { background: '#efefef', color: '#666', opacity: 1 } as const;
+
 interface PropertyValuationSectionProps {
     valuations: PropertyValuation[] | null;
     canWrite: boolean;
@@ -55,7 +59,7 @@ export default function PropertyValuationSection({
                                 onClick={onRefreshValuation}
                                 disabled={refreshing}
                                 size="sm"
-                                style={{ background: refreshing ? '#ccc' : undefined }}
+                                style={refreshing ? REFRESHING_STYLE : undefined}
                             >
                                 {refreshing ? 'Refreshing...' : 'Refresh Valuation'}
                             </Button>
@@ -103,7 +107,7 @@ export default function PropertyValuationSection({
                         onClick={onRefreshValuation}
                         disabled={refreshing}
                         size="sm"
-                        style={{ marginTop: '0.5rem', background: refreshing ? '#ccc' : undefined }}
+                        style={{ marginTop: '0.5rem', ...(refreshing ? REFRESHING_STYLE : undefined) }}
                     >
                         {refreshing ? 'Refreshing...' : 'Refresh Valuation'}
                     </Button>

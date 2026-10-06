@@ -137,7 +137,7 @@ export default function AccountDetailPage() {
         return (
             <EmptyState
                 title="Account not found"
-                action={<Link to="/accounts" style={{ color: '#1976d2' }}>Back to accounts</Link>}
+                action={<Link to="/accounts" style={{ color: '#1565c0' }}>Back to accounts</Link>}
             />
         );
     }
@@ -145,7 +145,7 @@ export default function AccountDetailPage() {
     return (
         <div>
             <div style={{ marginBottom: '1.5rem' }}>
-                <Link to="/accounts" style={{ color: '#1976d2', textDecoration: 'none' }}>Accounts</Link> / {account.name}
+                <Link to="/accounts" style={{ color: '#1565c0', textDecoration: 'none' }}>Accounts</Link> / {account.name}
             </div>
             <h2 style={{ marginBottom: '0.5rem' }}>{account.name}</h2>
             <div style={{ color: '#666', marginBottom: '2rem' }}>

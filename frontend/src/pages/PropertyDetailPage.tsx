@@ -277,7 +277,7 @@ export default function PropertyDetailPage() {
             return (
                 <div>
                     <div style={{ marginBottom: '1.5rem' }}>
-                        <Link to="/properties" style={{ color: '#1976d2', textDecoration: 'none' }}>Properties</Link>
+                        <Link to="/properties" style={{ color: '#1565c0', textDecoration: 'none' }}>Properties</Link>
                     </div>
                     <ErrorState
                         message={propertyError}
@@ -291,7 +291,7 @@ export default function PropertyDetailPage() {
     return (
         <div>
             <div style={{ marginBottom: '1.5rem' }}>
-                <Link to="/properties" style={{ color: '#1976d2', textDecoration: 'none' }}>Properties</Link> / {property?.address}
+                <Link to="/properties" style={{ color: '#1565c0', textDecoration: 'none' }}>Properties</Link> / {property?.address}
             </div>
 
             {showEditForm && (

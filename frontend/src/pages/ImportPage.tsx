@@ -97,7 +97,7 @@ export default function ImportPage() {
     return (
         <div>
             <div style={{ marginBottom: '1.5rem' }}>
-                <Link to={`/accounts/${accountId}`} style={{ color: '#1976d2', textDecoration: 'none' }}>Back to Account</Link>
+                <Link to={`/accounts/${accountId}`} style={{ color: '#1565c0', textDecoration: 'none' }}>Back to Account</Link>
             </div>
             <h2 style={{ marginBottom: '1.5rem' }}>Import</h2>
 

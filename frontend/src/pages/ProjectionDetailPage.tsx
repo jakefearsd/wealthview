@@ -154,7 +154,7 @@ export default function ProjectionDetailPage() {
     return (
         <div>
             <div style={{ marginBottom: '1.5rem' }}>
-                <Link to="/projections" style={{ color: '#1976d2', textDecoration: 'none' }}>Projections</Link> / {scenario.name}
+                <Link to="/projections" style={{ color: '#1565c0', textDecoration: 'none' }}>Projections</Link> / {scenario.name}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>

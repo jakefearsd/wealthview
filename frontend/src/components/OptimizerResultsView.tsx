@@ -55,7 +55,7 @@ export default function OptimizerResultsView({
                 }}>
                     <span style={{ color: '#bf360c' }}>This profile is stale &mdash; the scenario has changed since optimization.</span>
                     <button onClick={onReoptimize}
-                        style={{ padding: '0.35rem 0.75rem', background: '#ff9800', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>
+                        style={{ padding: '0.35rem 0.75rem', background: '#b45309', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>
                         Re-optimize
                     </button>
                 </div>

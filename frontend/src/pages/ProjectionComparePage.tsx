@@ -73,7 +73,7 @@ export default function ProjectionComparePage() {
     return (
         <div>
             <div style={{ marginBottom: '1.5rem' }}>
-                <Link to="/projections" style={{ color: '#1976d2', textDecoration: 'none' }}>Projections</Link> / Compare
+                <Link to="/projections" style={{ color: '#1565c0', textDecoration: 'none' }}>Projections</Link> / Compare
             </div>
 
             <h2 style={{ marginBottom: '1.5rem' }}>Compare Scenarios</h2>

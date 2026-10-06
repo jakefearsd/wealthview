@@ -31,6 +31,12 @@ describe('DataExportPage', () => {
         expect(screen.getByRole('button', { name: 'properties' })).toBeInTheDocument();
     });
 
+    it('gives the Download JSON button a background that contrasts with its white text', () => {
+        render(<DataExportPage />);
+
+        expect(screen.getByText('Download JSON')).toHaveStyle({ background: '#1976d2', color: '#fff' });
+    });
+
     it('triggers JSON download', async () => {
         vi.mocked(downloadJson).mockResolvedValue(undefined);
         render(<DataExportPage />);

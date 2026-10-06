@@ -33,3 +33,16 @@ describe('text contrast', () => {
         });
     }
 });
+
+// White text needs a background of at least 4.5:1: #ef5350 (3.48:1), #4a9eff (2.75:1) and #ff9800 (2.15:1) fail.
+const LOW_CONTRAST_BUTTON_BACKGROUNDS = /background:\s*['"]#(ef5350|4a9eff|ff9800)['"][^}]{0,120}color:\s*['"]#fff['"]/i;
+
+describe('button contrast', () => {
+    it('no source file puts white text on a low-contrast button background', () => {
+        const offenders = Object.entries(sources)
+            .filter(([, text]) => LOW_CONTRAST_BUTTON_BACKGROUNDS.test(text))
+            .map(([path]) => path);
+
+        expect(offenders).toEqual([]);
+    });
+});

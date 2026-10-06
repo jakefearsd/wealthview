@@ -67,6 +67,29 @@ describe('PropertyValuationSection', () => {
         expect(onRefresh).toHaveBeenCalled();
     });
 
+    it.each([
+        ['with history', [valuation]],
+        ['without history', []],
+    ])('keeps the disabled Refresh Valuation button readable while refreshing (%s)', (_label, valuations) => {
+        render(
+            <PropertyValuationSection
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                valuations={valuations as any}
+                canWrite={true}
+                refreshing={true}
+                zillowCandidates={null}
+                onRefreshValuation={vi.fn()}
+                onSelectZpid={vi.fn()}
+                onDismissCandidates={vi.fn()}
+            />
+        );
+
+        const button = screen.getByRole('button', { name: /Refreshing/i });
+
+        expect(button).toBeDisabled();
+        expect(button).toHaveStyle({ background: '#efefef', color: '#666', opacity: '1' });
+    });
+
     it('lists Zillow candidates when provided', () => {
         render(
             <PropertyValuationSection

@@ -110,7 +110,7 @@ export default function HoldingDetailPage() {
     return (
         <div>
             <div style={{ marginBottom: '1.5rem' }}>
-                <Link to={`/accounts/${holding.account_id}`} style={{ color: '#1976d2', textDecoration: 'none' }}>Account</Link> / {holding.symbol}
+                <Link to={`/accounts/${holding.account_id}`} style={{ color: '#1565c0', textDecoration: 'none' }}>Account</Link> / {holding.symbol}
             </div>
 
             <h2 style={{ marginBottom: '1.5rem' }}>
