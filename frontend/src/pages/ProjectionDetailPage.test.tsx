@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -72,6 +72,7 @@ vi.mock('../components/TaxBreakdownChart', () => ({
 }));
 
 import { useApiQuery } from '../hooks/useApiQuery';
+import { getScenario } from '../api/projections';
 const mockUseApiQuery = vi.mocked(useApiQuery);
 
 function renderPage() {
@@ -252,5 +253,44 @@ describe('ProjectionDetailPage', () => {
         await userEvent.click(screen.getByRole('button', { name: /run projection/i }));
 
         expect(screen.queryByText('After-tax Legacy')).not.toBeInTheDocument();
+    });
+
+    describe('load failures', () => {
+        it('shows an error with retry, not "not found", when the load fails', async () => {
+            const refetch = vi.fn();
+            mockUseApiQuery.mockReturnValue({ data: null, loading: false, error: 'Network Error', refetch });
+            renderPage();
+
+            expect(screen.getByText('Network Error')).toBeInTheDocument();
+            expect(screen.queryByText('Scenario not found')).not.toBeInTheDocument();
+
+            await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+            expect(refetch).toHaveBeenCalled();
+        });
+
+        it('shows "not found" when the scenario loads as null', () => {
+            mockUseApiQuery.mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
+            renderPage();
+
+            expect(screen.getByText('Scenario not found')).toBeInTheDocument();
+        });
+
+        it('turns a 404 into a null scenario but lets other failures propagate', async () => {
+            let fetchFn: (() => Promise<unknown>) | undefined;
+            mockUseApiQuery.mockImplementation(((fn: () => Promise<unknown>) => {
+                fetchFn ??= fn;
+                return { data: null, loading: false, error: null, refetch: vi.fn() };
+            }) as never);
+            renderPage();
+
+            vi.mocked(getScenario).mockRejectedValueOnce({ response: { status: 404 } });
+            await expect(fetchFn!()).resolves.toBeNull();
+
+            vi.mocked(getScenario).mockRejectedValueOnce({ response: { status: 500 } });
+            await waitFor(async () => {
+                await expect(fetchFn!()).rejects.toEqual({ response: { status: 500 } });
+            });
+        });
     });
 });

@@ -25,6 +25,7 @@ import IncomeTaxTab from '../components/IncomeTaxTab';
 import TaxShieldTab from '../components/TaxShieldTab';
 import TaxSpaceTab from '../components/TaxSpaceTab';
 import LoadingState from '../components/LoadingState';
+import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import { useProjectionCache } from '../context/ProjectionCacheContext';
 import type { ProjectionResult, CreateScenarioRequest } from '../types/projection';
@@ -39,7 +40,13 @@ export default function ProjectionDetailPage() {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const cache = useProjectionCache();
-    const { data: scenario, loading, refetch } = useApiQuery(() => getScenario(id!));
+    // A 404 resolves to null (rendered as "not found"); any other failure stays an error with a retry.
+    const { data: scenario, loading, error, refetch } = useApiQuery(
+        () => getScenario(id!).catch((err: unknown) => {
+            if ((err as { response?: { status?: number } } | null)?.response?.status === 404) return null;
+            throw err;
+        }),
+    );
     const [result, setResult] = useState<ProjectionResult | null>(() => cache.get(id!));
     const [activeTab, setActiveTab] = useState<TabId>('chart');
     const [editing, setEditing] = useState(false);
@@ -101,6 +108,7 @@ export default function ProjectionDetailPage() {
     );
 
     if (loading) return <LoadingState message="Loading scenario..." />;
+    if (error) return <ErrorState message={error} onRetry={refetch} />;
     if (!scenario) return <EmptyState title="Scenario not found" message="This scenario may have been deleted." />;
 
     const retirementYear = scenario.retirement_date ? yearOf(scenario.retirement_date) : null;
@@ -201,70 +209,74 @@ export default function ProjectionDetailPage() {
                     {scenario.income_sources && scenario.income_sources.length > 0 && (
                         <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
                             <h3 style={{ marginBottom: '1rem' }}>Income Sources</h3>
-                            <table style={tableStyle}>
-                                <thead>
-                                    <tr>
-                                        <th style={thStyle}>Name</th>
-                                        <th style={thStyle}>Type</th>
-                                        <th style={{ ...thStyle, textAlign: 'right' }}>Start Age</th>
-                                        <th style={{ ...thStyle, textAlign: 'right' }}>End Age</th>
-                                        <th style={{ ...thStyle, textAlign: 'right' }}>Base Amount</th>
-                                        <th style={{ ...thStyle, textAlign: 'right' }}>Override</th>
-                                        <th style={{ ...thStyle, textAlign: 'right' }}>Effective</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {scenario.income_sources.map(is => (
-                                        <tr key={is.income_source_id} style={trHoverStyle}>
-                                            <td style={tdStyle}>{is.name}</td>
-                                            <td style={{ ...tdStyle, textTransform: 'capitalize' }}>{is.income_type.replace(/_/g, ' ')}</td>
-                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{is.start_age}</td>
-                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{is.end_age != null ? is.end_age : '∞'}</td>
-                                            <td style={{ ...tdStyle, textAlign: 'right' }}>
-                                                {formatCurrency(is.annual_amount)}
-                                                {is.income_type === 'rental_property' && (
-                                                    <span style={{ fontSize: '0.75rem', color: '#999', marginLeft: '0.25rem' }}>(gross)</span>
-                                                )}
-                                            </td>
-                                            <td style={{ ...tdStyle, textAlign: 'right', color: '#666' }}>
-                                                {is.override_annual_amount != null ? formatCurrency(is.override_annual_amount) : '—'}
-                                            </td>
-                                            <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>
-                                                {is.income_type === 'rental_property' && is.annual_net_cash_flow != null
-                                                    ? <>{formatCurrency(is.annual_net_cash_flow)}<span style={{ fontSize: '0.75rem', color: '#999', fontWeight: 400, marginLeft: '0.25rem' }}>(net)</span></>
-                                                    : formatCurrency(is.effective_amount)
-                                                }
-                                            </td>
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={tableStyle}>
+                                    <thead>
+                                        <tr>
+                                            <th style={thStyle}>Name</th>
+                                            <th style={thStyle}>Type</th>
+                                            <th style={{ ...thStyle, textAlign: 'right' }}>Start Age</th>
+                                            <th style={{ ...thStyle, textAlign: 'right' }}>End Age</th>
+                                            <th style={{ ...thStyle, textAlign: 'right' }}>Base Amount</th>
+                                            <th style={{ ...thStyle, textAlign: 'right' }}>Override</th>
+                                            <th style={{ ...thStyle, textAlign: 'right' }}>Effective</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {scenario.income_sources.map(is => (
+                                            <tr key={is.income_source_id} style={trHoverStyle}>
+                                                <td style={tdStyle}>{is.name}</td>
+                                                <td style={{ ...tdStyle, textTransform: 'capitalize' }}>{is.income_type.replace(/_/g, ' ')}</td>
+                                                <td style={{ ...tdStyle, textAlign: 'right' }}>{is.start_age}</td>
+                                                <td style={{ ...tdStyle, textAlign: 'right' }}>{is.end_age != null ? is.end_age : '∞'}</td>
+                                                <td style={{ ...tdStyle, textAlign: 'right' }}>
+                                                    {formatCurrency(is.annual_amount)}
+                                                    {is.income_type === 'rental_property' && (
+                                                        <span style={{ fontSize: '0.75rem', color: '#999', marginLeft: '0.25rem' }}>(gross)</span>
+                                                    )}
+                                                </td>
+                                                <td style={{ ...tdStyle, textAlign: 'right', color: '#666' }}>
+                                                    {is.override_annual_amount != null ? formatCurrency(is.override_annual_amount) : '—'}
+                                                </td>
+                                                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>
+                                                    {is.income_type === 'rental_property' && is.annual_net_cash_flow != null
+                                                        ? <>{formatCurrency(is.annual_net_cash_flow)}<span style={{ fontSize: '0.75rem', color: '#999', fontWeight: 400, marginLeft: '0.25rem' }}>(net)</span></>
+                                                        : formatCurrency(is.effective_amount)
+                                                    }
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     )}
 
                     {scenario.accounts.length > 0 && (
                         <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
                             <h3 style={{ marginBottom: '1rem' }}>Accounts</h3>
-                            <table style={tableStyle}>
-                                <thead>
-                                    <tr>
-                                        <th style={thStyle}>Type</th>
-                                        <th style={{ ...thStyle, textAlign: 'right' }}>Initial Balance</th>
-                                        <th style={{ ...thStyle, textAlign: 'right' }}>Annual Contribution</th>
-                                        <th style={{ ...thStyle, textAlign: 'right' }}>Expected Return</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {scenario.accounts.map(a => (
-                                        <tr key={a.id} style={trHoverStyle}>
-                                            <td style={{ ...tdStyle, textTransform: 'capitalize' }}>{a.account_type || 'taxable'}</td>
-                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(a.initial_balance)}</td>
-                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(a.annual_contribution)}</td>
-                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{a.expected_return != null ? `${(a.expected_return * 100).toFixed(1)}%` : 'Derived'}</td>
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={tableStyle}>
+                                    <thead>
+                                        <tr>
+                                            <th style={thStyle}>Type</th>
+                                            <th style={{ ...thStyle, textAlign: 'right' }}>Initial Balance</th>
+                                            <th style={{ ...thStyle, textAlign: 'right' }}>Annual Contribution</th>
+                                            <th style={{ ...thStyle, textAlign: 'right' }}>Expected Return</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {scenario.accounts.map(a => (
+                                            <tr key={a.id} style={trHoverStyle}>
+                                                <td style={{ ...tdStyle, textTransform: 'capitalize' }}>{a.account_type || 'taxable'}</td>
+                                                <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(a.initial_balance)}</td>
+                                                <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(a.annual_contribution)}</td>
+                                                <td style={{ ...tdStyle, textAlign: 'right' }}>{a.expected_return != null ? `${(a.expected_return * 100).toFixed(1)}%` : 'Derived'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     )}
                 </>
