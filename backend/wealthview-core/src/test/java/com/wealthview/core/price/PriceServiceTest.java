@@ -58,6 +58,38 @@ class PriceServiceTest {
     }
 
     @Test
+    void createPrice_lowercaseSymbolWithWhitespace_isStoredNormalised() {
+        var request = new PriceRequest(" aapl ", LocalDate.now(), new BigDecimal("185.50"));
+        when(priceRepository.save(any(PriceEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var result = priceService.createPrice(request);
+
+        assertThat(result.symbol()).isEqualTo("AAPL");
+    }
+
+    @Test
+    void getLatestPrice_lowercaseSymbol_looksUpNormalisedSymbol() {
+        var price = new PriceEntity("MSFT", LocalDate.now(), new BigDecimal("420.00"), "manual");
+        when(priceRepository.findFirstBySymbolOrderByDateDesc("MSFT")).thenReturn(Optional.of(price));
+
+        var result = priceService.getLatestPrice(" msft");
+
+        assertThat(result.symbol()).isEqualTo("MSFT");
+    }
+
+    @Test
+    void bulkUpsertPrices_lowercaseSymbol_upsertsUnderNormalisedSymbol() {
+        when(priceRepository.findById(any())).thenReturn(Optional.empty());
+        var entry = new BulkPriceRequest.PriceEntry("vti", LocalDate.of(2025, 1, 2), new BigDecimal("250"));
+
+        priceService.bulkUpsertPrices(List.of(entry), "manual");
+
+        var captor = org.mockito.ArgumentCaptor.forClass(PriceEntity.class);
+        org.mockito.Mockito.verify(priceRepository).save(captor.capture());
+        assertThat(captor.getValue().getSymbol()).isEqualTo("VTI");
+    }
+
+    @Test
     void getLatestPrice_existing_returnsPrice() {
         var price = new PriceEntity("MSFT", LocalDate.now(), new BigDecimal("420.00"), "manual");
         when(priceRepository.findFirstBySymbolOrderByDateDesc("MSFT"))

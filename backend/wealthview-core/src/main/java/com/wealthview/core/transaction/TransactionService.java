@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.common.Entities;
+import com.wealthview.core.common.Symbols;
 import com.wealthview.core.common.PageResponse;
 import com.wealthview.core.holding.HoldingsComputationService;
 import com.wealthview.core.split.SplitAdjustmentApplier;
@@ -55,7 +56,7 @@ public class TransactionService {
         var txn = persistTransaction(tenantId, accountId, request, null);
 
         holdingsComputationService.recomputeForAccountAndSymbol(
-                txn.getAccount(), txn.getTenant(), request.symbol());
+                txn.getAccount(), txn.getTenant(), txn.getSymbol());
 
         log.info("Transaction {} created for account {}", txn.getId(), accountId);
         eventPublisher.publishEvent(new AuditEvent(tenantId, null, "CREATE", "transaction",
@@ -84,7 +85,7 @@ public class TransactionService {
                 .orElseThrow(Entities.notFound("Account"));
 
         var txn = new TransactionEntity(account, account.getTenant(), request.date(),
-                request.type(), request.symbol(), request.quantity(), request.amount());
+                request.type(), Symbols.normalize(request.symbol()), request.quantity(), request.amount());
         if (importHash != null) {
             txn.setImportHash(importHash);
         }
@@ -104,7 +105,7 @@ public class TransactionService {
     public PageResponse<TransactionResponse> listByAccountAndSymbol(UUID tenantId, UUID accountId,
                                                                      String symbol, Pageable pageable) {
         var page = transactionRepository.findByAccount_IdAndTenant_IdAndSymbol(
-                accountId, tenantId, symbol, newestFirst(pageable));
+                accountId, tenantId, Symbols.normalize(symbol), newestFirst(pageable));
         return PageResponse.from(page, TransactionResponse::from);
     }
 
@@ -123,17 +124,18 @@ public class TransactionService {
                 .orElseThrow(Entities.notFound("Transaction"));
 
         var oldSymbol = txn.getSymbol();
+        var newSymbol = Symbols.normalize(request.symbol());
         txn.setDate(request.date());
         txn.setType(request.type());
-        txn.setSymbol(request.symbol());
+        txn.setSymbol(newSymbol);
         txn.setQuantity(request.quantity());
         txn.setAmount(request.amount());
         txn = transactionRepository.save(txn);
 
         var account = txn.getAccount();
         var tenant = txn.getTenant();
-        holdingsComputationService.recomputeForAccountAndSymbol(account, tenant, request.symbol());
-        if (oldSymbol != null && !oldSymbol.equals(request.symbol())) {
+        holdingsComputationService.recomputeForAccountAndSymbol(account, tenant, newSymbol);
+        if (oldSymbol != null && !oldSymbol.equals(newSymbol)) {
             holdingsComputationService.recomputeForAccountAndSymbol(account, tenant, oldSymbol);
         }
 
@@ -165,8 +167,9 @@ public class TransactionService {
         var details = new java.util.HashMap<String, Object>();
         // .value(): audit details land in a jsonb column, so store the wire token, not name().
         details.put("type", request.type().value());
-        if (request.symbol() != null) {
-            details.put("symbol", request.symbol());
+        var symbol = Symbols.normalize(request.symbol());
+        if (symbol != null) {
+            details.put("symbol", symbol);
         }
         return details;
     }

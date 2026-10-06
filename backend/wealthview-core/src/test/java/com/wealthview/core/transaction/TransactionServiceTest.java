@@ -95,6 +95,49 @@ class TransactionServiceTest {
     }
 
     @Test
+    void create_lowercaseSymbolWithWhitespace_isNormalisedBeforeSavingAndRecomputing() {
+        var request = new TransactionRequest(LocalDate.now(), BUY, " aapl ",
+                new BigDecimal("10"), new BigDecimal("1500"));
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
+                .thenReturn(Optional.of(account));
+        when(transactionRepository.save(any(TransactionEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var result = transactionService.create(tenantId, accountId, request);
+
+        assertThat(result.symbol()).isEqualTo("AAPL");
+        verify(holdingsComputationService).recomputeForAccountAndSymbol(eq(account), any(), eq("AAPL"));
+    }
+
+    @Test
+    void update_lowercaseSymbol_isNormalisedAndDoesNotRecomputeOldSymbolTwice() {
+        var txnId = UUID.randomUUID();
+        var existing = new TransactionEntity(account, tenant, LocalDate.of(2025, 1, 1), BUY, "AAPL",
+                new BigDecimal("1"), new BigDecimal("100"));
+        when(transactionRepository.findByIdAndTenant_Id(txnId, tenantId)).thenReturn(Optional.of(existing));
+        when(transactionRepository.save(any(TransactionEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var result = transactionService.update(tenantId, txnId, new TransactionRequest(
+                LocalDate.of(2025, 1, 1), BUY, "aapl", new BigDecimal("1"), new BigDecimal("100")));
+
+        assertThat(result.symbol()).isEqualTo("AAPL");
+        verify(holdingsComputationService, times(1)).recomputeForAccountAndSymbol(eq(account), any(), eq("AAPL"));
+    }
+
+    @Test
+    void listByAccountAndSymbol_lowercaseSymbol_filtersOnNormalisedSymbol() {
+        var pageable = PageRequest.of(0, 5);
+        when(transactionRepository.findByAccount_IdAndTenant_IdAndSymbol(
+                eq(accountId), eq(tenantId), eq("MSFT"), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        transactionService.listByAccountAndSymbol(tenantId, accountId, " msft", pageable);
+
+        verify(transactionRepository).findByAccount_IdAndTenant_IdAndSymbol(
+                eq(accountId), eq(tenantId), eq("MSFT"), any(Pageable.class));
+    }
+
+    @Test
     void create_adjustsForSplitsBeforeRecomputingHoldings() {
         var request = new TransactionRequest(LocalDate.of(2019, 1, 1), BUY, "AAPL",
                 new BigDecimal("100"), new BigDecimal("8000"));

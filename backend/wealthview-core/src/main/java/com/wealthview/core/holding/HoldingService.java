@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.common.Entities;
+import com.wealthview.core.common.Symbols;
 import com.wealthview.core.holding.dto.HoldingRequest;
 import com.wealthview.core.holding.dto.HoldingResponse;
 import com.wealthview.core.price.LatestPriceLookup;
@@ -80,15 +81,16 @@ public class HoldingService {
         var account = accountRepository.findByTenant_IdAndId(tenantId, request.accountId())
                 .orElseThrow(Entities.notFound("Account"));
 
+        var symbol = Symbols.normalize(request.symbol());
         var holding = new HoldingEntity(account, account.getTenant(),
-                request.symbol(), request.quantity(), request.costBasis());
+                symbol, request.quantity(), request.costBasis());
         holding.setManualOverride(true);
         holding.setAsOfDate(LocalDate.now());
         holding = holdingRepository.save(holding);
 
-        log.info("Manual holding created for account {} symbol {}", request.accountId(), request.symbol());
+        log.info("Manual holding created for account {} symbol {}", request.accountId(), symbol);
         eventPublisher.publishEvent(new AuditEvent(tenantId, null, "CREATE", "holding",
-                holding.getId(), Map.of("symbol", request.symbol())));
+                holding.getId(), Map.of("symbol", symbol)));
         return HoldingResponse.from(holding);
     }
 

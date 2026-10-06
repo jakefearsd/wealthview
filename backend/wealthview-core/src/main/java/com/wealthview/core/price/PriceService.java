@@ -14,6 +14,7 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.wealthview.core.common.Symbols;
 import com.wealthview.core.config.EvictPriceDerivedCaches;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.ServiceUnavailableException;
@@ -60,14 +61,15 @@ public class PriceService {
     @EvictPriceDerivedCaches
     @Transactional
     public PriceResponse createPrice(PriceRequest request) {
-        var price = new PriceEntity(request.symbol(), request.date(),
+        var price = new PriceEntity(Symbols.normalize(request.symbol()), request.date(),
                 request.closePrice(), SOURCE_MANUAL);
         price = priceRepository.save(price);
         return PriceResponse.from(price);
     }
 
     @Transactional(readOnly = true)
-    public PriceResponse getLatestPrice(String symbol) {
+    public PriceResponse getLatestPrice(String rawSymbol) {
+        var symbol = Symbols.normalize(rawSymbol);
         return priceRepository.findFirstBySymbolOrderByDateDesc(symbol)
                 .map(PriceResponse::from)
                 .orElseThrow(() -> new EntityNotFoundException(
@@ -185,14 +187,16 @@ public class PriceService {
 
     @Transactional(readOnly = true)
     public List<PriceResponse> browseSymbol(String symbol, LocalDate from, LocalDate to) {
-        return priceRepository.findBySymbolAndDateBetweenOrderByDateDesc(symbol, from, to).stream()
+        return priceRepository.findBySymbolAndDateBetweenOrderByDateDesc(Symbols.normalize(symbol), from, to)
+                .stream()
                 .map(PriceResponse::from)
                 .toList();
     }
 
     @EvictPriceDerivedCaches
     @Transactional
-    public void deletePrice(String symbol, LocalDate date) {
+    public void deletePrice(String rawSymbol, LocalDate date) {
+        var symbol = Symbols.normalize(rawSymbol);
         var priceId = new PriceId(symbol, date);
         if (!priceRepository.existsById(priceId)) {
             throw new EntityNotFoundException(
@@ -205,7 +209,8 @@ public class PriceService {
     /**
      * Upserts a price. Returns true if an existing record was updated, false if a new one was inserted.
      */
-    private boolean upsertPrice(String symbol, LocalDate date, java.math.BigDecimal closePrice, String source) {
+    private boolean upsertPrice(String rawSymbol, LocalDate date, java.math.BigDecimal closePrice, String source) {
+        var symbol = Symbols.normalize(rawSymbol);
         var priceId = new PriceId(symbol, date);
         var existing = priceRepository.findById(priceId);
 

@@ -114,6 +114,17 @@ class HoldingServiceTest {
     }
 
     @Test
+    void createManual_lowercaseSymbol_isStoredNormalised() {
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId)).thenReturn(Optional.of(account));
+        when(holdingRepository.save(any(HoldingEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var result = holdingService.createManual(tenantId, new HoldingRequest(accountId, " msft ",
+                new BigDecimal("50"), new BigDecimal("15000")));
+
+        assertThat(result.symbol()).isEqualTo("MSFT");
+    }
+
+    @Test
     void createManual_setsOverrideFlag() {
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(account));
