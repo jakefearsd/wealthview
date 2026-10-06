@@ -51,7 +51,8 @@ export default function TaxBreakdownChart({ data, retirementYear, hasStateTax }:
         return {
             year: y.year,
             age: y.age,
-            federal_tax: (hasStateTax ? federal : total - se) - capGains,
+            // federal_tax already contains SE tax and cap-gains tax; both get their own bar below.
+            federal_tax: (hasStateTax ? federal : total) - se - capGains,
             state_tax: state,
             self_employment_tax: se,
             capital_gains_tax: capGains,

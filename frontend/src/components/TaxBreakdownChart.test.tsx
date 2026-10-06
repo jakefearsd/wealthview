@@ -134,6 +134,27 @@ describe('TaxBreakdownChart', () => {
         expect(point.federal_tax + point.capital_gains_tax + point.state_tax).toBe(8000);
     });
 
+    it('does not double-count SE tax in the federal bar when state tax is present', () => {
+        // Backend folds SE tax into federal_tax (10500 = 10000 ordinary + 500 SE), so the stack of
+        // federal + SE + cap-gains + state must equal tax_liability, not exceed it by the SE tax.
+        const data = [
+            makeYear({
+                year: 2040, age: 66,
+                tax_liability: 12500, federal_tax: 10500, state_tax: 2000,
+                self_employment_tax: 500, capital_gains_tax: 1000,
+            }),
+        ];
+
+        render(<TaxBreakdownChart data={data} retirementYear={2040} hasStateTax={true} />);
+
+        const point = chartData()[0] as {
+            federal_tax: number; self_employment_tax: number; capital_gains_tax: number; state_tax: number;
+        };
+        expect(point.federal_tax).toBe(9000);
+        expect(point.federal_tax + point.self_employment_tax + point.capital_gains_tax + point.state_tax)
+            .toBe(12500);
+    });
+
     it('hides the Cap-Gains Tax bar when no retired year has capital-gains tax', () => {
         const data = [
             makeYear({ year: 2040, age: 65, tax_liability: 8000, federal_tax: 8000 }),
