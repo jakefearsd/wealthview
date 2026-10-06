@@ -284,4 +284,31 @@ class PortfolioPathGeneratorTest {
             }
         }
     }
+
+    // API #23 / #5, Monte Carlo side: a pool whose accounts all open at $0 must use its OWN
+    // accounts' return (weighted by contribution, else equally), not a zero balance weight.
+
+    @Test
+    void generate_zeroBalancePoolWithAccounts_growsAtItsOwnAccountsReturn() {
+        var model = PoolReturnModel.from(List.of(
+                overrideAccount("100000", "0.03", "taxable"),
+                new HypotheticalAccountInput(BigDecimal.ZERO, new BigDecimal("7000"),
+                        new BigDecimal("0.07"), "roth")), 0.0);
+
+        var paths = PortfolioPathGenerator.generate(1, 3, model, FLAT_US_MATRIX, new Random(1L), 0.0);
+
+        assertAllClose(paths.rothReturns()[0], 0.07);
+    }
+
+    @Test
+    void generate_allBalancesZero_portfolioUsesEqualWeightMeanNotZero() {
+        var model = PoolReturnModel.from(List.of(
+                overrideAccount("0", "0.05", "taxable"),
+                overrideAccount("0", "0.07", "roth")), 0.0);
+
+        var paths = PortfolioPathGenerator.generate(1, 3, model, FLAT_US_MATRIX, new Random(1L), 0.0);
+
+        assertAllClose(paths.taxableReturns()[0], 0.05);
+        assertAllClose(paths.traditionalReturns()[0], 0.06);
+    }
 }

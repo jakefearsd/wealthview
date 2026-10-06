@@ -74,6 +74,13 @@ tax-accuracy fixes in both projection engines. One schema change (V081).
   spouse birth year is entered. A missing status on a saved scenario resolves the
   same way in the projection, the Monte Carlo optimizer and the guardrail
   signature.
+- **An account or pool that opens at $0 now grows.** Each pool's return was
+  weighted by opening balance, so a brand-new account ($0 plus contributions)
+  earned 0% for the whole projection, and Roth money created by conversions in a
+  scenario with no Roth account sat at 0% for decades (one probe: $1.55M final
+  balance instead of $7.47M). A zero-balance pool now uses its accounts' return
+  weighted by contribution (or equally), and a pool with no accounts uses the
+  household's overall return, in both the projection and the Monte Carlo.
 
 ## [1.2.8] — 2026-10-04
 

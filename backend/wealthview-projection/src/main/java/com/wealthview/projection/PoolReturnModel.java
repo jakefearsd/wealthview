@@ -13,7 +13,8 @@ import com.wealthview.core.projection.dto.ProjectionAccountInput;
  *
  * <p>The aggregation mirrors the deterministic engine's {@code PoolStrategy}: each account's real
  * return comes from a fixed override (if present) or from blending its allocation against the
- * capital-market matrix; a pool's return is the balance-weighted average of its accounts' returns.
+ * capital-market matrix; a pool's return is the balance-weighted average of its accounts' returns
+ * (contribution-weighted, else equal-weighted, when every account in the pool opens at zero).
  * Because every account in a trial shares one index sequence, cross-account/pool correlation is
  * preserved.
  */
@@ -27,10 +28,12 @@ record PoolReturnModel(
     /**
      * One account's return source. When {@code overrideBased} is true the account grows at a fixed
      * real return ({@code overrideReal}, a deterministic escape hatch with no volatility); otherwise
-     * its {@code allocation} is blended against the matrix per year.
+     * its {@code allocation} is blended against the matrix per year. {@code contribution} is the
+     * account's annual contribution, the fallback blend weight when every account in a pool opens
+     * at a zero balance -- mirroring the deterministic {@code PoolStrategy} weighting.
      */
-    record AccountReturnSource(double balance, boolean overrideBased, double overrideReal,
-                               AssetAllocation allocation) {}
+    record AccountReturnSource(double balance, double contribution, boolean overrideBased,
+                               double overrideReal, AssetAllocation allocation) {}
 
     // ExhaustiveSwitchHasDefault: the switch below is exhaustive over PoolType, but Checkstyle's
     // MissingSwitchDefault rule (also an enforced gate) requires the default anyway on a switch
@@ -77,11 +80,12 @@ record PoolReturnModel(
 
     private static AccountReturnSource sourceFor(ProjectionAccountInput account,
                                                  double inflationRate, double balance) {
+        double contribution = account.annualContribution().doubleValue();
         if (account.expectedReturnOverride().isPresent()) {
             double nominal = account.expectedReturnOverride().get().doubleValue();
             double real = (1 + nominal) / (1 + inflationRate) - 1;
-            return new AccountReturnSource(balance, true, real, account.allocation());
+            return new AccountReturnSource(balance, contribution, true, real, account.allocation());
         }
-        return new AccountReturnSource(balance, false, 0.0, account.allocation());
+        return new AccountReturnSource(balance, contribution, false, 0.0, account.allocation());
     }
 }

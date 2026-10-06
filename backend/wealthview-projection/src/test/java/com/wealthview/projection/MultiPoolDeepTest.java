@@ -155,14 +155,16 @@ class MultiPoolDeepTest {
     }
 
     @Test
-    void create_zeroTotalBalance_weightedReturnIsZero() {
+    void create_zeroTotalBalance_weightedReturnIsTheAccountsReturnNotZero() {
+        // A brand-new $0 account still has a return assumption; weighting it by a zero balance used
+        // to collapse the whole scenario's return to 0%.
         var accounts = List.<ProjectionAccountInput>of(
                 new HypotheticalAccountInput(bd("0"), bd("0"), bd("0.07"), "taxable"));
         var config = PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST);
 
         var strategy = PoolStrategy.create(accounts, config);
 
-        assertThat(strategy.getWeightedReturn()).isEqualByComparingTo(ZERO);
+        assertThat(strategy.getWeightedReturn()).isEqualByComparingTo(bd("0.07"));
     }
 
     // ---- withdrawal ordering ----

@@ -68,26 +68,33 @@ final class PortfolioPathGenerator {
     }
 
     /**
-     * Balance-weighted REAL return sequence for one pool. An empty pool (no accounts / zero
-     * balance) grows at the blended portfolio return {@code fallback} — e.g. a Roth pool that only
-     * receives Roth conversions has no starting accounts but must still grow the converted dollars
-     * at a sensible rate. For the portfolio blend itself the fallback is {@code null} (never empty
-     * when the run has any balance). {@code fallback} already carries {@code feeRate} (it is itself
-     * the output of a prior call to this method), so only the non-fallback branch subtracts it —
-     * once per pool, uniformly across override-based and allocation-based accounts alike (audit B1).
+     * Weighted REAL return sequence for one pool. A pool with NO accounts grows at the blended
+     * portfolio return {@code fallback} — e.g. a Roth pool that only receives Roth conversions has
+     * no starting accounts but must still grow the converted dollars at a sensible rate. For the
+     * portfolio blend itself the fallback is {@code null} (zero returns only when the run has no
+     * accounts at all). {@code fallback} already carries {@code feeRate} (it is itself the output of
+     * a prior call to this method), so only the non-fallback branch subtracts it — once per pool,
+     * uniformly across override-based and allocation-based accounts alike (audit B1).
+     *
+     * <p>Accounts are weighted by opening balance; when the pool's accounts all open at zero they
+     * are weighted by annual contribution, else equally (API #23) — so a zero-balance pool grows at
+     * its OWN accounts' return, exactly like the deterministic {@code PoolStrategy}, instead of a
+     * zero weight.
      */
     private static double[] poolRealReturns(List<AccountReturnSource> accounts, double poolBalance,
                                             int[] indexSequence, RealReturnMatrix matrix,
                                             int years, @Nullable double[] fallback, double feeRate) {
-        if (poolBalance <= 0 || accounts.isEmpty()) {
+        if (accounts.isEmpty()) {
             return fallback != null ? fallback : new double[years];
         }
+        double[] weights = blendWeights(accounts, poolBalance);
         double[] real = new double[years];
-        for (var account : accounts) {
+        for (int i = 0; i < accounts.size(); i++) {
+            var account = accounts.get(i);
             double[] accountReal = account.overrideBased()
                     ? PortfolioReturnResolver.fixed(years, account.overrideReal())
                     : PortfolioReturnResolver.resolveReal(indexSequence, account.allocation(), matrix);
-            double weight = account.balance() / poolBalance;
+            double weight = weights[i];
             for (int y = 0; y < years; y++) {
                 real[y] += weight * accountReal[y];
             }
@@ -96,5 +103,25 @@ final class PortfolioPathGenerator {
             real[y] -= feeRate;
         }
         return real;
+    }
+
+    /** Normalized blend weights: balance share, else contribution share, else equal (non-empty list). */
+    private static double[] blendWeights(List<AccountReturnSource> accounts, double poolBalance) {
+        double[] weights = new double[accounts.size()];
+        double contributions = 0;
+        for (var account : accounts) {
+            contributions += account.contribution();
+        }
+        for (int i = 0; i < weights.length; i++) {
+            var account = accounts.get(i);
+            if (poolBalance > 0) {
+                weights[i] = account.balance() / poolBalance;
+            } else if (contributions > 0) {
+                weights[i] = account.contribution() / contributions;
+            } else {
+                weights[i] = 1.0 / weights.length;
+            }
+        }
+        return weights;
     }
 }

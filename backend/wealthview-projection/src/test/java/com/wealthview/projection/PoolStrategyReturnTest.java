@@ -135,4 +135,64 @@ class PoolStrategyReturnTest {
         assertThat(growth.traditional()).isEqualByComparingTo(bd("5750"));   // 100000 * (0.06 - 0.0025)
         assertThat(growth.roth()).isEqualByComparingTo(bd("6750"));          // 100000 * (0.07 - 0.0025)
     }
+
+    // API #23 / #5: a pool whose accounts all open at $0 (a brand-new account, or the Roth pool a
+    // conversion creates) used to be weighted by a zero balance and grow at 0% for the whole run.
+
+    private static PoolStrategy.PoolConfig zeroInflationConfig() {
+        return new PoolStrategy.PoolConfig(FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO,
+                "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST, null, null, GEO, BigDecimal.ZERO);
+    }
+
+    @Test
+    void multiPool_zeroOpeningPoolWithContributions_growsAtItsOwnAccountsReturn() {
+        var pool = PoolStrategy.create(List.<ProjectionAccountInput>of(
+                new HypotheticalAccountInput(bd("100000"), BigDecimal.ZERO, bd("0.03"), "traditional"),
+                new HypotheticalAccountInput(BigDecimal.ZERO, bd("7000"), bd("0.07"), "roth")),
+                zeroInflationConfig());
+
+        pool.applyContributions();
+        var growth = pool.applyGrowth(false);
+
+        assertThat(growth.roth()).isEqualByComparingTo(bd("490"));            // 7000 * 0.07
+    }
+
+    @Test
+    void multiPool_zeroOpeningPool_weightsAccountsByContribution() {
+        var pool = PoolStrategy.create(List.<ProjectionAccountInput>of(
+                new HypotheticalAccountInput(BigDecimal.ZERO, bd("3000"), bd("0.05"), "roth"),
+                new HypotheticalAccountInput(BigDecimal.ZERO, bd("1000"), bd("0.09"), "roth")),
+                zeroInflationConfig());
+
+        pool.applyContributions();
+        var growth = pool.applyGrowth(false);
+
+        // (3000*0.05 + 1000*0.09) / 4000 = 0.06 on the 4000 contributed.
+        assertThat(growth.roth()).isEqualByComparingTo(bd("240"));
+    }
+
+    @Test
+    void create_allBalancesAndContributionsZero_weightedReturnIsEqualWeightMean() {
+        var pool = PoolStrategy.create(List.<ProjectionAccountInput>of(
+                new HypotheticalAccountInput(BigDecimal.ZERO, BigDecimal.ZERO, bd("0.05"), "taxable"),
+                new HypotheticalAccountInput(BigDecimal.ZERO, BigDecimal.ZERO, bd("0.07"), "roth")),
+                zeroInflationConfig());
+
+        assertThat(pool.getWeightedReturn()).isEqualByComparingTo(bd("0.06"));
+    }
+
+    @Test
+    void multiPool_poolWithNoAccounts_growsAtHouseholdBalanceWeightedReturn() {
+        // No taxable account: money that lands in the taxable pool later (RMD excess, surplus
+        // reinvestment) grows at the household's overall return, (300k*0.04 + 100k*0.08)/400k = 0.05.
+        var pool = PoolStrategy.create(List.<ProjectionAccountInput>of(
+                new HypotheticalAccountInput(bd("300000"), BigDecimal.ZERO, bd("0.04"), "traditional"),
+                new HypotheticalAccountInput(bd("100000"), BigDecimal.ZERO, bd("0.08"), "roth")),
+                zeroInflationConfig());
+
+        pool.depositToTaxable(bd("10000"));
+        var growth = pool.applyGrowth(false);
+
+        assertThat(growth.taxable()).isEqualByComparingTo(bd("500"));          // 10000 * 0.05
+    }
 }

@@ -579,4 +579,45 @@ class DeterministicProjectionEngineRothConversionTest extends DeterministicProje
         assertThat(year1.rothConversionAmount()).isEqualByComparingTo(bd("80000"));
         assertThat(year1.capitalGainsTax()).isCloseTo(bd("747.08"), within(bd("0.01")));
     }
+
+    // API #5: with no Roth account, the Roth pool that conversions create used to grow at 0% for the
+    // whole run (its return was weighted by a zero opening balance). It must grow at the household's
+    // return instead -- here the only account's 6% (zero inflation, zero fee => real == nominal).
+    @Test
+    void run_conversionsWithNoRothAccount_convertedMoneyGrowsAtHouseholdReturn() {
+        var input = createInput(
+                LocalDate.now().plusYears(30), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "annual_roth_conversion": 50000, "fee_rate": 0}
+                """.formatted(LocalDate.now().getYear() - 35),
+                List.of(acct("500000.0000", "0", "0.0600", "traditional")));
+
+        var result = engine.run(input);
+
+        var year1 = result.yearlyData().get(0);
+        var year2 = result.yearlyData().get(1);
+        assertThat(year1.rothBalance()).isPositive();
+        assertThat(year2.rothGrowth())
+                .isEqualByComparingTo(year1.rothBalance().multiply(bd("0.06")).setScale(4, java.math.RoundingMode.HALF_UP));
+    }
+
+    // API #23: a brand-new $0 Roth with $7,000/yr contributions used to end at exactly N x 7,000.
+    @Test
+    void run_zeroOpeningRothWithContributions_compounds() {
+        var input = createInput(
+                LocalDate.now().plusYears(11), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "fee_rate": 0}
+                """.formatted(LocalDate.now().getYear() - 35),
+                List.of(acct("0", "7000", "0.0700", "roth")));
+
+        var result = engine.run(input);
+
+        assertThat(result.yearlyData()).allSatisfy(y -> {
+            if (!y.retired() && y.rothBalance().signum() > 0) {
+                assertThat(y.rothGrowth()).isPositive();
+            }
+        });
+        assertThat(result.yearlyData().get(10).rothBalance()).isGreaterThan(bd("77000"));
+    }
 }
