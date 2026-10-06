@@ -149,7 +149,7 @@ public class PropertyAnalyticsService {
                 .plusMonths(property.getLoanTermMonths());
 
         var monthsRemaining = (int) Math.max(0,
-                java.time.temporal.ChronoUnit.MONTHS.between(now, estimatedPayoffDate));
+                ChronoUnit.MONTHS.between(now, estimatedPayoffDate));
 
         return new MortgageProgress(
                 property.getLoanAmount(),
@@ -255,7 +255,7 @@ public class PropertyAnalyticsService {
             return BigDecimal.ZERO;
         }
 
-        long overlappingMonths = overlapStart.until(overlapEnd, java.time.temporal.ChronoUnit.MONTHS) + 1;
+        long overlappingMonths = overlapStart.until(overlapEnd, ChronoUnit.MONTHS) + 1;
         return amount.multiply(new BigDecimal(overlappingMonths))
                 .divide(new BigDecimal("12"), 4, RoundingMode.HALF_UP);
     }

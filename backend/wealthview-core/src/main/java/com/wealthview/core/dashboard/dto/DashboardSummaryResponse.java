@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
+ * Net-worth summary of a tenant's accounts and properties in USD.
+ *
  * @param unconvertedAccounts names of accounts left out of every total because their currency has no
  *                            exchange rate; empty when all accounts could be converted to USD
  */
