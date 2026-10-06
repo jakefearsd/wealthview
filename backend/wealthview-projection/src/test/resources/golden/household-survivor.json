@@ -35,8 +35,8 @@
     "socialSecurityTaxable" : 10250.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
-      "00000000-0000-0000-0000-0000000000d3" : 30000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 30000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -88,8 +88,8 @@
     "socialSecurityTaxable" : 11015.8537,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
-      "00000000-0000-0000-0000-0000000000d3" : 30000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 30000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -141,8 +141,8 @@
     "socialSecurityTaxable" : 11763.0280,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
-      "00000000-0000-0000-0000-0000000000d3" : 30000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 30000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -194,9 +194,9 @@
     "socialSecurityTaxable" : 17166.9785,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d3" : 30000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
       "00000000-0000-0000-0000-0000000000d2" : 11000.0000,
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 30000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -248,9 +248,9 @@
     "socialSecurityTaxable" : 22553.1498,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d3" : 30000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
       "00000000-0000-0000-0000-0000000000d2" : 22000.0000,
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 30000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -292,8 +292,8 @@
     "discretionaryExpenses" : 30000.0000,
     "incomeStreamsTotal" : 90000.0000,
     "netSpendingNeed" : 10000.0000,
-    "spendingSurplus" : -2917.5323,
-    "discretionaryAfterCuts" : 27082.4677,
+    "spendingSurplus" : 0.0000,
+    "discretionaryAfterCuts" : 30000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
     "depreciationTotal" : null,
@@ -302,9 +302,9 @@
     "socialSecurityTaxable" : 28287.7691,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d3" : 30000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
       "00000000-0000-0000-0000-0000000000d2" : 22000.0000,
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 30000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -346,7 +346,7 @@
     "discretionaryExpenses" : 30000.0000,
     "incomeStreamsTotal" : 90000.0000,
     "netSpendingNeed" : 10000.0000,
-    "spendingSurplus" : 30013.4708,
+    "spendingSurplus" : 41542.1176,
     "discretionaryAfterCuts" : 30000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -356,9 +356,9 @@
     "socialSecurityTaxable" : 51000.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d3" : 30000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
       "00000000-0000-0000-0000-0000000000d2" : 22000.0000,
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 30000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -400,7 +400,7 @@
     "discretionaryExpenses" : 30000.0000,
     "incomeStreamsTotal" : 90000.0000,
     "netSpendingNeed" : 10000.0000,
-    "spendingSurplus" : 31014.6158,
+    "spendingSurplus" : 43016.2568,
     "discretionaryAfterCuts" : 30000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -410,9 +410,9 @@
     "socialSecurityTaxable" : 51000.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d3" : 30000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
       "00000000-0000-0000-0000-0000000000d2" : 22000.0000,
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 30000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -454,7 +454,7 @@
     "discretionaryExpenses" : 30000.0000,
     "incomeStreamsTotal" : 90000.0000,
     "netSpendingNeed" : 10000.0000,
-    "spendingSurplus" : 31925.3885,
+    "spendingSurplus" : 44363.9800,
     "discretionaryAfterCuts" : 30000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -464,9 +464,9 @@
     "socialSecurityTaxable" : 51000.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d3" : 30000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
       "00000000-0000-0000-0000-0000000000d2" : 22000.0000,
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 30000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -508,7 +508,7 @@
     "discretionaryExpenses" : 30000.0000,
     "incomeStreamsTotal" : 90000.0000,
     "netSpendingNeed" : 10000.0000,
-    "spendingSurplus" : 32870.0175,
+    "spendingSurplus" : 45749.1844,
     "discretionaryAfterCuts" : 30000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -518,9 +518,9 @@
     "socialSecurityTaxable" : 51000.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d3" : 30000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
       "00000000-0000-0000-0000-0000000000d2" : 22000.0000,
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 30000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -562,7 +562,7 @@
     "discretionaryExpenses" : 30000.0000,
     "incomeStreamsTotal" : 90000.0000,
     "netSpendingNeed" : 10000.0000,
-    "spendingSurplus" : 33774.9921,
+    "spendingSurplus" : 46966.3689,
     "discretionaryAfterCuts" : 30000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -572,9 +572,9 @@
     "socialSecurityTaxable" : 51000.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d3" : 30000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
       "00000000-0000-0000-0000-0000000000d2" : 22000.0000,
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 30000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -616,7 +616,7 @@
     "discretionaryExpenses" : 30000.0000,
     "incomeStreamsTotal" : 90000.0000,
     "netSpendingNeed" : 10000.0000,
-    "spendingSurplus" : 34839.6291,
+    "spendingSurplus" : 48422.2222,
     "discretionaryAfterCuts" : 30000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -626,9 +626,9 @@
     "socialSecurityTaxable" : 51000.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d3" : 30000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
       "00000000-0000-0000-0000-0000000000d2" : 22000.0000,
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 30000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -670,7 +670,7 @@
     "discretionaryExpenses" : 30000.0000,
     "incomeStreamsTotal" : 90000.0000,
     "netSpendingNeed" : 10000.0000,
-    "spendingSurplus" : 35933.2455,
+    "spendingSurplus" : 49916.7006,
     "discretionaryAfterCuts" : 30000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -680,9 +680,9 @@
     "socialSecurityTaxable" : 51000.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d3" : 30000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
       "00000000-0000-0000-0000-0000000000d2" : 22000.0000,
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 30000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -724,7 +724,7 @@
     "discretionaryExpenses" : 20000.0000,
     "incomeStreamsTotal" : 90000.0000,
     "netSpendingNeed" : 0,
-    "spendingSurplus" : 48473.6318,
+    "spendingSurplus" : 55807.0027,
     "discretionaryAfterCuts" : 20000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -734,9 +734,9 @@
     "socialSecurityTaxable" : 51000.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d3" : 30000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
       "00000000-0000-0000-0000-0000000000d2" : 22000.0000,
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 30000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -778,7 +778,7 @@
     "discretionaryExpenses" : 20000.0000,
     "incomeStreamsTotal" : 90000.0000,
     "netSpendingNeed" : 0,
-    "spendingSurplus" : 49447.5439,
+    "spendingSurplus" : 57105.8661,
     "discretionaryAfterCuts" : 20000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -788,9 +788,9 @@
     "socialSecurityTaxable" : 51000.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d3" : 30000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
       "00000000-0000-0000-0000-0000000000d2" : 22000.0000,
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 30000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -832,7 +832,7 @@
     "discretionaryExpenses" : 20000.0000,
     "incomeStreamsTotal" : 90000.0000,
     "netSpendingNeed" : 0,
-    "spendingSurplus" : 50652.0794,
+    "spendingSurplus" : 58709.5428,
     "discretionaryAfterCuts" : 20000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -842,9 +842,9 @@
     "socialSecurityTaxable" : 51000.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d3" : 30000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
       "00000000-0000-0000-0000-0000000000d2" : 22000.0000,
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 30000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -886,7 +886,7 @@
     "discretionaryExpenses" : 20000.0000,
     "incomeStreamsTotal" : 90000.0000,
     "netSpendingNeed" : 0,
-    "spendingSurplus" : 72548.7349,
+    "spendingSurplus" : 87860.3234,
     "discretionaryAfterCuts" : 20000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -896,9 +896,9 @@
     "socialSecurityTaxable" : 51000.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d3" : 30000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
       "00000000-0000-0000-0000-0000000000d2" : 22000.0000,
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 30000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -940,7 +940,7 @@
     "discretionaryExpenses" : 20000.0000,
     "incomeStreamsTotal" : 90000.0000,
     "netSpendingNeed" : 0,
-    "spendingSurplus" : 74260.8597,
+    "spendingSurplus" : 90400.7639,
     "discretionaryAfterCuts" : 20000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -950,9 +950,9 @@
     "socialSecurityTaxable" : 51000.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d3" : 30000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
       "00000000-0000-0000-0000-0000000000d2" : 22000.0000,
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 30000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -994,7 +994,7 @@
     "discretionaryExpenses" : 12000.0000,
     "incomeStreamsTotal" : 53000.0000,
     "netSpendingNeed" : 4000.0000,
-    "spendingSurplus" : 68820.1058,
+    "spendingSurplus" : 92381.3114,
     "discretionaryAfterCuts" : 12000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -1004,8 +1004,8 @@
     "socialSecurityTaxable" : 32300.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
-      "00000000-0000-0000-0000-0000000000d3" : 15000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 15000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -1047,7 +1047,7 @@
     "discretionaryExpenses" : 12000.0000,
     "incomeStreamsTotal" : 53000.0000,
     "netSpendingNeed" : 4000.0000,
-    "spendingSurplus" : 56814.6014,
+    "spendingSurplus" : 76078.0620,
     "discretionaryAfterCuts" : 12000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -1057,8 +1057,8 @@
     "socialSecurityTaxable" : 32300.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
-      "00000000-0000-0000-0000-0000000000d3" : 15000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 15000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -1100,7 +1100,7 @@
     "discretionaryExpenses" : 12000.0000,
     "incomeStreamsTotal" : 53000.0000,
     "netSpendingNeed" : 4000.0000,
-    "spendingSurplus" : 56676.6151,
+    "spendingSurplus" : 76704.1952,
     "discretionaryAfterCuts" : 12000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -1110,8 +1110,8 @@
     "socialSecurityTaxable" : 32300.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
-      "00000000-0000-0000-0000-0000000000d3" : 15000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 15000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -1153,7 +1153,7 @@
     "discretionaryExpenses" : 12000.0000,
     "incomeStreamsTotal" : 53000.0000,
     "netSpendingNeed" : 4000.0000,
-    "spendingSurplus" : 56774.9996,
+    "spendingSurplus" : 77387.9305,
     "discretionaryAfterCuts" : 12000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -1163,8 +1163,8 @@
     "socialSecurityTaxable" : 32300.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
-      "00000000-0000-0000-0000-0000000000d3" : 15000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 15000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -1206,7 +1206,7 @@
     "discretionaryExpenses" : 12000.0000,
     "incomeStreamsTotal" : 53000.0000,
     "netSpendingNeed" : 4000.0000,
-    "spendingSurplus" : 58125.3006,
+    "spendingSurplus" : 79315.0331,
     "discretionaryAfterCuts" : 12000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -1216,8 +1216,8 @@
     "socialSecurityTaxable" : 32300.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
-      "00000000-0000-0000-0000-0000000000d3" : 15000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 15000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -1259,7 +1259,7 @@
     "discretionaryExpenses" : 12000.0000,
     "incomeStreamsTotal" : 53000.0000,
     "netSpendingNeed" : 4000.0000,
-    "spendingSurplus" : 59809.3108,
+    "spendingSurplus" : 81694.3821,
     "discretionaryAfterCuts" : 12000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -1269,8 +1269,8 @@
     "socialSecurityTaxable" : 32300.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
-      "00000000-0000-0000-0000-0000000000d3" : 15000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 15000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -1312,7 +1312,7 @@
     "discretionaryExpenses" : 12000.0000,
     "incomeStreamsTotal" : 53000.0000,
     "netSpendingNeed" : 4000.0000,
-    "spendingSurplus" : 62648.6964,
+    "spendingSurplus" : 85252.4596,
     "discretionaryAfterCuts" : 12000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -1322,8 +1322,8 @@
     "socialSecurityTaxable" : 32300.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
-      "00000000-0000-0000-0000-0000000000d3" : 15000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 15000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -1365,7 +1365,7 @@
     "discretionaryExpenses" : 12000.0000,
     "incomeStreamsTotal" : 53000.0000,
     "netSpendingNeed" : 4000.0000,
-    "spendingSurplus" : 64398.1882,
+    "spendingSurplus" : 87732.6442,
     "discretionaryAfterCuts" : 12000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -1375,8 +1375,8 @@
     "socialSecurityTaxable" : 32300.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
-      "00000000-0000-0000-0000-0000000000d3" : 15000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 15000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -1418,7 +1418,7 @@
     "discretionaryExpenses" : 12000.0000,
     "incomeStreamsTotal" : 53000.0000,
     "netSpendingNeed" : 4000.0000,
-    "spendingSurplus" : 65781.0875,
+    "spendingSurplus" : 89719.7845,
     "discretionaryAfterCuts" : 12000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -1428,8 +1428,8 @@
     "socialSecurityTaxable" : 32300.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
-      "00000000-0000-0000-0000-0000000000d3" : 15000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 15000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -1471,7 +1471,7 @@
     "discretionaryExpenses" : 12000.0000,
     "incomeStreamsTotal" : 53000.0000,
     "netSpendingNeed" : 4000.0000,
-    "spendingSurplus" : 67160.3909,
+    "spendingSurplus" : 91703.8695,
     "discretionaryAfterCuts" : 12000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -1481,8 +1481,8 @@
     "socialSecurityTaxable" : 32300.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
-      "00000000-0000-0000-0000-0000000000d3" : 15000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 15000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -1524,7 +1524,7 @@
     "discretionaryExpenses" : 12000.0000,
     "incomeStreamsTotal" : 53000.0000,
     "netSpendingNeed" : 4000.0000,
-    "spendingSurplus" : 68530.3040,
+    "spendingSurplus" : 93676.9525,
     "discretionaryAfterCuts" : 12000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -1534,8 +1534,8 @@
     "socialSecurityTaxable" : 32300.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
-      "00000000-0000-0000-0000-0000000000d3" : 15000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 15000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -1577,7 +1577,7 @@
     "discretionaryExpenses" : 12000.0000,
     "incomeStreamsTotal" : 53000.0000,
     "netSpendingNeed" : 4000.0000,
-    "spendingSurplus" : 69383.6690,
+    "spendingSurplus" : 94950.8035,
     "discretionaryAfterCuts" : 12000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -1587,8 +1587,8 @@
     "socialSecurityTaxable" : 32300.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
-      "00000000-0000-0000-0000-0000000000d3" : 15000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 15000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -1630,7 +1630,7 @@
     "discretionaryExpenses" : 12000.0000,
     "incomeStreamsTotal" : 53000.0000,
     "netSpendingNeed" : 4000.0000,
-    "spendingSurplus" : 70709.9184,
+    "spendingSurplus" : 96867.1071,
     "discretionaryAfterCuts" : 12000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -1640,8 +1640,8 @@
     "socialSecurityTaxable" : 32300.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
-      "00000000-0000-0000-0000-0000000000d3" : 15000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 15000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -1683,7 +1683,7 @@
     "discretionaryExpenses" : 12000.0000,
     "incomeStreamsTotal" : 53000.0000,
     "netSpendingNeed" : 4000.0000,
-    "spendingSurplus" : 71423.6176,
+    "spendingSurplus" : 97952.1278,
     "discretionaryAfterCuts" : 12000.0000,
     "rentalIncomeGross" : null,
     "rentalExpensesTotal" : null,
@@ -1693,8 +1693,8 @@
     "socialSecurityTaxable" : 32300.0000,
     "selfEmploymentTax" : null,
     "incomeBySource" : {
-      "00000000-0000-0000-0000-0000000000d1" : 38000.0000,
-      "00000000-0000-0000-0000-0000000000d3" : 15000.0000
+      "00000000-0000-0000-0000-0000000000d3" : 15000.0000,
+      "00000000-0000-0000-0000-0000000000d1" : 38000.0000
     },
     "rentalPropertyDetails" : null,
     "rothConversionAmount" : null,
@@ -1715,10 +1715,10 @@
   "finalBalance" : 4414800.7777,
   "yearsInRetirement" : 27,
   "spendingFeasibility" : {
-    "spendingFeasible" : false,
-    "firstShortfallYear" : 2030,
-    "firstShortfallAge" : 72,
-    "sustainableAnnualSpending" : 100000.0000,
+    "spendingFeasible" : true,
+    "firstShortfallYear" : null,
+    "firstShortfallAge" : null,
+    "sustainableAnnualSpending" : 102917.5323,
     "requiredAnnualSpending" : 102917.5323
   },
   "finalNetWorth" : null

@@ -60,7 +60,7 @@ final class SpendingFeasibilityAnalyzer {
                 firstShortfallAge = year.age();
             }
 
-            BigDecimal realAvailable = year.withdrawals();
+            BigDecimal realAvailable = year.withdrawals().add(taxPaidFromPools(year));
             if (year.incomeStreamsTotal() != null) {
                 realAvailable = realAvailable.add(year.incomeStreamsTotal());
             }
@@ -128,7 +128,7 @@ final class SpendingFeasibilityAnalyzer {
 
         BigDecimal taxBurden = base.taxLiability() != null ? base.taxLiability() : BigDecimal.ZERO;
         BigDecimal netNeed = essential.add(discretionary).subtract(activeIncome).max(BigDecimal.ZERO);
-        BigDecimal totalAvailable = base.withdrawals().add(activeIncome);
+        BigDecimal totalAvailable = base.withdrawals().add(activeIncome).add(taxPaidFromPools(base));
         BigDecimal totalRequired = essential.add(discretionary).add(taxBurden);
         BigDecimal surplus = totalAvailable.subtract(totalRequired);
 
@@ -140,5 +140,24 @@ final class SpendingFeasibilityAnalyzer {
         }
 
         return base.withViability(essential, discretionary, activeIncome, netNeed, surplus, discAfterCuts);
+    }
+
+    /**
+     * The part of the year's tax bill the pools ACTUALLY paid via their own tax-settlement draw
+     * ({@code tax_paid_from_taxable/_traditional/_roth} -- conversion tax, the withdrawal bundle and
+     * its traditional gross-up). That draw is separate from {@code withdrawals} (the spending draw),
+     * yet the full {@code taxLiability} sits on the requirement side, so it must be credited on the
+     * available side too or every pool-funded tax dollar reads as a shortfall. The tax sources report
+     * only what was funded (see {@code PoolStrategy.MultiPool#deductFromPools}), so a bill the
+     * depleted pools could not pay still leaves a negative surplus.
+     */
+    private static BigDecimal taxPaidFromPools(ProjectionYearDto year) {
+        return orZero(year.taxPaidFromTaxable())
+                .add(orZero(year.taxPaidFromTraditional()))
+                .add(orZero(year.taxPaidFromRoth()));
+    }
+
+    private static BigDecimal orZero(@Nullable BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
     }
 }

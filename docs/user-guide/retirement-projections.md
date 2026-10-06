@@ -257,7 +257,7 @@ Manual (unlinked) accounts let you model future accounts, an employer 401(k) you
 The last card changes shape depending on what you've configured:
 
 - With **no spending plan**, it's labelled **Depletion** and reads either the year and age the portfolio hits zero, or "Funds last through plan".
-- With a spending plan linked, it's labelled **Plan Outcome** and reads **Fully Sustainable**, **Depleted at age N**, or **Underfunded at age N**. "Underfunded" means the money technically lasts, but there are years where it can't cover your full planned spending.
+- With a spending plan linked, it's labelled **Plan Outcome** and reads **Fully Sustainable**, **Depleted at age N**, or **Underfunded at age N**. "Underfunded" means the money technically lasts, but there are years where it can't cover your full planned spending. Income tax counts on both sides of that check: tax your accounts pay (including the tax on a Roth conversion) is money the plan had, so a year is short only when the accounts can't cover both the planned spending and that year's tax.
 
 A **Milestone Strip** below repeats the retirement year, peak balance, and plan outcome in a compact band.
 

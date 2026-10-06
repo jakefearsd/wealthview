@@ -409,6 +409,35 @@ class MultiPoolDeepTest {
         assertThat(r.taxSource().fromRoth()).isEqualByComparingTo(bd("10"));
     }
 
+    @Test
+    void executeWithdrawals_allPoolsEmptyForTax_reportsNoTaxPaidFromRoth() {
+        // The spend draw empties the only pool, so the 10 tax bill has nowhere to be paid from. The
+        // Roth catch-all still debits (floorAtZero clears it at year end), but the REPORTED source
+        // must be what was actually funded -- an unfunded bill is not "tax paid from Roth".
+        var p = new PoolStrategy.MultiPool(
+                grouped("0", "10", "0", "0", "0", "0"),
+                ZERO, PoolFixtures.singleFilerConfig(
+                        WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("1.0")));
+
+        var r = p.executeWithdrawals(bd("10"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
+
+        assertThat(r.taxLiability()).isEqualByComparingTo(bd("10"));
+        assertThat(r.taxSource().fromRoth()).isEqualByComparingTo(ZERO);
+    }
+
+    @Test
+    void executeWithdrawals_rothCoversPartOfTax_reportsOnlyFundedRothSlice() {
+        var p = new PoolStrategy.MultiPool(
+                grouped("0", "10", "4", "0", "0", "0"),
+                ZERO, PoolFixtures.singleFilerConfig(
+                        WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("1.0")));
+
+        var r = p.executeWithdrawals(bd("10"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
+
+        assertThat(r.taxLiability()).isEqualByComparingTo(bd("10"));
+        assertThat(r.taxSource().fromRoth()).isEqualByComparingTo(bd("4"));
+    }
+
     // ---- roth conversion (fill_bracket) ----
 
     @Test

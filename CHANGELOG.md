@@ -55,6 +55,13 @@ tax-accuracy fixes in both projection engines. One schema change (V081).
   including the traditional gross-up slice.
 - The Monte Carlo deflates the NIIT threshold on the calendar clock.
 - The scenario signature covers every Monte-Carlo-affecting input.
+- **Spending feasibility no longer reports a false shortfall when the accounts
+  pay the year's tax.** Tax settled by its own draw on the taxable, traditional
+  or Roth pool (including Roth-conversion tax) was charged against the plan but
+  never credited as money the plan had, so a well-funded plan showed a deficit
+  equal to the tax, a spurious "Underfunded at age N" and cut discretionary
+  spending. A real shortfall is still flagged: tax the depleted accounts cannot
+  pay is no longer reported as "tax paid from Roth".
 
 ## [1.2.8] — 2026-10-04
 

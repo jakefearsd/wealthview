@@ -1852,8 +1852,13 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             traditional.debitProportional(fromTrad);
             remaining = remaining.subtract(fromTrad);
 
+            // Report only the Roth slice that was actually there to pay: the part of the catch-all
+            // debit beyond the Roth balance is an UNFUNDED bill (floorAtZero erases it at year end),
+            // and crediting it as tax_paid_from_roth would let SpendingFeasibilityAnalyzer count
+            // money the household never had as available.
+            BigDecimal fundedFromRoth = remaining.min(roth.total().max(BigDecimal.ZERO));
             roth.debitProportional(remaining);
-            return new TaxSourceResult(fromTax, fromTrad, remaining);
+            return new TaxSourceResult(fromTax, fromTrad, fundedFromRoth);
         }
     }
 }

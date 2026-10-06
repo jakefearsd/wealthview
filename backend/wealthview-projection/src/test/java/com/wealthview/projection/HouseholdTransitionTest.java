@@ -541,13 +541,13 @@ class HouseholdTransitionTest extends DeterministicProjectionEngineTestSupport {
             var row = yearOf(result.yearlyData(), year);
             assertThat(row.withdrawals()).as("withdrawals %d", year).isEqualByComparingTo(bd("15000"));
             assertThat(row.essentialExpenses()).as("essential %d", year).isEqualByComparingTo(bd("45000"));
-            // Coherence identity: available (draw + income) EXACTLY funds the scaled spending —
-            // surplus + taxLiability == 0. (The residual surplus of −tax is the pre-existing
-            // deficit-year convention for base-income tax — funded from the pools outside the
-            // `withdrawals` figure — not a household artifact; pre-fix this identity broke by the
+            // Coherence identity: available (draw + income + the tax the pools paid through their
+            // own tax-settlement draw) EXACTLY funds the scaled spending plus that tax — surplus
+            // == 0. (The base-income tax is funded from the pools outside the `withdrawals` figure
+            // and is credited as available alongside it; pre-fix this identity broke by the
             // phantom (1−0.75)×30,000 = +7,500 over-draw.)
-            assertThat(nz(row.spendingSurplus()).add(row.taxLiability()))
-                    .as("surplus + tax %d", year).isEqualByComparingTo(ZERO);
+            assertThat(row.taxLiability()).as("tax %d", year).isPositive();
+            assertThat(nz(row.spendingSurplus())).as("surplus %d", year).isEqualByComparingTo(ZERO);
             assertThat(nz(row.surplusReinvested())).as("surplusReinvested %d", year).isEqualByComparingTo(ZERO);
         }
     }

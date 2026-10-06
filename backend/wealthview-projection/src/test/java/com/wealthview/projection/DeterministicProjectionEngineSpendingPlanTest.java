@@ -1025,21 +1025,25 @@ class DeterministicProjectionEngineSpendingPlanTest extends DeterministicProject
         assertThat(foundShortfall).as("Expected at least one year with discretionary cuts").isTrue();
     }
 
-    // === spendingSurplus must account for tax liability ===
+    // === spendingSurplus must count tax the pools actually paid as available ===
+    //
+    // The year's tax bill is settled by a SEPARATE pool draw (PoolStrategy#deductFromPools, reported
+    // as tax_paid_from_taxable/_traditional/_roth) that is NOT inside `withdrawals`. Subtracting the
+    // tax from the requirement without crediting that funding draw double-counted it: a household
+    // whose portfolio easily paid both the spending and the tax showed surplus == -taxLiability, a
+    // spurious first_shortfall_year and a discretionary cut.
 
     @Test
-    void run_viability_withdrawalBarelyCoversSpendsButTaxOwed_surplusIsNegative() {
+    void run_viability_taxGrossedUpFromTraditional_isNotAShortfall() {
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
         var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
         int retireAge = 66;
         int birthYear = LocalDate.now().getYear() - retireAge;
 
-        // Pension $40K, spending $45K → portfolioNeed $5K from traditional
-        // Withdrawal exactly covers spending need, but tax is also owed
-        // Tax on ($40K pension + $5K trad withdrawal) = tax($45K) = $3,361.50
-        // Withdrawal ($5K) covers spending gap but NOT the $3,361.50 tax
-        // surplus = withdrawals - netNeed - taxLiability = $5K - $5K - $3,361.50 = -$3,361.50
+        // Pension $40K, spending $45K -> $5K spend draw from traditional. The tax on that year is
+        // funded by a separate (grossed-up) traditional draw out of a $500K balance, so the
+        // household had everything it needed: surplus is zero, not -taxLiability.
         var input = createInput(
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
@@ -1055,27 +1059,25 @@ class DeterministicProjectionEngineSpendingPlanTest extends DeterministicProject
         var result = engineTax.run(input);
         var year1 = result.yearlyData().getFirst();
 
-        assertThat(year1.taxLiability()).isNotNull();
-        assertThat(year1.taxLiability()).isGreaterThan(BigDecimal.ZERO);
-
-        // spendingSurplus must reflect that tax eats into available resources
-        assertThat(year1.spendingSurplus()).isNotNull();
-        assertThat(year1.spendingSurplus()).isLessThan(BigDecimal.ZERO);
+        assertThat(year1.taxLiability()).isPositive();
+        assertThat(year1.taxPaidFromTraditional()).isEqualByComparingTo(year1.taxLiability());
+        assertThat(year1.spendingSurplus()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(year1.discretionaryAfterCuts()).isEqualByComparingTo(bd("15000"));
+        assertThat(result.spendingFeasibility().spendingFeasible()).isTrue();
+        assertThat(result.spendingFeasibility().firstShortfallYear()).isNull();
     }
 
     @Test
-    void run_viability_withdrawalWithTax_discretionaryCutReflectsTax() {
+    void run_viability_taxPaidFromTaxable_isNotAShortfall() {
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
         var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
         int retireAge = 66;
         int birthYear = LocalDate.now().getYear() - retireAge;
 
-        // Pension $40K, spending $45K (essential $30K + discretionary $15K)
-        // portfolioNeed = $5K from traditional, tax on $45K pension + $5K withdrawal = $50K
-        // Tax = $3,961.50
-        // surplus = $5K withdrawal - $5K need - $3,961.50 tax = -$3,961.50
-        // discretionaryAfterCuts should be less than $15K
+        // The reported defect's shape: the spend draw comes from traditional, the year's tax is
+        // paid from a large taxable account. The taxable draw is reported in tax_paid_from_taxable,
+        // not in withdrawals -- it must still count as money the household had.
         var input = createInput(
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
@@ -1084,19 +1086,91 @@ class DeterministicProjectionEngineSpendingPlanTest extends DeterministicProject
                 """.formatted(birthYear),
                 List.of(
                         acct("500000", "0", "0.00", "traditional"),
-                        acct("100000", "0", "0.00", "roth")),
+                        acct("200000", "0", "0.00", "taxable")),
                 new SpendingProfileInput(bd("30000"), bd("15000"), "[]"),
                 List.of(incomeSource("Pension", "40000", retireAge - 1, null, "0")));
 
         var result = engineTax.run(input);
         var year1 = result.yearlyData().getFirst();
 
-        assertThat(year1.taxLiability()).isNotNull();
-        assertThat(year1.taxLiability()).isGreaterThan(BigDecimal.ZERO);
+        assertThat(year1.taxLiability()).isPositive();
+        assertThat(year1.taxPaidFromTaxable()).isEqualByComparingTo(year1.taxLiability());
+        assertThat(year1.spendingSurplus()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(year1.discretionaryAfterCuts()).isEqualByComparingTo(bd("15000"));
+        assertThat(result.spendingFeasibility().spendingFeasible()).isTrue();
+        assertThat(result.spendingFeasibility().firstShortfallYear()).isNull();
+        assertThat(result.spendingFeasibility().sustainableAnnualSpending())
+                .isEqualByComparingTo(result.spendingFeasibility().requiredAnnualSpending());
+    }
 
-        // Discretionary should be cut because tax reduces available resources
-        assertThat(year1.discretionaryAfterCuts()).isLessThan(bd("15000"));
-        assertThat(year1.discretionaryAfterCuts()).isGreaterThanOrEqualTo(BigDecimal.ZERO);
+    @Test
+    void run_viability_conversionTaxPaidFromTaxable_isNotAShortfall() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int retireAge = 66;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        // A $50K/yr Roth conversion's tax is paid from taxable. That conversion tax is part of
+        // taxLiability but its funding draw is not a spending withdrawal: before the fix the whole
+        // conversion tax showed up as a deficit and wiped out discretionary spending.
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single",
+                 "withdrawal_order": "taxable_first", "annual_roth_conversion": 50000}
+                """.formatted(birthYear),
+                List.of(
+                        acct("600000", "0", "0.00", "traditional"),
+                        acct("800000", "0", "0.00", "taxable"),
+                        acct("100000", "0", "0.00", "roth")),
+                new SpendingProfileInput(bd("30000"), bd("15000"), "[]"));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        assertThat(year1.rothConversionAmount()).isPositive();
+        assertThat(year1.taxPaidFromTaxable()).isEqualByComparingTo(year1.taxLiability());
+        assertThat(year1.spendingSurplus()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(year1.discretionaryAfterCuts()).isEqualByComparingTo(bd("15000"));
+        assertThat(result.spendingFeasibility().spendingFeasible()).isTrue();
+    }
+
+    @Test
+    void run_viability_depletedPoolsCannotPayTax_surplusIsNegative() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int retireAge = 66;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        // Pension $40K, spending $45K: the $5K spend draw empties the ONLY account, so the year's
+        // tax on $45K of ordinary income has nothing left to be paid from. That is a genuine
+        // shortfall -- the unfunded bill must not be credited as "paid from Roth".
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single",
+                 "withdrawal_order": "traditional_first"}
+                """.formatted(birthYear),
+                List.of(acct("5000", "0", "0.00", "traditional")),
+                new SpendingProfileInput(bd("30000"), bd("15000"), "[]"),
+                List.of(incomeSource("Pension", "40000", retireAge - 1, null, "0")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        assertThat(year1.taxLiability()).isPositive();
+        assertThat(year1.taxPaidFromRoth()).isNull();
+        // surplus = draw actually made (the whole, fee-trimmed balance) + $40K pension - $45K
+        // spending - the unpaid tax; nothing is credited for the bill the pools could not fund.
+        BigDecimal expectedSurplus = year1.withdrawals().add(bd("40000")).subtract(bd("45000"))
+                .subtract(year1.taxLiability());
+        assertThat(year1.spendingSurplus()).isEqualByComparingTo(expectedSurplus);
+        assertThat(year1.spendingSurplus()).isLessThan(year1.taxLiability().negate().add(BigDecimal.ONE));
+        assertThat(year1.discretionaryAfterCuts()).isEqualByComparingTo(bd("15000").add(expectedSurplus));
+        assertThat(result.spendingFeasibility().spendingFeasible()).isFalse();
+        assertThat(result.spendingFeasibility().firstShortfallYear()).isEqualTo(year1.year());
     }
 
     // === Surplus with tax must not produce false shortfall ===
