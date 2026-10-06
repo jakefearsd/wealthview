@@ -8,6 +8,7 @@ import {
     computeTaxMetrics,
     computeTotalSpending,
     computePlanOutcome,
+    monthlyAxisTickInterval,
 } from './projectionCalcs';
 import type { ProjectionYear, RentalPropertyYearDetail, SpendingFeasibility } from '../types/projection';
 
@@ -411,5 +412,27 @@ describe('findCrossoverYear', () => {
 
     it('returns null for empty data', () => {
         expect(findCrossoverYear([])).toBeNull();
+    });
+});
+
+describe('monthlyAxisTickInterval', () => {
+    // Recharts interval={n} shows every (n+1)th tick, and the formatter only labels January ticks
+    // (index 0, 12, 24, ...). So n + 1 must be a multiple of 12 or most labels vanish.
+    it.each([1, 5, 15, 16, 30, 45, 60])('lands every shown tick on a January for %i years', (years) => {
+        const interval = monthlyAxisTickInterval(years);
+
+        expect((interval + 1) % 12).toBe(0);
+    });
+
+    it('labels every year for a short projection', () => {
+        expect(monthlyAxisTickInterval(10)).toBe(11);
+    });
+
+    it('thins labels to every other year past fifteen years', () => {
+        expect(monthlyAxisTickInterval(30)).toBe(23);
+    });
+
+    it('never returns a negative interval for an empty series', () => {
+        expect(monthlyAxisTickInterval(0)).toBe(11);
     });
 });

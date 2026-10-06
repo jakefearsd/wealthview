@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { formatCurrency } from '../utils/format';
 import { formatDollarAxis, MONTH_ABBREVIATIONS } from '../utils/chartFormatters';
-import { findDepletionYear, findCrossoverYear } from '../utils/projectionCalcs';
+import { findDepletionYear, findCrossoverYear, monthlyAxisTickInterval } from '../utils/projectionCalcs';
 import { interpolateMonthly } from '../utils/monthlyInterpolation';
 import type { ProjectionYear } from '../types/projection';
 import ChartTooltip from './ChartTooltip';
@@ -107,7 +107,7 @@ export default function BalanceChart({ data, retirementYear }: BalanceChartProps
         });
     }, [monthlyData, filteredData, hasPoolData]);
 
-    const xTickInterval = Math.max(1, Math.floor(monthlyData.length / Math.min(filteredData.length, 30)));
+    const xTickInterval = monthlyAxisTickInterval(filteredData.length);
 
     const xTickFormatter = (label: string) => {
         const month = parseInt(label.substring(5, 7), 10);

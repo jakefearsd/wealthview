@@ -1,6 +1,16 @@
 import type { ProjectionYear, SpendingFeasibility } from '../types/projection';
 import { formatCurrency } from './format';
 
+/**
+ * Recharts `interval={n}` shows every (n+1)th tick, and the balance chart only labels January ticks
+ * (monthly data starts in January, so they sit at indexes 0, 12, 24, ...). Returning a multiple of
+ * 12 minus one keeps every shown tick on a January, with at most ~15 labelled years.
+ */
+export function monthlyAxisTickInterval(yearCount: number): number {
+    const yearsPerTick = Math.max(1, Math.ceil(yearCount / 15));
+    return yearsPerTick * 12 - 1;
+}
+
 export function findPeakBalance(data: ProjectionYear[]): { year: number; balance: number } {
     if (data.length === 0) return { year: 0, balance: 0 };
     let peak = data[0];
