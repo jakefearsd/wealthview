@@ -3,7 +3,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import client from '../../api/client';
 import { useApiMutation } from '../../hooks/useApiMutation';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
-import { formatCurrency } from '../../utils/format';
+import { formatCurrency, formatDate, todayIso } from '../../utils/format';
 import Button from '../Button';
 import LinkButton from '../LinkButton';
 import toast from 'react-hot-toast';
@@ -15,29 +15,29 @@ interface PriceRecord {
     source: string;
 }
 
-function todayStr(): string {
-    return new Date().toISOString().slice(0, 10);
-}
-
 function thirtyDaysAgoStr(): string {
     const d = new Date();
     d.setDate(d.getDate() - 30);
-    return d.toISOString().slice(0, 10);
+    return todayIso(d);
 }
 
 export default function PriceBrowserTab() {
     const [symbol, setSymbol] = useState('');
     const [fromDate, setFromDate] = useState(thirtyDaysAgoStr());
-    const [toDate, setToDate] = useState(todayStr());
+    const [toDate, setToDate] = useState(todayIso());
     const [prices, setPrices] = useState<PriceRecord[]>([]);
+    // The symbol the table was fetched for. The input keeps changing as the user types, so deletes
+    // and the chart heading must not read it.
+    const [searchedSymbol, setSearchedSymbol] = useState('');
 
     const searchMutation = useApiMutation(
         (input: { symbol: string; from: string; to: string }) => client
             .get<PriceRecord[]>(`/admin/prices/${input.symbol}/history`, { params: { from: input.from, to: input.to } })
             .then((r) => r.data),
         {
-            onSuccess: (data) => {
+            onSuccess: (data, input) => {
                 setPrices(data);
+                setSearchedSymbol(input.symbol);
                 if (data.length === 0) toast('No price data found for that range');
             },
         },
@@ -54,20 +54,22 @@ export default function PriceBrowserTab() {
     }
 
     const deleteMutation = useApiMutation(
-        (date: string) => client.delete(`/admin/prices/${symbol.trim().toUpperCase()}/${date}`),
+        (input: { symbol: string; date: string }) => client.delete(`/admin/prices/${input.symbol}/${input.date}`),
         {
             successMessage: 'Price deleted',
-            onSuccess: (_result, date) => setPrices((prev) => prev.filter((p) => p.date !== date)),
+            onSuccess: (_result, input) => setPrices((prev) => prev.filter((p) => p.date !== input.date)),
         },
     );
 
     function handleDelete(date: string) {
-        const sym = symbol.trim().toUpperCase();
-        if (!confirm(`Delete price for ${sym} on ${date}?`)) return;
-        void deleteMutation.mutate(date);
+        if (!confirm(`Delete price for ${searchedSymbol} on ${date}?`)) return;
+        void deleteMutation.mutate({ symbol: searchedSymbol, date });
     }
 
-    const chartData = prices.map((p) => ({ date: p.date, price: p.close_price }));
+    // The API returns newest first (as the table shows it); the chart's x-axis must run oldest to newest.
+    const chartData = [...prices]
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((p) => ({ date: p.date, price: p.close_price }));
 
     return (
         <div>
@@ -117,7 +119,7 @@ export default function PriceBrowserTab() {
             {chartData.length > 1 && (
                 <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
                     <h3 style={{ marginBottom: '1rem' }}>
-                        {symbol.trim().toUpperCase()} Price History
+                        {searchedSymbol} Price History
                     </h3>
                     <ResponsiveContainer width="100%" height={250}>
                         <LineChart data={chartData}>
@@ -149,7 +151,7 @@ export default function PriceBrowserTab() {
                             <tbody>
                                 {prices.map((p) => (
                                     <tr key={p.date} style={trHoverStyle}>
-                                        <td style={tdStyle}>{p.date}</td>
+                                        <td style={tdStyle}>{formatDate(p.date)}</td>
                                         <td style={{ ...tdStyle, textAlign: 'right' }}>
                                             {formatCurrency(p.close_price)}
                                         </td>

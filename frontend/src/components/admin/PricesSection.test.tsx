@@ -16,6 +16,9 @@ vi.mock('../../api/adminPrices', () => ({
 
 vi.mock('../../utils/format', () => ({
     formatCurrency: (v: number) => `$${v.toLocaleString()}`,
+    formatDate: (v: string | null | undefined) => v ?? '--',
+    // Local-calendar helper, like the real one: no argument means today.
+    todayIso: vi.fn((d?: Date) => (d ? '2025-12-16' : '2026-01-15')),
 }));
 
 vi.mock('../../utils/styles', () => ({
@@ -220,5 +223,26 @@ describe('PricesSection', () => {
         const { input } = uploadCsv();
 
         await waitFor(() => expect(input.value).toBe(''));
+    });
+
+    it('shows an error with retry when the price status fails to load, not an empty table', () => {
+        const refetch = vi.fn();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockUseApiQuery.mockReturnValue({ data: null, loading: false, error: 'Status failed', refetch } as any);
+        render(<PricesSection />);
+
+        expect(screen.getByText('Status failed')).toBeInTheDocument();
+        expect(screen.queryByText('No price data found')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+        expect(refetch).toHaveBeenCalled();
+    });
+
+    it('defaults the Yahoo date range from the local-date helper', () => {
+        render(<PricesSection />);
+        fireEvent.click(screen.getByText('Yahoo Finance'));
+
+        const [from, to] = Array.from(document.querySelectorAll('input[type="date"]')) as HTMLInputElement[];
+        expect(from.value).toBe('2025-12-16');
+        expect(to.value).toBe('2026-01-15');
     });
 });

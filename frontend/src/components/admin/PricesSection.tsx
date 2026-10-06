@@ -11,9 +11,10 @@ import type { PriceSyncStatus, PriceEntry } from '../../api/adminPrices';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { useApiMutation } from '../../hooks/useApiMutation';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
-import { formatCurrency } from '../../utils/format';
+import { formatCurrency, formatDate, todayIso } from '../../utils/format';
 import PriceBrowserTab from './PriceBrowserTab';
 import Button from '../Button';
+import ErrorState from '../ErrorState';
 import TabBar from '../TabBar';
 import toast from 'react-hot-toast';
 
@@ -26,14 +27,10 @@ const TABS: Array<{ key: TabId; label: string }> = [
     { key: 'browse', label: 'Browse' },
 ];
 
-function todayStr(): string {
-    return new Date().toISOString().slice(0, 10);
-}
-
 function thirtyDaysAgoStr(): string {
     const d = new Date();
     d.setDate(d.getDate() - 30);
-    return d.toISOString().slice(0, 10);
+    return todayIso(d);
 }
 
 export default function PricesSection() {
@@ -54,7 +51,7 @@ export default function PricesSection() {
 }
 
 function FinnhubTab() {
-    const { data: statuses, loading, refetch } = useApiQuery(getPriceStatus);
+    const { data: statuses, loading, error, refetch } = useApiQuery(getPriceStatus);
 
     const syncMutation = useApiMutation(
         () => syncFinnhub(),
@@ -97,6 +94,8 @@ function FinnhubTab() {
                 <h3 style={{ marginBottom: '1rem' }}>Price Sync Status</h3>
                 {loading ? (
                     <div style={{ color: '#666' }}>Loading...</div>
+                ) : error ? (
+                    <ErrorState message={error} onRetry={refetch} />
                 ) : (
                     <table style={tableStyle}>
                         <thead>
@@ -111,7 +110,7 @@ function FinnhubTab() {
                             {statuses?.map((s: PriceSyncStatus) => (
                                 <tr key={s.symbol} style={trHoverStyle}>
                                     <td style={{ ...tdStyle, fontWeight: 600 }}>{s.symbol}</td>
-                                    <td style={{ ...tdStyle, color: '#555' }}>{s.latest_date ?? '—'}</td>
+                                    <td style={{ ...tdStyle, color: '#555' }}>{s.latest_date ? formatDate(s.latest_date) : '—'}</td>
                                     <td style={{ ...tdStyle, color: '#555' }}>{s.source ?? '—'}</td>
                                     <td style={{ ...tdStyle, textAlign: 'center' }}>
                                         <span style={{
@@ -144,7 +143,7 @@ function FinnhubTab() {
 function YahooTab() {
     const [symbolInput, setSymbolInput] = useState('');
     const [fromDate, setFromDate] = useState(thirtyDaysAgoStr());
-    const [toDate, setToDate] = useState(todayStr());
+    const [toDate, setToDate] = useState(todayIso());
     const [preview, setPreview] = useState<PriceEntry[] | null>(null);
 
     const syncAllMutation = useApiMutation(
@@ -293,7 +292,7 @@ function YahooTab() {
                                     {preview.map((p, i) => (
                                         <tr key={`${p.symbol}-${p.date}-${i}`} style={trHoverStyle}>
                                             <td style={{ ...tdStyle, fontWeight: 600 }}>{p.symbol}</td>
-                                            <td style={{ ...tdStyle, color: '#555' }}>{p.date}</td>
+                                            <td style={{ ...tdStyle, color: '#555' }}>{formatDate(p.date)}</td>
                                             <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(p.close_price)}</td>
                                         </tr>
                                     ))}
