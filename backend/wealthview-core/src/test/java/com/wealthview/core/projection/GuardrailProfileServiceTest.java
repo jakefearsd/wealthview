@@ -339,6 +339,24 @@ class GuardrailProfileServiceTest {
     }
 
     @Test
+    void computeScenarioHash_spouseWithAbsentFilingStatus_hashesAsMarriedFilingJointly() {
+        // A spouse with no filing_status resolves to MFJ -- the same status both engines now tax
+        // with -- so the signature must agree with an explicit MFJ scenario, not a Single one.
+        var implicit = ScenarioMother.guardrailScenario(tenant, "Plan",
+                "{\"birth_year\":1968,\"spouse_birth_year\":1970}");
+        var explicitMfj = ScenarioMother.guardrailScenario(tenant, "Plan",
+                "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"filing_status\":\"married_filing_jointly\"}");
+        var explicitSingle = ScenarioMother.guardrailScenario(tenant, "Plan",
+                "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"filing_status\":\"single\"}");
+
+        String implicitHash = GuardrailProfileService.computeScenarioHash(implicit, List.of());
+
+        assertThat(implicitHash)
+                .isEqualTo(GuardrailProfileService.computeScenarioHash(explicitMfj, List.of()))
+                .isNotEqualTo(GuardrailProfileService.computeScenarioHash(explicitSingle, List.of()));
+    }
+
+    @Test
     void optimize_setsGuardrailProfileOnScenarioAndClearsSpendingProfile() {
         scenario.setSpendingProfile(new com.wealthview.persistence.entity.SpendingProfileEntity(
                 tenant, "Manual", new BigDecimal("40000"), new BigDecimal("20000"), "[]"));

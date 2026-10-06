@@ -156,15 +156,20 @@ Two strategies:
 
 **Fill Tax Bracket** — Automatically convert enough to fill income up to the top of a **Target Tax Bracket** you pick (10%, 12%, 22%, 24%, 32%, or 35%) each year.
 
-Once conversions are active, three more fields appear:
+Once conversions are active, two more fields appear (the filing status your conversions are taxed at is set under **Tax Configuration** below):
 
 - **Conversion Start Year** — Calendar year when conversions begin. Leave blank to start immediately.
-- **Filing Status** — Single or Married Filing Jointly.
 - **Other Income** — Non-retirement income (salary, rental income) that affects which bracket your conversions land in.
 
 For a fully optimized conversion schedule computed against thousands of market paths, use **Optimize Spending** instead — the optimizer can search for conversions jointly with the spending plan.
 
 ### Tax Configuration
+
+**Filing Status** — Single or Married Filing Jointly. It sets the federal brackets and standard
+deduction for every projection year, with or without Roth conversions. Until you pick one it
+follows the household: Married Filing Jointly when a **Spouse Birth Year** is entered, otherwise
+Single. Saved scenarios that never stored a filing status follow the same rule. After a modelled
+first death the survivor files Single.
 
 **Heir Tax Rate** — The income-tax rate your heirs are assumed to pay on inherited traditional
 (pre-tax) money, which they must withdraw within 10 years. Default 24%. Used only for the

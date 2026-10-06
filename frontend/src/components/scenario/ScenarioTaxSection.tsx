@@ -1,14 +1,18 @@
 import CurrencyInput from '../CurrencyInput';
 import FormField from '../FormField';
 import { inputStyle } from '../../utils/styles';
-import type { ScenarioFormFields, SetScenarioField } from './scenarioFormFields';
+import { effectiveFilingStatus, type ScenarioFormFields, type SetScenarioField } from './scenarioFormFields';
 
 export interface ScenarioTaxSectionProps {
     fields: ScenarioFormFields;
     setField: SetScenarioField;
 }
 
-/** Tax configuration: state selection plus the SALT/itemized inputs it unlocks. */
+/**
+ * Tax configuration: filing status (always shown — it sets the brackets and deduction for every
+ * scenario, not only ones with Roth conversions), state selection plus the SALT/itemized inputs it
+ * unlocks, and the heirs' tax rate.
+ */
 export default function ScenarioTaxSection({ fields, setField }: ScenarioTaxSectionProps) {
     const { state, primaryResidencePropertyTax, primaryResidenceMortgageInterest, heirTaxRate } = fields;
 
@@ -16,6 +20,19 @@ export default function ScenarioTaxSection({ fields, setField }: ScenarioTaxSect
         <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', marginBottom: '1rem' }}>
             <h4 style={{ marginBottom: '0.75rem' }}>Tax Configuration</h4>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                <FormField
+                    label="Filing Status"
+                    helpText="Sets the federal brackets and standard deduction for every projection year. Defaults to Married Filing Jointly when a spouse birth year is entered; after a first death the survivor files Single."
+                >
+                    <select
+                        style={inputStyle}
+                        value={effectiveFilingStatus(fields)}
+                        onChange={e => setField('filingStatus', e.target.value)}
+                    >
+                        <option value="single">Single</option>
+                        <option value="married_filing_jointly">Married Filing Jointly</option>
+                    </select>
+                </FormField>
                 <FormField label="State" helpText="State income tax applied to projections. Enables SALT deduction and itemized vs standard deduction comparison.">
                     <select style={inputStyle} value={state} onChange={e => setField('state', e.target.value)}>
                         <option value="">None (federal only)</option>

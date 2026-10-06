@@ -49,12 +49,6 @@ import io.micrometer.observation.annotation.Observed;
  * concerns to {@link WithdrawalStrategyFactory}, {@link PropertyEquityCalculator}, and
  * {@link IncomeSourceFieldMapper}.
  */
-// GodClass: the engine is the single orchestration point for one deterministic run (parameter
-// resolution, year loop, IRMAA lookback window, tax annotation, run-detail assembly). Phase 1a's
-// extra delegating constructor (taxSpaceCalculator seam) nudged WMC onto PMD's threshold after the
-// picture/tax-space construction was already extracted into YearTaxPictureBuilder; the remaining
-// methods are cohesive steps of that one lifecycle, so splitting further would scatter it.
-@SuppressWarnings("PMD.GodClass")
 @Component
 public class DeterministicProjectionEngine implements ProjectionEngine {
 
@@ -330,7 +324,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         // it, so this fallback is effectively unreachable in practice).
         BigDecimal inflationRate = scenarioInflationRate != null ? scenarioInflationRate : CMA_INFLATION_RATE;
         var config = PoolStrategy.PoolConfig.builder(
-                params.filingStatus() != null ? FilingStatus.fromString(params.filingStatus()) : FilingStatus.SINGLE,
+                FilingStatus.resolve(params.filingStatus(), params.spouseBirthYear()),
                 params.otherIncome() != null ? params.otherIncome() : BigDecimal.ZERO,
                 params.annualRothConversion() != null ? params.annualRothConversion() : BigDecimal.ZERO,
                 params.rothConversionStrategy(), params.targetBracketRate(),

@@ -123,8 +123,7 @@ final class OptimizationContextBuilder {
         // Security threshold deflator both use -- see IncomeProjector.computeDeterministic.
         int retirementYearOffsetFromBase = retirementYear - input.baseYear();
 
-        FilingStatus filingStatus = input.filingStatus() != null
-                ? FilingStatus.fromString(input.filingStatus()) : FilingStatus.SINGLE;
+        FilingStatus filingStatus = FilingStatus.resolve(input.filingStatus(), input.spouseBirthYear());
 
         // Household task 6: resolve the first-death transition inputs. Single-person (spouse absent)
         // ⇒ every branch below reduces to the pre-household path bit-for-bit (the byte-identical

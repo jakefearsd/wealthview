@@ -14,6 +14,7 @@ import ScenarioAccountsSection from './scenario/ScenarioAccountsSection';
 import {
     DEFAULT_SURVIVOR_SPENDING_FACTOR,
     DEFAULT_LONGEVITY_CONDITIONAL_AGE,
+    effectiveFilingStatus,
     type ScenarioFormFields,
 } from './scenario/scenarioFormFields';
 import { isAllocationValid } from '../utils/allocation';
@@ -76,7 +77,9 @@ function buildInitialFields(initialValues: Scenario | null | undefined): Scenari
         withdrawalStrategy: parsedParams.withdrawal_strategy ?? 'fixed_percentage',
         dynamicCeiling: toPercent(parsedParams.dynamic_ceiling ?? 0.05),
         dynamicFloor: toPercent(parsedParams.dynamic_floor ?? -0.025),
-        filingStatus: parsedParams.filing_status ?? 'single',
+        // null = never explicitly picked: the effective status then follows the household
+        // (effectiveFilingStatus), so a saved married scenario without one is not shown as Single.
+        filingStatus: parsedParams.filing_status || null,
         otherIncome: parsedParams.other_income ?? 0,
         annualRothConversion: parsedParams.annual_roth_conversion ?? 0,
         rothConversionStrategy: parsedParams.roth_conversion_strategy ?? 'fixed_amount',
@@ -156,7 +159,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
 
     const {
         name, retirementDate, endAge, inflationRate, birthYear, birthMonth, withdrawalRate,
-        withdrawalStrategy, dynamicCeiling, dynamicFloor, filingStatus, otherIncome,
+        withdrawalStrategy, dynamicCeiling, dynamicFloor, otherIncome,
         annualRothConversion, rothConversionStrategy, targetBracketRate,
         rothConversionStartYear, withdrawalOrder, dynamicSequencingBracketRate,
         state, primaryResidencePropertyTax, primaryResidenceMortgageInterest,
@@ -261,7 +264,9 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 withdrawal_strategy: withdrawalStrategy,
                 dynamic_ceiling: withdrawalStrategy === 'vanguard_dynamic_spending' ? dynamicCeiling / 100 : null,
                 dynamic_floor: withdrawalStrategy === 'vanguard_dynamic_spending' ? dynamicFloor / 100 : null,
-                filing_status: (rothConversionStrategy === 'fill_bracket' || annualRothConversion > 0) ? filingStatus : null,
+                // Always sent: filing status sets the brackets and deduction for every scenario,
+                // not only ones with Roth conversions.
+                filing_status: effectiveFilingStatus(fields),
                 other_income: (rothConversionStrategy === 'fill_bracket' || annualRothConversion > 0) ? otherIncome : null,
                 annual_roth_conversion: rothConversionStrategy === 'fixed_amount' && annualRothConversion > 0 ? annualRothConversion : null,
                 withdrawal_order: withdrawalOrder !== 'taxable_first' ? withdrawalOrder : null,
@@ -350,8 +355,6 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 onTargetBracketRateChange={v => setField('targetBracketRate', v)}
                 rothConversionStartYear={rothConversionStartYear}
                 onRothConversionStartYearChange={v => setField('rothConversionStartYear', v)}
-                filingStatus={filingStatus}
-                onFilingStatusChange={v => setField('filingStatus', v)}
                 otherIncome={otherIncome}
                 onOtherIncomeChange={v => setField('otherIncome', v)}
             />

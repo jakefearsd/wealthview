@@ -105,6 +105,37 @@ class HouseholdTransitionTest extends DeterministicProjectionEngineTestSupport {
                 """.formatted(PRIMARY_BIRTH, survivorFactor, communityProperty);
     }
 
+    // === Filing status follows the household when the scenario leaves it unset ===
+
+    private static String spouseParams(String filingStatusEntry) {
+        return """
+                {"birth_year": %d, "spouse_birth_year": %d, %s "withdrawal_rate": 0.04,
+                 "withdrawal_order": "taxable_first", "fee_rate": 0}
+                """.formatted(PRIMARY_BIRTH, SPOUSE_BIRTH, filingStatusEntry);
+    }
+
+    private BigDecimal bothAliveYearTax(String paramsJson) {
+        var engine = engineWithTax(taxBracketRepository, standardDeductionRepository);
+        var result = engine.run(input(2040, 90, paramsJson,
+                List.of(acct("1000000", "1000000", "taxable", "joint")),
+                new SpendingProfileInput(bd("60000"), bd("0"), null),
+                List.of(pension("90000", 62, "primary", "1.0")), household(85, 90)));
+        return yearOf(result.yearlyData(), 2041).taxLiability();
+    }
+
+    @Test
+    void run_spouseWithoutFilingStatus_taxedAsMarriedFilingJointly() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        stubMfj2025(taxBracketRepository, standardDeductionRepository);
+
+        BigDecimal implicit = bothAliveYearTax(spouseParams(""));
+        BigDecimal explicitMfj = bothAliveYearTax(spouseParams("\"filing_status\": \"married_filing_jointly\","));
+        BigDecimal explicitSingle = bothAliveYearTax(spouseParams("\"filing_status\": \"single\","));
+
+        assertThat(implicit).isEqualByComparingTo(explicitMfj);
+        assertThat(implicit).isLessThan(explicitSingle);
+    }
+
     // === Transition step 1: Social Security keep-larger + deceased-owned non-SS × survivor_percent ===
 
     @Test

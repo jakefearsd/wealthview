@@ -954,4 +954,87 @@ describe('ScenarioForm', () => {
             expect(onSubmit.mock.calls[0][0].spouse_birth_month).toBe(11);
         });
     });
+
+    describe('filing status', () => {
+        async function submitAndCapture(onSubmit: ReturnType<typeof vi.fn>) {
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            return onSubmit.mock.calls[0][0];
+        }
+
+        it('is always shown in Tax Configuration and sent even with no Roth conversion', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+            expect(labeledInput<HTMLSelectElement>('Filing Status').value).toBe('single');
+
+            const call = await submitAndCapture(onSubmit);
+            expect(call.filing_status).toBe('single');
+            expect(call.annual_roth_conversion).toBeNull();
+        });
+
+        it('defaults to married filing jointly once a spouse birth year is entered', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1970' } });
+
+            expect(labeledInput<HTMLSelectElement>('Filing Status').value).toBe('married_filing_jointly');
+            const call = await submitAndCapture(onSubmit);
+            expect(call.filing_status).toBe('married_filing_jointly');
+        });
+
+        it('falls back to single when the spouse is removed and no status was picked', () => {
+            setupMocks();
+            render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
+
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1970' } });
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '' } });
+
+            expect(labeledInput<HTMLSelectElement>('Filing Status').value).toBe('single');
+        });
+
+        it('keeps an explicitly picked status when the household changes', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+            fireEvent.change(labeledInput<HTMLSelectElement>('Filing Status'), { target: { value: 'single' } });
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1970' } });
+
+            expect(labeledInput<HTMLSelectElement>('Filing Status').value).toBe('single');
+            const call = await submitAndCapture(onSubmit);
+            expect(call.filing_status).toBe('single');
+        });
+
+        it('resolves a saved household scenario with no filing_status to married filing jointly', async () => {
+            setupMocks();
+            const scenario = makeScenario({});
+            scenario.params_json = JSON.stringify({ birth_year: 1960, spouse_birth_year: 1962 });
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm initialValues={scenario} onSubmit={onSubmit} submitLabel="Save" />);
+
+            expect(labeledInput<HTMLSelectElement>('Filing Status').value).toBe('married_filing_jointly');
+            const call = await submitAndCapture(onSubmit);
+            expect(call.filing_status).toBe('married_filing_jointly');
+        });
+
+        it('round-trips a saved explicit filing_status unchanged', async () => {
+            setupMocks();
+            const scenario = makeScenario({});
+            scenario.params_json = JSON.stringify({
+                birth_year: 1960, spouse_birth_year: 1962, filing_status: 'single',
+            });
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm initialValues={scenario} onSubmit={onSubmit} submitLabel="Save" />);
+
+            expect(labeledInput<HTMLSelectElement>('Filing Status').value).toBe('single');
+            const call = await submitAndCapture(onSubmit);
+            expect(call.filing_status).toBe('single');
+        });
+    });
 });

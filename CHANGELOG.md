@@ -15,6 +15,9 @@ tax-accuracy fixes in both projection engines. One schema change (V081).
   is saved**, because the plan signature now also covers filing status, state,
   other income, withdrawal order and birth months. This is a flag only: no saved
   data or phases change, and nothing goes stale at deploy.
+- **Saved scenarios with a spouse and no stored filing status are now taxed
+  as Married Filing Jointly**, so their lifetime tax drops (often sharply) and
+  any optimizer profile on them is flagged stale.
 - **Projection numbers move slightly.** Balances are a little lower in scenarios
   that fund tax bills from taxable accounts (the gain on those sales is now
   taxed), and Social Security taxation, capital-gains stacking and Monte Carlo
@@ -62,6 +65,15 @@ tax-accuracy fixes in both projection engines. One schema change (V081).
   equal to the tax, a spurious "Underfunded at age N" and cut discretionary
   spending. A real shortfall is still flagged: tax the depleted accounts cannot
   pay is no longer reported as "tax paid from Roth".
+- **Married households are no longer taxed as Single unless Roth conversions
+  are on.** The form sent `filing_status` only with an active conversion, its
+  only Filing Status control sat in the Roth conversion section, and both
+  engines treated a missing status as Single, so a scenario with a spouse and no
+  conversions used single brackets and deduction. Filing Status now lives in Tax
+  Configuration and is always sent; it defaults to Married Filing Jointly when a
+  spouse birth year is entered. A missing status on a saved scenario resolves the
+  same way in the projection, the Monte Carlo optimizer and the guardrail
+  signature.
 
 ## [1.2.8] — 2026-10-04
 

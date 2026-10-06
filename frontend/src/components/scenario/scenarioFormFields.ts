@@ -25,7 +25,11 @@ export interface ScenarioFormFields {
     withdrawalStrategy: string;
     dynamicCeiling: number;
     dynamicFloor: number;
-    filingStatus: string;
+    /**
+     * The filing status the user explicitly picked, or null when they haven't — then it follows the
+     * household (see {@link effectiveFilingStatus}), mirroring the backend's FilingStatus.resolve.
+     */
+    filingStatus: string | null;
     otherIncome: number;
     annualRothConversion: number;
     rothConversionStrategy: string;
@@ -54,6 +58,20 @@ export interface ScenarioFormFields {
     primarySex: Sex | null;
     spouseSex: Sex | null;
     longevityConditionalAge: number;
+}
+
+/**
+ * The filing status the scenario is taxed with: the user's explicit pick, else Married Filing
+ * Jointly when a spouse birth year is entered, else Single — the same rule the backend applies to a
+ * scenario saved without one, so the form always shows (and sends) what the engines will use.
+ */
+export function effectiveFilingStatus(
+    fields: Pick<ScenarioFormFields, 'filingStatus' | 'spouseBirthYear'>,
+): string {
+    if (fields.filingStatus) {
+        return fields.filingStatus;
+    }
+    return fields.spouseBirthYear != null ? 'married_filing_jointly' : 'single';
 }
 
 /** Typed single-field updater shared by ScenarioForm (the state owner) and its section components. */

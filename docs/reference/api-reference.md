@@ -365,6 +365,11 @@ Create and update take an identical payload. Beyond the basics (`name`,
 `heir_tax_rate`, 0-0.50, default 0.24), plus `accounts`, `income_sources`, `spending_profile_id`,
 and `use_guardrail_profile`.
 
+`filing_status` (`single` / `married_filing_jointly`) applies to every scenario, not only ones
+with Roth conversions. When it is absent or blank, the engines, the Monte Carlo optimizer and the
+guardrail staleness signature all resolve it from the household: `married_filing_jointly` when
+`spouse_birth_year` is set, otherwise `single`. The web form always sends it.
+
 `spending_profile_id` and the guardrail profile are mutually exclusive — setting one
 clears the other, and clearing both falls back to a withdrawal-rate strategy. The
 scenario response echoes both `spending_profile` and `guardrail_profile` so a client can

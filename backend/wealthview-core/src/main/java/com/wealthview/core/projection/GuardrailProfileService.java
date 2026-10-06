@@ -422,7 +422,7 @@ public class GuardrailProfileService {
                 // signature -- tax tables (filing status, state), the ordinary base (other
                 // income), pool sequencing (RESOLVED withdrawal order, so an absent key and the
                 // explicit default hash alike), and early-access dates (birth months).
-                .append('|').append(FilingStatus.fromString(hashParams.filingStatus()))
+                .append('|').append(FilingStatus.resolve(hashParams.filingStatus(), hashParams.spouseBirthYear()))
                 .append('|').append(hashParams.state())
                 .append('|').append(hashParams.otherIncome())
                 .append('|').append(hashParams.resolvedWithdrawalOrder())

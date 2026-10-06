@@ -214,6 +214,35 @@ class OptimizationContextBuilderTest {
         assertThat(tax).isEqualTo(3679.50, within(1e-6));
     }
 
+    // A scenario with a spouse but no filing_status (the UI used to send it only when Roth
+    // conversions were on) must be taxed as Married Filing Jointly, not silently as Single.
+    @Test
+    void build_household_filingStatusAbsent_resolvesMarriedFilingJointly() {
+        var builderWithTax = new OptimizationContextBuilder(federalTaxCalcMfjWithAge65Addition());
+        var input = GuardrailOptimizationInputBuilder.builder()
+                .withBirthYear(1960)
+                .withFilingStatus(null)
+                .withSpouseBirthYear(1962)
+                .withPrimaryDeathAge(95)
+                .withSpouseDeathAge(95)
+                .build();
+
+        var setup = builderWithTax.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        assertThat(setup.taxIncome().filingStatus()).isEqualTo(FilingStatus.MARRIED_FILING_JOINTLY);
+        assertThat(setup.taxIncome().ordinaryTaxTableByYear()[0].incrementalTax(0, 50_000))
+                .isEqualTo(1530.00, within(1e-6));
+    }
+
+    @Test
+    void build_noSpouse_filingStatusAbsent_resolvesSingle() {
+        var input = GuardrailOptimizationInputBuilder.builder().withFilingStatus(null).build();
+
+        var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        assertThat(setup.taxIncome().filingStatus()).isEqualTo(FilingStatus.SINGLE);
+    }
+
     /** MFJ 2025 fixtures with a deduction carrying a nonzero age-65 addition. */
     private static FederalTaxCalculator federalTaxCalcMfjWithAge65Addition() {
         var taxBracketRepo = mock(TaxBracketRepository.class);
