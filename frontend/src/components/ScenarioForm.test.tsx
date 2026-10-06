@@ -227,6 +227,38 @@ describe('ScenarioForm', () => {
         expect(call.accounts[0].expected_return).toBeUndefined();
     });
 
+    it.each([
+        ['ira', 'traditional'],
+        ['401k', 'traditional'],
+        ['roth', 'roth'],
+        ['brokerage', 'taxable'],
+    ])('maps a linked %s account to the %s pool type', (realType, expected) => {
+        const existingAccount = { id: 'ext-9', name: 'Linked', type: realType, institution: 'Fidelity', currency: 'USD', balance: 50000, created_at: '2024-01-01T00:00:00Z' };
+        setupMocks({ accounts: [existingAccount] });
+        render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
+
+        const linkSelect = screen.getByText('Link Existing Account').parentElement?.querySelector('select');
+        if (!linkSelect) {
+            throw new Error('Link Existing Account select not found');
+        }
+        fireEvent.change(linkSelect, { target: { value: 'ext-9' } });
+
+        expect(labeledInput<HTMLSelectElement>('Account Type').value).toBe(expected);
+    });
+
+    it.each([
+        ['Dividend Yield (%)', 'dividend_yield', 0.018, '1.8'],
+        ['Investment Fees (%)', 'fee_rate', 0.0035, '0.35'],
+        ['Bond Interest Yield (%)', 'interest_yield', 0.035, '3.5'],
+    ])('hydrates %s without float noise', (label, paramKey, fraction, display) => {
+        setupMocks();
+        const scenario = makeScenario({});
+        scenario.params_json = JSON.stringify({ [paramKey]: fraction });
+        render(<ScenarioForm initialValues={scenario} onSubmit={vi.fn()} submitLabel="Save" />);
+
+        expect(labeledInput(label).value).toBe(display);
+    });
+
     it('hydrates a null expected_return to a blank override and omits it on submit', async () => {
         setupMocks();
         const onSubmit = vi.fn().mockResolvedValue(undefined);

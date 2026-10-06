@@ -55,7 +55,7 @@ function defaultAccount(): ScenarioAccountInput {
 function mapAccountType(realType: string): string {
     switch (realType) {
         case 'roth': return 'roth';
-        case '401k': case 'traditional_ira': return 'traditional';
+        case 'ira': case '401k': return 'traditional';
         default: return 'taxable';
     }
 }
@@ -90,9 +90,9 @@ function buildInitialFields(initialValues: Scenario | null | undefined): Scenari
         state: parsedParams.state ?? '',
         primaryResidencePropertyTax: parsedParams.primary_residence_property_tax ?? 0,
         primaryResidenceMortgageInterest: parsedParams.primary_residence_mortgage_interest ?? 0,
-        dividendYield: parsedParams.dividend_yield != null ? parsedParams.dividend_yield * 100 : 1.8,
-        feeRate: parsedParams.fee_rate != null ? parsedParams.fee_rate * 100 : 0.25,
-        interestYield: parsedParams.interest_yield != null ? parsedParams.interest_yield * 100 : 4.0,
+        dividendYield: parsedParams.dividend_yield != null ? toPercent(parsedParams.dividend_yield) : 1.8,
+        feeRate: parsedParams.fee_rate != null ? toPercent(parsedParams.fee_rate) : 0.25,
+        interestYield: parsedParams.interest_yield != null ? toPercent(parsedParams.interest_yield) : 4.0,
         includeDepressionYears: parsedParams.include_depression_years ?? false,
         heirTaxRate: parsedParams.heir_tax_rate != null ? toPercent(parsedParams.heir_tax_rate) : 24,
         spendingPlanSelection,

@@ -50,6 +50,13 @@ describe('fromProfile', () => {
         expect(config.phases).toEqual(makeProfile().phases);
     });
 
+    it('converts stored fractions without float noise (0.035 -> 3.5, 0.07 -> 7)', () => {
+        const config = fromProfile(makeProfile({ cash_return_rate: 0.035, max_annual_adjustment_rate: 0.07 }));
+
+        expect(config.cashReturnRatePct).toBe(3.5);
+        expect(config.spendingFlexibilityPct).toBe(7);
+    });
+
     it('does not restore a confidence override (risk tolerance drives it)', () => {
         const config = fromProfile(makeProfile({ confidence_level: 0.85 }));
 

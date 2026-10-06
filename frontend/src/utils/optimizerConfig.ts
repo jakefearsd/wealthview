@@ -1,3 +1,4 @@
+import { toPercent } from './format';
 import type { GuardrailOptimizationRequest, GuardrailPhase, GuardrailProfileResponse } from '../types/projection';
 
 export type RiskTolerance = 'conservative' | 'moderate' | 'aggressive';
@@ -94,11 +95,11 @@ export function fromProfile(profile: GuardrailProfileResponse): OptimizerConfig 
         trialCount: profile.trial_count,
         cashReserveYears: profile.cash_reserve_years ?? defaults.cashReserveYears,
         cashReturnRatePct: profile.cash_return_rate != null
-            ? profile.cash_return_rate * 100
+            ? toPercent(profile.cash_return_rate)
             : defaults.cashReturnRatePct,
         portfolioFloor: profile.portfolio_floor ?? defaults.portfolioFloor,
         spendingFlexibilityPct: profile.max_annual_adjustment_rate != null
-            ? profile.max_annual_adjustment_rate * 100
+            ? toPercent(profile.max_annual_adjustment_rate)
             : defaults.spendingFlexibilityPct,
         phaseBlendYears: profile.phase_blend_years ?? defaults.phaseBlendYears,
         riskTolerance: profile.risk_tolerance
