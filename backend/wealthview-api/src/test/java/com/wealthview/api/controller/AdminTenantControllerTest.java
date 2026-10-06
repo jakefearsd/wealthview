@@ -15,11 +15,15 @@ import com.wealthview.api.testutil.WealthViewControllerTest;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.tenant.TenantService;
 import com.wealthview.core.tenant.dto.TenantDetailResponse;
+import com.wealthview.persistence.entity.InviteCodeEntity;
 import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.persistence.entity.UserEntity;
 
+import static com.wealthview.api.testutil.ControllerTestUtils.USER_ID;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedSuperAdmin;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -135,5 +139,71 @@ class AdminTenantControllerTest {
                                 {"active": false}
                                 """))
                 .andExpect(status().isNoContent());
+    }
+
+    private InviteCodeEntity createInviteCode(TenantEntity tenant) {
+        var creator = new UserEntity(tenant, "root@example.com", "hash", "admin");
+        TestEntityHelper.setId(creator, USER_ID);
+        var invite = new InviteCodeEntity(tenant, "NEWTENANTCODE", creator, OffsetDateTime.now().plusDays(7));
+        TestEntityHelper.setId(invite, UUID.randomUUID());
+        return invite;
+    }
+
+    @Test
+    void generateInviteCode_superAdmin_returns201WithCode() throws Exception {
+        var tenant = createTenantEntity();
+        when(tenantService.generateInviteCodeForTenant(tenant.getId(), USER_ID, 7))
+                .thenReturn(createInviteCode(tenant));
+
+        mockMvc.perform(post("/api/v1/admin/tenants/{id}/invite-codes", tenant.getId())
+                        .with(authenticatedSuperAdmin()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value("NEWTENANTCODE"))
+                .andExpect(jsonPath("$.expires_at").exists())
+                .andExpect(jsonPath("$.consumed").value(false));
+    }
+
+    @Test
+    void generateInviteCode_withExpiryDays_passesExpiryToService() throws Exception {
+        var tenant = createTenantEntity();
+        when(tenantService.generateInviteCodeForTenant(eq(tenant.getId()), eq(USER_ID), eq(30)))
+                .thenReturn(createInviteCode(tenant));
+
+        mockMvc.perform(post("/api/v1/admin/tenants/{id}/invite-codes", tenant.getId())
+                        .with(authenticatedSuperAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"expiry_days": 30}
+                                """))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void generateInviteCode_unknownTenant_returns404() throws Exception {
+        var tenantId = UUID.randomUUID();
+        when(tenantService.generateInviteCodeForTenant(eq(tenantId), eq(USER_ID), eq(7)))
+                .thenThrow(new EntityNotFoundException("Tenant not found"));
+
+        mockMvc.perform(post("/api/v1/admin/tenants/{id}/invite-codes", tenantId)
+                        .with(authenticatedSuperAdmin()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void generateInviteCode_inactiveTenant_returns409() throws Exception {
+        var tenantId = UUID.randomUUID();
+        when(tenantService.generateInviteCodeForTenant(eq(tenantId), eq(USER_ID), eq(7)))
+                .thenThrow(new IllegalStateException("Tenant is inactive"));
+
+        mockMvc.perform(post("/api/v1/admin/tenants/{id}/invite-codes", tenantId)
+                        .with(authenticatedSuperAdmin()))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void generateInviteCode_nonSuperAdmin_returns403() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/tenants/{id}/invite-codes", UUID.randomUUID())
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isForbidden());
     }
 }

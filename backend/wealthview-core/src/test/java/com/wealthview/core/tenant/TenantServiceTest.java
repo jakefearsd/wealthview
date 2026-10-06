@@ -188,6 +188,49 @@ class TenantServiceTest {
     }
 
     @Test
+    void generateInviteCodeForTenant_activeTenant_returnsInviteCodeForThatTenant() {
+        var tenant = new TenantEntity("Fresh Tenant");
+        var tenantId = UUID.randomUUID();
+        TestEntityHelper.setId(tenant, tenantId);
+        var superAdmin = new UserEntity(new TenantEntity("Home"), "root@test.com", "hash", "admin");
+        var superAdminId = UUID.randomUUID();
+
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(userRepository.findById(superAdminId)).thenReturn(Optional.of(superAdmin));
+        when(inviteCodeRepository.save(any(InviteCodeEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var result = tenantService.generateInviteCodeForTenant(tenantId, superAdminId, 14);
+
+        assertThat(result.getTenant()).isSameAs(tenant);
+        assertThat(result.getCreatedBy()).isSameAs(superAdmin);
+        assertThat(result.getExpiresAt()).isAfter(OffsetDateTime.now().plusDays(13));
+        assertThat(result.getExpiresAt()).isBefore(OffsetDateTime.now().plusDays(15));
+    }
+
+    @Test
+    void generateInviteCodeForTenant_unknownTenant_throwsEntityNotFound() {
+        var tenantId = UUID.randomUUID();
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> tenantService.generateInviteCodeForTenant(tenantId, UUID.randomUUID(), 7))
+                .isInstanceOf(EntityNotFoundException.class)
+                .hasMessage("Tenant not found");
+    }
+
+    @Test
+    void generateInviteCodeForTenant_inactiveTenant_throwsIllegalState() {
+        var tenant = new TenantEntity("Disabled");
+        tenant.setActive(false);
+        var tenantId = UUID.randomUUID();
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+
+        assertThatThrownBy(() -> tenantService.generateInviteCodeForTenant(tenantId, UUID.randomUUID(), 7))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("inactive");
+    }
+
+    @Test
     void getAllTenantDetails_returnsTenantDetailsWithCounts() {
         var tenant1 = new TenantEntity("Tenant A");
         var tenant2 = new TenantEntity("Tenant B");

@@ -110,7 +110,26 @@ public class TenantService {
     @Transactional
     public InviteCodeEntity generateInviteCode(UUID tenantId, UUID createdByUserId, int expiryDays) {
         var tenant = tenantLookup.requireTenant(tenantId);
+        return saveInviteCode(tenant, createdByUserId, expiryDays);
+    }
 
+    /**
+     * Super-admin path: mints an invite code for an arbitrary tenant. Unlike
+     * {@link #generateInviteCode(UUID, UUID, int)} the tenant id comes from the URL, so an
+     * unknown tenant is a plain 404 (not an invalid-session) and an inactive tenant is rejected.
+     */
+    @Transactional
+    public InviteCodeEntity generateInviteCodeForTenant(UUID tenantId, UUID createdByUserId, int expiryDays) {
+        var tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(Entities.notFound("Tenant"));
+        if (!tenant.isActive()) {
+            throw new IllegalStateException("Tenant is inactive; reactivate it before creating invite codes");
+        }
+        return saveInviteCode(tenant, createdByUserId, expiryDays);
+    }
+
+    private InviteCodeEntity saveInviteCode(TenantEntity tenant, UUID createdByUserId, int expiryDays) {
+        var tenantId = tenant.getId();
         var creator = userRepository.findById(createdByUserId)
                 .orElseThrow(Entities.notFound("User", createdByUserId));
 
