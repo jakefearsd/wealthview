@@ -477,7 +477,11 @@ exactly three uppercase letters and `rate_to_usd` must be greater than zero.
 | `/api/v1/dashboard/snapshot-projection`  | GET    | Forward projection from today's snapshot (`years` default 10, `lookback` default 10) |
 
 `summary` returns `net_worth`, `total_investments`, `total_cash`,
-`total_property_equity`, `accounts`, `allocation`.
+`total_property_equity`, `accounts`, `allocation` and `unconverted_accounts`
+(the names of accounts left out of the totals because their currency has no
+exchange rate). `snapshot-projection` returns `data_points`, `projection_years`,
+`investment_account_count`, `property_count`, `portfolio_cagr` and
+`unconverted_accounts`, and leaves such accounts out the same way.
 
 ## Audit Log
 

@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -59,6 +60,7 @@ class SnapshotProjectionServiceTest {
                 theoreticalPortfolioService, exchangeRateService);
         lenient().when(exchangeRateService.convertToUsd(any(BigDecimal.class), eq("USD"), any(UUID.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(exchangeRateService.hasRate(any(UUID.class), any(String.class))).thenReturn(true);
     }
 
     @Test
@@ -151,6 +153,49 @@ class SnapshotProjectionServiceTest {
         var result = service.computeProjection(TENANT_ID, 5, 10);
 
         assertThat(result.dataPoints().getFirst().investmentValue()).isEqualByComparingTo("6700");
+    }
+
+    @Test
+    void computeProjection_accountsWithNoExchangeRate_areSkippedAndReportedNotFailed() {
+        // Mirrors /dashboard/summary: a legacy account in a currency with no rate is left out of the
+        // totals and listed under unconverted_accounts instead of failing the whole card with a 404.
+        var usdBank = mockAccount("bank");
+        var usdBankId = usdBank.getId();
+        var eurBank = mock(AccountEntity.class);
+        lenient().when(eurBank.getId()).thenReturn(UUID.randomUUID());
+        when(eurBank.getCurrency()).thenReturn("EUR");
+        when(eurBank.getName()).thenReturn("Euro Savings");
+        var gbpBrokerage = mock(AccountEntity.class);
+        lenient().when(gbpBrokerage.getId()).thenReturn(UUID.randomUUID());
+        when(gbpBrokerage.getCurrency()).thenReturn("GBP");
+        when(gbpBrokerage.getName()).thenReturn("UK ISA");
+        when(accountRepository.findByTenant_Id(TENANT_ID)).thenReturn(List.of(usdBank, eurBank, gbpBrokerage));
+        when(propertyRepository.findByTenant_Id(TENANT_ID)).thenReturn(List.of());
+        when(accountService.computeAllBalances(TENANT_ID))
+                .thenReturn(Map.of(usdBankId, new BigDecimal("5000")));
+        when(exchangeRateService.hasRate(TENANT_ID, "EUR")).thenReturn(false);
+        when(exchangeRateService.hasRate(TENANT_ID, "GBP")).thenReturn(false);
+
+        var result = service.computeProjection(TENANT_ID, 5, 10);
+
+        assertThat(result.dataPoints().getFirst().investmentValue()).isEqualByComparingTo("5000");
+        assertThat(result.investmentAccountCount()).isEqualTo(1);
+        assertThat(result.unconvertedAccounts()).containsExactly("Euro Savings", "UK ISA");
+        verifyNoInteractions(theoreticalPortfolioService);
+    }
+
+    @Test
+    void computeProjection_allAccountsConvertible_reportsNoUnconvertedAccounts() {
+        var account = mockAccount("bank");
+        var accountId = account.getId();
+        when(accountRepository.findByTenant_Id(TENANT_ID)).thenReturn(List.of(account));
+        when(propertyRepository.findByTenant_Id(TENANT_ID)).thenReturn(List.of());
+        when(accountService.computeAllBalances(TENANT_ID))
+                .thenReturn(Map.of(accountId, new BigDecimal("5000")));
+
+        var result = service.computeProjection(TENANT_ID, 5, 10);
+
+        assertThat(result.unconvertedAccounts()).isEmpty();
     }
 
     @Test

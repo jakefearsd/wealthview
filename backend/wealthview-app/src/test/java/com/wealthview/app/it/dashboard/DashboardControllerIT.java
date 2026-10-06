@@ -13,7 +13,9 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 import com.wealthview.app.it.testutil.TestDataHelper;
@@ -23,6 +25,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class DashboardControllerIT extends AbstractApiIntegrationTest {
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     @Override
@@ -202,7 +207,7 @@ class DashboardControllerIT extends AbstractApiIntegrationTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         var body = response.getBody();
         assertThat(body).containsKeys("data_points", "projection_years", "investment_account_count",
-                "property_count", "portfolio_cagr");
+                "property_count", "portfolio_cagr", "unconverted_accounts");
 
         @SuppressWarnings("unchecked")
         var dataPoints = (List<Map<String, Object>>) body.get("data_points");
@@ -263,5 +268,25 @@ class DashboardControllerIT extends AbstractApiIntegrationTest {
         assertThat(((Number) body.get("investment_account_count")).intValue()).isEqualTo(0);
         assertThat(((Number) body.get("property_count")).intValue()).isEqualTo(0);
         assertThat(((Number) body.get("weeks")).intValue()).isEqualTo(0);
+    }
+
+    @Test
+    @Order(102)
+    @SuppressWarnings("unchecked")
+    void getSnapshotProjection_legacyAccountWithNoExchangeRate_skipsAndReportsItLikeTheSummary() {
+        databaseCleaner.clean();
+        authHelper.bootstrap(restTemplate);
+        var data = new TestDataHelper(restTemplate, authHelper);
+        var accountId = (String) data.createAccount("Euro Savings", "bank").get("id");
+        // The API refuses a currency with no rate, but a legacy row (or a rate deleted later) can hold one.
+        jdbcTemplate.update("UPDATE accounts SET currency = 'EUR' WHERE id = ?::uuid", accountId);
+
+        var snapshot = api.getForEntity("/api/v1/dashboard/snapshot-projection");
+        var summary = api.getForEntity("/api/v1/dashboard/summary");
+
+        assertThat(snapshot.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat((List<String>) snapshot.getBody().get("unconverted_accounts")).containsExactly("Euro Savings");
+        assertThat(((Number) snapshot.getBody().get("investment_account_count")).intValue()).isZero();
+        assertThat((List<String>) summary.getBody().get("unconverted_accounts")).containsExactly("Euro Savings");
     }
 }

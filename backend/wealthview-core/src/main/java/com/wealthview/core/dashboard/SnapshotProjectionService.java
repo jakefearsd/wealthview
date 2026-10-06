@@ -63,13 +63,22 @@ public class SnapshotProjectionService {
         var properties = propertyRepository.findByTenant_Id(tenantId);
 
         if (accounts.isEmpty() && properties.isEmpty()) {
-            return new SnapshotProjectionResponse(List.of(), clampedYears, 0, 0, BigDecimal.ZERO);
+            return new SnapshotProjectionResponse(List.of(), clampedYears, 0, 0, BigDecimal.ZERO, List.of());
         }
 
         // Compute per-account current value and CAGR
         var balances = accountService.computeAllBalances(tenantId);
         var accountProjections = new ArrayList<AccountProjection>();
+        var unconvertedAccounts = new ArrayList<String>();
         for (var account : accounts) {
+            if (!exchangeRateService.hasRate(tenantId, account.getCurrency())) {
+                // Same degradation as /dashboard/summary: adding native units to dollars would be
+                // wrong, so leave the account out and report it rather than failing the whole card.
+                log.warn("Snapshot projection for tenant {} skips account {}: no exchange rate for {}",
+                        tenantId, account.getId(), account.getCurrency());
+                unconvertedAccounts.add(account.getName());
+                continue;
+            }
             if (account.isBank()) {
                 var balance = exchangeRateService.convertToUsd(
                         balances.getOrDefault(account.getId(), BigDecimal.ZERO), account.getCurrency(), tenantId);
@@ -116,8 +125,8 @@ public class SnapshotProjectionService {
                 tenantId, clampedYears, accounts.size(), properties.size());
 
         return new SnapshotProjectionResponse(
-                dataPoints, clampedYears, accounts.size(), properties.size(),
-                portfolioCagr.setScale(6, RoundingMode.HALF_UP));
+                dataPoints, clampedYears, accountProjections.size(), properties.size(),
+                portfolioCagr.setScale(6, RoundingMode.HALF_UP), unconvertedAccounts);
     }
 
     private AccountProjection computeInvestmentProjection(UUID tenantId, AccountEntity account, int lookbackYears) {

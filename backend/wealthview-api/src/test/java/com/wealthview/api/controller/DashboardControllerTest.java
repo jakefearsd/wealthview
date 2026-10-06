@@ -117,7 +117,7 @@ class DashboardControllerTest {
                 0, LocalDate.of(2026, 3, 13),
                 new BigDecimal("500000"), new BigDecimal("200000"), new BigDecimal("300000"));
         var response = new SnapshotProjectionResponse(
-                List.of(dataPoint), 10, 2, 1, new BigDecimal("0.08"));
+                List.of(dataPoint), 10, 2, 1, new BigDecimal("0.08"), List.of("Euro Savings"));
         when(snapshotProjectionService.computeProjection(TENANT_ID, 10, 10)).thenReturn(response);
 
         mockMvc.perform(get("/api/v1/dashboard/snapshot-projection")
@@ -127,6 +127,7 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.investment_account_count").value(2))
                 .andExpect(jsonPath("$.property_count").value(1))
                 .andExpect(jsonPath("$.portfolio_cagr").value(0.08))
+                .andExpect(jsonPath("$.unconverted_accounts[0]").value("Euro Savings"))
                 .andExpect(jsonPath("$.data_points[0].year").value(0))
                 .andExpect(jsonPath("$.data_points[0].total_value").value(500000))
                 .andExpect(jsonPath("$.data_points[0].investment_value").value(200000))
@@ -135,7 +136,7 @@ class DashboardControllerTest {
 
     @Test
     void getSnapshotProjection_withParams_passesToService() throws Exception {
-        var response = new SnapshotProjectionResponse(List.of(), 15, 0, 0, BigDecimal.ZERO);
+        var response = new SnapshotProjectionResponse(List.of(), 15, 0, 0, BigDecimal.ZERO, List.of());
         when(snapshotProjectionService.computeProjection(TENANT_ID, 15, 5)).thenReturn(response);
 
         mockMvc.perform(get("/api/v1/dashboard/snapshot-projection")
@@ -148,7 +149,7 @@ class DashboardControllerTest {
 
     @Test
     void getSnapshotProjection_defaultParams_uses10and10() throws Exception {
-        var response = new SnapshotProjectionResponse(List.of(), 10, 0, 0, BigDecimal.ZERO);
+        var response = new SnapshotProjectionResponse(List.of(), 10, 0, 0, BigDecimal.ZERO, List.of());
         when(snapshotProjectionService.computeProjection(TENANT_ID, 10, 10)).thenReturn(response);
 
         mockMvc.perform(get("/api/v1/dashboard/snapshot-projection")
