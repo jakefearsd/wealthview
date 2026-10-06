@@ -4,7 +4,9 @@ import { listScenarios, createScenario, deleteScenario } from '../api/projection
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useApiMutation } from '../hooks/useApiMutation';
 import { cardStyle } from '../utils/styles';
+import { formatDate } from '../utils/format';
 import LoadingState from '../components/LoadingState';
+import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import type { CreateScenarioRequest } from '../types/projection';
 import ScenarioForm from '../components/ScenarioForm';
@@ -12,7 +14,7 @@ import Button from '../components/Button';
 import LinkButton from '../components/LinkButton';
 
 export default function ProjectionsPage() {
-    const { data: scenarios, loading, refetch } = useApiQuery(listScenarios);
+    const { data: scenarios, loading, error, refetch } = useApiQuery(listScenarios);
     const [showForm, setShowForm] = useState(false);
 
     const createMutation = useApiMutation(
@@ -38,11 +40,13 @@ export default function ProjectionsPage() {
         },
     );
 
-    function handleDelete(id: string) {
+    function handleDelete(id: string, name: string) {
+        if (!confirm(`Delete scenario "${name}"? Its spending optimizer profile will be deleted with it.`)) return;
         void deleteMutation.mutate(id);
     }
 
     if (loading) return <LoadingState message="Loading scenarios..." />;
+    if (error) return <ErrorState message={error} onRetry={refetch} />;
 
     return (
         <div>
@@ -84,17 +88,17 @@ export default function ProjectionsPage() {
                                 >
                                     {s.name}
                                 </Link>
-                                <LinkButton variant="danger" onClick={() => handleDelete(s.id)} style={{ padding: '0' }}>
+                                <LinkButton variant="danger" onClick={() => handleDelete(s.id, s.name)} style={{ padding: '0' }}>
                                     Delete
                                 </LinkButton>
                             </div>
                             <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.75rem', fontSize: '0.9rem', color: '#444' }}>
-                                <div><span style={{ color: '#999' }}>Retire:</span> {s.retirement_date}</div>
+                                <div><span style={{ color: '#999' }}>Retire:</span> {formatDate(s.retirement_date)}</div>
                                 <div><span style={{ color: '#999' }}>End Age:</span> {s.end_age}</div>
                                 <div><span style={{ color: '#999' }}>Inflation:</span> {(s.inflation_rate * 100).toFixed(1)}%</div>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: '#999' }}>
-                                <span>Created {new Date(s.created_at).toLocaleDateString()}</span>
+                                <span>Created {formatDate(s.created_at)}</span>
                                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                                     <Link
                                         to={`/projections/${s.id}?run=true`}

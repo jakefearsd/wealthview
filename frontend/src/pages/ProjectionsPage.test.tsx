@@ -77,10 +77,8 @@ describe('ProjectionsPage', () => {
 
     // === delete, and the form toggle ===
     //
-    // Deleting a scenario takes its guardrail profile and projection history with it, and — unlike
-    // every other destructive action in the app — this one has NO confirmation dialog. That is
-    // worth pinning explicitly so a later refactor cannot quietly remove a guard that was never
-    // there, and so the absence is visible to anyone reading the tests.
+    // Deleting a scenario takes its guardrail profile and projection history with it, so it asks
+    // first, like accounts, properties and guardrail profiles do.
 
     const renderList = (scenarios = mockScenarios) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -90,7 +88,8 @@ describe('ProjectionsPage', () => {
 
     const cardFor = (name: string) => screen.getByText(name).closest('div')!.parentElement!;
 
-    it('deletes the scenario whose row the control belongs to', async () => {
+    it('deletes the scenario whose row the control belongs to once confirmed', async () => {
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
         vi.mocked(deleteScenario).mockResolvedValue(undefined as never);
         renderList();
 
@@ -98,24 +97,23 @@ describe('ProjectionsPage', () => {
 
         await waitFor(() => expect(deleteScenario).toHaveBeenCalledWith('2'));
         await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Scenario deleted'));
+        expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('Conservative Plan'));
+        confirmSpy.mockRestore();
     });
 
-    it('deletes without asking for confirmation', async () => {
-        // Documents current behaviour: unlike accounts, properties and guardrail profiles, a
-        // scenario delete is immediate. If a confirm is ever added, this test should be the one
-        // that fails and gets updated deliberately.
-        const confirmSpy = vi.spyOn(window, 'confirm');
-        vi.mocked(deleteScenario).mockResolvedValue(undefined as never);
+    it('does not delete when the confirmation is declined', async () => {
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
         renderList();
 
         await userEvent.click(within(cardFor('Early Retirement')).getByRole('button', { name: 'Delete' }));
 
-        await waitFor(() => expect(deleteScenario).toHaveBeenCalled());
-        expect(confirmSpy).not.toHaveBeenCalled();
+        expect(confirmSpy).toHaveBeenCalled();
+        expect(deleteScenario).not.toHaveBeenCalled();
         confirmSpy.mockRestore();
     });
 
     it('keeps the scenario listed when the delete fails', async () => {
+        vi.spyOn(window, 'confirm').mockReturnValue(true);
         vi.mocked(deleteScenario).mockRejectedValue(new Error('referenced by a projection'));
         renderList();
 
@@ -145,5 +143,28 @@ describe('ProjectionsPage', () => {
         renderWithRouter(<ProjectionsPage />);
 
         expect(screen.getByText(/Loading scenarios/i)).toBeInTheDocument();
+    });
+
+    it('shows an error with retry, not a blank page, when scenarios fail to load', async () => {
+        const refetch = vi.fn();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockUseApiQuery.mockReturnValue({ data: null, loading: false, error: 'Boom', refetch } as any);
+        renderWithRouter(<ProjectionsPage />);
+
+        expect(screen.getByText('Boom')).toBeInTheDocument();
+        expect(screen.queryByText('No scenarios')).not.toBeInTheDocument();
+
+        await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+        expect(refetch).toHaveBeenCalled();
+    });
+
+    it('formats the retire and created dates as plain calendar dates', () => {
+        renderList([makeScenario({
+            id: '9', name: 'Dated', retirement_date: '2030-01-01', created_at: '2026-10-05T03:30:00Z',
+        })]);
+
+        expect(screen.getByText(/Created 2026-10-0[45]/)).toBeInTheDocument();
+        expect(screen.getByText('Retire:').parentElement).toHaveTextContent('Retire: 2030-01-01');
     });
 });
