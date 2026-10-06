@@ -7,6 +7,7 @@ import { useApiMutation } from '../hooks/useApiMutation';
 import { cardStyle, inputStyle } from '../utils/styles';
 import { formatWholeCurrency, yearOf } from '../utils/format';
 import { defaultOptimizerConfig, fromProfile, toRequest, type OptimizerConfig, type RiskTolerance } from '../utils/optimizerConfig';
+import { failureRateSeverity, type FailureRateSeverity } from '../utils/projectionCalcs';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
 import CurrencyInput from '../components/CurrencyInput';
@@ -31,7 +32,7 @@ export interface PlanDiagnostics {
     phases: PhaseDiagnostic[];
     overallAchievement: number;
     warnings: string[];
-    failureRateSeverity: 'good' | 'caution' | 'danger';
+    failureRateSeverity: FailureRateSeverity;
     depletionAgeP10: number | null;
     depletionAgeP25: number | null;
 }
@@ -76,14 +77,9 @@ export function computePlanDiagnostics(
         ? phaseDiags.reduce((sum, p) => sum + p.achievementPct, 0) / phaseDiags.length
         : 100;
 
-    let failureRateSeverity: 'good' | 'caution' | 'danger';
-    if (failureRate > 0.20) {
-        failureRateSeverity = 'danger';
+    const severity = failureRateSeverity(failureRate);
+    if (severity === 'danger') {
         warnings.push(`Failure rate exceeds 20%`);
-    } else if (failureRate > 0.10) {
-        failureRateSeverity = 'caution';
-    } else {
-        failureRateSeverity = 'good';
     }
 
     // Detect portfolio depletion at p10 and p25
@@ -104,7 +100,7 @@ export function computePlanDiagnostics(
         warnings.push(`In a below-average scenario (25th percentile), portfolio depleted by age ${depletionAgeP25}`);
     }
 
-    return { phases: phaseDiags, overallAchievement, warnings, failureRateSeverity, depletionAgeP10, depletionAgeP25 };
+    return { phases: phaseDiags, overallAchievement, warnings, failureRateSeverity: severity, depletionAgeP10, depletionAgeP25 };
 }
 
 const selectStyle: React.CSSProperties = {

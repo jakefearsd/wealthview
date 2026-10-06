@@ -57,6 +57,11 @@ const mockGuardrailProfile = makeProfile({
     cash_return_rate: 0.04,
 });
 
+const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
+vi.mock('react-hot-toast', () => ({
+    default: { success: vi.fn(), error: toastError },
+}));
+
 vi.mock('../api/spendingProfiles', () => ({
     listSpendingProfiles: vi.fn(),
     createSpendingProfile: vi.fn(),
@@ -77,6 +82,7 @@ vi.mock('../hooks/useApiQuery', () => ({
 
 import { useApiQuery } from '../hooks/useApiQuery';
 import { listScenarios, getGuardrailProfile, deleteGuardrailProfile, reoptimize } from '../api/projections';
+import { createSpendingProfile, deleteSpendingProfile } from '../api/spendingProfiles';
 
 const mockUseApiQuery = vi.mocked(useApiQuery);
 const mockListScenarios = vi.mocked(listScenarios);
@@ -264,5 +270,120 @@ describe('SpendingProfilesPage', () => {
 
         // The tier-based profiles must still render even when the guardrail lookup blows up.
         expect(await screen.findByText('Conservative')).toBeInTheDocument();
+    });
+
+    describe('load failures', () => {
+        it('shows an error with retry instead of an empty grid', () => {
+            const refetch = vi.fn();
+            mockUseApiQuery.mockReturnValue({ data: null, loading: false, error: 'Boom', refetch });
+            renderWithRouter(<SpendingProfilesPage />);
+
+            expect(screen.getByText('Boom')).toBeInTheDocument();
+
+            fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+            expect(refetch).toHaveBeenCalled();
+        });
+    });
+
+    describe('deleting a profile', () => {
+        it('asks for confirmation and does nothing when declined', () => {
+            mockUseApiQuery.mockReturnValue({ data: mockProfiles, loading: false, error: null, refetch: vi.fn() });
+            const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+            renderWithRouter(<SpendingProfilesPage />);
+
+            fireEvent.click(within(screen.getByText('Conservative').parentElement!).getByRole('button', { name: 'Delete' }));
+
+            expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('Conservative'));
+            expect(deleteSpendingProfile).not.toHaveBeenCalled();
+            confirmSpy.mockRestore();
+        });
+
+        it('deletes once confirmed', async () => {
+            mockUseApiQuery.mockReturnValue({ data: mockProfiles, loading: false, error: null, refetch: vi.fn() });
+            vi.mocked(deleteSpendingProfile).mockResolvedValue(undefined as never);
+            const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+            renderWithRouter(<SpendingProfilesPage />);
+
+            fireEvent.click(within(screen.getByText('Conservative').parentElement!).getByRole('button', { name: 'Delete' }));
+
+            await waitFor(() => expect(deleteSpendingProfile).toHaveBeenCalledWith('1'));
+            confirmSpy.mockRestore();
+        });
+    });
+
+    describe('spending tiers', () => {
+        async function openTierForm() {
+            mockUseApiQuery.mockReturnValue({ data: [], loading: false, error: null, refetch: vi.fn() });
+            renderWithRouter(<SpendingProfilesPage />);
+            await userEvent.click(screen.getByRole('button', { name: /new profile/i }));
+            fireEvent.change(screen.getByPlaceholderText('Retirement Spending'), { target: { value: 'Plan' } });
+        }
+        const addTier = () => userEvent.click(screen.getByRole('button', { name: /add spending tier/i }));
+        const startInputs = () => screen.getAllByLabelText('Start Age') as HTMLInputElement[];
+        const endInputs = () => screen.getAllByLabelText(/End Age/) as HTMLInputElement[];
+
+        it('describes tier amounts as constant real dollars, not auto-inflated', async () => {
+            await openTierForm();
+
+            expect(screen.getByText(/held constant in real terms/)).toBeInTheDocument();
+            expect(screen.queryByText(/inflation is applied automatically/)).not.toBeInTheDocument();
+        });
+
+        it('defaults a new tier to start the year after the previous tier ends', async () => {
+            await openTierForm();
+            await addTier();
+            fireEvent.change(startInputs()[0], { target: { value: '60' } });
+            fireEvent.change(endInputs()[0], { target: { value: '69' } });
+
+            await addTier();
+
+            expect(startInputs()[1].value).toBe('70');
+        });
+
+        it('rejects a tier whose end age is before its start age', async () => {
+            await openTierForm();
+            await addTier();
+            fireEvent.change(startInputs()[0], { target: { value: '70' } });
+            fireEvent.change(endInputs()[0], { target: { value: '65' } });
+
+            fireEvent.click(screen.getByRole('button', { name: 'Create Profile' }));
+
+            expect(toastError).toHaveBeenCalledWith('Tier 1: end age must be at least the start age');
+            expect(createSpendingProfile).not.toHaveBeenCalled();
+        });
+
+        it('rejects a tier with a cleared start age', async () => {
+            await openTierForm();
+            await addTier();
+            fireEvent.change(startInputs()[0], { target: { value: '' } });
+
+            fireEvent.click(screen.getByRole('button', { name: 'Create Profile' }));
+
+            expect(toastError).toHaveBeenCalledWith('Tier 1: start age is required');
+            expect(createSpendingProfile).not.toHaveBeenCalled();
+        });
+    });
+
+    it('associates the profile form labels with their inputs', async () => {
+        mockUseApiQuery.mockReturnValue({ data: [], loading: false, error: null, refetch: vi.fn() });
+        renderWithRouter(<SpendingProfilesPage />);
+
+        await userEvent.click(screen.getByRole('button', { name: /new profile/i }));
+
+        expect(screen.getByLabelText('Name')).toBe(screen.getByPlaceholderText('Retirement Spending'));
+        expect(screen.getByLabelText(/Essential Expenses/)).toBeInTheDocument();
+    });
+
+    it('colours a guardrail failure rate with the optimizer bands: amber from 10%, red from 20%', async () => {
+        mockUseApiQuery.mockReturnValue({ data: mockProfiles, loading: false, error: null, refetch: vi.fn() });
+        mockListScenarios.mockResolvedValue([makeScenario({ id: 'sc-1', name: 'Base Case' })] as never);
+        mockGetGuardrailProfile.mockResolvedValue({ ...mockGuardrailProfile, failure_rate: 0.15 } as never);
+        renderWithRouter(<SpendingProfilesPage />);
+
+        const value = (await screen.findByText('15.0%')) as HTMLElement;
+
+        expect(value).not.toHaveStyle({ color: '#d32f2f' });
+        expect(value).toHaveStyle({ color: '#e65100' });
     });
 });

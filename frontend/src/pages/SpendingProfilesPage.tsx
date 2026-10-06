@@ -7,7 +7,9 @@ import { useApiMutation } from '../hooks/useApiMutation';
 import { useCrudForm } from '../hooks/useCrudForm';
 import { cardStyle, inputStyle, labelStyle } from '../utils/styles';
 import { formatCurrency } from '../utils/format';
+import { failureRateSeverity } from '../utils/projectionCalcs';
 import LoadingState from '../components/LoadingState';
+import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import CurrencyInput from '../components/CurrencyInput';
 import HelpText from '../components/HelpText';
@@ -16,8 +18,29 @@ import LinkButton from '../components/LinkButton';
 import StatTile from '../components/StatTile';
 import type { SpendingProfile, CreateSpendingProfileRequest, SpendingTier, GuardrailProfileResponse } from '../types/projection';
 
-function defaultSpendingTier(): SpendingTier {
-    return { name: '', start_age: 55, end_age: null, essential_expenses: 0, discretionary_expenses: 0 };
+const FIRST_TIER_START_AGE = 55;
+
+/**
+ * A blank tier. It starts the year after the previous tier ends so the new row does not overlap
+ * (the engine averages overlapping tiers); after an open-ended tier there is no obvious start, so
+ * it is left blank for the user to fill in.
+ */
+function defaultSpendingTier(previous?: SpendingTier): SpendingTier {
+    const startAge = previous === undefined
+        ? FIRST_TIER_START_AGE
+        : (previous.end_age != null ? previous.end_age + 1 : 0);
+    return { name: '', start_age: startAge, end_age: null, essential_expenses: 0, discretionary_expenses: 0 };
+}
+
+function validateProfile(data: CreateSpendingProfileRequest): string | undefined {
+    if (!data.name) return 'Name is required';
+    for (const [i, tier] of data.spending_tiers.entries()) {
+        if (!(tier.start_age > 0)) return `Tier ${i + 1}: start age is required`;
+        if (tier.end_age != null && tier.end_age < tier.start_age) {
+            return `Tier ${i + 1}: end age must be at least the start age`;
+        }
+    }
+    return undefined;
 }
 
 const initialFormData: CreateSpendingProfileRequest = {
@@ -27,6 +50,8 @@ const initialFormData: CreateSpendingProfileRequest = {
     spending_tiers: [],
 };
 
+const FAILURE_RATE_COLORS = { good: '#2e7d32', caution: '#e65100', danger: '#d32f2f' } as const;
+
 interface GuardrailWithScenario {
     profile: GuardrailProfileResponse;
     scenarioName: string;
@@ -34,7 +59,7 @@ interface GuardrailWithScenario {
 
 export default function SpendingProfilesPage() {
     const navigate = useNavigate();
-    const { data: profiles, loading, refetch } = useApiQuery(listSpendingProfiles);
+    const { data: profiles, loading, error, refetch } = useApiQuery(listSpendingProfiles);
     const [showForm, setShowForm] = useState(false);
     const [guardrails, setGuardrails] = useState<GuardrailWithScenario[]>([]);
     const [guardrailsLoading, setGuardrailsLoading] = useState(true);
@@ -98,7 +123,7 @@ export default function SpendingProfilesPage() {
         entityName: 'Profile',
         initialFormData,
         onSuccess,
-        validate: (data) => !data.name ? 'Name is required' : undefined,
+        validate: validateProfile,
     });
 
     const resetForm = useCallback(() => {
@@ -116,6 +141,11 @@ export default function SpendingProfilesPage() {
         setShowForm(true);
     }
 
+    function deleteProfile(profile: SpendingProfile) {
+        if (!confirm(`Delete spending profile "${profile.name}"? Scenarios using it will revert to a withdrawal-rate strategy.`)) return;
+        void handleDelete(profile.id);
+    }
+
     function updateTier(index: number, field: keyof SpendingTier, value: string | number | null) {
         setFormData(prev => ({
             ...prev,
@@ -124,6 +154,7 @@ export default function SpendingProfilesPage() {
     }
 
     if (loading) return <LoadingState message="Loading spending profiles..." />;
+    if (error) return <ErrorState message={error} onRetry={refetch} />;
 
     const { name, essential_expenses: essentialExpenses, discretionary_expenses: discretionaryExpenses, spending_tiers: spendingTiers } = formData;
 
@@ -146,17 +177,17 @@ export default function SpendingProfilesPage() {
                     <h3 style={{ marginBottom: '1rem' }}>{editingId ? 'Edit Profile' : 'Create Profile'}</h3>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                         <div>
-                            <label style={labelStyle}>Name</label>
-                            <input style={inputStyle} value={name} onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))} placeholder="Retirement Spending" />
+                            <label htmlFor="profile-name" style={labelStyle}>Name</label>
+                            <input id="profile-name" style={inputStyle} value={name} onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))} placeholder="Retirement Spending" />
                         </div>
                         <div>
-                            <label style={labelStyle}>Essential Expenses (annual)</label>
-                            <CurrencyInput style={inputStyle} value={essentialExpenses || ''} onChange={v => setFormData(prev => ({ ...prev, essential_expenses: Number(v) || 0 }))} />
+                            <label htmlFor="profile-essential" style={labelStyle}>Essential Expenses (annual)</label>
+                            <CurrencyInput id="profile-essential" style={inputStyle} value={essentialExpenses || ''} onChange={v => setFormData(prev => ({ ...prev, essential_expenses: Number(v) || 0 }))} />
                             <HelpText>Default non-negotiable annual costs when no spending tier matches the current age.</HelpText>
                         </div>
                         <div>
-                            <label style={labelStyle}>Discretionary Expenses (annual)</label>
-                            <CurrencyInput style={inputStyle} value={discretionaryExpenses || ''} onChange={v => setFormData(prev => ({ ...prev, discretionary_expenses: Number(v) || 0 }))} />
+                            <label htmlFor="profile-discretionary" style={labelStyle}>Discretionary Expenses (annual)</label>
+                            <CurrencyInput id="profile-discretionary" style={inputStyle} value={discretionaryExpenses || ''} onChange={v => setFormData(prev => ({ ...prev, discretionary_expenses: Number(v) || 0 }))} />
                             <HelpText>Default flexible annual spending when no spending tier matches the current age.</HelpText>
                         </div>
                     </div>
@@ -166,11 +197,11 @@ export default function SpendingProfilesPage() {
                         <div>
                             <h4>Spending Tiers</h4>
                             <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.15rem' }}>
-                                Define age-based spending phases. When tiers are defined, spending varies by life stage instead of staying flat. Amounts are in today's dollars; inflation is applied automatically.
+                                Define age-based spending phases. When tiers are defined, spending varies by life stage instead of staying flat. Amounts are in today's dollars and held constant in real terms; do not pre-inflate them.
                             </div>
                         </div>
                         <button
-                            onClick={() => setFormData(prev => ({ ...prev, spending_tiers: [...prev.spending_tiers, defaultSpendingTier()] }))}
+                            onClick={() => setFormData(prev => ({ ...prev, spending_tiers: [...prev.spending_tiers, defaultSpendingTier(prev.spending_tiers.at(-1))] }))}
                             style={{ padding: '0.25rem 0.75rem', background: '#7b1fa2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
                         >
                             + Add Spending Tier
@@ -179,24 +210,24 @@ export default function SpendingProfilesPage() {
                     {spendingTiers.map((tier, idx) => (
                         <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 1fr auto', gap: '1rem', marginBottom: '0.75rem', alignItems: 'end' }}>
                             <div>
-                                <label style={labelStyle}>Phase Name</label>
-                                <input style={inputStyle} value={tier.name} onChange={e => updateTier(idx, 'name', e.target.value)} placeholder="e.g., Go-Go Years" />
+                                <label htmlFor={`tier-${idx}-name`} style={labelStyle}>Phase Name</label>
+                                <input id={`tier-${idx}-name`} style={inputStyle} value={tier.name} onChange={e => updateTier(idx, 'name', e.target.value)} placeholder="e.g., Go-Go Years" />
                             </div>
                             <div>
-                                <label style={labelStyle}>Start Age</label>
-                                <input style={inputStyle} type="number" value={tier.start_age || ''} onChange={e => updateTier(idx, 'start_age', Number(e.target.value))} />
+                                <label htmlFor={`tier-${idx}-start`} style={labelStyle}>Start Age</label>
+                                <input id={`tier-${idx}-start`} style={inputStyle} type="number" value={tier.start_age || ''} onChange={e => updateTier(idx, 'start_age', Number(e.target.value))} />
                             </div>
                             <div>
-                                <label style={labelStyle}>End Age (blank = forever)</label>
-                                <input style={inputStyle} type="number" value={tier.end_age ?? ''} onChange={e => updateTier(idx, 'end_age', e.target.value ? Number(e.target.value) : null)} />
+                                <label htmlFor={`tier-${idx}-end`} style={labelStyle}>End Age (blank = forever)</label>
+                                <input id={`tier-${idx}-end`} style={inputStyle} type="number" value={tier.end_age ?? ''} onChange={e => updateTier(idx, 'end_age', e.target.value ? Number(e.target.value) : null)} />
                             </div>
                             <div>
-                                <label style={labelStyle}>Essential (annual)</label>
-                                <CurrencyInput style={inputStyle} value={tier.essential_expenses || ''} onChange={v => updateTier(idx, 'essential_expenses', Number(v) || 0)} />
+                                <label htmlFor={`tier-${idx}-essential`} style={labelStyle}>Essential (annual)</label>
+                                <CurrencyInput id={`tier-${idx}-essential`} style={inputStyle} value={tier.essential_expenses || ''} onChange={v => updateTier(idx, 'essential_expenses', Number(v) || 0)} />
                             </div>
                             <div>
-                                <label style={labelStyle}>Discretionary (annual)</label>
-                                <CurrencyInput style={inputStyle} value={tier.discretionary_expenses || ''} onChange={v => updateTier(idx, 'discretionary_expenses', Number(v) || 0)} />
+                                <label htmlFor={`tier-${idx}-discretionary`} style={labelStyle}>Discretionary (annual)</label>
+                                <CurrencyInput id={`tier-${idx}-discretionary`} style={inputStyle} value={tier.discretionary_expenses || ''} onChange={v => updateTier(idx, 'discretionary_expenses', Number(v) || 0)} />
                             </div>
                             <div>
                                 <button
@@ -225,7 +256,7 @@ export default function SpendingProfilesPage() {
                     message="Create one to attach to your retirement scenarios."
                 />
             ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 420px), 1fr))', gap: '1rem' }}>
                     {profiles?.map(p => {
                         const totalBase = p.essential_expenses + p.discretionary_expenses;
                         return (
@@ -234,7 +265,7 @@ export default function SpendingProfilesPage() {
                                 <h3 style={{ margin: 0 }}>{p.name}</h3>
                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                                     <LinkButton onClick={() => startEdit(p)}>Edit</LinkButton>
-                                    <LinkButton variant="danger" onClick={() => handleDelete(p.id)}>Delete</LinkButton>
+                                    <LinkButton variant="danger" onClick={() => deleteProfile(p)}>Delete</LinkButton>
                                 </div>
                             </div>
                             <div style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '1rem', color: '#b71c1c' }}>
@@ -271,7 +302,7 @@ export default function SpendingProfilesPage() {
                     <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '1rem' }}>
                         Optimized spending plans generated by the Monte Carlo simulator. These override the standard spending profile on their attached scenario.
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 420px), 1fr))', gap: '1rem' }}>
                         {guardrails.map(({ profile: g, scenarioName }) => {
                             const spendingYears = g.yearly_spending.filter(y => y.recommended > 0);
                             const minSpend = spendingYears.length > 0 ? Math.min(...spendingYears.map(y => y.recommended)) : 0;
@@ -315,7 +346,7 @@ export default function SpendingProfilesPage() {
                                         <StatTile
                                             label="Failure Rate"
                                             value={`${(g.failure_rate * 100).toFixed(1)}%`}
-                                            valueColor={g.failure_rate > 0.1 ? '#d32f2f' : '#2e7d32'}
+                                            valueColor={FAILURE_RATE_COLORS[failureRateSeverity(g.failure_rate)]}
                                             valueStyle={{ fontWeight: 500 }}
                                         />
                                         <StatTile label="Median Final Balance" value={formatCurrency(g.median_final_balance)} valueStyle={{ fontWeight: 500 }} />

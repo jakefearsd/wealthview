@@ -9,6 +9,7 @@ import {
     computeTotalSpending,
     computePlanOutcome,
     monthlyAxisTickInterval,
+    failureRateSeverity,
 } from './projectionCalcs';
 import type { ProjectionYear, RentalPropertyYearDetail, SpendingFeasibility } from '../types/projection';
 
@@ -434,5 +435,13 @@ describe('monthlyAxisTickInterval', () => {
 
     it('never returns a negative interval for an empty series', () => {
         expect(monthlyAxisTickInterval(0)).toBe(11);
+    });
+});
+
+describe('failureRateSeverity', () => {
+    it.each([
+        [0, 'good'], [0.10, 'good'], [0.101, 'caution'], [0.20, 'caution'], [0.201, 'danger'], [0.5, 'danger'],
+    ])('classifies %s as %s', (rate, expected) => {
+        expect(failureRateSeverity(rate)).toBe(expected);
     });
 });

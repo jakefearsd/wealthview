@@ -11,6 +11,15 @@ export function monthlyAxisTickInterval(yearCount: number): number {
     return yearsPerTick * 12 - 1;
 }
 
+export type FailureRateSeverity = 'good' | 'caution' | 'danger';
+
+/** Monte Carlo failure-rate bands shared by every screen that colours one: >20% danger, >10% caution. */
+export function failureRateSeverity(failureRate: number): FailureRateSeverity {
+    if (failureRate > 0.20) return 'danger';
+    if (failureRate > 0.10) return 'caution';
+    return 'good';
+}
+
 export function findPeakBalance(data: ProjectionYear[]): { year: number; balance: number } {
     if (data.length === 0) return { year: 0, balance: 0 };
     let peak = data[0];
