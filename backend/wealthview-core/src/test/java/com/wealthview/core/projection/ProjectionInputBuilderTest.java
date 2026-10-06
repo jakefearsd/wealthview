@@ -439,6 +439,57 @@ class ProjectionInputBuilderTest {
     }
 
     @Test
+    void buildWithMetadata_rentalWithMortgageBalanceButNoLoanDetails_warnsDebtServiceIsNotModelled() {
+        var scenario = ScenarioMother.scenario(tenant);
+        var property = new PropertyEntity(tenant, "789 Pine Rd",
+                new BigDecimal("400000"), LocalDate.of(2020, 1, 1),
+                new BigDecimal("400000"), new BigDecimal("250000"));
+        property.setDepreciationMethod("none");
+        linkRental(scenario, property);
+
+        var result = builder.buildWithMetadata(scenario, tenantId);
+
+        assertThat(result.warnings()).singleElement().asString()
+                .contains("789 Pine Rd")
+                .contains("mortgage balance but no loan details");
+        assertThat(result.input().incomeSources().getFirst().mortgageInterestByYear()).isNull();
+    }
+
+    @Test
+    void buildWithMetadata_rentalWithLoanDetails_noWarning() {
+        var scenario = ScenarioMother.scenario(tenant);
+        linkRental(scenario, mortgagedRental());
+
+        var result = builder.buildWithMetadata(scenario, tenantId);
+
+        assertThat(result.warnings()).isEmpty();
+    }
+
+    @Test
+    void buildWithMetadata_rentalWithoutMortgage_noWarning() {
+        var scenario = ScenarioMother.scenario(tenant);
+        var property = new PropertyEntity(tenant, "12 Free Clear Ln",
+                new BigDecimal("400000"), LocalDate.of(2020, 1, 1),
+                new BigDecimal("400000"), BigDecimal.ZERO);
+        property.setDepreciationMethod("none");
+        linkRental(scenario, property);
+
+        var result = builder.buildWithMetadata(scenario, tenantId);
+
+        assertThat(result.warnings()).isEmpty();
+    }
+
+    private void linkRental(ProjectionScenarioEntity scenario, PropertyEntity property) {
+        var incomeSource = new IncomeSourceEntity(
+                tenant, "Rental Income", "rental_property",
+                new BigDecimal("30000"), 0, null,
+                BigDecimal.ZERO, false, "taxable");
+        incomeSource.setProperty(property);
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of(new ScenarioIncomeSourceEntity(scenario, incomeSource, null)));
+    }
+
+    @Test
     void build_rentalNoProperty_expensesRemainNull() {
         var scenario = ScenarioMother.scenario(tenant);
 

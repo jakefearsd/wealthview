@@ -259,4 +259,26 @@ class ProjectionServiceTest {
 
         assertThat(result.warnings()).isEmpty();
     }
+
+    @Test
+    void runProjection_inputWarnings_surfaceAheadOfStateWarnings() {
+        var scenario = ScenarioMother.scenarioWithParams(tenant, "{\"state\": \"NY\"}");
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+
+        var input = new ProjectionInput(scenarioId, "Plan", LocalDate.of(2055, 1, 1),
+                90, new BigDecimal("0.03"), scenario.getParamsJson(), List.of(), null, null, List.of());
+        when(projectionInputBuilder.buildWithMetadata(scenario, tenantId))
+                .thenReturn(new ProjectionInputResult(input, List.of(), List.of("Mortgage not modelled")));
+
+        var engineResult = new ProjectionResultResponse(scenarioId, List.of(), BigDecimal.ZERO, 0, null);
+        when(projectionEngine.runDetailed(input)).thenReturn(detailOf(engineResult));
+        when(stateTaxCalculatorFactory.unsupportedStateWarning("NY"))
+                .thenReturn(Optional.of("State tax for NY is not modeled (treated as $0)"));
+
+        var result = service.runProjection(tenantId, scenarioId);
+
+        assertThat(result.warnings()).containsExactly(
+                "Mortgage not modelled", "State tax for NY is not modeled (treated as $0)");
+    }
 }

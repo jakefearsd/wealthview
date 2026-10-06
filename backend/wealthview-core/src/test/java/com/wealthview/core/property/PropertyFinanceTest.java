@@ -65,6 +65,26 @@ class PropertyFinanceTest {
         assertThat(balance).isEqualByComparingTo("123456.0000");
     }
 
+    // ── hasUnamortizableMortgage ──────────────────────────────────────────
+
+    @Test
+    void hasUnamortizableMortgage_balanceWithoutLoanDetails_isTrue() {
+        assertThat(PropertyFinance.hasUnamortizableMortgage(propertyWithoutLoan())).isTrue();
+    }
+
+    @Test
+    void hasUnamortizableMortgage_withLoanDetails_isFalse() {
+        assertThat(PropertyFinance.hasUnamortizableMortgage(propertyWithLoan())).isFalse();
+    }
+
+    @Test
+    void hasUnamortizableMortgage_noBalance_isFalse() {
+        var property = propertyWithoutLoan();
+        property.setMortgageBalance(BigDecimal.ZERO);
+
+        assertThat(PropertyFinance.hasUnamortizableMortgage(property)).isFalse();
+    }
+
     // ── mortgageBalanceAsOf ────────────────────────────────────────────────
 
     @Test

@@ -60,8 +60,10 @@ public class ProjectionService {
                 .orElseThrow(Entities.notFound("Scenario"));
         var inputResult = projectionInputBuilder.buildWithMetadata(scenario, tenantId);
         var detail = projectionEngine.runDetailed(inputResult.input());
+        var warnings = new ArrayList<>(inputResult.warnings());
+        warnings.addAll(resolveWarnings(scenario));
         return new ProjectionRunResult(detail.result(), inputResult.unclassifiedSymbols(),
-                resolveWarnings(scenario), detail.taxSpace(), detail.terminalValue());
+                List.copyOf(warnings), detail.taxSpace(), detail.terminalValue());
     }
 
     /**

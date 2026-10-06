@@ -34,6 +34,16 @@ public final class PropertyFinance {
     private PropertyFinance() {
     }
 
+    /**
+     * True when the property carries a mortgage balance but no loan details: there is no rate, term
+     * or start date to build a payment schedule from, so its debt service cannot be modelled.
+     */
+    public static boolean hasUnamortizableMortgage(PropertyEntity property) {
+        return !property.hasLoanDetails()
+                && property.getMortgageBalance() != null
+                && property.getMortgageBalance().signum() > 0;
+    }
+
     public static BigDecimal effectiveCurrentMortgageBalance(PropertyEntity property) {
         if (property.isUseComputedBalance() && property.hasLoanDetails()) {
             return remainingBalance(property, LocalDate.now());

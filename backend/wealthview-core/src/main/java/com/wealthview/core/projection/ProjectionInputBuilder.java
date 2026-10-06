@@ -56,6 +56,9 @@ public class ProjectionInputBuilder {
 
     private static final Logger log = LoggerFactory.getLogger(ProjectionInputBuilder.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final String UNAMORTIZABLE_MORTGAGE_WARNING = "Rental property %s has a mortgage balance but "
+            + "no loan details, so its mortgage payments are not included in this projection. Add the loan "
+            + "amount, interest rate, term and start date to the property to include them.";
 
     private final AccountService accountService;
     private final ExchangeRateService exchangeRateService;
@@ -110,7 +113,8 @@ public class ProjectionInputBuilder {
         var unclassifiedSymbols = new TreeSet<String>();
         var accounts        = resolveAccounts(scenario, tenantId, unclassifiedSymbols);
         var spendingProfile = resolveSpendingProfile(scenario);
-        var incomeSources   = resolveIncomeSources(scenario.getId());
+        var warnings        = new TreeSet<String>();
+        var incomeSources   = resolveIncomeSources(scenario.getId(), warnings);
         var guardrailSpending = resolveGuardrailSpending(scenario);
         var properties      = resolveProperties(tenantId);
         var household       = resolveHousehold(scenario);
@@ -118,7 +122,7 @@ public class ProjectionInputBuilder {
                 scenario.getId(), scenario.getName(), scenario.getRetirementDate(),
                 scenario.getEndAge(), scenario.getInflationRate(), scenario.getParamsJson(),
                 accounts, spendingProfile, null, incomeSources, guardrailSpending, properties, household);
-        return new ProjectionInputResult(input, List.copyOf(unclassifiedSymbols));
+        return new ProjectionInputResult(input, List.copyOf(unclassifiedSymbols), List.copyOf(warnings));
     }
 
     /**
@@ -263,17 +267,23 @@ public class ProjectionInputBuilder {
         return new AssetAllocation(weights);
     }
 
-    private List<ProjectionIncomeSourceInput> resolveIncomeSources(UUID scenarioId) {
+    /**
+     * Resolves the scenario's linked income sources into engine inputs.
+     *
+     * @param warnings collects a warning for each linked rental whose mortgage cannot be amortized
+     */
+    private List<ProjectionIncomeSourceInput> resolveIncomeSources(UUID scenarioId, Set<String> warnings) {
         var scenarioLinks = scenarioIncomeSourceRepository.findByScenario_Id(scenarioId);
         if (scenarioLinks.isEmpty()) {
             return List.of();
         }
         return scenarioLinks.stream()
-                .map(link -> toIncomeSourceInput(link.getIncomeSource(), link.effectiveAnnualAmount()))
+                .map(link -> toIncomeSourceInput(link.getIncomeSource(), link.effectiveAnnualAmount(), warnings))
                 .toList();
     }
 
-    private ProjectionIncomeSourceInput toIncomeSourceInput(IncomeSourceEntity source, BigDecimal amount) {
+    private ProjectionIncomeSourceInput toIncomeSourceInput(IncomeSourceEntity source, BigDecimal amount,
+                                                            Set<String> warnings) {
         BigDecimal annualOpEx = null;
         Map<Integer, BigDecimal> mortgageInterestByYear = null;
         Map<Integer, BigDecimal> mortgagePrincipalByYear = null;
@@ -292,6 +302,11 @@ public class ProjectionInputBuilder {
             // calendar year: the engines charge each year's own interest and principal (none after
             // payoff) and deflate them as fixed-nominal outflows.
             var debtSchedule = PropertyFinance.debtServiceByYear(property, LocalDate.now().getYear());
+            if (PropertyFinance.hasUnamortizableMortgage(property)) {
+                // No rate/term/start date means no schedule: model no debt service rather than guess
+                // a payment, but say so, since the rental's cash flow is overstated.
+                warnings.add(UNAMORTIZABLE_MORTGAGE_WARNING.formatted(property.getAddress()));
+            }
             if (!debtSchedule.isEmpty()) {
                 mortgageInterestByYear = new TreeMap<>();
                 mortgagePrincipalByYear = new TreeMap<>();
