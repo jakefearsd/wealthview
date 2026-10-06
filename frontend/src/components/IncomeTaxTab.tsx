@@ -82,7 +82,9 @@ export default function IncomeTaxTab({
                                         onClick={() => hasDetails && onToggleTaxYear(y.year)}
                                     >
                                         <td style={{ padding: '0.5rem' }}>
-                                            {hasDetails ? (isExpanded ? '\u25BC ' : '\u25B6 ') : '  '}{y.year}
+                                            <span style={{ display: 'inline-block', width: '1.25em' }}>
+                                                {hasDetails ? (isExpanded ? '\u25BC' : '\u25B6') : ''}
+                                            </span>{y.year}
                                         </td>
                                         <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.age}</td>
                                         <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>

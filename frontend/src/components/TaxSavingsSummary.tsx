@@ -9,7 +9,8 @@ interface Props {
 const pctFmt = (n: number) => formatPercent(n, 0);
 
 export default function TaxSavingsSummary({ schedule }: Props) {
-    const savingsColor = schedule.tax_savings > 0 ? '#2e7d32' : '#d32f2f';
+    // Exactly $0 is neither a saving nor a cost, so it stays neutral rather than reading as a loss.
+    const savingsColor = schedule.tax_savings > 0 ? '#2e7d32' : schedule.tax_savings < 0 ? '#d32f2f' : '#444';
 
     return (
         <div>

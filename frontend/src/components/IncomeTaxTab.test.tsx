@@ -122,4 +122,23 @@ describe('IncomeTaxTab', () => {
         expect(screen.queryByText('IRMAA')).not.toBeInTheDocument();
         expect(screen.queryByText('Early Penalty')).not.toBeInTheDocument();
     });
+
+    it('reserves the same fixed-width marker slot on rows with and without property details', () => {
+        const detail = {
+            income_source_id: 'is-1', property_name: 'Rental', tax_treatment: 'rental_passive', gross_rent: 1000,
+            operating_expenses: 0, mortgage_interest: 0, property_tax: 0, depreciation: 0,
+            loss_applied_to_income: 0, suspended_loss_carryforward: 0, net_income: 1000,
+        } as unknown as NonNullable<ProjectionYear['rental_property_details']>[number];
+        const data = [
+            makeYear({ year: 2040, age: 65, tax_liability: 5000, rental_property_details: [detail] }),
+            makeYear({ year: 2041, age: 66, tax_liability: 5000 }),
+        ];
+
+        render(<IncomeTaxTab yearlyData={data} {...commonProps} />);
+
+        const marker = (year: string) => screen.getByText(year).querySelector('span') as HTMLElement;
+        expect(marker('2040').style.width).toBe('1.25em');
+        expect(marker('2041').style.width).toBe('1.25em');
+        expect(marker('2041').textContent).toBe('');
+    });
 });

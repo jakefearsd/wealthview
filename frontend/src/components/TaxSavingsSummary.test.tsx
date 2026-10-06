@@ -43,4 +43,18 @@ describe('TaxSavingsSummary', () => {
         expect(screen.getByText('22%')).toBeInTheDocument();
         expect(screen.getByText('12%')).toBeInTheDocument();
     });
+
+    it.each([
+        [60000, 'rgb(46, 125, 50)'],
+        [0, 'rgb(68, 68, 68)'],
+        [-5000, 'rgb(211, 47, 47)'],
+    ])('colours savings of %s correctly', (savings, color) => {
+        const schedule = { ...baseSchedule, tax_savings: savings };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        render(<TaxSavingsSummary schedule={schedule as any} />);
+
+        const value = screen.getByText('Estimated Savings').nextElementSibling as HTMLElement;
+
+        expect(value.style.color).toBe(color);
+    });
 });

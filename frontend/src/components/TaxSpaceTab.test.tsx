@@ -87,7 +87,16 @@ describe('TaxSpaceTab', () => {
 
         const row = screen.getByRole('row', { name: /2031/ });
         expect(within(row).getByText('85¢ per $1')).toBeInTheDocument();
-        expect(within(row).getByText('Tier 0 · $36,000 to next (+$2,100/yr) (2033)')).toBeInTheDocument();
+        expect(within(row).getByText('Tier 0 · $36,000 to next tier (+$2,100/yr on 2033 premiums)')).toBeInTheDocument();
+    });
+
+    it('still names the premium year when the next-tier cost is unknown', () => {
+        render(<TaxSpaceTab taxSpace={[makeYear({
+            irmaa_premium_year: 2033, irmaa_tier: 1, irmaa_room_to_next_tier: 8000,
+            irmaa_next_tier_annual_cost: null,
+        })]} />);
+
+        expect(screen.getByText('Tier 1 · $8,000 to next tier (2033 premiums)')).toBeInTheDocument();
     });
 
     it('marks the IRMAA top tier when there is no next tier', () => {
@@ -95,7 +104,7 @@ describe('TaxSpaceTab', () => {
             irmaa_premium_year: 2033, irmaa_tier: 5, irmaa_room_to_next_tier: null,
         })]} />);
 
-        expect(screen.getByText('Tier 5 (top) · 2033')).toBeInTheDocument();
+        expect(screen.getByText('Tier 5 (top) · 2033 premiums')).toBeInTheDocument();
     });
 
     it('renders the column explainers and the planning disclaimer', () => {

@@ -23,10 +23,13 @@ function ssZone(rate: number | null): string {
 
 function irmaa(y: TaxSpaceYear): string {
     if (y.irmaa_premium_year == null || y.irmaa_tier == null) return DASH;
-    if (y.irmaa_room_to_next_tier == null) return `Tier ${y.irmaa_tier} (top) · ${y.irmaa_premium_year}`;
+    if (y.irmaa_room_to_next_tier == null) return `Tier ${y.irmaa_tier} (top) · ${y.irmaa_premium_year} premiums`;
     const roomStr = formatCurrency(y.irmaa_room_to_next_tier);
-    const costStr = y.irmaa_next_tier_annual_cost != null ? ` (+${formatCurrency(y.irmaa_next_tier_annual_cost)}/yr)` : '';
-    return `Tier ${y.irmaa_tier} · ${roomStr} to next${costStr} (${y.irmaa_premium_year})`;
+    // This year's income sets the premium two years later, so name that year as the one affected.
+    const costStr = y.irmaa_next_tier_annual_cost != null
+        ? ` (+${formatCurrency(y.irmaa_next_tier_annual_cost)}/yr on ${y.irmaa_premium_year} premiums)`
+        : ` (${y.irmaa_premium_year} premiums)`;
+    return `Tier ${y.irmaa_tier} · ${roomStr} to next tier${costStr}`;
 }
 
 const EXPLAINERS: [string, string][] = [
