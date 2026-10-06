@@ -80,14 +80,17 @@ tax-accuracy fixes in both projection engines. One schema change (V081).
   scenario with no Roth account sat at 0% for decades (one probe: $1.55M final
   balance instead of $7.47M). A zero-balance pool now uses its accounts' return
   weighted by contribution (or equally), and a pool with no accounts uses the
-  household's overall return, in both the projection and the Monte Carlo.
+  household's overall return, in both the projection and the Monte Carlo. A
+  negative contribution (a planned withdrawal) gets no weight in that blend.
 - **The spending optimizer now starts retirement from the balances you will
   have then.** Monte Carlo trials began in the retirement year from today's
   balances, ignoring the contributions and growth before retirement, so a
   29-year-old saving $45,500/yr was judged on a $25k portfolio while the
-  projection showed $3.87M. Accounts are now rolled forward to retirement the
-  same way the projection does (contributions, then growth) before the trials
-  begin. Market variation is still simulated from retirement onward only.
+  projection showed $3.87M. Each account is now rolled forward to retirement
+  at its own return (contributions, then growth) before the trials begin. The
+  projection grows each pool at one blended return instead, so for a pool that
+  mixes allocations the two balances at retirement can differ. Market
+  variation is still simulated from retirement onward only.
 - **A household's optimized spending plan now ends at the second death, like
   the projection.** The optimizer stopped simulating at the survivor's death
   but kept emitting yearly rows to the primary's end age, each repeating the
@@ -110,20 +113,28 @@ tax-accuracy fixes in both projection engines. One schema change (V081).
   - Accounts: `currency` must be three capital letters, and creating (or switching) an account
     in a currency with no exchange rate is rejected with a 400. `/dashboard/summary` leaves such
     an existing account out of the totals and lists it under `unconverted_accounts` rather than
-    failing. The Snapshot Forward Projection converts bank balances to USD. The accounts CSV
-    export gains a `currency` column (appended last).
+    failing. The Snapshot Forward Projection converts bank balances to USD and, like the
+    summary, leaves out such an account and lists it under `unconverted_accounts` instead of
+    failing. The accounts CSV export gains a `currency` column (appended last).
   - Transactions list newest first (date, then creation time), holdings by symbol. Editing a
     manual holding no longer leaves the dashboard stale for up to five minutes. Transaction,
-    holding and price symbols are trimmed and upper-cased on write. The viewer role can now be
-    assigned.
-  - Request validation: transactions (buy/sell quantity above 0, amount 0 or more, symbol
+    holding and price symbols are trimmed and upper-cased on write. Existing rows are not
+    rewritten: lookups and price deletes find a symbol as stored first, then its normalised
+    form. The viewer role can now be assigned.
+  - Request validation: transactions (a buy/sell quantity, when given, above 0; symbol
     length), holdings (quantity and cost basis 0 or more), account name length, spending
     profiles (blank name, negative amounts, tier ages 0-120 with end not before start),
     income sources (ages 0-120, end not before start), scenarios (inflation -5% to 20%,
     non-negative amounts, known withdrawal strategy, order, filing status and conversion
-    strategy values) and optimizer requests (at least one phase, phase ages, non-negative floor,
-    rates and risk tolerance in range) return 400 for clearly invalid input. Page and window
-    parameters are still clamped rather than rejected.
+    strategy values) and optimizer requests (phase ages, non-negative floor, rates and risk
+    tolerance in range) return 400 for clearly invalid input. Page and window parameters are
+    still clamped rather than rejected. The rules accept what the importers and earlier
+    versions stored, so existing rows stay editable: transaction amounts may be negative and a
+    buy or sell may have no quantity (it leaves the holding unchanged instead of failing the
+    holdings recompute); a scenario account linked to a real one may echo a
+    negative live balance or cost basis, and contributions may be negative; strategy fields
+    accept blank values, any letter case where the engine ignores case, and the old
+    comma-separated withdrawal order; and an optimizer request may have no phases.
 
 ## [1.2.8] — 2026-10-04
 
