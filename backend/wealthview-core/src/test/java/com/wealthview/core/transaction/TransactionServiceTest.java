@@ -125,8 +125,11 @@ class TransactionServiceTest {
     }
 
     @Test
-    void listByAccountAndSymbol_lowercaseSymbol_filtersOnNormalisedSymbol() {
+    void listByAccountAndSymbol_noExactMatch_fallsBackToNormalisedSymbol() {
         var pageable = PageRequest.of(0, 5);
+        when(transactionRepository.findByAccount_IdAndTenant_IdAndSymbol(
+                eq(accountId), eq(tenantId), eq(" msft"), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
         when(transactionRepository.findByAccount_IdAndTenant_IdAndSymbol(
                 eq(accountId), eq(tenantId), eq("MSFT"), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), pageable, 0));
@@ -135,6 +138,22 @@ class TransactionServiceTest {
 
         verify(transactionRepository).findByAccount_IdAndTenant_IdAndSymbol(
                 eq(accountId), eq(tenantId), eq("MSFT"), any(Pageable.class));
+    }
+
+    @Test
+    void listByAccountAndSymbol_legacyRowsStoredUnnormalised_returnsExactSymbolRows() {
+        var pageable = PageRequest.of(0, 5);
+        var legacy = new TransactionEntity(account, tenant, LocalDate.of(2020, 3, 1), BUY, "vti",
+                new BigDecimal("2"), new BigDecimal("300"));
+        when(transactionRepository.findByAccount_IdAndTenant_IdAndSymbol(
+                eq(accountId), eq(tenantId), eq("vti"), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(legacy), pageable, 1));
+
+        var result = transactionService.listByAccountAndSymbol(tenantId, accountId, "vti", pageable);
+
+        assertThat(result.data()).extracting(r -> r.symbol()).containsExactly("vti");
+        verify(transactionRepository, never()).findByAccount_IdAndTenant_IdAndSymbol(
+                eq(accountId), eq(tenantId), eq("VTI"), any(Pageable.class));
     }
 
     @Test

@@ -104,8 +104,11 @@ public class TransactionService {
     @Transactional(readOnly = true)
     public PageResponse<TransactionResponse> listByAccountAndSymbol(UUID tenantId, UUID accountId,
                                                                      String symbol, Pageable pageable) {
-        var page = transactionRepository.findByAccount_IdAndTenant_IdAndSymbol(
-                accountId, tenantId, Symbols.normalize(symbol), newestFirst(pageable));
+        var sorted = newestFirst(pageable);
+        var page = Symbols.lookUpExactThenNormalized(symbol,
+                candidate -> transactionRepository.findByAccount_IdAndTenant_IdAndSymbol(
+                        accountId, tenantId, candidate, sorted),
+                found -> found.getTotalElements() > 0);
         return PageResponse.from(page, TransactionResponse::from);
     }
 

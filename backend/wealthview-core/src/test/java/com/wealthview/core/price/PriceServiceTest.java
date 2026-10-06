@@ -70,11 +70,74 @@ class PriceServiceTest {
     @Test
     void getLatestPrice_lowercaseSymbol_looksUpNormalisedSymbol() {
         var price = new PriceEntity("MSFT", LocalDate.now(), new BigDecimal("420.00"), "manual");
+        when(priceRepository.findFirstBySymbolOrderByDateDesc(" msft")).thenReturn(Optional.empty());
         when(priceRepository.findFirstBySymbolOrderByDateDesc("MSFT")).thenReturn(Optional.of(price));
 
         var result = priceService.getLatestPrice(" msft");
 
         assertThat(result.symbol()).isEqualTo("MSFT");
+    }
+
+    @Test
+    void getLatestPrice_legacyRowStoredUnnormalised_findsExactSymbolFirst() {
+        var legacy = new PriceEntity(" AAPL", LocalDate.now(), new BigDecimal("185.50"), "manual");
+        when(priceRepository.findFirstBySymbolOrderByDateDesc(" AAPL")).thenReturn(Optional.of(legacy));
+
+        var result = priceService.getLatestPrice(" AAPL");
+
+        assertThat(result.symbol()).isEqualTo(" AAPL");
+        verify(priceRepository, never()).findFirstBySymbolOrderByDateDesc("AAPL");
+    }
+
+    @Test
+    void browseSymbol_legacyRowsStoredUnnormalised_returnsExactSymbolRows() {
+        var from = LocalDate.of(2024, 1, 1);
+        var to = LocalDate.of(2024, 1, 5);
+        var legacy = new PriceEntity("vti", LocalDate.of(2024, 1, 3), new BigDecimal("250"), "manual");
+        when(priceRepository.findBySymbolAndDateBetweenOrderByDateDesc("vti", from, to))
+                .thenReturn(List.of(legacy));
+
+        var result = priceService.browseSymbol("vti", from, to);
+
+        assertThat(result).extracting(r -> r.symbol()).containsExactly("vti");
+        verify(priceRepository, never()).findBySymbolAndDateBetweenOrderByDateDesc("VTI", from, to);
+    }
+
+    @Test
+    void browseSymbol_noExactMatch_fallsBackToNormalisedSymbol() {
+        var from = LocalDate.of(2024, 1, 1);
+        var to = LocalDate.of(2024, 1, 5);
+        var price = new PriceEntity("VTI", LocalDate.of(2024, 1, 3), new BigDecimal("250"), "yahoo");
+        when(priceRepository.findBySymbolAndDateBetweenOrderByDateDesc(" vti", from, to))
+                .thenReturn(List.of());
+        when(priceRepository.findBySymbolAndDateBetweenOrderByDateDesc("VTI", from, to))
+                .thenReturn(List.of(price));
+
+        var result = priceService.browseSymbol(" vti", from, to);
+
+        assertThat(result).extracting(r -> r.symbol()).containsExactly("VTI");
+    }
+
+    @Test
+    void deletePrice_legacyRowStoredUnnormalised_deletesExactRow() {
+        var date = LocalDate.of(2024, 1, 2);
+        when(priceRepository.existsById(new PriceId(" AAPL", date))).thenReturn(true);
+
+        priceService.deletePrice(" AAPL", date);
+
+        verify(priceRepository).deleteBySymbolAndDate(" AAPL", date);
+        verify(priceRepository, never()).deleteBySymbolAndDate("AAPL", date);
+    }
+
+    @Test
+    void deletePrice_noExactMatch_deletesNormalisedRow() {
+        var date = LocalDate.of(2024, 1, 2);
+        when(priceRepository.existsById(new PriceId("aapl", date))).thenReturn(false);
+        when(priceRepository.existsById(new PriceId("AAPL", date))).thenReturn(true);
+
+        priceService.deletePrice("aapl", date);
+
+        verify(priceRepository).deleteBySymbolAndDate("AAPL", date);
     }
 
     @Test

@@ -68,9 +68,9 @@ public class PriceService {
     }
 
     @Transactional(readOnly = true)
-    public PriceResponse getLatestPrice(String rawSymbol) {
-        var symbol = Symbols.normalize(rawSymbol);
-        return priceRepository.findFirstBySymbolOrderByDateDesc(symbol)
+    public PriceResponse getLatestPrice(String symbol) {
+        return Symbols.lookUpExactThenNormalized(symbol, priceRepository::findFirstBySymbolOrderByDateDesc,
+                        Optional::isPresent)
                 .map(PriceResponse::from)
                 .orElseThrow(() -> new EntityNotFoundException(
                         "No price found for symbol: " + symbol));
@@ -187,7 +187,9 @@ public class PriceService {
 
     @Transactional(readOnly = true)
     public List<PriceResponse> browseSymbol(String symbol, LocalDate from, LocalDate to) {
-        return priceRepository.findBySymbolAndDateBetweenOrderByDateDesc(Symbols.normalize(symbol), from, to)
+        return Symbols.lookUpExactThenNormalized(symbol,
+                        candidate -> priceRepository.findBySymbolAndDateBetweenOrderByDateDesc(candidate, from, to),
+                        found -> !found.isEmpty())
                 .stream()
                 .map(PriceResponse::from)
                 .toList();
@@ -196,12 +198,12 @@ public class PriceService {
     @EvictPriceDerivedCaches
     @Transactional
     public void deletePrice(String rawSymbol, LocalDate date) {
-        var symbol = Symbols.normalize(rawSymbol);
-        var priceId = new PriceId(symbol, date);
-        if (!priceRepository.existsById(priceId)) {
-            throw new EntityNotFoundException(
-                    "Price not found for symbol %s on %s".formatted(symbol, date));
-        }
+        var symbol = Symbols.lookUpExactThenNormalized(rawSymbol,
+                        candidate -> Optional.ofNullable(candidate)
+                                .filter(stored -> priceRepository.existsById(new PriceId(stored, date))),
+                        Optional::isPresent)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Price not found for symbol %s on %s".formatted(rawSymbol, date)));
         priceRepository.deleteBySymbolAndDate(symbol, date);
         log.info("Deleted price for {} on {}", symbol, date);
     }
