@@ -594,6 +594,28 @@ describe('SpendingOptimizerPage state machine', () => {
         await waitFor(() => expect(toastError).toHaveBeenCalledWith('Failed to load scenario'));
     });
 
+    it('shows an error with retry instead of an endless spinner when the scenario fails to load', async () => {
+        mockGetScenario.mockRejectedValueOnce(new Error('gone'));
+        mockGetProfile.mockResolvedValue(null);
+        renderPage();
+
+        expect(await screen.findByText('Failed to load scenario')).toBeInTheDocument();
+        expect(screen.queryByText('Loading scenario...')).not.toBeInTheDocument();
+
+        mockGetScenario.mockResolvedValue(mockScenario);
+        await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+        expect(await screen.findByText('Optimization Parameters')).toBeInTheDocument();
+    });
+
+    it('shows an error when the existing guardrail profile fails to load', async () => {
+        mockGetScenario.mockResolvedValue(mockScenario);
+        mockGetProfile.mockRejectedValueOnce(new Error('profile down'));
+        renderPage();
+
+        expect(await screen.findByText('Failed to load the saved optimizer profile')).toBeInTheDocument();
+    });
+
     it('shows the trial count while an optimisation is running', async () => {
         mockGetScenario.mockResolvedValue(mockScenario);
         mockGetProfile.mockResolvedValue(null);

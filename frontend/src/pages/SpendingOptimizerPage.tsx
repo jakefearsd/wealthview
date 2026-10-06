@@ -8,6 +8,7 @@ import { cardStyle, inputStyle } from '../utils/styles';
 import { formatWholeCurrency, yearOf } from '../utils/format';
 import { defaultOptimizerConfig, fromProfile, toRequest, type OptimizerConfig, type RiskTolerance } from '../utils/optimizerConfig';
 import LoadingState from '../components/LoadingState';
+import ErrorState from '../components/ErrorState';
 import CurrencyInput from '../components/CurrencyInput';
 import FormField from '../components/FormField';
 import PhaseEditor from '../components/PhaseEditor';
@@ -151,6 +152,10 @@ export default function SpendingOptimizerPage() {
     const [state, setState] = useState<OptimizerState>('configure');
     const [result, setResult] = useState<GuardrailProfileResponse | null>(null);
 
+    // A failed load shows an error with retry instead of an endless spinner; retrying re-runs the load effect.
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [loadAttempt, setLoadAttempt] = useState(0);
+
     // Advanced parameters section is collapsed by default; not part of the wire config itself.
     const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -165,15 +170,19 @@ export default function SpendingOptimizerPage() {
 
     useEffect(() => {
         if (!id) return;
-        getScenario(id).then(setScenario).catch(() => toast.error('Failed to load scenario'));
+        setLoadError(null);
+        getScenario(id).then(setScenario).catch(() => {
+            toast.error('Failed to load scenario');
+            setLoadError('Failed to load scenario');
+        });
         getGuardrailProfile(id).then(profile => {
             if (profile) {
                 setResult(profile);
                 setState('results');
                 setConfig(fromProfile(profile));
             }
-        });
-    }, [id]);
+        }).catch(() => setLoadError('Failed to load the saved optimizer profile'));
+    }, [id, loadAttempt]);
 
     const optimize = useApiMutation(
         (input: GuardrailOptimizationRequest) => optimizeSpending(id!, input),
@@ -212,6 +221,10 @@ export default function SpendingOptimizerPage() {
         setState('running');
         await reoptimizeMutation.mutate(undefined);
     };
+
+    if (loadError) {
+        return <ErrorState message={loadError} onRetry={() => setLoadAttempt(n => n + 1)} />;
+    }
 
     if (!scenario) {
         return <LoadingState message="Loading scenario..." />;
