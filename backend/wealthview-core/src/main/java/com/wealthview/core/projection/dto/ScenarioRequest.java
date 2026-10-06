@@ -17,6 +17,14 @@ import jakarta.validation.constraints.Pattern;
  * Request body for both scenario create and update — the two endpoints take
  * an identical payload. Implements {@link ScenarioParamsSource} so the params
  * blob is serialized through {@link ScenarioParams}.
+ *
+ * <p>The four strategy fields are checked against exactly what their parsers recognise, because the
+ * form sends stored values back on every save and a stored value the engine honours must stay
+ * saveable. Every parser treats a blank value as "not set". {@code FilingStatus.fromString} and
+ * {@code WithdrawalOrder.fromString} lower-case their input, so those two match case-insensitively;
+ * {@code WithdrawalStrategyFactory} and the {@code fill_bracket} check compare exactly, so those do
+ * not. {@code withdrawal_order} also keeps the pre-enum comma-list form
+ * ({@code "roth,taxable,traditional"}), which persisted scenarios may still hold.
  */
 public record ScenarioRequest(
         @NotBlank String name,
@@ -25,16 +33,15 @@ public record ScenarioRequest(
         @DecimalMin("-0.05") @DecimalMax("0.20") BigDecimal inflationRate,
         @Min(1900) @Max(2100) Integer birthYear,
         @DecimalMin("0") @DecimalMax("1") BigDecimal withdrawalRate,
-        @Pattern(regexp = "(fixed_percentage|dynamic_percentage|vanguard_dynamic_spending)?") String withdrawalStrategy,
+        @Pattern(regexp = WITHDRAWAL_STRATEGY_PATTERN) String withdrawalStrategy,
         @DecimalMin("-1") @DecimalMax("1") BigDecimal dynamicCeiling,
         @DecimalMin("-1") @DecimalMax("1") BigDecimal dynamicFloor,
-        @Pattern(regexp = "(single|married_filing_jointly)?") String filingStatus,
+        @Pattern(regexp = FILING_STATUS_PATTERN, flags = Pattern.Flag.CASE_INSENSITIVE) String filingStatus,
         @DecimalMin("0") BigDecimal otherIncome,
         @DecimalMin("0") BigDecimal annualRothConversion,
-        @Pattern(regexp = "(taxable_first|traditional_first|roth_first|pro_rata|dynamic_sequencing)?")
-        String withdrawalOrder,
+        @Pattern(regexp = WITHDRAWAL_ORDER_PATTERN, flags = Pattern.Flag.CASE_INSENSITIVE) String withdrawalOrder,
         @DecimalMin("0") @DecimalMax("0.5") BigDecimal dynamicSequencingBracketRate,
-        @Pattern(regexp = "(fixed_amount|fill_bracket)?") String rothConversionStrategy,
+        @Pattern(regexp = ROTH_CONVERSION_STRATEGY_PATTERN) String rothConversionStrategy,
         @DecimalMin("0") @DecimalMax("0.5") BigDecimal targetBracketRate,
         Integer rothConversionStartYear,
         String state,
@@ -60,6 +67,27 @@ public record ScenarioRequest(
         UUID spendingProfileId,
         Boolean useGuardrailProfile,
         List<ScenarioIncomeSourceInput> incomeSources) implements ScenarioParamsSource {
+
+    /** Blank, or a value {@code WithdrawalStrategyFactory} recognises (case-sensitive). */
+    static final String WITHDRAWAL_STRATEGY_PATTERN =
+            "\\s*|fixed_percentage|dynamic_percentage|vanguard_dynamic_spending";
+
+    /** Blank, or a value {@code FilingStatus.fromString} recognises; matched case-insensitively. */
+    static final String FILING_STATUS_PATTERN = "\\s*|single|married_filing_jointly";
+
+    /** One pool name in the legacy comma-list withdrawal order. */
+    private static final String LEGACY_POOL = "\\s*(?:taxable|traditional|roth)\\s*";
+
+    /**
+     * Blank, a {@code WithdrawalOrder} token, or the legacy comma list of pool names; matched
+     * case-insensitively.
+     */
+    static final String WITHDRAWAL_ORDER_PATTERN =
+            "\\s*|taxable_first|traditional_first|roth_first|pro_rata|dynamic_sequencing|"
+                    + LEGACY_POOL + "(?:," + LEGACY_POOL + ")*";
+
+    /** Blank, or a Roth conversion strategy the engine recognises (case-sensitive). */
+    static final String ROTH_CONVERSION_STRATEGY_PATTERN = "\\s*|fixed_amount|fill_bracket";
 
     /**
      * Back-compat convenience for callers that predate {@link #includeDepressionYears} (audit

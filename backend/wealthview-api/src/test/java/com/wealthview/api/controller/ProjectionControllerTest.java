@@ -505,4 +505,97 @@ class ProjectionControllerTest {
                                 """))
                 .andExpect(status().isCreated());
     }
+
+    private void assertScenarioAccepted(String extraFields, String accountsJson) throws Exception {
+        when(scenarioCrudService.createScenario(eq(TENANT_ID), any()))
+                .thenReturn(sampleScenario());
+
+        mockMvc.perform(post("/api/v1/projections")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Plan", "retirement_date": "2055-01-01", "end_age": 90,
+                                 "inflation_rate": 0.03, "birth_year": 1990%s,
+                                 "accounts": %s}
+                                """.formatted(extraFields, accountsJson)))
+                .andExpect(status().isCreated());
+    }
+
+    private void assertScenarioAccepted(String extraFields) throws Exception {
+        assertScenarioAccepted(extraFields, "[]");
+    }
+
+    @Test
+    void create_linkedAccountWithNegativeLiveBalanceAndCostBasis_returns201() throws Exception {
+        // A linked bank account echoes its live balance, which is negative after an import with
+        // no opening balance. The backend ignores both values for linked rows.
+        assertScenarioAccepted("", """
+                [{"linked_account_id": "%s", "initial_balance": -2000, "cost_basis": -2000,
+                  "annual_contribution": 0, "account_type": "taxable"}]""".formatted(UUID.randomUUID()));
+    }
+
+    @Test
+    void create_unlinkedNegativeCostBasis_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/projections")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Plan", "retirement_date": "2055-01-01", "end_age": 90,
+                                 "inflation_rate": 0.03, "birth_year": 1990,
+                                 "accounts": [{"initial_balance": 1000, "cost_basis": -1,
+                                               "annual_contribution": 0, "expected_return": 0.07}]}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void create_negativeAnnualContribution_returns201() throws Exception {
+        // A negative contribution models a planned pre-retirement withdrawal; legacy rows hold it.
+        assertScenarioAccepted("", """
+                [{"initial_balance": 100000, "annual_contribution": -10000, "expected_return": 0.07,
+                  "account_type": "taxable"}]""");
+    }
+
+    @Test
+    void create_legacyCommaListWithdrawalOrder_returns201() throws Exception {
+        assertScenarioAccepted(", \"withdrawal_order\": \"roth,taxable,traditional\"");
+    }
+
+    @Test
+    void create_legacyCommaListWithdrawalOrderWithSpaces_returns201() throws Exception {
+        assertScenarioAccepted(", \"withdrawal_order\": \"Traditional, Roth, Taxable\"");
+    }
+
+    @Test
+    void create_upperCaseWithdrawalOrder_returns201() throws Exception {
+        assertScenarioAccepted(", \"withdrawal_order\": \"TRADITIONAL_FIRST\"");
+    }
+
+    @Test
+    void create_upperCaseFilingStatus_returns201() throws Exception {
+        assertScenarioAccepted(", \"filing_status\": \"MARRIED_FILING_JOINTLY\"");
+    }
+
+    @Test
+    void create_whitespaceOnlyEnumFields_returns201() throws Exception {
+        // Every parser treats a blank value as "not set" and falls back to its default.
+        assertScenarioAccepted(", \"filing_status\": \" \", \"withdrawal_strategy\": \" \","
+                + " \"withdrawal_order\": \" \", \"roth_conversion_strategy\": \" \"");
+    }
+
+    @Test
+    void create_upperCaseWithdrawalStrategy_returns400() throws Exception {
+        // WithdrawalStrategyFactory matches case-sensitively, so an upper-case token was never honoured.
+        assertScenarioRejected("\"withdrawal_strategy\": \"DYNAMIC_PERCENTAGE\"");
+    }
+
+    @Test
+    void create_upperCaseRothConversionStrategy_returns400() throws Exception {
+        assertScenarioRejected("\"roth_conversion_strategy\": \"FILL_BRACKET\"");
+    }
+
+    @Test
+    void create_commaListWithUnknownPool_returns400() throws Exception {
+        assertScenarioRejected("\"withdrawal_order\": \"roth,brokerage\"");
+    }
 }
