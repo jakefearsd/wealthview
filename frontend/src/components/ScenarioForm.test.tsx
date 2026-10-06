@@ -469,6 +469,7 @@ describe('ScenarioForm', () => {
         it('shows the derived mix in the summary for a non-override account', () => {
             setupMocks();
             const scenario = makeScenario({
+                linked_account_id: 'ext-1',
                 allocation: { us_stock: 55, intl_stock: 25, bond: 15, cash: 5 },
                 allocation_is_override: false,
             });
@@ -478,9 +479,35 @@ describe('ScenarioForm', () => {
             expect(screen.getByText(/55\.0% US \/ 25\.0% Intl \/ 15\.0% Bond \/ 5\.0% Cash/)).toBeInTheDocument();
         });
 
+        it('says a manual account without an allocation defaults to 100% US stocks, not derived from holdings', () => {
+            setupMocks();
+            render(<ScenarioForm initialValues={makeScenario({ linked_account_id: null, allocation: null })} onSubmit={vi.fn()} submitLabel="Save" />);
+
+            expect(screen.getByText('Default: 100% US stocks')).toBeInTheDocument();
+            expect(screen.queryByText(/Derived from holdings/)).not.toBeInTheDocument();
+        });
+
+        it('keeps the derived-from-holdings copy for a linked account', () => {
+            setupMocks();
+            render(<ScenarioForm initialValues={makeScenario({ linked_account_id: 'ext-1', allocation: null })} onSubmit={vi.fn()} submitLabel="Save" />);
+
+            expect(screen.getByText(/Derived from holdings/)).toBeInTheDocument();
+            expect(screen.queryByText('Default: 100% US stocks')).not.toBeInTheDocument();
+        });
+
+        it('renders the linked cost-basis placeholder at the same font size as the inputs around it', () => {
+            setupMocks();
+            render(<ScenarioForm initialValues={makeScenario({ linked_account_id: 'ext-1', cost_basis: null })} onSubmit={vi.fn()} submitLabel="Save" />);
+
+            const placeholder = screen.getByText('Available after first run');
+
+            expect(placeholder.style.fontSize).toBe('0.8333rem');
+        });
+
         it('does not echo a former override as the derived mix after reset-to-derived', () => {
             setupMocks();
             const scenario = makeScenario({
+                linked_account_id: 'ext-1',
                 allocation: { us_stock: 61, intl_stock: 19, bond: 12, cash: 8 },
                 allocation_is_override: true,
             });

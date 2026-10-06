@@ -13,6 +13,9 @@ const ACCOUNT_TYPE_HELP: Record<string, string> = {
     roth: 'After-tax contributions. Growth and qualified withdrawals in retirement are completely tax-free.',
 };
 
+/** Browsers render form controls at 13.33px, not the 16px body size; read-only stand-ins must match. */
+const INPUT_FONT_SIZE = '0.8333rem';
+
 function formatAllocationSummary(a: AllocationInput): string {
     return `${a.us_stock.toFixed(1)}% US / ${a.intl_stock.toFixed(1)}% Intl / ${a.bond.toFixed(1)}% Bond / ${a.cash.toFixed(1)}% Cash`;
 }
@@ -151,20 +154,26 @@ export default function ScenarioAccountsSection({
                                     onChange={v => onUpdateAccount(idx, 'cost_basis', v ? Number(v) : null)}
                                 />
                             ) : (
-                                <div style={{ ...inputStyle, background: '#f5f5f5' }}>
+                                <div style={{ ...inputStyle, background: '#f5f5f5', fontSize: INPUT_FONT_SIZE }}>
                                     {acct.cost_basis != null ? formatCurrency(acct.cost_basis) : 'Available after first run'}
                                 </div>
                             )}
                         </FormField>
                         <FormField
                             label="Allocation"
-                            helpText="US/Intl stocks, bonds, and cash drive the account's projected return. Leave derived to use the linked holdings' actual mix."
+                            helpText={acct.linked_account_id
+                                ? "US/Intl stocks, bonds, and cash drive the account's projected return. Leave derived to use the linked holdings' actual mix."
+                                : "US/Intl stocks, bonds, and cash drive the account's projected return. A manual account with no allocation is projected as 100% US stocks."}
                         >
                             {acct.allocation == null ? (
                                 <div>
                                     <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.4rem' }}>
-                                        Derived from holdings
-                                        {derivedAllocations[idx] && ` (${formatAllocationSummary(derivedAllocations[idx] as AllocationInput)})`}
+                                        {acct.linked_account_id ? (
+                                            <>
+                                                Derived from holdings
+                                                {derivedAllocations[idx] && ` (${formatAllocationSummary(derivedAllocations[idx] as AllocationInput)})`}
+                                            </>
+                                        ) : 'Default: 100% US stocks'}
                                     </div>
                                     <button
                                         type="button"
