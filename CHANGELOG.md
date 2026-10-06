@@ -92,6 +92,33 @@ tax-accuracy fixes in both projection engines. One schema change (V081).
   the projection.** The optimizer stopped simulating at the survivor's death
   but kept emitting yearly rows to the primary's end age, each repeating the
   same frozen balance.
+- **Backend misc fixes from the bug hunt:**
+  - A wrong-verb request (for example `GET /auth/login`) now returns 405, an unsupported
+    content type 415 and a missing required query parameter 400, instead of a 500.
+  - Properties: `loan_term_months` of 0 and `useful_life_years` of 0 or less (which crashed the
+    cash-flow and depreciation views with a 500) are rejected, as are interest rates outside
+    0-1, appreciation outside -100% to +100%, a bonus rate outside 0-1, negative tax, insurance,
+    maintenance or land value, and a land value above the purchase price. Already-stored bad
+    rows now read as a zero payment or an empty schedule instead of failing. The equity-growth
+    chart values months before the first valuation on a straight line from the purchase price to
+    today's value instead of today's value throughout.
+  - Accounts: `currency` must be three capital letters, and creating (or switching) an account
+    in a currency with no exchange rate is rejected with a 400. `/dashboard/summary` leaves such
+    an existing account out of the totals and lists it under `unconverted_accounts` rather than
+    failing. The Snapshot Forward Projection converts bank balances to USD. The accounts CSV
+    export gains a `currency` column (appended last).
+  - Transactions list newest first (date, then creation time), holdings by symbol. Editing a
+    manual holding no longer leaves the dashboard stale for up to five minutes. Transaction,
+    holding and price symbols are trimmed and upper-cased on write. The viewer role can now be
+    assigned.
+  - Request validation: transactions (buy/sell quantity above 0, amount 0 or more, symbol
+    length), holdings (quantity and cost basis 0 or more), account name length, spending
+    profiles (blank name, negative amounts, tier ages 0-120 with end not before start),
+    income sources (ages 0-120, end not before start), scenarios (inflation -5% to 20%,
+    non-negative amounts, known withdrawal strategy, order, filing status and conversion
+    strategy values) and optimizer requests (at least one phase, phase ages, non-negative floor,
+    rates and risk tolerance in range) return 400 for clearly invalid input. Page and window
+    parameters are still clamped rather than rejected.
 
 ## [1.2.8] — 2026-10-04
 

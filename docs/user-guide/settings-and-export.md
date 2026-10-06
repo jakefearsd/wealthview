@@ -263,7 +263,7 @@ Four buttons, one per table:
 
 | Export | Columns |
 |--------|---------|
-| **accounts** | `id, name, type, institution, created_at` |
+| **accounts** | `id, name, type, institution, created_at, currency` |
 | **transactions** | `id, account_id, date, type, symbol, quantity, amount, created_at` |
 | **holdings** | `id, account_id, symbol, quantity, cost_basis, is_manual_override, as_of_date` |
 | **properties** | `id, address, purchase_price, purchase_date, current_value, mortgage_balance, property_type` |
