@@ -7,6 +7,9 @@ export {
     formatWholeCurrency,
     formatCompactCurrency,
     formatPercent,
+    formatDate,
+    todayIso,
+    yearOf,
 } from './format';
 export { createApiClient } from './api/client';
 export type { ApiClientConfig } from './api/client';

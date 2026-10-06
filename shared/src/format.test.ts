@@ -7,6 +7,9 @@ import {
     formatWholeCurrency,
     formatCompactCurrency,
     formatPercent,
+    formatDate,
+    todayIso,
+    yearOf,
 } from './format';
 
 describe('toPercent', () => {
@@ -154,5 +157,36 @@ describe('formatPercent', () => {
     it('returns a placeholder for null and undefined', () => {
         expect(formatPercent(null)).toBe('--');
         expect(formatPercent(undefined)).toBe('--');
+    });
+});
+
+describe('yearOf', () => {
+    it('reads the year from an ISO date without timezone shifting', () => {
+        // new Date('2030-01-01').getFullYear() is 2029 west of UTC.
+        expect(yearOf('2030-01-01')).toBe(2030);
+        expect(yearOf('2030-12-31T23:59:59Z')).toBe(2030);
+    });
+});
+
+describe('formatDate', () => {
+    it('keeps date-only ISO strings as-is instead of parsing them as UTC', () => {
+        expect(formatDate('2030-01-01')).toBe('2030-01-01');
+    });
+
+    it('formats Date objects and timestamps as the local calendar date', () => {
+        expect(formatDate(new Date(2026, 9, 5, 23, 30))).toBe('2026-10-05');
+        expect(formatDate(new Date(2026, 0, 9, 0, 5).toISOString())).toBe('2026-01-09');
+    });
+
+    it('renders nullish and unparseable values as the placeholder', () => {
+        expect(formatDate(null)).toBe('--');
+        expect(formatDate(undefined)).toBe('--');
+        expect(formatDate('not a date')).toBe('--');
+    });
+});
+
+describe('todayIso', () => {
+    it('uses the local calendar date, not the UTC one', () => {
+        expect(todayIso(new Date(2026, 9, 5, 23, 30))).toBe('2026-10-05');
     });
 });

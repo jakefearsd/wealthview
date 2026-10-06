@@ -64,3 +64,36 @@ export function formatCurrencyInput(value: string | number): string {
     }
     return formatted;
 }
+
+const ISO_DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+function localIsoDate(date: Date): string {
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/**
+ * Year of an ISO date string ("2030-01-01" -> 2030). Reads the digits directly because
+ * `new Date('2030-01-01')` is UTC midnight, which is still 2029 in any timezone west of UTC.
+ */
+export function yearOf(isoDate: string): number {
+    return Number(isoDate.slice(0, 4));
+}
+
+/**
+ * Display a date as YYYY-MM-DD. Date-only strings pass through untouched (no UTC shift);
+ * timestamps and Date objects render as the local calendar date. Nullish or unparseable
+ * values render as "--".
+ */
+export function formatDate(value: string | Date | null | undefined): string {
+    if (value == null) return NULLISH_PLACEHOLDER;
+    if (typeof value === 'string' && ISO_DATE_ONLY.test(value)) return value;
+    const date = typeof value === 'string' ? new Date(value) : value;
+    return Number.isNaN(date.getTime()) ? NULLISH_PLACEHOLDER : localIsoDate(date);
+}
+
+/** Today's local calendar date as YYYY-MM-DD (unlike `toISOString()`, which is the UTC date). */
+export function todayIso(now: Date = new Date()): string {
+    return localIsoDate(now);
+}

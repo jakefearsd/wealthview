@@ -9,4 +9,7 @@ export {
     formatWholeCurrency,
     formatCompactCurrency,
     formatPercent,
+    formatDate,
+    todayIso,
+    yearOf,
 } from '@wealthview/shared';
