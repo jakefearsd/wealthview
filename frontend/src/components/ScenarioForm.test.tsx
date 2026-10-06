@@ -1068,7 +1068,7 @@ describe('ScenarioForm', () => {
             return onSubmit.mock.calls[0][0];
         }
 
-        it('is always shown in Tax Configuration and sent even with no Roth conversion', async () => {
+        it('is always shown in Tax Configuration and sends null when never picked', async () => {
             setupMocks();
             const onSubmit = vi.fn().mockResolvedValue(undefined);
             render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
@@ -1076,11 +1076,11 @@ describe('ScenarioForm', () => {
             expect(labeledInput<HTMLSelectElement>('Filing Status').value).toBe('single');
 
             const call = await submitAndCapture(onSubmit);
-            expect(call.filing_status).toBe('single');
+            expect(call.filing_status).toBeNull();
             expect(call.annual_roth_conversion).toBeNull();
         });
 
-        it('defaults to married filing jointly once a spouse birth year is entered', async () => {
+        it('displays married filing jointly once a spouse is added but still sends null', async () => {
             setupMocks();
             const onSubmit = vi.fn().mockResolvedValue(undefined);
             render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
@@ -1089,7 +1089,7 @@ describe('ScenarioForm', () => {
 
             expect(labeledInput<HTMLSelectElement>('Filing Status').value).toBe('married_filing_jointly');
             const call = await submitAndCapture(onSubmit);
-            expect(call.filing_status).toBe('married_filing_jointly');
+            expect(call.filing_status).toBeNull();
         });
 
         it('falls back to single when the spouse is removed and no status was picked', () => {
@@ -1115,7 +1115,7 @@ describe('ScenarioForm', () => {
             expect(call.filing_status).toBe('single');
         });
 
-        it('resolves a saved household scenario with no filing_status to married filing jointly', async () => {
+        it('shows married filing jointly for a saved household scenario with no filing_status but sends null', async () => {
             setupMocks();
             const scenario = makeScenario({});
             scenario.params_json = JSON.stringify({ birth_year: 1960, spouse_birth_year: 1962 });
@@ -1124,7 +1124,22 @@ describe('ScenarioForm', () => {
 
             expect(labeledInput<HTMLSelectElement>('Filing Status').value).toBe('married_filing_jointly');
             const call = await submitAndCapture(onSubmit);
-            expect(call.filing_status).toBe('married_filing_jointly');
+            expect(call.filing_status).toBeNull();
+        });
+
+        it('keeps following the household when a legacy scenario with no status gains a spouse', async () => {
+            setupMocks();
+            const scenario = makeScenario({});
+            scenario.params_json = JSON.stringify({ birth_year: 1960 });
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm initialValues={scenario} onSubmit={onSubmit} submitLabel="Save" />);
+
+            expect(labeledInput<HTMLSelectElement>('Filing Status').value).toBe('single');
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1962' } });
+
+            expect(labeledInput<HTMLSelectElement>('Filing Status').value).toBe('married_filing_jointly');
+            const call = await submitAndCapture(onSubmit);
+            expect(call.filing_status).toBeNull();
         });
 
         it('round-trips a saved explicit filing_status unchanged', async () => {

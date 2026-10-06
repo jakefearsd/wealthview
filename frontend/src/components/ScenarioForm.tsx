@@ -14,7 +14,6 @@ import ScenarioAccountsSection from './scenario/ScenarioAccountsSection';
 import {
     DEFAULT_SURVIVOR_SPENDING_FACTOR,
     DEFAULT_LONGEVITY_CONDITIONAL_AGE,
-    effectiveFilingStatus,
     type ScenarioFormFields,
 } from './scenario/scenarioFormFields';
 import { isAllocationValid } from '../utils/allocation';
@@ -264,9 +263,9 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 withdrawal_strategy: withdrawalStrategy,
                 dynamic_ceiling: withdrawalStrategy === 'vanguard_dynamic_spending' ? dynamicCeiling / 100 : null,
                 dynamic_floor: withdrawalStrategy === 'vanguard_dynamic_spending' ? dynamicFloor / 100 : null,
-                // Always sent: filing status sets the brackets and deduction for every scenario,
-                // not only ones with Roth conversions.
-                filing_status: effectiveFilingStatus(fields),
+                // Only an explicit pick is sent. An untouched select sends null so the backend keeps
+                // resolving the status from the household (married when a spouse is present).
+                filing_status: fields.filingStatus,
                 // Always sent: other income shifts the tax bracket for every scenario, not only ones with conversions.
                 other_income: otherIncome > 0 ? otherIncome : null,
                 annual_roth_conversion: rothConversionStrategy === 'fixed_amount' && annualRothConversion > 0 ? annualRothConversion : null,
