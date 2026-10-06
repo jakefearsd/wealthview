@@ -10,7 +10,7 @@ import { trailingTwelveMonthRange } from '../utils/dateRange';
 import { annualDebtService, loanTermsOf } from '../utils/amortization';
 import { formatCurrency } from '../utils/format';
 import { legendTextFormatter } from './legendTextFormatter';
-import { MONTH_ABBREVIATIONS } from '../utils/chartFormatters';
+import { MONTH_ABBREVIATIONS, formatDollarAxis } from '../utils/chartFormatters';
 import { cardStyle } from '../utils/styles';
 import StatTile from './StatTile';
 import ChartTooltip from './ChartTooltip';
@@ -358,7 +358,7 @@ function TrailingView({ data, monthlyRent, propertyId }: { data: MonthlyCashFlow
                     <YAxis
                         domain={[yMin, yMax]}
                         tick={{ fontSize: 11 }}
-                        tickFormatter={(v: number) => `$${Math.abs(v / 1000).toFixed(1)}k`}
+                        tickFormatter={formatDollarAxis}
                     />
                     <Tooltip content={<ChartTooltip renderContent={trailingTooltipContent} />} />
                     <Legend formatter={legendTextFormatter} />
@@ -445,7 +445,7 @@ function ForwardView({
                     <YAxis
                         domain={[yMin, yMax]}
                         tick={{ fontSize: 11 }}
-                        tickFormatter={(v: number) => `$${Math.abs(v / 1000).toFixed(0)}k`}
+                        tickFormatter={formatDollarAxis}
                     />
                     <Tooltip content={<ChartTooltip<ForwardRow> renderContent={forwardTooltipContent} />} />
                     <Legend formatter={legendTextFormatter} />
