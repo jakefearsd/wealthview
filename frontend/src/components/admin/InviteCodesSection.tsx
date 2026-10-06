@@ -3,7 +3,9 @@ import { listInviteCodes, generateInviteCodeWithExpiry, revokeInviteCode, delete
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { useApiMutation } from '../../hooks/useApiMutation';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
+import { formatDate } from '../../utils/format';
 import Button from '../Button';
+import ErrorState from '../ErrorState';
 import LinkButton from '../LinkButton';
 import toast from 'react-hot-toast';
 
@@ -32,7 +34,7 @@ function getStatusColor(status: string): { background: string; color: string } {
 }
 
 export default function InviteCodesSection() {
-    const { data: codes, refetch } = useApiQuery(listInviteCodes);
+    const { data: codes, error, refetch } = useApiQuery(listInviteCodes);
     const [expiryDays, setExpiryDays] = useState(7);
 
     const generateMutation = useApiMutation(
@@ -82,6 +84,8 @@ export default function InviteCodesSection() {
     }
 
     const hasUsedCodes = codes?.some((c) => c.consumed) ?? false;
+
+    if (error && !codes) return <ErrorState message={error} onRetry={refetch} />;
 
     return (
         <div>
@@ -136,10 +140,10 @@ export default function InviteCodesSection() {
                                         {code.created_by_email ?? '-'}
                                     </td>
                                     <td style={{ ...tdStyle, fontSize: '0.85rem', color: '#666' }}>
-                                        {new Date(code.created_at).toLocaleDateString()}
+                                        {formatDate(code.created_at)}
                                     </td>
                                     <td style={{ ...tdStyle, fontSize: '0.85rem', color: '#666' }}>
-                                        {new Date(code.expires_at).toLocaleDateString()}
+                                        {formatDate(code.expires_at)}
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: 'center' }}>
                                         <span style={{

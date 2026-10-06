@@ -105,4 +105,11 @@ describe('ExchangeRatesSection', () => {
         });
         expect(toastError.mock.calls[0][0]).toMatch(/Failed to load exchange rates/);
     });
+
+    it('shows the last-updated date as an ISO date', async () => {
+        vi.mocked(listExchangeRates).mockResolvedValue([{ ...rate, updated_at: '2026-04-10T12:00:00Z' }]);
+        render(<ExchangeRatesSection />);
+
+        expect(await screen.findByText('2026-04-10')).toBeInTheDocument();
+    });
 });

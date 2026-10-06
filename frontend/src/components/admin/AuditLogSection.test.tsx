@@ -56,4 +56,12 @@ describe('AuditLogSection', () => {
             expect(getAuditLogs).toHaveBeenLastCalledWith(0, 50, 'account');
         });
     });
+
+    it('shows the error rather than "No audit log entries" when the load fails', async () => {
+        vi.mocked(getAuditLogs).mockRejectedValue(new Error('Audit unavailable'));
+        render(<AuditLogSection />);
+
+        expect(await screen.findByText('Audit unavailable')).toBeInTheDocument();
+        expect(screen.queryByText('No audit log entries')).not.toBeInTheDocument();
+    });
 });

@@ -3,10 +3,12 @@ import { listTenantDetails, createTenant, setTenantActive } from '../../api/admi
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { useApiMutation } from '../../hooks/useApiMutation';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
+import { formatDate } from '../../utils/format';
 import Button from '../Button';
+import ErrorState from '../ErrorState';
 
 export default function TenantsSection() {
-    const { data: tenants, loading, refetch } = useApiQuery(listTenantDetails);
+    const { data: tenants, loading, error, refetch } = useApiQuery(listTenantDetails);
     const [newName, setNewName] = useState('');
 
     const createMutation = useApiMutation(
@@ -39,6 +41,7 @@ export default function TenantsSection() {
     }
 
     if (loading) return <div>Loading...</div>;
+    if (error && !tenants) return <ErrorState message={error} onRetry={refetch} />;
 
     return (
         <div>
@@ -91,7 +94,7 @@ export default function TenantsSection() {
                                     </span>
                                 </td>
                                 <td style={{ ...tdStyle, fontSize: '0.85rem', color: '#666' }}>
-                                    {new Date(t.created_at).toLocaleDateString()}
+                                    {formatDate(t.created_at)}
                                 </td>
                                 <td style={{ ...tdStyle, textAlign: 'center' }}>
                                     <button

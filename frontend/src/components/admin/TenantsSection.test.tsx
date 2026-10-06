@@ -79,4 +79,23 @@ describe('TenantsSection', () => {
             expect(setTenantActive).toHaveBeenCalledWith('t-1', false);
         });
     });
+
+    it('shows an error with retry rather than an empty table when tenants fail to load', () => {
+        const refetch = vi.fn();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockUseApiQuery.mockReturnValue({ data: null, loading: false, error: 'Tenants unavailable', refetch } as any);
+        render(<TenantsSection />);
+
+        expect(screen.getByText('Tenants unavailable')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+        expect(refetch).toHaveBeenCalled();
+    });
+
+    it('shows the created date as an ISO date', () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockUseApiQuery.mockReturnValue({ data: [{ ...acmeTenant, created_at: '2026-01-01T12:00:00Z' }], loading: false, error: null, refetch: vi.fn() } as any);
+        render(<TenantsSection />);
+
+        expect(screen.getByText('2026-01-01')).toBeInTheDocument();
+    });
 });

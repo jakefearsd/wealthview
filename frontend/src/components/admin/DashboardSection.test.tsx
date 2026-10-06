@@ -88,4 +88,31 @@ describe('DashboardSection', () => {
             expect(syncFinnhub).toHaveBeenCalled();
         });
     });
+
+    it('shows an error with retry instead of zeroed stats when the stats call fails', () => {
+        const refetch = vi.fn();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockUseApiQuery.mockReturnValue({ data: null, loading: false, error: 'Stats unavailable', refetch } as any);
+        render(<DashboardSection />);
+
+        expect(screen.getByText('Stats unavailable')).toBeInTheDocument();
+        expect(screen.queryByText('Total Users')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+        expect(refetch).toHaveBeenCalled();
+    });
+
+    it('shows the error rather than "No login activity recorded" when the activity call fails', () => {
+        let call = 0;
+        mockUseApiQuery.mockImplementation(() => {
+            call++;
+            return call % 2 === 1
+                ? { data: stats, loading: false, error: null, refetch: vi.fn() }
+                : { data: null, loading: false, error: 'Activity unavailable', refetch: vi.fn() };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any;
+        render(<DashboardSection />);
+
+        expect(screen.getByText('Activity unavailable')).toBeInTheDocument();
+        expect(screen.queryByText('No login activity recorded')).not.toBeInTheDocument();
+    });
 });

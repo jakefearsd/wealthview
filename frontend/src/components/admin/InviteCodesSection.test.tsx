@@ -93,4 +93,25 @@ describe('InviteCodesSection', () => {
         render(<InviteCodesSection />);
         expect(screen.queryByText('ABC12345')).not.toBeInTheDocument();
     });
+
+    it('shows an error with retry rather than "No invite codes" when the list fails to load', () => {
+        const refetch = vi.fn();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockUseApiQuery.mockReturnValue({ data: null, loading: false, error: 'Codes unavailable', refetch } as any);
+        render(<InviteCodesSection />);
+
+        expect(screen.getByText('Codes unavailable')).toBeInTheDocument();
+        expect(screen.queryByText('No invite codes')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+        expect(refetch).toHaveBeenCalled();
+    });
+
+    it('shows created and expiry dates as ISO dates', () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockUseApiQuery.mockReturnValue({ data: [{ ...activeCode, created_at: '2026-04-01', expires_at: '2099-04-08' }], loading: false, error: null, refetch: vi.fn() } as any);
+        render(<InviteCodesSection />);
+
+        expect(screen.getByText('2026-04-01')).toBeInTheDocument();
+        expect(screen.getByText('2099-04-08')).toBeInTheDocument();
+    });
 });

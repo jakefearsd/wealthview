@@ -9,7 +9,9 @@ import type { StockSplit } from '../../api/stockSplits';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { useApiMutation } from '../../hooks/useApiMutation';
 import { cardStyle, inputStyle, tableStyle, thStyle, tdStyle } from '../../utils/styles';
+import { formatDate } from '../../utils/format';
 import Button from '../Button';
+import ErrorState from '../ErrorState';
 import toast from 'react-hot-toast';
 
 const sourceLabel: Record<StockSplit['source'], string> = {
@@ -20,7 +22,7 @@ const sourceLabel: Record<StockSplit['source'], string> = {
 };
 
 export default function StockSplitsSection() {
-    const { data: splits, refetch, loading } = useApiQuery(() => listStockSplits());
+    const { data: splits, refetch, loading, error } = useApiQuery(() => listStockSplits());
     const [form, setForm] = useState({
         symbol: '',
         effective_date: '',
@@ -109,12 +111,14 @@ export default function StockSplitsSection() {
                 <form onSubmit={handleCreate} style={{ display: 'grid', gap: '0.75rem', gridTemplateColumns: '1fr 1fr 1fr 1fr auto' }}>
                     <input
                         style={inputStyle}
+                        aria-label="Symbol"
                         placeholder="Symbol (e.g. AAPL)"
                         value={form.symbol}
                         onChange={(e) => setForm({ ...form, symbol: e.target.value })}
                     />
                     <input
                         type="date"
+                        aria-label="Effective date"
                         style={inputStyle}
                         value={form.effective_date}
                         onChange={(e) => setForm({ ...form, effective_date: e.target.value })}
@@ -123,6 +127,7 @@ export default function StockSplitsSection() {
                         type="number"
                         min={1}
                         style={inputStyle}
+                        aria-label="Numerator"
                         placeholder="Numerator"
                         value={form.numerator}
                         onChange={(e) => setForm({ ...form, numerator: e.target.value })}
@@ -131,6 +136,7 @@ export default function StockSplitsSection() {
                         type="number"
                         min={1}
                         style={inputStyle}
+                        aria-label="Denominator"
                         placeholder="Denominator"
                         value={form.denominator}
                         onChange={(e) => setForm({ ...form, denominator: e.target.value })}
@@ -144,10 +150,11 @@ export default function StockSplitsSection() {
             <div style={cardStyle}>
                 <h3 style={{ marginTop: 0 }}>Applied splits</h3>
                 {loading && <p style={{ color: '#666' }}>Loading...</p>}
-                {!loading && splits && splits.length === 0 && (
+                {!loading && error && <ErrorState message={error} onRetry={refetch} />}
+                {!loading && !error && splits && splits.length === 0 && (
                     <p style={{ color: '#666' }}>No splits have been applied yet.</p>
                 )}
-                {!loading && splits && splits.length > 0 && (
+                {!loading && !error && splits && splits.length > 0 && (
                     <table style={tableStyle}>
                         <thead>
                             <tr>
@@ -163,7 +170,7 @@ export default function StockSplitsSection() {
                             {splits.map((s) => (
                                 <tr key={s.id}>
                                     <td style={tdStyle}>{s.symbol}</td>
-                                    <td style={tdStyle}>{s.effective_date}</td>
+                                    <td style={tdStyle}>{formatDate(s.effective_date)}</td>
                                     <td style={tdStyle}>{s.numerator}:{s.denominator}</td>
                                     <td style={tdStyle}>{sourceLabel[s.source]}</td>
                                     <td style={tdStyle}>{new Date(s.applied_at).toLocaleString()}</td>

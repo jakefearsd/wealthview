@@ -186,4 +186,22 @@ describe('StockSplitsSection', () => {
         await waitFor(() => expect(toastError).toHaveBeenCalled());
         expect(screen.getByText('AAPL')).toBeInTheDocument();
     });
+
+    it('gives the manual-split inputs accessible names', async () => {
+        render(<StockSplitsSection />);
+        await screen.findByText('AAPL');
+
+        expect(screen.getByLabelText('Symbol')).toBeInTheDocument();
+        expect(screen.getByLabelText('Effective date')).toBeInTheDocument();
+        expect(screen.getByLabelText('Numerator')).toBeInTheDocument();
+        expect(screen.getByLabelText('Denominator')).toBeInTheDocument();
+    });
+
+    it('shows the error rather than the empty message when the splits fail to load', async () => {
+        vi.mocked(listStockSplits).mockRejectedValue(new Error('Splits unavailable'));
+        render(<StockSplitsSection />);
+
+        expect(await screen.findByText('Splits unavailable')).toBeInTheDocument();
+        expect(screen.queryByText('No splits have been applied yet.')).not.toBeInTheDocument();
+    });
 });

@@ -4,6 +4,7 @@ import type { SystemStats, LoginActivity } from '../../api/adminSystem';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { useApiMutation } from '../../hooks/useApiMutation';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
+import ErrorState from '../ErrorState';
 
 const statCardStyle = {
     ...cardStyle,
@@ -22,8 +23,8 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 }
 
 export default function DashboardSection() {
-    const { data: stats, loading: statsLoading } = useApiQuery<SystemStats>(getSystemStats);
-    const { data: activity, loading: activityLoading } = useApiQuery<LoginActivity[]>(
+    const { data: stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useApiQuery<SystemStats>(getSystemStats);
+    const { data: activity, loading: activityLoading, error: activityError, refetch: refetchActivity } = useApiQuery<LoginActivity[]>(
         () => getLoginActivity(50)
     );
     const finnhubMutation = useApiMutation(
@@ -47,6 +48,7 @@ export default function DashboardSection() {
     }
 
     if (statsLoading) return <div>Loading dashboard...</div>;
+    if (statsError) return <ErrorState message={statsError} onRetry={refetchStats} />;
 
     return (
         <div>
@@ -110,6 +112,8 @@ export default function DashboardSection() {
                 <h3 style={{ marginBottom: '1rem' }}>Recent Login Activity</h3>
                 {activityLoading ? (
                     <div>Loading...</div>
+                ) : activityError ? (
+                    <ErrorState message={activityError} onRetry={refetchActivity} />
                 ) : (
                     <table style={tableStyle}>
                         <thead>

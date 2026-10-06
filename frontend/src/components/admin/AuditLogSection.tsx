@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { getAuditLogs } from '../../api/audit';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
+import ErrorState from '../ErrorState';
 
 const ENTITY_TYPES = ['', 'account', 'transaction', 'holding', 'property', 'user', 'tenant'];
 
@@ -9,11 +10,11 @@ export default function AuditLogSection() {
     const [filter, setFilter] = useState('');
     const [page, setPage] = useState(0);
 
-    const { data, loading, error } = useApiQuery(
+    const { data, loading, error, refetch } = useApiQuery(
         () => getAuditLogs(page, 50, filter || undefined),
         [page, filter],
     );
-    const entries = error ? [] : (data?.data ?? []);
+    const entries = data?.data ?? [];
     const total = data?.total ?? 0;
 
     return (
@@ -37,6 +38,8 @@ export default function AuditLogSection() {
             <div style={cardStyle}>
                 {loading ? (
                     <div>Loading...</div>
+                ) : error ? (
+                    <ErrorState message={error} onRetry={refetch} />
                 ) : (
                     <>
                         <table style={tableStyle}>

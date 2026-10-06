@@ -4,6 +4,7 @@ import { useApiQuery } from '../../hooks/useApiQuery';
 import { useApiMutation } from '../../hooks/useApiMutation';
 import { cardStyle, inputFieldStyle } from '../../utils/styles';
 import { extractErrorMessage } from '../../utils/errorMessage';
+import { formatDate } from '../../utils/format';
 import Button from '../Button';
 import toast from 'react-hot-toast';
 
@@ -164,7 +165,7 @@ export default function ExchangeRatesSection() {
                                         )}
                                     </td>
                                     <td style={{ padding: '0.5rem', color: '#999', fontSize: '0.85rem' }}>
-                                        {new Date(rate.updated_at).toLocaleDateString()}
+                                        {formatDate(rate.updated_at)}
                                     </td>
                                     <td style={{ padding: '0.5rem', textAlign: 'right' }}>
                                         {editingCode !== rate.currency_code && (
