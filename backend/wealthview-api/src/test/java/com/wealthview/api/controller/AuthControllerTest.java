@@ -64,6 +64,32 @@ class AuthControllerTest {
     private SessionStateValidator sessionStateValidator;
 
     @Test
+    void login_getRequest_returns405WithErrorEnvelope() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/login"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(header().string("Allow", "POST"))
+                .andExpect(jsonPath("$.error").value("METHOD_NOT_ALLOWED"))
+                .andExpect(jsonPath("$.status").value(405));
+    }
+
+    @Test
+    void login_textPlainBody_returns415WithErrorEnvelope() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("hello"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.error").value("UNSUPPORTED_MEDIA_TYPE"));
+    }
+
+    @Test
+    void login_missingBody_returns400WithErrorEnvelope() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+    }
+
+    @Test
     void login_validCredentials_returns200_setsAuthCookies_omitsTokensFromBody() throws Exception {
         var result = new AuthResult("access-jwt", "refresh-jwt",
                 UUID.randomUUID(), UUID.randomUUID(), "test@example.com", "admin");

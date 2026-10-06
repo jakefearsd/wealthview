@@ -11,12 +11,16 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -187,6 +191,44 @@ public class GlobalExceptionHandler {
         var typeName = requiredType != null ? requiredType.getSimpleName() : "value";
         var message = "Parameter '" + ex.getName() + "' must be a valid " + typeName;
         return respond(ex, request, HttpStatus.BAD_REQUEST, "BAD_REQUEST", "Type mismatch", message);
+    }
+
+    /**
+     * A known path hit with the wrong verb (e.g. {@code GET /auth/login}) is a client error, not a
+     * server fault. The {@code Allow} header from the exception is preserved so clients can discover
+     * the supported verbs.
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotSupported(
+            HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
+        var response = respond(ex, request, HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED",
+                "Method not allowed", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                .headers(allowHeader(ex.getHeaders()))
+                .body(response.getBody());
+    }
+
+    private static HttpHeaders allowHeader(HttpHeaders source) {
+        var headers = new HttpHeaders();
+        var allow = source.getAllow();
+        if (!allow.isEmpty()) {
+            headers.setAllow(allow);
+        }
+        return headers;
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMediaTypeNotSupported(
+            HttpMediaTypeNotSupportedException ex, HttpServletRequest request) {
+        return respond(ex, request, HttpStatus.UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_MEDIA_TYPE",
+                "Unsupported media type", ex.getMessage());
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParameter(
+            MissingServletRequestParameterException ex, HttpServletRequest request) {
+        return respond(ex, request, HttpStatus.BAD_REQUEST, "BAD_REQUEST", "Missing parameter",
+                "Required parameter '" + ex.getParameterName() + "' is missing");
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

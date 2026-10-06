@@ -403,6 +403,44 @@ class GlobalExceptionHandlerTest {
         assertCounter("DateTimeParseException", "400", 1);
     }
 
+    @Test
+    void handleMethodNotSupported_returns405AndRecordsMetric() {
+        var ex = new org.springframework.web.HttpRequestMethodNotSupportedException("GET", java.util.List.of("POST"));
+
+        var response = handler.handleMethodNotSupported(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(response.getBody().error()).isEqualTo("METHOD_NOT_ALLOWED");
+        assertThat(response.getBody().status()).isEqualTo(405);
+        assertThat(response.getHeaders().getAllow()).containsExactly(HttpMethod.POST);
+        assertCounter("HttpRequestMethodNotSupportedException", "405", 1);
+    }
+
+    @Test
+    void handleMediaTypeNotSupported_returns415AndRecordsMetric() {
+        var ex = new org.springframework.web.HttpMediaTypeNotSupportedException(
+                org.springframework.http.MediaType.TEXT_PLAIN,
+                java.util.List.of(org.springframework.http.MediaType.APPLICATION_JSON));
+
+        var response = handler.handleMediaTypeNotSupported(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        assertThat(response.getBody().error()).isEqualTo("UNSUPPORTED_MEDIA_TYPE");
+        assertThat(response.getBody().status()).isEqualTo(415);
+        assertCounter("HttpMediaTypeNotSupportedException", "415", 1);
+    }
+
+    @Test
+    void handleMissingParameter_returns400AndRecordsMetric() {
+        var ex = new org.springframework.web.bind.MissingServletRequestParameterException("from", "String");
+
+        var response = handler.handleMissingParameter(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().message()).contains("from");
+        assertCounter("MissingServletRequestParameterException", "400", 1);
+    }
+
     private void assertErrorEnvelope(
             ResponseEntity<ErrorResponse> response, HttpStatus status, String error, String message) {
         assertThat(response.getStatusCode()).isEqualTo(status);
