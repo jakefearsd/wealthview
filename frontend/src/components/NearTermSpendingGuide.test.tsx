@@ -127,14 +127,13 @@ describe('NearTermSpendingGuide', () => {
     });
 
     describe('in a timezone west of UTC', () => {
-        const originalTz = process.env.TZ;
         afterEach(() => {
             vi.useRealTimers();
-            if (originalTz === undefined) delete process.env.TZ; else process.env.TZ = originalTz;
+            vi.unstubAllEnvs();
         });
 
         it('counts years to a 1 January retirement date from the calendar year, not the UTC-shifted one', () => {
-            process.env.TZ = 'America/Los_Angeles';
+            vi.stubEnv('TZ', 'America/Los_Angeles');
             vi.useFakeTimers({ toFake: ['Date'] });
             vi.setSystemTime(new Date('2027-06-15T19:00:00Z'));
 

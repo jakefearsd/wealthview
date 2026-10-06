@@ -108,8 +108,7 @@ describe('SpendingOptimizerPage', () => {
     });
 
     it('shows the retirement year from the date string, not a timezone-shifted parse', async () => {
-        const originalTz = process.env.TZ;
-        process.env.TZ = 'America/Los_Angeles';
+        vi.stubEnv('TZ', 'America/Los_Angeles');
         try {
             renderPage();
 
@@ -118,7 +117,7 @@ describe('SpendingOptimizerPage', () => {
             });
             expect(screen.getByText(/Retirement:/).parentElement).toHaveTextContent('Retirement: 2030');
         } finally {
-            if (originalTz === undefined) delete process.env.TZ; else process.env.TZ = originalTz;
+            vi.unstubAllEnvs();
         }
     });
 
