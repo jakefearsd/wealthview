@@ -463,6 +463,26 @@ describe('IncomeSourcesPage', () => {
             expect(mockCreateIncomeSource).not.toHaveBeenCalled();
         });
 
+        it('accepts a start age of 0', async () => {
+            mockCreateIncomeSource.mockResolvedValue(ssSource);
+            fireEvent.change(startAgeInput(), { target: { value: '0' } });
+
+            expect(startAgeInput().value).toBe('0');
+            save();
+
+            await waitFor(() => expect(mockCreateIncomeSource).toHaveBeenCalled());
+            expect(mockCreateIncomeSource.mock.calls[0][0].start_age).toBe(0);
+        });
+
+        it('rejects a negative start age', () => {
+            fireEvent.change(startAgeInput(), { target: { value: '-3' } });
+
+            save();
+
+            expect(toast.error).toHaveBeenCalledWith('Start age cannot be negative');
+            expect(mockCreateIncomeSource).not.toHaveBeenCalled();
+        });
+
         it('rejects an end age before the start age', () => {
             fireEvent.change(startAgeInput(), { target: { value: '65' } });
             fireEvent.change(screen.getByLabelText(/End Age/), { target: { value: '60' } });

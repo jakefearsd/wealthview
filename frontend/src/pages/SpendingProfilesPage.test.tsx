@@ -371,6 +371,30 @@ describe('SpendingProfilesPage', () => {
             expect(toastError).toHaveBeenCalledWith('Tier 1: start age is required');
             expect(createSpendingProfile).not.toHaveBeenCalled();
         });
+
+        it('accepts a tier that starts at age 0', async () => {
+            vi.mocked(createSpendingProfile).mockResolvedValue(undefined as never);
+            await openTierForm();
+            await addTier();
+            fireEvent.change(startInputs()[0], { target: { value: '0' } });
+
+            expect(startInputs()[0].value).toBe('0');
+            fireEvent.click(screen.getByRole('button', { name: 'Create Profile' }));
+
+            await waitFor(() => expect(createSpendingProfile).toHaveBeenCalled());
+            expect(vi.mocked(createSpendingProfile).mock.calls[0][0].spending_tiers[0].start_age).toBe(0);
+        });
+
+        it('rejects a tier with a negative start age', async () => {
+            await openTierForm();
+            await addTier();
+            fireEvent.change(startInputs()[0], { target: { value: '-5' } });
+
+            fireEvent.click(screen.getByRole('button', { name: 'Create Profile' }));
+
+            expect(toastError).toHaveBeenCalledWith('Tier 1: start age cannot be negative');
+            expect(createSpendingProfile).not.toHaveBeenCalled();
+        });
     });
 
     it('associates the profile form labels with their inputs', async () => {

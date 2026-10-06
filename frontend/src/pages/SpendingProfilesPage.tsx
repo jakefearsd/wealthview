@@ -23,19 +23,21 @@ const FIRST_TIER_START_AGE = 55;
 /**
  * A blank tier. It starts the year after the previous tier ends so the new row does not overlap
  * (the engine averages overlapping tiers); after an open-ended tier there is no obvious start, so
- * it is left blank for the user to fill in.
+ * it is left blank (NaN) for the user to fill in. A stored start age of 0 is valid ("from the
+ * start"), so blank has to be distinguishable from 0.
  */
 function defaultSpendingTier(previous?: SpendingTier): SpendingTier {
     const startAge = previous === undefined
         ? FIRST_TIER_START_AGE
-        : (previous.end_age != null ? previous.end_age + 1 : 0);
+        : (previous.end_age != null ? previous.end_age + 1 : Number.NaN);
     return { name: '', start_age: startAge, end_age: null, essential_expenses: 0, discretionary_expenses: 0 };
 }
 
 function validateProfile(data: CreateSpendingProfileRequest): string | undefined {
     if (!data.name) return 'Name is required';
     for (const [i, tier] of data.spending_tiers.entries()) {
-        if (!(tier.start_age > 0)) return `Tier ${i + 1}: start age is required`;
+        if (!Number.isFinite(tier.start_age)) return `Tier ${i + 1}: start age is required`;
+        if (tier.start_age < 0) return `Tier ${i + 1}: start age cannot be negative`;
         if (tier.end_age != null && tier.end_age < tier.start_age) {
             return `Tier ${i + 1}: end age must be at least the start age`;
         }
@@ -215,7 +217,7 @@ export default function SpendingProfilesPage() {
                             </div>
                             <div>
                                 <label htmlFor={`tier-${idx}-start`} style={labelStyle}>Start Age</label>
-                                <input id={`tier-${idx}-start`} style={inputStyle} type="number" value={tier.start_age || ''} onChange={e => updateTier(idx, 'start_age', Number(e.target.value))} />
+                                <input id={`tier-${idx}-start`} style={inputStyle} type="number" value={Number.isFinite(tier.start_age) ? tier.start_age : ''} onChange={e => updateTier(idx, 'start_age', e.target.value === '' ? Number.NaN : Number(e.target.value))} />
                             </div>
                             <div>
                                 <label htmlFor={`tier-${idx}-end`} style={labelStyle}>End Age (blank = forever)</label>

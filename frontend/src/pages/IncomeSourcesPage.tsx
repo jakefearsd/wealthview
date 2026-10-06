@@ -165,7 +165,8 @@ export default function IncomeSourcesPage() {
         validate: (data) => {
             if (!data.name) return 'Name is required';
             if (data.annual_amount <= 0) return 'Annual amount must be greater than 0';
-            if (!(data.start_age > 0)) return 'Start age is required';
+            if (!Number.isFinite(data.start_age)) return 'Start age is required';
+            if (data.start_age < 0) return 'Start age cannot be negative';
             if (!data.one_time && data.end_age != null && data.end_age < data.start_age) {
                 return 'End age must be at least the start age';
             }
@@ -372,7 +373,7 @@ export default function IncomeSourcesPage() {
                         </div>
                         <div>
                             <label htmlFor="income-start-age" style={labelStyle}>{oneTime ? 'Payment Age' : 'Start Age'}</label>
-                            <input id="income-start-age" style={inputStyle} type="number" value={startAge || ''} onChange={e => setFormData(prev => ({ ...prev, start_age: Number(e.target.value) }))} />
+                            <input id="income-start-age" style={inputStyle} type="number" value={Number.isFinite(startAge) ? startAge : ''} onChange={e => setFormData(prev => ({ ...prev, start_age: e.target.value === '' ? Number.NaN : Number(e.target.value) }))} />
                             <HelpText>{oneTime ? 'Age when the one-time payment occurs.' : 'Age when this income begins.'}</HelpText>
                         </div>
                         {!oneTime && (
