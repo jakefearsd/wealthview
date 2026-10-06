@@ -17,6 +17,7 @@ import com.wealthview.core.account.AccountService;
 import com.wealthview.core.common.Money;
 import com.wealthview.core.dashboard.dto.SnapshotProjectionDataPointDto;
 import com.wealthview.core.dashboard.dto.SnapshotProjectionResponse;
+import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.core.portfolio.TheoreticalPortfolioService;
 import com.wealthview.core.property.PropertyFinance;
 import com.wealthview.persistence.entity.AccountEntity;
@@ -39,15 +40,18 @@ public class SnapshotProjectionService {
     private final AccountService accountService;
     private final PropertyRepository propertyRepository;
     private final TheoreticalPortfolioService theoreticalPortfolioService;
+    private final ExchangeRateService exchangeRateService;
 
     public SnapshotProjectionService(AccountRepository accountRepository,
                                       AccountService accountService,
                                       PropertyRepository propertyRepository,
-                                      TheoreticalPortfolioService theoreticalPortfolioService) {
+                                      TheoreticalPortfolioService theoreticalPortfolioService,
+                                      ExchangeRateService exchangeRateService) {
         this.accountRepository = accountRepository;
         this.accountService = accountService;
         this.propertyRepository = propertyRepository;
         this.theoreticalPortfolioService = theoreticalPortfolioService;
+        this.exchangeRateService = exchangeRateService;
     }
 
     @Transactional(readOnly = true)
@@ -67,7 +71,8 @@ public class SnapshotProjectionService {
         var accountProjections = new ArrayList<AccountProjection>();
         for (var account : accounts) {
             if (account.isBank()) {
-                var balance = balances.getOrDefault(account.getId(), BigDecimal.ZERO);
+                var balance = exchangeRateService.convertToUsd(
+                        balances.getOrDefault(account.getId(), BigDecimal.ZERO), account.getCurrency(), tenantId);
                 accountProjections.add(new AccountProjection(balance, BigDecimal.ZERO));
             } else {
                 var projection = computeInvestmentProjection(tenantId, account, clampedLookback);

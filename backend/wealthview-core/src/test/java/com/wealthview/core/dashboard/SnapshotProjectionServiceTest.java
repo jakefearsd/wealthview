@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.wealthview.core.account.AccountService;
+import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.core.portfolio.TheoreticalPortfolioService;
 import com.wealthview.core.portfolio.dto.PortfolioDataPointDto;
 import com.wealthview.core.portfolio.dto.PortfolioHistoryResponse;
@@ -24,6 +25,7 @@ import com.wealthview.persistence.repository.PropertyRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -45,13 +47,18 @@ class SnapshotProjectionServiceTest {
     @Mock
     private TheoreticalPortfolioService theoreticalPortfolioService;
 
+    @Mock
+    private ExchangeRateService exchangeRateService;
+
     private SnapshotProjectionService service;
 
     @BeforeEach
     void setUp() {
         service = new SnapshotProjectionService(
                 accountRepository, accountService, propertyRepository,
-                theoreticalPortfolioService);
+                theoreticalPortfolioService, exchangeRateService);
+        lenient().when(exchangeRateService.convertToUsd(any(BigDecimal.class), eq("USD"), any(UUID.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
     }
 
     @Test
@@ -127,6 +134,23 @@ class SnapshotProjectionServiceTest {
         for (var dp : result.dataPoints()) {
             assertThat(dp.investmentValue()).isEqualByComparingTo(new BigDecimal("5000"));
         }
+    }
+
+    @Test
+    void computeProjection_nonUsdBankAccount_isConvertedToUsdBeforeProjecting() {
+        var account = mockAccount("bank");
+        var bankId = account.getId();
+        when(account.getCurrency()).thenReturn("JPY");
+        when(accountRepository.findByTenant_Id(TENANT_ID)).thenReturn(List.of(account));
+        when(propertyRepository.findByTenant_Id(TENANT_ID)).thenReturn(List.of());
+        when(accountService.computeAllBalances(TENANT_ID))
+                .thenReturn(Map.of(bankId, new BigDecimal("1000000")));
+        when(exchangeRateService.convertToUsd(new BigDecimal("1000000"), "JPY", TENANT_ID))
+                .thenReturn(new BigDecimal("6700"));
+
+        var result = service.computeProjection(TENANT_ID, 5, 10);
+
+        assertThat(result.dataPoints().getFirst().investmentValue()).isEqualByComparingTo("6700");
     }
 
     @Test
@@ -295,6 +319,7 @@ class SnapshotProjectionServiceTest {
         var id = UUID.randomUUID();
         lenient().when(account.getId()).thenReturn(id);
         when(account.isBank()).thenReturn("bank".equals(type));
+        lenient().when(account.getCurrency()).thenReturn("USD");
         return account;
     }
 
