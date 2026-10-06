@@ -218,14 +218,46 @@ class TransactionControllerTest {
         assertTransactionRejected("\"type\": \"buy\", \"symbol\": \"AAPL\", \"quantity\": 0, \"amount\": 100");
     }
 
-    @Test
-    void create_sellWithoutQuantity_returns400() throws Exception {
-        assertTransactionRejected("\"type\": \"sell\", \"symbol\": \"AAPL\", \"amount\": 100");
+    private void assertTransactionAccepted(String fields) throws Exception {
+        when(transactionService.create(eq(TENANT_ID), eq(ACCOUNT_ID), any(TransactionRequest.class)))
+                .thenReturn(sampleResponse());
+
+        mockMvc.perform(post("/api/v1/accounts/{accountId}/transactions", ACCOUNT_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\": \"2025-01-15\", " + fields + "}"))
+                .andExpect(status().isCreated());
     }
 
     @Test
-    void create_negativeAmount_returns400() throws Exception {
-        assertTransactionRejected("\"type\": \"buy\", \"symbol\": \"AAPL\", \"quantity\": 1, \"amount\": -100");
+    void create_buyWithNegativeQuantity_returns400() throws Exception {
+        assertTransactionRejected("\"type\": \"buy\", \"symbol\": \"AAPL\", \"quantity\": -2, \"amount\": 100");
+    }
+
+    @Test
+    void create_sellWithoutQuantity_returns201() throws Exception {
+        // Imported and legacy buy/sell rows can carry no quantity; they must stay editable.
+        assertTransactionAccepted("\"type\": \"sell\", \"symbol\": \"AAPL\", \"amount\": 100");
+    }
+
+    @Test
+    void create_negativeAmount_returns201() throws Exception {
+        // Broker and generic CSV imports store signed amounts, so a negative amount is legitimate.
+        assertTransactionAccepted("\"type\": \"withdrawal\", \"amount\": -250");
+    }
+
+    @Test
+    void update_importedRowWithNegativeAmountAndNoQuantity_returns200() throws Exception {
+        when(transactionService.update(eq(TENANT_ID), eq(TXN_ID), any(TransactionRequest.class)))
+                .thenReturn(sampleResponse());
+
+        mockMvc.perform(put("/api/v1/transactions/{id}", TXN_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"date": "2025-01-20", "type": "buy", "symbol": "AAPL", "amount": -1500.00}
+                                """))
+                .andExpect(status().isOk());
     }
 
     @Test

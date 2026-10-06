@@ -25,17 +25,19 @@ public record TransactionRequest(
         @NotNull TransactionType type,
         @Size(max = 32) String symbol,
         @DecimalMin("0") BigDecimal quantity,
-        @NotNull @DecimalMin("0") BigDecimal amount
+        @NotNull BigDecimal amount
 ) {
 
     /**
-     * A buy or sell of zero (or an unspecified number of) shares is meaningless and would corrupt
-     * holdings math. Other types (dividend, deposit, fee...) legitimately carry no quantity.
+     * A buy or sell of zero shares is meaningless and would corrupt holdings math, so a quantity
+     * given on a buy or sell must be positive. A missing quantity stays allowed: the CSV importers
+     * write buy and sell rows without one, and those rows (and older ones) must remain editable.
+     * The amount carries no sign rule for the same reason: broker CSVs store signed amounts.
      */
     @JsonIgnore
     @AssertTrue(message = "quantity must be greater than 0 for buy and sell transactions")
     public boolean isQuantityValidForType() {
-        var needsQuantity = type == TransactionType.BUY || type == TransactionType.SELL;
-        return !needsQuantity || quantity != null && quantity.signum() > 0;
+        var isTrade = type == TransactionType.BUY || type == TransactionType.SELL;
+        return !isTrade || quantity == null || quantity.signum() > 0;
     }
 }

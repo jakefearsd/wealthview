@@ -80,6 +80,30 @@ class HoldingsComputationServiceTest {
     }
 
     @Test
+    void recomputeHoldings_tradesWithoutQuantity_areSkippedRatherThanFailing() {
+        // Importers write buy/sell rows with no quantity, and validation lets them be saved and
+        // edited; the share count cannot use them, so they leave the position unchanged.
+        var buy = new TransactionEntity(account, tenant, LocalDate.of(2024, 1, 1), BUY, "AAPL",
+                new BigDecimal("10"), new BigDecimal("1500.0000"));
+        var buyWithoutQuantity = new TransactionEntity(account, tenant, LocalDate.of(2024, 1, 2), BUY, "AAPL",
+                null, new BigDecimal("400.0000"));
+        var sellWithoutQuantity = new TransactionEntity(account, tenant, LocalDate.of(2024, 1, 3), SELL, "AAPL",
+                null, new BigDecimal("300.0000"));
+
+        when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.empty());
+        when(transactionRepository.findByAccount_IdAndSymbol(any(), any()))
+                .thenReturn(List.of(buy, buyWithoutQuantity, sellWithoutQuantity));
+        when(holdingRepository.save(any(HoldingEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.recomputeForAccountAndSymbol(account, tenant, "AAPL");
+
+        var captor = ArgumentCaptor.forClass(HoldingEntity.class);
+        verify(holdingRepository).save(captor.capture());
+        assertThat(captor.getValue().getQuantity()).isEqualByComparingTo("10");
+        assertThat(captor.getValue().getCostBasis()).isEqualByComparingTo("1500.0000");
+    }
+
+    @Test
     void recomputeHoldings_buyThenSell_calculatesNetQuantity() {
         var buy = new TransactionEntity(account, tenant, LocalDate.now(), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500.0000"));

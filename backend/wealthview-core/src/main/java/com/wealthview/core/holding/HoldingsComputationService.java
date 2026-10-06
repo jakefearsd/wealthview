@@ -118,6 +118,12 @@ public class HoldingsComputationService {
         var position = AggregatedPosition.FLAT;
 
         for (var txn : transactions) {
+            if (txn.getQuantity() == null) {
+                // A buy or sell with no share count (written by the CSV importers, and allowed by
+                // validation so such rows stay editable) cannot move the position; cash-only types
+                // never carry one.
+                continue;
+            }
             // Exhaustive over TransactionType with no default branch: adding a constant to the
             // enum becomes a compile error here instead of silently falling into "ignore".
             position = switch (txn.getType()) {
