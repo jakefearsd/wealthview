@@ -33,6 +33,7 @@ export default function ScenarioIncomeSourcesSection({
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                             <input
                                 type="checkbox"
+                                aria-label={`Include ${is.name}`}
                                 checked={!!selected}
                                 onChange={e => {
                                     if (e.target.checked) {
@@ -50,13 +51,16 @@ export default function ScenarioIncomeSourcesSection({
                             </div>
                             {selected && (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <label style={{ fontSize: '0.85rem', color: '#666' }}>Override:</label>
+                                    <label htmlFor={`income-override-${is.id}`} style={{ fontSize: '0.85rem', color: '#666' }}>Override:</label>
                                     <CurrencyInput
+                                        id={`income-override-${is.id}`}
                                         style={{ ...inputStyle, width: '140px' }}
                                         placeholder="Use default"
                                         value={selected.override_annual_amount != null ? selected.override_annual_amount : ''}
                                         onChange={v => {
-                                            const val = v ? Number(v) || null : null;
+                                            // '' means no override; a typed 0 is a real override (exclude this income in this scenario).
+                                            const parsed = Number(v);
+                                            const val = v === '' || !Number.isFinite(parsed) ? null : parsed;
                                             onSelectedIncomeSourcesChange(prev => prev.map(s =>
                                                 s.income_source_id === is.id ? { ...s, override_annual_amount: val } : s
                                             ));
