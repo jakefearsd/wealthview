@@ -6,21 +6,53 @@ import type { AdminUser } from '../../api/adminUsers';
 import type { TenantUser } from '../../types/tenant';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { useApiMutation } from '../../hooks/useApiMutation';
+import { formatDate } from '../../utils/format';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
+import { useModalDialog } from '../../hooks/useModalDialog';
 import Button from '../Button';
+import ErrorState from '../ErrorState';
+
+const ROLE_LABELS: Record<string, string> = {
+    super_admin: 'Super Admin',
+    admin: 'Admin',
+    member: 'Member',
+    viewer: 'Viewer',
+};
+
+/** Roles the role-change endpoint accepts. A super admin's role is never editable here. */
+const ASSIGNABLE_ROLES = ['admin', 'member', 'viewer'] as const;
+
+const NO_USERS: AdminUser[] = [];
+
+function RoleSelect({ email, value, onChange }: { email: string; value: string; onChange: (role: string) => void }) {
+    return (
+        <select
+            aria-label={`Role for ${email}`}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            style={{ padding: '0.3rem' }}
+        >
+            {ASSIGNABLE_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+        </select>
+    );
+}
 
 export default function UsersSection() {
-    const { role } = useAuth();
+    const { role, tenantId } = useAuth();
     const isSuperAdmin = role === 'super_admin';
 
-    const { data: adminUsers, loading: adminLoading, refetch: refetchAdmin } = useApiQuery<AdminUser[]>(getAllUsers);
-    const { data: tenantUsers, loading: tenantLoading, refetch: refetchTenant } = useApiQuery<TenantUser[]>(listUsers);
+    // Each role has exactly one list it may read (the other endpoint 403s), so the unused query resolves empty.
+    const { data: adminUsers, loading: adminLoading, error: adminError, refetch: refetchAdmin } = useApiQuery<AdminUser[]>(
+        () => (isSuperAdmin ? getAllUsers() : Promise.resolve(NO_USERS)), [isSuperAdmin]);
+    const { data: tenantUsers, loading: tenantLoading, error: tenantError, refetch: refetchTenant } = useApiQuery<TenantUser[]>(
+        () => (isSuperAdmin ? Promise.resolve([]) : listUsers()), [isSuperAdmin]);
 
     const [resetModal, setResetModal] = useState<{ userId: string; email: string } | null>(null);
     const [newPassword, setNewPassword] = useState('');
 
     const users = isSuperAdmin ? adminUsers : null;
     const loading = isSuperAdmin ? adminLoading : tenantLoading;
+    const error = isSuperAdmin ? adminError : tenantError;
 
     function refetchUsers() {
         if (isSuperAdmin) refetchAdmin(); else refetchTenant();
@@ -39,8 +71,9 @@ export default function UsersSection() {
     const resetting = resetPasswordMutation.loading;
 
     function handleResetPassword() {
-        if (!resetModal || !newPassword.trim()) return;
-        void resetPasswordMutation.mutate({ userId: resetModal.userId, email: resetModal.email, password: newPassword.trim() });
+        if (!resetModal || !newPassword) return;
+        // Sent exactly as typed: trimming would silently change a password that has leading or trailing spaces.
+        void resetPasswordMutation.mutate({ userId: resetModal.userId, email: resetModal.email, password: newPassword });
     }
 
     const toggleActiveMutation = useApiMutation(
@@ -80,7 +113,13 @@ export default function UsersSection() {
         void deleteUserMutation.mutate(userId);
     }
 
+    function closeResetModal() {
+        setResetModal(null);
+        setNewPassword('');
+    }
+
     if (loading) return <div>Loading...</div>;
+    if (error) return <ErrorState message={error} onRetry={refetchUsers} />;
 
     return (
         <div>
@@ -103,22 +142,17 @@ export default function UsersSection() {
                             <tr key={user.id} style={trHoverStyle}>
                                 <td style={tdStyle}>{user.email}</td>
                                 <td style={tdStyle}>
-                                    <select
-                                        value={user.role}
-                                        onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                                        style={{ padding: '0.3rem' }}
-                                    >
-                                        <option value="super_admin">Super Admin</option>
-                                        <option value="admin">Admin</option>
-                                        <option value="member">Member</option>
-                                        <option value="viewer">Viewer</option>
-                                    </select>
+                                    {/* Role changes and deletes go through tenant-scoped endpoints, which cannot reach other
+                                        tenants' users, and a super admin's role is not editable at all. */}
+                                    {user.role === 'super_admin' || user.tenant_id !== tenantId
+                                        ? (ROLE_LABELS[user.role] ?? user.role)
+                                        : <RoleSelect email={user.email} value={user.role} onChange={(r) => handleRoleChange(user.id, r)} />}
                                 </td>
                                 <td style={{ ...tdStyle, fontSize: '0.85rem', color: '#666' }}>
                                     {user.tenant_name}
                                 </td>
                                 <td style={{ ...tdStyle, fontSize: '0.85rem', color: '#666' }}>
-                                    {new Date(user.created_at).toLocaleDateString()}
+                                    {formatDate(user.created_at)}
                                 </td>
                                 <td style={{ ...tdStyle, textAlign: 'center' }}>
                                     <span style={{
@@ -145,12 +179,14 @@ export default function UsersSection() {
                                         >
                                             {user.is_active ? 'Deactivate' : 'Activate'}
                                         </button>
-                                        <button
-                                            onClick={() => handleDelete(user.id)}
-                                            style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer', fontSize: '0.85rem' }}
-                                        >
-                                            Delete
-                                        </button>
+                                        {user.tenant_id === tenantId && (
+                                            <button
+                                                onClick={() => handleDelete(user.id)}
+                                                style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer', fontSize: '0.85rem' }}
+                                            >
+                                                Delete
+                                            </button>
+                                        )}
                                     </div>
                                 </td>
                             </tr>
@@ -159,18 +195,10 @@ export default function UsersSection() {
                             <tr key={user.id} style={trHoverStyle}>
                                 <td style={tdStyle}>{user.email}</td>
                                 <td style={tdStyle}>
-                                    <select
-                                        value={user.role}
-                                        onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                                        style={{ padding: '0.3rem' }}
-                                    >
-                                        <option value="admin">Admin</option>
-                                        <option value="member">Member</option>
-                                        <option value="viewer">Viewer</option>
-                                    </select>
+                                    <RoleSelect email={user.email} value={user.role} onChange={(r) => handleRoleChange(user.id, r)} />
                                 </td>
                                 <td style={{ ...tdStyle, fontSize: '0.85rem', color: '#666' }}>
-                                    {new Date(user.created_at).toLocaleDateString()}
+                                    {formatDate(user.created_at)}
                                 </td>
                                 <td style={{ ...tdStyle, textAlign: 'center' }}>
                                     <button
@@ -194,47 +222,80 @@ export default function UsersSection() {
                 </table>
             </div>
 
-            {/* Reset Password Modal */}
             {resetModal && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000,
-                }}>
-                    <div style={{ ...cardStyle, width: '400px' }}>
-                        <h3 style={{ marginBottom: '1rem' }}>Reset Password</h3>
-                        <p style={{ marginBottom: '1rem', color: '#666' }}>
-                            Set a new password for <strong>{resetModal.email}</strong>
-                        </p>
-                        <input
-                            type="password"
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                            placeholder="New password"
-                            style={{ width: '100%', padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px', marginBottom: '1rem', boxSizing: 'border-box' }}
-                        />
-                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                            <Button
-                                onClick={() => { setResetModal(null); setNewPassword(''); }}
-                                variant="secondary"
-                                style={{ background: '#fff', color: '#333', border: '1px solid #ccc' }}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                onClick={handleResetPassword}
-                                disabled={resetting || !newPassword.trim()}
-                            >
-                                {resetting ? 'Resetting...' : 'Reset Password'}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
+                <ResetPasswordDialog
+                    email={resetModal.email}
+                    password={newPassword}
+                    resetting={resetting}
+                    onPasswordChange={setNewPassword}
+                    onSubmit={handleResetPassword}
+                    onClose={closeResetModal}
+                />
             )}
+        </div>
+    );
+}
+
+interface ResetPasswordDialogProps {
+    email: string;
+    password: string;
+    resetting: boolean;
+    onPasswordChange: (value: string) => void;
+    onSubmit: () => void;
+    onClose: () => void;
+}
+
+function ResetPasswordDialog({ email, password, resetting, onPasswordChange, onSubmit, onClose }: ResetPasswordDialogProps) {
+    const dialogRef = useModalDialog<HTMLDivElement>(onClose);
+
+    return (
+        <div style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+        }}>
+            <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="reset-password-title"
+                tabIndex={-1}
+                style={{ ...cardStyle, width: '400px' }}
+            >
+                <h3 id="reset-password-title" style={{ marginBottom: '1rem' }}>Reset Password</h3>
+                <p style={{ marginBottom: '1rem', color: '#666' }}>
+                    Set a new password for <strong>{email}</strong>
+                </p>
+                <input
+                    type="password"
+                    aria-label="New password"
+                    aria-describedby="reset-password-hint"
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => onPasswordChange(e.target.value)}
+                    placeholder="New password"
+                    style={{ width: '100%', padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px', marginBottom: '0.25rem', boxSizing: 'border-box' }}
+                />
+                <div id="reset-password-hint" style={{ fontSize: '0.8rem', color: '#666', marginBottom: '1rem' }}>
+                    12–64 characters. Common passwords are rejected.
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                    <Button
+                        onClick={onClose}
+                        variant="secondary"
+                        style={{ background: '#fff', color: '#333', border: '1px solid #ccc' }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button onClick={onSubmit} disabled={resetting || !password}>
+                        {resetting ? 'Resetting...' : 'Reset Password'}
+                    </Button>
+                </div>
+            </div>
         </div>
     );
 }
