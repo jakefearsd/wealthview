@@ -15,12 +15,17 @@ vi.mock('../api/holdings', () => ({
     updateHolding: vi.fn(),
 }));
 
+vi.mock('../api/accounts', () => ({
+    getAccount: vi.fn(),
+}));
+
 vi.mock('../api/transactions', () => ({
     listTransactions: vi.fn(),
 }));
 
 vi.mock('../utils/format', () => ({
-    formatCurrency: (v: number) => `$${v.toLocaleString()}`,
+    formatCurrency: (v: number, c = 'USD') => `${c === 'USD' ? '$' : `${c} `}${v.toLocaleString()}`,
+    formatDate: (v: string | null | undefined) => (v ?? '--').slice(0, 10),
     formatCurrencyInput: (v: string | number) => String(v),
     parseCurrencyInput: (v: string) => v.replace(/,/g, ''),
 }));
@@ -59,6 +64,7 @@ const holding = {
     current_price: 180,
     current_value: 1800,
     is_manual_override: false,
+    as_of_date: '2026-03-01',
 };
 
 function renderPage() {
@@ -209,5 +215,107 @@ describe('HoldingDetailPage', () => {
 
         await waitFor(() => expect(screen.getByText('Manual Override')).toBeInTheDocument());
         expect(screen.getByText('Yes')).toBeInTheDocument();
+    });
+
+    // === load failures, currency and ordering ===
+    //
+    // The page issues three queries per render in a fixed order: holding, transactions, account.
+
+    const txn = (over: Record<string, unknown>) => ({
+        id: 't', account_id: 'acc-1', date: '2026-01-01', type: 'buy', symbol: 'AAPL',
+        quantity: 1, amount: 100, created_at: '2026-01-01T00:00:00Z', ...over,
+    });
+
+    function setupQueries({ holdingResult = {}, txnResult = {}, accountResult = {} }: {
+        holdingResult?: object; txnResult?: object; accountResult?: object;
+    }) {
+        let call = 0;
+        mockUseApiQuery.mockImplementation(() => {
+            const idx = call % 3;
+            call++;
+            const base = { data: null, loading: false, error: null, refetch: vi.fn() };
+            if (idx === 0) return { ...base, data: holding, ...holdingResult };
+            if (idx === 1) return { ...base, data: { data: [], total: 0, page: 0, size: 100 }, ...txnResult };
+            return { ...base, data: { id: 'acc-1', currency: 'USD' }, ...accountResult };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any;
+    }
+
+    it('shows a retryable error, not "Holding not found", when the holding request fails', () => {
+        const refetch = vi.fn();
+        setupQueries({ holdingResult: { data: null, error: 'server down', refetch } });
+        renderPage();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+        expect(screen.getByText('server down')).toBeInTheDocument();
+        expect(screen.queryByText('Holding not found')).not.toBeInTheDocument();
+        expect(refetch).toHaveBeenCalled();
+    });
+
+    it('shows an error instead of "No transactions" when the transaction request fails', () => {
+        const refetch = vi.fn();
+        setupQueries({ txnResult: { data: null, error: 'txn boom', refetch } });
+        renderPage();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+        expect(screen.getByText('txn boom')).toBeInTheDocument();
+        expect(screen.queryByText('No transactions for AAPL')).not.toBeInTheDocument();
+        expect(refetch).toHaveBeenCalled();
+    });
+
+    it('keeps the page on screen while the holding is refetching', () => {
+        setupQueries({ holdingResult: { loading: true } });
+        renderPage();
+
+        expect(screen.queryByText(/Loading holding/i)).not.toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'AAPL' })).toBeInTheDocument();
+    });
+
+    it('formats amounts in the account currency and names it beside the symbol', () => {
+        setupQueries({
+            accountResult: { data: { id: 'acc-1', currency: 'EUR' } },
+            txnResult: { data: { data: [txn({ amount: 250 })], total: 1, page: 0, size: 100 } },
+        });
+        renderPage();
+
+        expect(screen.getByText('EUR 1,500')).toBeInTheDocument();
+        expect(screen.getByText('EUR 250')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /AAPL.*EUR/ })).toBeInTheDocument();
+    });
+
+    it('lists transactions newest first with a capitalised type', () => {
+        setupQueries({
+            txnResult: {
+                data: {
+                    data: [
+                        txn({ id: 'a', date: '2025-02-02', type: 'dividend' }),
+                        txn({ id: 'b', date: '2026-05-05', type: 'sell' }),
+                    ],
+                    total: 2, page: 0, size: 100,
+                },
+            },
+        });
+        renderPage();
+
+        const rows = screen.getAllByRole('row').map((r) => r.textContent ?? '');
+        expect(rows.findIndex((r) => r.includes('Sell'))).toBeLessThan(rows.findIndex((r) => r.includes('Dividend')));
+    });
+
+    it('says when only the most recent transactions are shown', () => {
+        setupQueries({ txnResult: { data: { data: [txn({})], total: 250, page: 0, size: 100 } } });
+        renderPage();
+
+        expect(screen.getByText(/Showing the 1 most recent of 250 transactions/)).toBeInTheDocument();
+    });
+
+    it('blocks saving an override with a blank quantity and associates the labels with their inputs', async () => {
+        await openEditor();
+
+        fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '' } });
+
+        expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+        expect(screen.getByLabelText('Cost Basis')).toBeInTheDocument();
     });
 });
