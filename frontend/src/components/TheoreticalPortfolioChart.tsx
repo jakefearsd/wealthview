@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { getTheoreticalHistory } from '../api/accounts';
 import { useApiQuery } from '../hooks/useApiQuery';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatDate as formatIsoDate } from '../utils/format';
+import { formatDollarAxis } from '../utils/chartFormatters';
 import { cardStyle } from '../utils/styles';
+import ErrorState from './ErrorState';
 import type { PortfolioHistory } from '../types/portfolio';
 
 interface Props {
@@ -26,6 +28,8 @@ function formatDate(dateStr: string): string {
     return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
 }
 
+const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000;
+
 const chartCardStyle = { ...cardStyle, marginBottom: '2rem' };
 const selectStyle = {
     padding: '0.3rem 0.5rem',
@@ -38,7 +42,7 @@ const selectStyle = {
 
 export default function TheoreticalPortfolioChart({ accountId, accountType }: Props) {
     const [months, setMonths] = useState(24);
-    const { data, loading, error } = useApiQuery<PortfolioHistory>(
+    const { data, loading, error, refetch } = useApiQuery<PortfolioHistory>(
         () => getTheoreticalHistory(accountId, months),
         [accountId, months],
     );
@@ -58,10 +62,15 @@ export default function TheoreticalPortfolioChart({ accountId, accountType }: Pr
         if (startValue === 0) return null;
         const totalGrowth = endValue - startValue;
         const totalReturn = totalGrowth / startValue;
-        const years = months / 12;
+        // Annualise over the span actually plotted: the series starts later than the requested window when a
+        // held symbol's price history is shorter, so dividing by the selected horizon would understate the rate.
+        const spanMs = Date.parse(`${chartData[chartData.length - 1].date}T00:00:00Z`)
+            - Date.parse(`${chartData[0].date}T00:00:00Z`);
+        const years = spanMs / MS_PER_YEAR;
+        if (!(years > 0)) return null;
         const annualizedRate = Math.pow(1 + totalReturn, 1 / years) - 1;
         return { totalGrowth, annualizedRate };
-    }, [chartData, months]);
+    }, [chartData]);
 
     if (accountType === 'bank') {
         return (
@@ -75,7 +84,6 @@ export default function TheoreticalPortfolioChart({ accountId, accountType }: Pr
     }
 
     const tickInterval = Math.max(1, Math.floor(chartData.length / 10));
-    const selectedLabel = TIME_HORIZONS.find(h => h.value === months)?.label ?? `${months} months`;
 
     return (
         <div style={chartCardStyle}>
@@ -95,14 +103,16 @@ export default function TheoreticalPortfolioChart({ accountId, accountType }: Pr
 
             {loading ? (
                 <div style={{ color: '#999', textAlign: 'center', padding: '2rem 0' }}>Loading...</div>
-            ) : error || !data || data.data_points.length === 0 ? (
+            ) : error ? (
+                <ErrorState message={error} onRetry={refetch} />
+            ) : !data || data.data_points.length === 0 ? (
                 <div style={{ color: '#999', textAlign: 'center', padding: '2rem 0' }}>
                     No price data available for current holdings.
                 </div>
             ) : (
                 <>
                     <div style={{ color: '#999', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                        What your current holdings ({data.symbols.join(', ')}) would have been worth over the past {selectedLabel.toLowerCase()}
+                        What your current holdings ({data.symbols.join(', ')}) would have been worth from {formatIsoDate(chartData[0].date)} to {formatIsoDate(chartData[chartData.length - 1].date)}
                     </div>
                     {data.has_money_market_holdings && (
                         <div style={{ color: '#7b6900', fontSize: '0.8rem', marginBottom: '1rem', background: '#fffde7', padding: '0.4rem 0.6rem', borderRadius: '4px', display: 'inline-block' }}>
@@ -124,13 +134,13 @@ export default function TheoreticalPortfolioChart({ accountId, accountType }: Pr
                                 tick={{ fontSize: 12 }}
                             />
                             <YAxis
-                                tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+                                tickFormatter={formatDollarAxis}
                                 tick={{ fontSize: 12 }}
                                 width={60}
                             />
                             <Tooltip
                                 formatter={(value) => [formatCurrency(Number(value)), 'Value']}
-                                labelFormatter={(label) => new Date(String(label) + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                labelFormatter={(label) => formatIsoDate(String(label))}
                             />
                             <Area
                                 type="monotone"

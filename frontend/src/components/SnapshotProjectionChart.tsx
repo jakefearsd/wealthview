@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { getSnapshotProjection } from '../api/dashboard';
 import { useApiQuery } from '../hooks/useApiQuery';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatDate } from '../utils/format';
+import { formatDollarAxis } from '../utils/chartFormatters';
 import { cardStyle, selectStyle } from '../utils/styles';
 import type { SnapshotProjection } from '../types/dashboard';
 
@@ -91,7 +92,7 @@ export default function SnapshotProjectionChart() {
                                 tick={{ fontSize: 12 }}
                             />
                             <YAxis
-                                tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+                                tickFormatter={formatDollarAxis}
                                 tick={{ fontSize: 12 }}
                                 width={60}
                             />
@@ -102,8 +103,7 @@ export default function SnapshotProjectionChart() {
                                 ]}
                                 labelFormatter={(label) => {
                                     const dateStr = String(label);
-                                    const date = new Date(dateStr + 'T00:00:00');
-                                    const formatted = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+                                    const formatted = formatDate(dateStr);
                                     const dp = chartData.find(d => d.date === dateStr);
                                     const total = dp ? dp.investmentValue + dp.propertyEquity : 0;
                                     return `${formatted} — Total: ${formatCurrency(total)}`;

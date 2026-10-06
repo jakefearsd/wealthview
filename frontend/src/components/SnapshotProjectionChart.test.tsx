@@ -7,6 +7,7 @@ vi.mock('../api/dashboard', () => ({
 
 vi.mock('../utils/format', () => ({
     formatCurrency: (v: number) => `$${v.toLocaleString()}`,
+    formatDate: (v: string) => v,
 }));
 
 vi.mock('../utils/styles', () => ({

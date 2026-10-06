@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { getCombinedPortfolioHistory } from '../api/dashboard';
 import { useApiQuery } from '../hooks/useApiQuery';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatDate as formatIsoDate } from '../utils/format';
+import { formatDollarAxis } from '../utils/chartFormatters';
 import { cardStyle } from '../utils/styles';
+import ErrorState from './ErrorState';
 import type { CombinedPortfolioHistory } from '../types/dashboard';
 
 const TIME_HORIZONS = [
@@ -31,7 +33,7 @@ const selectStyle = {
 
 export default function CombinedPortfolioChart() {
     const [years, setYears] = useState(2);
-    const { data, loading, error } = useApiQuery<CombinedPortfolioHistory>(
+    const { data, loading, error, refetch } = useApiQuery<CombinedPortfolioHistory>(
         () => getCombinedPortfolioHistory(years),
         [years],
     );
@@ -65,7 +67,9 @@ export default function CombinedPortfolioChart() {
 
             {loading ? (
                 <div style={{ color: '#999', textAlign: 'center', padding: '2rem 0' }}>Loading...</div>
-            ) : error || !data || data.data_points.length === 0 ? (
+            ) : error ? (
+                <ErrorState message={error} onRetry={refetch} />
+            ) : !data || data.data_points.length === 0 ? (
                 <div style={{ color: '#999', textAlign: 'center', padding: '2rem 0' }}>
                     No portfolio history data available.
                 </div>
@@ -97,7 +101,7 @@ export default function CombinedPortfolioChart() {
                                 tick={{ fontSize: 12 }}
                             />
                             <YAxis
-                                tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+                                tickFormatter={formatDollarAxis}
                                 tick={{ fontSize: 12 }}
                                 width={60}
                             />
@@ -108,8 +112,7 @@ export default function CombinedPortfolioChart() {
                                 ]}
                                 labelFormatter={(label) => {
                                     const dateStr = String(label);
-                                    const date = new Date(dateStr + 'T00:00:00');
-                                    const formatted = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+                                    const formatted = formatIsoDate(dateStr);
                                     const dp = chartData.find(d => d.date === dateStr);
                                     const total = dp ? dp.investmentValue + dp.propertyEquity : 0;
                                     return `${formatted} — Total: ${formatCurrency(total)}`;

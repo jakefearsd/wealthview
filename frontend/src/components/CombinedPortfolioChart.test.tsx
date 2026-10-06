@@ -11,6 +11,7 @@ vi.mock('recharts');
 
 vi.mock('../utils/format', () => ({
     formatCurrency: (v: number) => `$${v.toLocaleString()}`,
+    formatDate: (v: string) => v,
 }));
 
 vi.mock('../utils/styles', () => ({
@@ -59,13 +60,18 @@ describe('CombinedPortfolioChart', () => {
         });
     });
 
-    it('renders empty state on API error', async () => {
-        mockGetHistory.mockRejectedValue(new Error('Network error'));
+    it('shows the failure with a retry, not a "no data" message, when the API errors', async () => {
+        mockGetHistory.mockRejectedValueOnce(new Error('Network error'));
+        mockGetHistory.mockResolvedValue(mockHistory);
+        const user = userEvent.setup();
         render(<CombinedPortfolioChart />);
 
-        await waitFor(() => {
-            expect(screen.getByText('No portfolio history data available.')).toBeInTheDocument();
-        });
+        expect(await screen.findByText('Network error')).toBeInTheDocument();
+        expect(screen.queryByText('No portfolio history data available.')).not.toBeInTheDocument();
+
+        await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+        expect(await screen.findByTestId('area-chart')).toBeInTheDocument();
     });
 
     it('renders chart heading and subtitle with correct counts', async () => {
