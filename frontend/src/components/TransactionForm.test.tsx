@@ -88,4 +88,60 @@ describe('TransactionForm', () => {
         fireEvent.click(screen.getByText('Cancel'));
         expect(onCancel).toHaveBeenCalled();
     });
+
+    function fillValid(overrides: { symbol?: string; quantity?: string; amount?: string } = {}) {
+        fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-04-10' } });
+        fireEvent.change(screen.getByLabelText('Symbol'), { target: { value: overrides.symbol ?? 'AAPL' } });
+        fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: overrides.quantity ?? '10' } });
+        fireEvent.change(screen.getByLabelText('Amount'), { target: { value: overrides.amount ?? '2000' } });
+    }
+
+    it('trims and upper-cases the symbol so it matches the price-keyed holding', async () => {
+        vi.mocked(createTransaction).mockResolvedValue({} as never);
+        render(<TransactionForm accountId="acc-1" onSuccess={vi.fn()} onCancel={vi.fn()} />);
+
+        fillValid({ symbol: ' aapl ' });
+        fireEvent.click(screen.getByText('Save'));
+
+        await waitFor(() => expect(createTransaction).toHaveBeenCalledWith(
+            'acc-1', expect.objectContaining({ symbol: 'AAPL' })));
+    });
+
+    it('omits a whitespace-only symbol', async () => {
+        vi.mocked(createTransaction).mockResolvedValue({} as never);
+        render(<TransactionForm accountId="acc-1" onSuccess={vi.fn()} onCancel={vi.fn()} />);
+
+        fillValid({ symbol: '   ', quantity: '' });
+        fireEvent.click(screen.getByText('Save'));
+
+        await waitFor(() => expect(createTransaction).toHaveBeenCalledWith(
+            'acc-1', expect.objectContaining({ symbol: undefined, quantity: undefined })));
+    });
+
+    it('disables Save until a date and a numeric amount are present', () => {
+        render(<TransactionForm accountId="acc-1" onSuccess={vi.fn()} onCancel={vi.fn()} />);
+        expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+
+        fillValid();
+
+        expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+    });
+
+    it('shows an inline message and blocks the save when the amount is cleared', () => {
+        render(<TransactionForm accountId="acc-1" onSuccess={vi.fn()} onCancel={vi.fn()} />);
+        fillValid();
+
+        fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '' } });
+
+        expect(screen.getByRole('alert')).toHaveTextContent('Amount must be a number.');
+        expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    });
+
+    it('rejects a negative quantity', () => {
+        render(<TransactionForm accountId="acc-1" onSuccess={vi.fn()} onCancel={vi.fn()} />);
+        fillValid({ quantity: '-3' });
+
+        expect(screen.getByRole('alert')).toHaveTextContent('Quantity must be zero or more.');
+        expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    });
 });
