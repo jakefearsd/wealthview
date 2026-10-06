@@ -1,4 +1,4 @@
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithRouter } from '../test-utils';
 import type { IncomeSource } from '../types/projection';
@@ -48,12 +48,14 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 import { useApiQuery } from '../hooks/useApiQuery';
-import { createIncomeSource, updateIncomeSource } from '../api/incomeSources';
+import toast from 'react-hot-toast';
+import { createIncomeSource, updateIncomeSource, deleteIncomeSource } from '../api/incomeSources';
 import IncomeSourcesPage from './IncomeSourcesPage';
 
 const mockUseApiQuery = vi.mocked(useApiQuery);
 const mockCreateIncomeSource = vi.mocked(createIncomeSource);
 const mockUpdateIncomeSource = vi.mocked(updateIncomeSource);
+const mockDeleteIncomeSource = vi.mocked(deleteIncomeSource);
 
 const ssSource: IncomeSource = {
     id: 'inc-1',
@@ -97,7 +99,7 @@ function ownerSelect(): HTMLSelectElement {
 }
 
 function survivorPercentInput(): HTMLInputElement {
-    const label = screen.getByText('Survivor % (%)');
+    const label = screen.getByText('Survivor Benefit (%)');
     const input = label.parentElement?.querySelector('input');
     if (!input) {
         throw new Error('Survivor % input not found');
@@ -207,7 +209,7 @@ describe('IncomeSourcesPage', () => {
             fireEvent.click(screen.getByText('New Income Source'));
 
             expect(screen.getByText(/Statutory survivor rule applies automatically/i)).toBeInTheDocument();
-            expect(screen.queryByText('Survivor % (%)')).not.toBeInTheDocument();
+            expect(screen.queryByText('Survivor Benefit (%)')).not.toBeInTheDocument();
             // Owner is not SS-gated -- it's always available.
             expect(ownerSelect()).toBeInTheDocument();
         });
@@ -219,7 +221,7 @@ describe('IncomeSourcesPage', () => {
 
             fireEvent.change(incomeTypeSelect(), { target: { value: 'pension' } });
 
-            expect(screen.getByText('Survivor % (%)')).toBeInTheDocument();
+            expect(screen.getByText('Survivor Benefit (%)')).toBeInTheDocument();
             expect(screen.queryByText(/Statutory survivor rule applies automatically/i)).not.toBeInTheDocument();
             expect(survivorPercentInput().value).toBe('100');
         });
@@ -370,6 +372,170 @@ describe('IncomeSourcesPage', () => {
             fireEvent.change(incomeTypeSelect(), { target: { value: 'pension' } });
 
             expect(screen.queryByText(/Link to Property/i)).not.toBeInTheDocument();
+        });
+    });
+
+    describe('load failures', () => {
+        it('shows an error with retry instead of a false "No income sources"', () => {
+            const refetch = vi.fn();
+            mockUseApiQuery.mockReturnValue({ data: null, loading: false, error: 'Boom', refetch });
+            renderWithRouter(<IncomeSourcesPage />);
+
+            expect(screen.getByText('Boom')).toBeInTheDocument();
+            expect(screen.queryByText('No income sources')).not.toBeInTheDocument();
+
+            fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+            expect(refetch).toHaveBeenCalled();
+        });
+    });
+
+    describe('deleting', () => {
+        it('asks for confirmation and does nothing when declined', () => {
+            setupMocks({ sources: [pensionSource] });
+            const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+            renderWithRouter(<IncomeSourcesPage />);
+
+            fireEvent.click(screen.getByText('Delete'));
+
+            expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('My Pension'));
+            expect(mockDeleteIncomeSource).not.toHaveBeenCalled();
+            confirmSpy.mockRestore();
+        });
+
+        it('deletes once confirmed', async () => {
+            setupMocks({ sources: [pensionSource] });
+            mockDeleteIncomeSource.mockResolvedValue(undefined as never);
+            const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+            renderWithRouter(<IncomeSourcesPage />);
+
+            fireEvent.click(screen.getByText('Delete'));
+
+            await waitFor(() => expect(mockDeleteIncomeSource).toHaveBeenCalledWith('inc-2'));
+            confirmSpy.mockRestore();
+        });
+
+        it('opens "New" as a create form, not an edit of the deleted source', async () => {
+            setupMocks({ sources: [pensionSource] });
+            mockDeleteIncomeSource.mockResolvedValue(undefined as never);
+            const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+            renderWithRouter(<IncomeSourcesPage />);
+            fireEvent.click(screen.getByText('Edit'));
+            fireEvent.click(screen.getByText('Delete'));
+            await waitFor(() => expect(mockDeleteIncomeSource).toHaveBeenCalled());
+
+            fireEvent.click(await screen.findByText('New Income Source'));
+
+            expect(await screen.findByRole('heading', { name: 'Create Income Source' })).toBeInTheDocument();
+            confirmSpy.mockRestore();
+        });
+    });
+
+    describe('validation', () => {
+        const fillValid = () => {
+            fireEvent.change(screen.getByPlaceholderText('e.g., Social Security'), { target: { value: 'My Pension' } });
+            fireEvent.change(incomeTypeSelect(), { target: { value: 'pension' } });
+            fireEvent.change(annualAmountInput(), { target: { value: '12000' } });
+        };
+        const save = () => fireEvent.click(screen.getByRole('button', { name: 'Create Income Source' }));
+
+        beforeEach(() => {
+            setupMocks();
+            renderWithRouter(<IncomeSourcesPage />);
+            fireEvent.click(screen.getByText('New Income Source'));
+            fillValid();
+        });
+
+        it('rejects a cleared start age instead of silently starting income at 0', () => {
+            fireEvent.change(startAgeInput(), { target: { value: '' } });
+
+            save();
+
+            expect(toast.error).toHaveBeenCalledWith('Start age is required');
+            expect(mockCreateIncomeSource).not.toHaveBeenCalled();
+        });
+
+        it('rejects an end age before the start age', () => {
+            fireEvent.change(startAgeInput(), { target: { value: '65' } });
+            fireEvent.change(screen.getByLabelText(/End Age/), { target: { value: '60' } });
+
+            save();
+
+            expect(toast.error).toHaveBeenCalledWith('End age must be at least the start age');
+            expect(mockCreateIncomeSource).not.toHaveBeenCalled();
+        });
+
+        it('rejects a cleared survivor benefit instead of silently sending 0%', () => {
+            fireEvent.change(survivorPercentInput(), { target: { value: '' } });
+
+            save();
+
+            expect(toast.error).toHaveBeenCalledWith('Survivor benefit must be between 0 and 100');
+            expect(mockCreateIncomeSource).not.toHaveBeenCalled();
+        });
+
+        it('rejects a survivor benefit above 100', () => {
+            fireEvent.change(survivorPercentInput(), { target: { value: '150' } });
+
+            save();
+
+            expect(toast.error).toHaveBeenCalledWith('Survivor benefit must be between 0 and 100');
+        });
+
+        it('still accepts an explicit 0% survivor benefit', async () => {
+            fireEvent.change(survivorPercentInput(), { target: { value: '0' } });
+
+            save();
+
+            await waitFor(() => expect(mockCreateIncomeSource).toHaveBeenCalled());
+            expect(mockCreateIncomeSource.mock.calls[0][0].survivor_percent).toBe(0);
+        });
+    });
+
+    describe('accessibility', () => {
+        it('associates form labels with their inputs', () => {
+            setupMocks();
+            renderWithRouter(<IncomeSourcesPage />);
+            fireEvent.click(screen.getByText('New Income Source'));
+
+            expect(screen.getByLabelText('Name')).toBe(screen.getByPlaceholderText('e.g., Social Security'));
+            expect(screen.getByLabelText('Income Type')).toBe(incomeTypeSelect());
+            expect(screen.getByLabelText('Start Age')).toBe(startAgeInput());
+        });
+
+        it('exposes tax treatment cards as a labelled radio group operable from the keyboard', () => {
+            setupMocks();
+            renderWithRouter(<IncomeSourcesPage />);
+            fireEvent.click(screen.getByText('New Income Source'));
+            fireEvent.change(incomeTypeSelect(), { target: { value: 'pension' } });
+
+            const group = screen.getByRole('radiogroup', { name: 'Tax Treatment' });
+            expect(within(group).getByRole('radio', { checked: true })).toHaveTextContent('Fully Taxable');
+
+            fireEvent.keyDown(within(group).getByRole('radio', { name: /Tax-Free/ }), { key: 'Enter' });
+
+            expect(within(group).getByRole('radio', { checked: true })).toHaveTextContent('Tax-Free');
+        });
+    });
+
+    describe('tax copy', () => {
+        it('states the passive-loss exception consistently as phasing out between $100k and $150k', () => {
+            setupMocks();
+            renderWithRouter(<IncomeSourcesPage />);
+            fireEvent.click(screen.getByText('New Income Source'));
+            fireEvent.change(incomeTypeSelect(), { target: { value: 'rental_property' } });
+
+            expect(screen.getByText(/\$25k exception applies below \$100k MAGI and phases out completely at \$150k/)).toBeInTheDocument();
+            expect(screen.queryByText(/MAGI < \$150k/)).not.toBeInTheDocument();
+        });
+
+        it('does not quote a stale year-specific Social Security wage base', () => {
+            setupMocks();
+            renderWithRouter(<IncomeSourcesPage />);
+            fireEvent.click(screen.getByText('New Income Source'));
+            fireEvent.change(incomeTypeSelect(), { target: { value: 'part_time_work' } });
+
+            expect(screen.queryByText(/168,600/)).not.toBeInTheDocument();
         });
     });
 });

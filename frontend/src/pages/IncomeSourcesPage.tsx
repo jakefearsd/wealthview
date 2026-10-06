@@ -6,6 +6,7 @@ import { useCrudForm } from '../hooks/useCrudForm';
 import { cardStyle, inputStyle, labelStyle } from '../utils/styles';
 import { formatCurrency, toPercent } from '../utils/format';
 import LoadingState from '../components/LoadingState';
+import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import CurrencyInput from '../components/CurrencyInput';
 import HelpText from '../components/HelpText';
@@ -14,6 +15,7 @@ import PropertyIncomeChart from '../components/PropertyIncomeChart';
 import Button from '../components/Button';
 import LinkButton from '../components/LinkButton';
 import StatTile from '../components/StatTile';
+import OptionCard from '../components/OptionCard';
 import type { IncomeSource, CreateIncomeSourceRequest } from '../types/projection';
 
 const INCOME_TYPES = [
@@ -34,7 +36,7 @@ const TAX_TREATMENTS: Record<string, { value: string; label: string; description
         { value: 'tax_free', label: 'Tax-Free', description: 'Some government pensions may be partially or fully tax-exempt.' },
     ],
     rental_property: [
-        { value: 'rental_passive', label: 'Passive', description: 'Losses only offset other passive income ($25k exception for MAGI < $150k).' },
+        { value: 'rental_passive', label: 'Passive', description: 'Losses only offset other passive income. The $25k exception applies below $100k MAGI and phases out completely at $150k.' },
         { value: 'rental_active_reps', label: 'Active - REPS', description: 'Real Estate Professional Status: all losses offset any income type.' },
         { value: 'rental_active_str', label: 'Active - STR', description: 'Short-Term Rental loophole: losses offset any income type.' },
     ],
@@ -91,7 +93,7 @@ interface IncomeSourceFormData {
     /** Household/survivor modeling: "primary" | "spouse". */
     owner: string;
     /** Percent (0-100) of this income the survivor keeps after the owner's death. Ignored for social_security (statutory keep-larger rule applies instead). */
-    survivor_percent: number;
+    survivor_percent: number | null;
 }
 
 const initialFormData: IncomeSourceFormData = {
@@ -109,7 +111,7 @@ const initialFormData: IncomeSourceFormData = {
 };
 
 export default function IncomeSourcesPage() {
-    const { data: sources, loading, refetch } = useApiQuery(listIncomeSources);
+    const { data: sources, loading, error, refetch } = useApiQuery(listIncomeSources);
     const { data: properties } = useApiQuery(listProperties);
     const [showForm, setShowForm] = useState(false);
 
@@ -132,7 +134,7 @@ export default function IncomeSourcesPage() {
             owner: data.owner,
             // Statutory keep-larger rule governs SS survivor behavior automatically; the
             // per-source override doesn't apply, so don't send a stale edited value for it.
-            survivor_percent: data.income_type === 'social_security' ? null : data.survivor_percent / 100,
+            survivor_percent: data.income_type === 'social_security' || data.survivor_percent == null ? null : data.survivor_percent / 100,
         };
         return createIncomeSource(request);
     }, []);
@@ -149,7 +151,7 @@ export default function IncomeSourcesPage() {
             tax_treatment: data.tax_treatment,
             property_id: data.income_type === 'rental_property' ? data.property_id : null,
             owner: data.owner,
-            survivor_percent: data.income_type === 'social_security' ? null : data.survivor_percent / 100,
+            survivor_percent: data.income_type === 'social_security' || data.survivor_percent == null ? null : data.survivor_percent / 100,
         });
     }, []);
 
@@ -163,6 +165,14 @@ export default function IncomeSourcesPage() {
         validate: (data) => {
             if (!data.name) return 'Name is required';
             if (data.annual_amount <= 0) return 'Annual amount must be greater than 0';
+            if (!(data.start_age > 0)) return 'Start age is required';
+            if (!data.one_time && data.end_age != null && data.end_age < data.start_age) {
+                return 'End age must be at least the start age';
+            }
+            if (data.income_type !== 'social_security'
+                && (data.survivor_percent == null || data.survivor_percent < 0 || data.survivor_percent > 100)) {
+                return 'Survivor benefit must be between 0 and 100';
+            }
             return undefined;
         },
     });
@@ -189,6 +199,11 @@ export default function IncomeSourcesPage() {
         setShowForm(true);
     }
 
+    function deleteSource(source: IncomeSource) {
+        if (!confirm(`Delete income source "${source.name}"? It will be removed from any scenarios that use it.`)) return;
+        void handleDelete(source.id);
+    }
+
     function handleTypeChange(newType: string) {
         setFormData(prev => {
             const updates: Partial<IncomeSourceFormData> = {
@@ -209,6 +224,7 @@ export default function IncomeSourcesPage() {
     }
 
     if (loading) return <LoadingState message="Loading income sources..." />;
+    if (error) return <ErrorState message={error} onRetry={refetch} />;
 
     const linkableProperties = properties ?? [];
     const grouped = (sources ?? []).reduce<Record<string, IncomeSource[]>>((acc, s) => {
@@ -243,12 +259,12 @@ export default function IncomeSourcesPage() {
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                         <div>
-                            <label style={labelStyle}>Name</label>
-                            <input style={inputStyle} value={name} onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))} placeholder="e.g., Social Security" />
+                            <label htmlFor="income-name" style={labelStyle}>Name</label>
+                            <input id="income-name" style={inputStyle} value={name} onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))} placeholder="e.g., Social Security" />
                         </div>
                         <div>
-                            <label style={labelStyle}>Income Type</label>
-                            <select style={inputStyle} value={incomeType} onChange={e => handleTypeChange(e.target.value)}>
+                            <label htmlFor="income-type" style={labelStyle}>Income Type</label>
+                            <select id="income-type" style={inputStyle} value={incomeType} onChange={e => handleTypeChange(e.target.value)}>
                                 {INCOME_TYPES.map(t => (
                                     <option key={t.value} value={t.value}>{t.label}</option>
                                 ))}
@@ -259,8 +275,8 @@ export default function IncomeSourcesPage() {
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                         <div>
-                            <label style={labelStyle}>Owner</label>
-                            <select style={inputStyle} value={owner} onChange={e => setFormData(prev => ({ ...prev, owner: e.target.value }))}>
+                            <label htmlFor="income-owner" style={labelStyle}>Owner</label>
+                            <select id="income-owner" style={inputStyle} value={owner} onChange={e => setFormData(prev => ({ ...prev, owner: e.target.value }))}>
                                 <option value="primary">Primary</option>
                                 <option value="spouse">Spouse</option>
                             </select>
@@ -275,15 +291,16 @@ export default function IncomeSourcesPage() {
                             </div>
                         ) : (
                             <div>
-                                <label style={labelStyle}>Survivor % (%)</label>
+                                <label htmlFor="income-survivor-percent" style={labelStyle}>Survivor Benefit (%)</label>
                                 <input
+                                    id="income-survivor-percent"
                                     style={inputStyle}
                                     type="number"
                                     step="1"
                                     min="0"
                                     max="100"
-                                    value={survivorPercent}
-                                    onChange={e => setFormData(prev => ({ ...prev, survivor_percent: Number(e.target.value) }))}
+                                    value={survivorPercent ?? ''}
+                                    onChange={e => setFormData(prev => ({ ...prev, survivor_percent: e.target.value === '' ? null : Number(e.target.value) }))}
                                 />
                                 <HelpText>Share of this income the survivor keeps after the owner&apos;s death (0-100%, default 100%).</HelpText>
                             </div>
@@ -293,8 +310,8 @@ export default function IncomeSourcesPage() {
                     {incomeType === 'rental_property' && (
                         <>
                             <div style={{ marginBottom: '1rem' }}>
-                                <label style={labelStyle}>Link to Property (optional)</label>
-                                <select style={inputStyle} value={propertyId ?? ''} onChange={e => setFormData(prev => ({ ...prev, property_id: e.target.value || null }))}>
+                                <label htmlFor="income-property" style={labelStyle}>Link to Property (optional)</label>
+                                <select id="income-property" style={inputStyle} value={propertyId ?? ''} onChange={e => setFormData(prev => ({ ...prev, property_id: e.target.value || null }))}>
                                     <option value="">No linked property (hypothetical)</option>
                                     {linkableProperties.map(p => (
                                         <option key={p.id} value={p.id}>{p.address} — {formatCurrency(p.current_value)}</option>
@@ -318,28 +335,27 @@ export default function IncomeSourcesPage() {
 
                     {incomeType === 'part_time_work' && (
                         <InfoSection prompt="What is self-employment tax?">
-                            Self-employment income is subject to a 15.3% SE tax (12.4% Social Security + 2.9% Medicare) on 92.35% of net earnings. The Social Security portion caps at the annual wage base (~$168,600 in 2024). Half of SE tax is deductible from AGI. W-2 income avoids SE tax because employers handle payroll taxes.
+                            Self-employment income is subject to a 15.3% SE tax (12.4% Social Security + 2.9% Medicare) on 92.35% of net earnings. The Social Security portion stops at the annual Social Security wage base. Half of SE tax is deductible from AGI. W-2 income avoids SE tax because employers handle payroll taxes.
                         </InfoSection>
                     )}
 
                     <div style={{ marginBottom: '1rem' }}>
-                        <label style={labelStyle}>Tax Treatment</label>
-                        <div style={{ display: 'grid', gridTemplateColumns: treatments.length > 2 ? '1fr 1fr 1fr' : '1fr 1fr', gap: '0.75rem' }}>
+                        <div id="income-tax-treatment-label" style={labelStyle}>Tax Treatment</div>
+                        <div
+                            role="radiogroup"
+                            aria-labelledby="income-tax-treatment-label"
+                            style={{ display: 'grid', gridTemplateColumns: treatments.length > 2 ? '1fr 1fr 1fr' : '1fr 1fr', gap: '0.75rem' }}
+                        >
                             {treatments.map(t => (
-                                <div
+                                <OptionCard
                                     key={t.value}
-                                    onClick={() => setFormData(prev => ({ ...prev, tax_treatment: t.value }))}
-                                    style={{
-                                        border: `2px solid ${taxTreatment === t.value ? '#1976d2' : '#e0e0e0'}`,
-                                        background: taxTreatment === t.value ? '#e3f2fd' : '#fff',
-                                        cursor: 'pointer',
-                                        borderRadius: '8px',
-                                        padding: '0.75rem',
-                                    }}
+                                    selected={taxTreatment === t.value}
+                                    onSelect={() => setFormData(prev => ({ ...prev, tax_treatment: t.value }))}
+                                    padding="0.75rem"
                                 >
                                     <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.25rem' }}>{t.label}</div>
                                     <div style={{ fontSize: '0.75rem', color: '#666', lineHeight: 1.3 }}>{t.description}</div>
-                                </div>
+                                </OptionCard>
                             ))}
                         </div>
                     </div>
@@ -351,24 +367,24 @@ export default function IncomeSourcesPage() {
 
                     <div style={{ display: 'grid', gridTemplateColumns: oneTime ? '1fr 1fr' : '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                         <div>
-                            <label style={labelStyle}>{oneTime ? 'Payment Amount' : propertyId ? 'Annual Rent Amount' : 'Annual Amount'}</label>
-                            <CurrencyInput style={inputStyle} value={annualAmount || ''} onChange={v => setFormData(prev => ({ ...prev, annual_amount: Number(v) || 0 }))} />
+                            <label htmlFor="income-amount" style={labelStyle}>{oneTime ? 'Payment Amount' : propertyId ? 'Annual Rent Amount' : 'Annual Amount'}</label>
+                            <CurrencyInput id="income-amount" style={inputStyle} value={annualAmount || ''} onChange={v => setFormData(prev => ({ ...prev, annual_amount: Number(v) || 0 }))} />
                         </div>
                         <div>
-                            <label style={labelStyle}>{oneTime ? 'Payment Age' : 'Start Age'}</label>
-                            <input style={inputStyle} type="number" value={startAge || ''} onChange={e => setFormData(prev => ({ ...prev, start_age: Number(e.target.value) }))} />
+                            <label htmlFor="income-start-age" style={labelStyle}>{oneTime ? 'Payment Age' : 'Start Age'}</label>
+                            <input id="income-start-age" style={inputStyle} type="number" value={startAge || ''} onChange={e => setFormData(prev => ({ ...prev, start_age: Number(e.target.value) }))} />
                             <HelpText>{oneTime ? 'Age when the one-time payment occurs.' : 'Age when this income begins.'}</HelpText>
                         </div>
                         {!oneTime && (
                             <>
                                 <div>
-                                    <label style={labelStyle}>End Age (blank = forever)</label>
-                                    <input style={inputStyle} type="number" value={endAge ?? ''} onChange={e => setFormData(prev => ({ ...prev, end_age: e.target.value ? Number(e.target.value) : null }))} />
+                                    <label htmlFor="income-end-age" style={labelStyle}>End Age (blank = forever)</label>
+                                    <input id="income-end-age" style={inputStyle} type="number" value={endAge ?? ''} onChange={e => setFormData(prev => ({ ...prev, end_age: e.target.value ? Number(e.target.value) : null }))} />
                                     <HelpText>Leave blank if this income continues for life.</HelpText>
                                 </div>
                                 <div>
-                                    <label style={labelStyle}>Inflation Rate (%)</label>
-                                    <input style={inputStyle} type="number" step="0.1" value={inflationRate || ''} onChange={e => setFormData(prev => ({ ...prev, inflation_rate: Number(e.target.value) || 0 }))} />
+                                    <label htmlFor="income-inflation" style={labelStyle}>Inflation Rate (%)</label>
+                                    <input id="income-inflation" style={inputStyle} type="number" step="0.1" value={inflationRate || ''} onChange={e => setFormData(prev => ({ ...prev, inflation_rate: Number(e.target.value) || 0 }))} />
                                     <HelpText>Annual adjustment rate (e.g., 2 = 2%). SS COLA is typically ~2%.</HelpText>
                                 </div>
                             </>
@@ -390,14 +406,14 @@ export default function IncomeSourcesPage() {
                 Object.entries(grouped).map(([type, items]) => (
                     <div key={type} style={{ marginBottom: '1.5rem' }}>
                         <h3 style={{ color: TYPE_COLORS[type] ?? '#333', marginBottom: '0.75rem' }}>{typeLabel(type)}</h3>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '1rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 400px), 1fr))', gap: '1rem' }}>
                             {items.map(s => (
                                 <div key={s.id} style={{ ...cardStyle, ...(s.property_id ? { gridColumn: '1 / -1' } : {}) }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                                         <h3 style={{ margin: 0, fontSize: '1.1rem' }}>{s.name}</h3>
                                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                                             <LinkButton onClick={() => startEdit(s)}>Edit</LinkButton>
-                                            <LinkButton variant="danger" onClick={() => handleDelete(s.id)}>Delete</LinkButton>
+                                            <LinkButton variant="danger" onClick={() => deleteSource(s)}>Delete</LinkButton>
                                         </div>
                                     </div>
                                     <div style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '1rem', color: '#1b5e20' }}>
