@@ -7,6 +7,7 @@ import { formatCurrency, formatDate, todayIso } from '../../utils/format';
 import Button from '../Button';
 import LinkButton from '../LinkButton';
 import toast from 'react-hot-toast';
+import { scrollRegionProps } from '../../utils/scrollRegion';
 
 interface PriceRecord {
     symbol: string;
@@ -138,7 +139,7 @@ export default function PriceBrowserTab() {
                     <div style={{ marginBottom: '0.75rem', fontSize: '0.9rem', color: '#555' }}>
                         {prices.length} prices found
                     </div>
-                    <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                    <div style={{ maxHeight: '400px', overflowY: 'auto' }} {...scrollRegionProps('Prices table')}>
                         <table style={tableStyle}>
                             <thead>
                                 <tr>

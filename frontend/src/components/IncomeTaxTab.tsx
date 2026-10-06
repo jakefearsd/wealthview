@@ -3,6 +3,7 @@ import { formatCurrency } from '../utils/format';
 import { tableStyle } from '../utils/styles';
 import TaxBreakdownChart from './TaxBreakdownChart';
 import type { ProjectionYear } from '../types/projection';
+import { scrollRegionProps } from '../utils/scrollRegion';
 
 interface IncomeTaxTabProps {
     yearlyData: ProjectionYear[];
@@ -43,7 +44,7 @@ export default function IncomeTaxTab({
                 hasStateTax={hasStateTax}
             />
             <h4 style={{ marginTop: '1.5rem', marginBottom: '0.5rem' }}>Year-by-Year Detail</h4>
-            <div style={{ maxHeight: '70vh', overflow: 'auto' }}>
+            <div style={{ maxHeight: '70vh', overflow: 'auto' }} {...scrollRegionProps('Year-by-year tax detail table')}>
                 <table style={tableStyle}>
                     <thead>
                         <tr style={{ borderBottom: '2px solid #e0e0e0' }}>

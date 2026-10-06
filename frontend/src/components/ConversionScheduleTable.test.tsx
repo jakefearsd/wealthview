@@ -24,6 +24,14 @@ const year = {
 };
 
 describe('ConversionScheduleTable', () => {
+    it('exposes the scrollable table as a focusable, named region', () => {
+        render(<ConversionScheduleTable years={[year]} />);
+
+        const region = screen.getByRole('region', { name: 'Conversion schedule by year' });
+        expect(region).toHaveAttribute('tabindex', '0');
+        expect(region.querySelector('table')).not.toBeNull();
+    });
+
     it('renders an empty-state message when no years provided', () => {
         render(<ConversionScheduleTable years={[]} />);
         expect(screen.getByText(/No conversion schedule/i)).toBeInTheDocument();

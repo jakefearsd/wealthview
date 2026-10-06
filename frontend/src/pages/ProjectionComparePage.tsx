@@ -14,6 +14,7 @@ import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
     Legend, CartesianGrid,
 } from 'recharts';
+import { scrollRegionProps } from '../utils/scrollRegion';
 
 const COLORS = ['#1976d2', '#2e7d32', '#9c27b0'];
 
@@ -136,7 +137,7 @@ export default function ProjectionComparePage() {
 
                     <div style={cardStyle}>
                         <h3 style={{ marginBottom: '1rem' }}>Summary</h3>
-                        <div style={{ overflowX: 'auto' }}>
+                        <div style={{ overflowX: 'auto' }} {...scrollRegionProps('Scenario comparison summary table')}>
                             <table style={tableStyle}>
                                 <thead>
                                     <tr>

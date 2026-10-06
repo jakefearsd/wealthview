@@ -110,6 +110,13 @@ describe('ProjectionDetailPage', () => {
         expect(screen.getByText('90')).toBeInTheDocument();
     });
 
+    it('exposes the scrollable accounts table as a focusable, named region', () => {
+        mockUseApiQuery.mockReturnValue({ data: mockScenario, loading: false, error: null, refetch: vi.fn() });
+        renderPage();
+
+        expect(screen.getByRole('region', { name: 'Accounts table' })).toHaveAttribute('tabindex', '0');
+    });
+
     it('shows run button', () => {
         mockUseApiQuery.mockReturnValue({ data: mockScenario, loading: false, error: null, refetch: vi.fn() });
         renderPage();

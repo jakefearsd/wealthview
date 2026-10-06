@@ -2,6 +2,7 @@ import React from 'react';
 import { formatCurrency } from '../utils/format';
 import { tableStyle } from '../utils/styles';
 import type { TaxSpaceYear } from '../types/projection';
+import { scrollRegionProps } from '../utils/scrollRegion';
 
 interface TaxSpaceTabProps {
     taxSpace: TaxSpaceYear[];
@@ -55,7 +56,7 @@ export default function TaxSpaceTab({ taxSpace }: TaxSpaceTabProps) {
     return (
         <div>
             <h4 style={{ marginBottom: '0.5rem' }}>Tax Space by Year</h4>
-            <div style={{ maxHeight: '70vh', overflow: 'auto' }}>
+            <div style={{ maxHeight: '70vh', overflow: 'auto' }} {...scrollRegionProps('Tax space by year table')}>
                 <table style={tableStyle}>
                     <thead>
                         <tr style={{ borderBottom: '2px solid #e0e0e0' }}>

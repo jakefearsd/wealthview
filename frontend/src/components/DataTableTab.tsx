@@ -3,6 +3,7 @@ import { formatCurrency } from '../utils/format';
 import { tableStyle } from '../utils/styles';
 import Button from './Button';
 import type { ProjectionYear } from '../types/projection';
+import { scrollRegionProps } from '../utils/scrollRegion';
 
 interface DataTableTabProps {
     yearlyData: ProjectionYear[];
@@ -56,7 +57,7 @@ export default function DataTableTab({
                     Download CSV
                 </Button>
             </div>
-            <div style={{ maxHeight: '70vh', overflow: 'auto' }}>
+            <div style={{ maxHeight: '70vh', overflow: 'auto' }} {...scrollRegionProps('Year-by-year data table')}>
                 <table style={tableStyle}>
                     <thead>
                         <tr style={{ borderBottom: '2px solid #e0e0e0' }}>

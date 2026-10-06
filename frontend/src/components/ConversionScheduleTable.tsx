@@ -1,6 +1,7 @@
 import type { ConversionYearDetail } from '../types/projection';
 import { tableStyle, thStyle as baseThStyle, tdStyle as baseTdStyle, trHoverStyle } from '../utils/styles';
 import { formatWholeCurrency as fmt, formatCompactCurrency as fmtShort } from '../utils/format';
+import { scrollRegionProps } from '../utils/scrollRegion';
 
 interface Props {
     years: ConversionYearDetail[];
@@ -23,7 +24,7 @@ export default function ConversionScheduleTable({ years }: Props) {
     }
 
     return (
-        <div style={{ overflowX: 'auto' }}>
+        <div style={{ overflowX: 'auto' }} {...scrollRegionProps('Conversion schedule by year')}>
             <table style={tableStyle}>
                 <thead>
                     <tr style={{ borderBottom: '2px solid #e0e0e0' }}>

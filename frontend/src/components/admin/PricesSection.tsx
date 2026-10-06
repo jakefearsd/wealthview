@@ -17,6 +17,7 @@ import Button from '../Button';
 import ErrorState from '../ErrorState';
 import TabBar from '../TabBar';
 import toast from 'react-hot-toast';
+import { scrollRegionProps } from '../../utils/scrollRegion';
 
 type TabId = 'finnhub' | 'yahoo' | 'csv' | 'browse';
 
@@ -279,7 +280,7 @@ function YahooTab() {
                                 {saving ? 'Saving...' : 'Save All'}
                             </Button>
                         </div>
-                        <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                        <div style={{ maxHeight: '320px', overflowY: 'auto' }} {...scrollRegionProps('Price entry table')}>
                             <table style={tableStyle}>
                                 <thead>
                                     <tr>

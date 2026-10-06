@@ -12,6 +12,7 @@ import TaxSavingsSummary from './TaxSavingsSummary';
 import ConversionScheduleTable from './ConversionScheduleTable';
 import TraditionalBalanceChart from './TraditionalBalanceChart';
 import NearTermSpendingGuide from './NearTermSpendingGuide';
+import { scrollRegionProps } from '../utils/scrollRegion';
 
 interface OptimizerResultsViewProps {
     result: GuardrailProfileResponse;
@@ -241,7 +242,7 @@ export default function OptimizerResultsView({
             {diagnostics.phases.length > 0 && (
                 <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
                     <h3 style={{ marginBottom: '1rem' }}>Phase Achievement</h3>
-                    <div style={{ overflowX: 'auto' }}>
+                    <div style={{ overflowX: 'auto' }} {...scrollRegionProps('Phase achievement table')}>
                         <table style={tableStyle}>
                             <thead>
                                 <tr>
@@ -312,7 +313,7 @@ export default function OptimizerResultsView({
                 <SpendingCorridorChart yearlySpending={result.yearly_spending} phases={result.phases} />
             </div>
 
-            <div style={{ ...cardStyle, marginBottom: '1.5rem', overflowX: 'auto' }}>
+            <div style={{ ...cardStyle, marginBottom: '1.5rem', overflowX: 'auto' }} {...scrollRegionProps('Year-by-year breakdown table')}>
                 <h3 style={{ marginBottom: '1rem' }}>Year-by-Year Breakdown</h3>
                 <table style={tableStyle}>
                     <thead>
@@ -385,7 +386,7 @@ export default function OptimizerResultsView({
                         />
                     </div>
 
-                    <div style={{ ...cardStyle, marginBottom: '1.5rem', overflowX: 'auto' }}>
+                    <div style={{ ...cardStyle, marginBottom: '1.5rem', overflowX: 'auto' }} {...scrollRegionProps('Conversion schedule table')}>
                         <h4 style={{ marginBottom: '1rem', marginTop: 0 }}>Conversion Schedule</h4>
                         <ConversionScheduleTable years={result.conversion_schedule.years} />
                     </div>

@@ -32,6 +32,7 @@ import type { ProjectionResult, CreateScenarioRequest } from '../types/projectio
 import { downloadBlob } from '../api/export';
 import Button from '../components/Button';
 import TabBar from '../components/TabBar';
+import { scrollRegionProps } from '../utils/scrollRegion';
 
 type TabId = 'chart' | 'flows' | 'table' | 'spending' | 'income_tax' | 'income_streams' | 'tax_shield' | 'tax_space';
 
@@ -209,7 +210,7 @@ export default function ProjectionDetailPage() {
                     {scenario.income_sources && scenario.income_sources.length > 0 && (
                         <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
                             <h3 style={{ marginBottom: '1rem' }}>Income Sources</h3>
-                            <div style={{ overflowX: 'auto' }}>
+                            <div style={{ overflowX: 'auto' }} {...scrollRegionProps('Income sources table')}>
                                 <table style={tableStyle}>
                                     <thead>
                                         <tr>
@@ -255,7 +256,7 @@ export default function ProjectionDetailPage() {
                     {scenario.accounts.length > 0 && (
                         <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
                             <h3 style={{ marginBottom: '1rem' }}>Accounts</h3>
-                            <div style={{ overflowX: 'auto' }}>
+                            <div style={{ overflowX: 'auto' }} {...scrollRegionProps('Accounts table')}>
                                 <table style={tableStyle}>
                                     <thead>
                                         <tr>
