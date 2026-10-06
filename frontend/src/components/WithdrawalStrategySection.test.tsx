@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('./HelpText', () => ({
@@ -54,5 +54,23 @@ describe('WithdrawalStrategySection', () => {
         render(<WithdrawalStrategySection {...baseProps} onWithdrawalOrderChange={onChange} />);
         fireEvent.click(screen.getByText(/Dynamic Sequencing/));
         expect(onChange).toHaveBeenCalledWith('dynamic_sequencing');
+    });
+
+    it('exposes strategy and order cards as labelled radio groups with the current choice checked', () => {
+        render(<WithdrawalStrategySection {...baseProps} />);
+
+        const strategy = screen.getByRole('radiogroup', { name: 'Withdrawal Strategy' });
+        expect(within(strategy).getAllByRole('radio')).toHaveLength(3);
+        expect(within(strategy).getByRole('radio', { checked: true })).toHaveTextContent('Fixed Percentage');
+        expect(screen.getByRole('radiogroup', { name: 'Withdrawal Order' })).toBeInTheDocument();
+    });
+
+    it('selects a strategy from the keyboard', () => {
+        const onChange = vi.fn();
+        render(<WithdrawalStrategySection {...baseProps} onWithdrawalStrategyChange={onChange} />);
+
+        fireEvent.keyDown(screen.getByRole('radio', { name: /Dynamic Percentage/ }), { key: 'Enter' });
+
+        expect(onChange).toHaveBeenCalledWith('dynamic_percentage');
     });
 });

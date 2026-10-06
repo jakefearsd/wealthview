@@ -1,4 +1,6 @@
+import { useId } from 'react';
 import HelpText from './HelpText';
+import OptionCard from './OptionCard';
 import InfoSection from './InfoSection';
 import { inputStyle, labelStyle } from '../utils/styles';
 
@@ -58,25 +60,25 @@ export default function WithdrawalStrategySection({
     dynamicSequencingBracketRate,
     onDynamicSequencingBracketRateChange,
 }: WithdrawalStrategySectionProps) {
+    const strategyLabelId = useId();
+    const orderLabelId = useId();
     return (
         <>
-            <label style={{ ...labelStyle, marginBottom: '0.5rem' }}>Withdrawal Strategy</label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+            <div id={strategyLabelId} style={{ ...labelStyle, marginBottom: '0.5rem' }}>Withdrawal Strategy</div>
+            <div
+                role="radiogroup"
+                aria-labelledby={strategyLabelId}
+                style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}
+            >
                 {STRATEGY_OPTIONS.map(opt => (
-                    <div
+                    <OptionCard
                         key={opt.value}
-                        onClick={() => onWithdrawalStrategyChange(opt.value)}
-                        style={{
-                            border: `2px solid ${withdrawalStrategy === opt.value ? '#1976d2' : '#e0e0e0'}`,
-                            background: withdrawalStrategy === opt.value ? '#e3f2fd' : '#fff',
-                            cursor: 'pointer',
-                            borderRadius: '8px',
-                            padding: '1rem',
-                        }}
+                        selected={withdrawalStrategy === opt.value}
+                        onSelect={() => onWithdrawalStrategyChange(opt.value)}
                     >
                         <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>{opt.title}</div>
                         <div style={{ fontSize: '0.8rem', color: '#666', lineHeight: 1.4 }}>{opt.description}</div>
-                    </div>
+                    </OptionCard>
                 ))}
             </div>
             {withdrawalStrategy === 'vanguard_dynamic_spending' && (
@@ -94,26 +96,24 @@ export default function WithdrawalStrategySection({
                 </div>
             )}
 
-            <label style={{ ...labelStyle, marginBottom: '0.5rem' }}>Withdrawal Order</label>
+            <div id={orderLabelId} style={{ ...labelStyle, marginBottom: '0.5rem' }}>Withdrawal Order</div>
             <InfoSection prompt="What is withdrawal order?">
                 When you withdraw from your portfolio in retirement, this determines which accounts are drawn from first. Different orders have different tax consequences — for example, drawing from traditional accounts first triggers income tax earlier but preserves Roth growth.
             </InfoSection>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+            <div
+                role="radiogroup"
+                aria-labelledby={orderLabelId}
+                style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}
+            >
                 {WITHDRAWAL_ORDER_OPTIONS.map(opt => (
-                    <div
+                    <OptionCard
                         key={opt.value}
-                        onClick={() => onWithdrawalOrderChange(opt.value)}
-                        style={{
-                            border: `2px solid ${withdrawalOrder === opt.value ? '#1976d2' : '#e0e0e0'}`,
-                            background: withdrawalOrder === opt.value ? '#e3f2fd' : '#fff',
-                            cursor: 'pointer',
-                            borderRadius: '8px',
-                            padding: '1rem',
-                        }}
+                        selected={withdrawalOrder === opt.value}
+                        onSelect={() => onWithdrawalOrderChange(opt.value)}
                     >
                         <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>{opt.title}</div>
                         <div style={{ fontSize: '0.8rem', color: '#666', lineHeight: 1.4 }}>{opt.description}</div>
-                    </div>
+                    </OptionCard>
                 ))}
             </div>
             {withdrawalOrder === 'dynamic_sequencing' && (

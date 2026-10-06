@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('./HelpText', () => ({
@@ -73,5 +73,17 @@ describe('RothConversionSection', () => {
         render(<RothConversionSection {...baseProps} rothConversionStrategy="fill_bracket" />);
         expect(screen.getByText('Conversion Start Year')).toBeInTheDocument();
         expect(screen.queryByText('Filing Status')).not.toBeInTheDocument();
+    });
+
+    it('exposes the strategy cards as a labelled radio group operable from the keyboard', () => {
+        const onChange = vi.fn();
+        render(<RothConversionSection {...baseProps} onRothConversionStrategyChange={onChange} />);
+
+        const group = screen.getByRole('radiogroup', { name: 'Roth conversion strategy' });
+        expect(within(group).getByRole('radio', { checked: true })).toHaveTextContent('Fixed Amount');
+
+        fireEvent.keyDown(within(group).getByRole('radio', { name: /Fill Tax Bracket/ }), { key: ' ' });
+
+        expect(onChange).toHaveBeenCalledWith('fill_bracket');
     });
 });

@@ -1,6 +1,7 @@
 import HelpText from './HelpText';
 import InfoSection from './InfoSection';
 import CurrencyInput from './CurrencyInput';
+import OptionCard from './OptionCard';
 import { inputStyle, labelStyle } from '../utils/styles';
 
 export interface RothConversionSectionProps {
@@ -34,33 +35,25 @@ export default function RothConversionSection({
             <InfoSection prompt="What is Roth conversion?">
                 Moving pre-tax retirement funds (Traditional IRA/401k) to a Roth account. You pay income tax on the converted amount now, but all future growth and withdrawals are tax-free. A conversion ladder spreads conversions over multiple years to stay in lower tax brackets.
             </InfoSection>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                <div
-                    onClick={() => onRothConversionStrategyChange('fixed_amount')}
-                    style={{
-                        border: `2px solid ${rothConversionStrategy === 'fixed_amount' ? '#1976d2' : '#e0e0e0'}`,
-                        background: rothConversionStrategy === 'fixed_amount' ? '#e3f2fd' : '#fff',
-                        cursor: 'pointer',
-                        borderRadius: '8px',
-                        padding: '1rem',
-                    }}
+            <div
+                role="radiogroup"
+                aria-label="Roth conversion strategy"
+                style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}
+            >
+                <OptionCard
+                    selected={rothConversionStrategy === 'fixed_amount'}
+                    onSelect={() => onRothConversionStrategyChange('fixed_amount')}
                 >
                     <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Fixed Amount</div>
                     <div style={{ fontSize: '0.8rem', color: '#666', lineHeight: 1.4 }}>Convert a fixed dollar amount from traditional to Roth each year. Set to $0 to skip conversions.</div>
-                </div>
-                <div
-                    onClick={() => onRothConversionStrategyChange('fill_bracket')}
-                    style={{
-                        border: `2px solid ${rothConversionStrategy === 'fill_bracket' ? '#1976d2' : '#e0e0e0'}`,
-                        background: rothConversionStrategy === 'fill_bracket' ? '#e3f2fd' : '#fff',
-                        cursor: 'pointer',
-                        borderRadius: '8px',
-                        padding: '1rem',
-                    }}
+                </OptionCard>
+                <OptionCard
+                    selected={rothConversionStrategy === 'fill_bracket'}
+                    onSelect={() => onRothConversionStrategyChange('fill_bracket')}
                 >
                     <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Fill Tax Bracket</div>
                     <div style={{ fontSize: '0.8rem', color: '#666', lineHeight: 1.4 }}>Automatically convert enough to fill up to a target tax bracket each year. Optimizes conversions to minimize lifetime taxes.</div>
-                </div>
+                </OptionCard>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                 {rothConversionStrategy === 'fixed_amount' && (
