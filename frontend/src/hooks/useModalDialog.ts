@@ -12,7 +12,10 @@ const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabi
 export function useModalDialog<T extends HTMLElement>(onClose: () => void) {
     const ref = useRef<T>(null);
     const onCloseRef = useRef(onClose);
-    onCloseRef.current = onClose;
+
+    useEffect(() => {
+        onCloseRef.current = onClose;
+    }, [onClose]);
 
     useEffect(() => {
         const previouslyFocused = document.activeElement as HTMLElement | null;

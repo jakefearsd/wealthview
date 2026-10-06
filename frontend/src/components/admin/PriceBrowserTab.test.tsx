@@ -104,7 +104,7 @@ describe('PriceBrowserTab', () => {
         const chartDates = JSON.parse(screen.getByTestId('line-chart').getAttribute('data-chart-data') ?? '[]')
             .map((r: { date: string }) => r.date);
         expect(chartDates).toEqual(['2026-04-10', '2026-04-11', '2026-04-12']);
-        const tableDates = screen.getAllByRole('row').slice(1).map((r) => r.cells[0].textContent);
+        const tableDates = screen.getAllByRole('row').slice(1).map((r) => r.querySelector('td')?.textContent);
         expect(tableDates).toEqual(['2026-04-12', '2026-04-11', '2026-04-10']);
     });
 
