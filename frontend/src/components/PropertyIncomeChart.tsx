@@ -7,6 +7,7 @@ import {
 import { getCashFlowDetail, getDepreciationSchedule, getProperty } from '../api/properties';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { trailingTwelveMonthRange } from '../utils/dateRange';
+import { annualDebtService, loanTermsOf } from '../utils/amortization';
 import { formatCurrency } from '../utils/format';
 import { legendTextFormatter } from './legendTextFormatter';
 import { MONTH_ABBREVIATIONS } from '../utils/chartFormatters';
@@ -28,6 +29,7 @@ const CATEGORY_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 const DEPRECIATION_COLOR = '#f44336';
+const MORTGAGE_LABEL = 'Mortgage (P&I)';
 
 type Horizon = 'trailing' | '5yr' | '10yr' | '15yr' | '20yr';
 const HORIZON_OPTIONS: { value: Horizon; label: string }[] = [
@@ -105,6 +107,10 @@ interface ForwardRow {
     year: number;
     income: number;
     expenses: number;
+    /** Principal and interest paid this year, negative like the other outflows. */
+    mortgage: number;
+    /** The deductible interest share of {@link mortgage}, as a positive amount. */
+    interest: number;
     depreciation: number;
     netCash: number;
     netTaxable: number;
@@ -120,7 +126,9 @@ function buildForwardData(
     const currentYear = new Date().getFullYear();
     const rows: ForwardRow[] = [];
 
-    // Compute annual expenses from property data
+    // Operating expenses from property data; these inflate with rent. Debt service does not:
+    // a fixed-rate mortgage payment is the same nominal amount every year until payoff.
+    const loan = loanTermsOf(property);
     const baseExpenses = (property?.annual_property_tax ?? 0)
         + (property?.annual_insurance_cost ?? 0)
         + (property?.annual_maintenance_cost ?? 0);
@@ -130,6 +138,7 @@ function buildForwardData(
         const inflationFactor = Math.pow(1 + inflationRate, i);
         const income = annualRent * inflationFactor;
         const expenses = baseExpenses * inflationFactor;
+        const debt = loan ? annualDebtService(loan, year) : { payment: 0, interest: 0 };
 
         // Look up depreciation for this year from the schedule
         let depreciation = 0;
@@ -140,14 +149,16 @@ function buildForwardData(
             }
         }
 
-        const netCash = income - expenses;
-        const netTaxable = income - expenses - depreciation;
+        const netCash = income - expenses - debt.payment;
+        const netTaxable = income - expenses - debt.interest - depreciation;
 
         rows.push({
             label: String(year),
             year,
             income,
             expenses: -expenses,
+            mortgage: debt.payment > 0 ? -debt.payment : 0,
+            interest: debt.interest,
             depreciation: depreciation > 0 ? -depreciation : 0,
             netCash,
             netTaxable,
@@ -211,6 +222,12 @@ function forwardTooltipContent(label: string | number | undefined, payload: Arra
             <div style={{ color: '#d32f2f', marginBottom: '0.15rem' }}>
                 Operating Expenses: {formatCurrency(Math.abs(row.expenses))}
             </div>
+            {row.mortgage < 0 && (
+                <div style={{ color: CATEGORY_CONFIG.mortgage.color, marginBottom: '0.15rem' }}>
+                    {MORTGAGE_LABEL}: {formatCurrency(Math.abs(row.mortgage))}
+                    <span style={{ fontSize: '0.8rem', color: '#666' }}> (interest {formatCurrency(row.interest)})</span>
+                </div>
+            )}
             {row.depreciation < 0 && (
                 <div style={{ color: DEPRECIATION_COLOR, marginBottom: '0.15rem' }}>
                     Depreciation: {formatCurrency(Math.abs(row.depreciation))}
@@ -284,6 +301,7 @@ export default function PropertyIncomeChart({
                 />
             ) : (
                 <ForwardView
+                    propertyId={propertyId}
                     years={horizonYears(horizon)}
                     annualRent={effectiveAnnualRent}
                     inflationRate={inflationRate}
@@ -365,6 +383,7 @@ function TrailingView({ data, monthlyRent, propertyId }: { data: MonthlyCashFlow
 // --- Forward projection sub-view ---
 
 function ForwardView({
+    propertyId,
     years,
     annualRent,
     inflationRate,
@@ -372,6 +391,7 @@ function ForwardView({
     depSchedule,
     hasDepreciation,
 }: {
+    propertyId: string;
     years: number;
     annualRent: number;
     inflationRate: number;
@@ -380,16 +400,20 @@ function ForwardView({
     hasDepreciation: boolean;
 }) {
     const data = buildForwardData(years, annualRent, inflationRate, property, depSchedule);
+    const hasMortgage = loanTermsOf(property) !== null;
+    // A manually entered balance without loan terms has no computable payment; say so rather than guess one.
+    const unamortizedBalance = !hasMortgage && (property?.mortgage_balance ?? 0) > 0;
 
-    // Summary stats
+    // Summary stats. Total expenses include debt service so that income - expenses = net cash flow,
+    // as in the trailing view.
     const totalIncome = data.reduce((s, d) => s + d.income, 0);
-    const totalExpenses = data.reduce((s, d) => s + Math.abs(d.expenses), 0);
+    const totalExpenses = data.reduce((s, d) => s + Math.abs(d.expenses) + Math.abs(d.mortgage), 0);
     const totalDepreciation = data.reduce((s, d) => s + Math.abs(d.depreciation), 0);
     const totalNetCash = data.reduce((s, d) => s + d.netCash, 0);
 
     // Y-axis scaling
     const maxIncome = Math.max(...data.map(d => d.income));
-    const maxNeg = Math.max(...data.map(d => Math.abs(d.expenses) + Math.abs(d.depreciation)));
+    const maxNeg = Math.max(...data.map(d => Math.abs(d.expenses) + Math.abs(d.mortgage) + Math.abs(d.depreciation)));
     const yMax = Math.ceil(maxIncome / 10000) * 10000 + 10000;
     const yMin = -Math.ceil(maxNeg / 10000) * 10000 - 10000;
 
@@ -428,12 +452,24 @@ function ForwardView({
                     <ReferenceLine y={0} stroke="#999" strokeWidth={1} />
                     <Bar dataKey="income" name="Rental Income" fill="#2e7d32" stackId="pos" />
                     <Bar dataKey="expenses" name="Operating Expenses" fill="#d32f2f" stackId="neg" />
+                    {hasMortgage && (
+                        <Bar dataKey="mortgage" name={MORTGAGE_LABEL} fill={CATEGORY_CONFIG.mortgage.color} stackId="neg" />
+                    )}
                     {hasDepreciation && (
                         <Bar dataKey="depreciation" name="Depreciation" fill={DEPRECIATION_COLOR} stackId="neg" fillOpacity={0.5} />
                     )}
                     <Bar dataKey="netCash" name="Net Cash Flow" fill="#ff9800" />
                 </BarChart>
             </ResponsiveContainer>
+
+            {unamortizedBalance && (
+                <div style={{ fontSize: '0.75rem', color: '#b26a00', marginTop: '0.5rem' }}>
+                    Mortgage debt service is not included: this property has a mortgage balance but no loan terms,
+                    so net cash flow is overstated. To include it,{' '}
+                    <Link to={`/properties/${propertyId}`} style={{ color: '#1976d2' }}>add loan details</Link>{' '}
+                    (amount, rate, term and start date).
+                </div>
+            )}
 
             {hasDepreciation && (
                 <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.5rem', fontStyle: 'italic' }}>

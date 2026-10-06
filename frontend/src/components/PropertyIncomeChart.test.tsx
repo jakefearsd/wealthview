@@ -1,8 +1,9 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { renderWithRouter } from '../test-utils';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { MonthlyCashFlowDetailEntry, DepreciationScheduleResponse, Property } from '../types/property';
+import { annualDebtService, monthlyPayment } from '../utils/amortization';
 
 const hoisted = vi.hoisted(() => ({
     query: { data: null as unknown, loading: false, error: null, refetch: () => {} },
@@ -251,6 +252,126 @@ describe('PropertyIncomeChart', () => {
             expect(screen.queryByText('10yr Depreciation')).not.toBeInTheDocument();
             expect(barNames()).not.toContain('Depreciation');
             expect(screen.queryByText(/non-cash tax deduction/)).not.toBeInTheDocument();
+        });
+
+        describe('mortgage debt service', () => {
+            // $360,000 at 4.25% for 30 years from July 2018: ~$1,771/mo of principal and interest.
+            const mortgaged = {
+                annual_property_tax: 3000,
+                annual_insurance_cost: 1000,
+                mortgage_balance: 300000,
+                has_loan_details: true,
+                loan_amount: 360000,
+                annual_interest_rate: 0.0425,
+                loan_term_months: 360,
+                loan_start_date: '2018-07-01',
+            } as Partial<Property>;
+            const terms = { loanAmount: 360000, annualRate: 0.0425, termMonths: 360, startDate: '2018-07-01' };
+
+            it('subtracts principal and interest from net cash flow and only interest from taxable income', async () => {
+                const user = userEvent.setup();
+                const schedule = {
+                    schedule: [{ tax_year: 2026, annual_depreciation: 5000, cumulative_taken: 5000, remaining_basis: 0 }],
+                } as DepreciationScheduleResponse;
+                setQuery([], schedule, mortgaged);
+
+                renderWithRouter(<PropertyIncomeChart {...defaultProps} annualRent={36000} />);
+                await user.click(screen.getByRole('button', { name: '5 Year' }));
+
+                const ds = annualDebtService(terms, 2026);
+                expect(monthlyPayment(360000, 0.0425, 360)).toBeCloseTo(1771, 0);
+                const row = chartRows()[0];
+                expect(row.mortgage).toBeCloseTo(-ds.payment, 6);
+                expect(row.netCash).toBeCloseTo(36000 - 4000 - ds.payment, 6);
+                expect(row.netTaxable).toBeCloseTo(36000 - 4000 - ds.interest - 5000, 6);
+            });
+
+            it('holds the payment at its fixed nominal amount while other expenses inflate', async () => {
+                const user = userEvent.setup();
+                setQuery([], null, mortgaged);
+
+                renderWithRouter(<PropertyIncomeChart {...defaultProps} annualRent={36000} inflationRate={0.1} />);
+                await user.click(screen.getByRole('button', { name: '5 Year' }));
+
+                const rows = chartRows();
+                expect(rows[1].expenses).toBeCloseTo(-4000 * 1.1, 6);
+                expect(rows[1].mortgage).toBeCloseTo(rows[0].mortgage as number, 6);
+            });
+
+            it('shows the mortgage as its own bar, tooltip line and part of the net cash flow tile', async () => {
+                const user = userEvent.setup();
+                setQuery([], null, mortgaged);
+
+                renderWithRouter(<PropertyIncomeChart {...defaultProps} annualRent={36000} />);
+                await user.click(screen.getByRole('button', { name: '5 Year' }));
+
+                expect(barNames()).toEqual(['Rental Income', 'Operating Expenses', 'Mortgage (P&I)', 'Net Cash Flow']);
+                const ds = annualDebtService(terms, 2026);
+                const tooltip = within(screen.getByTestId('tooltip'));
+                expect(tooltip.getByText(`Mortgage (P&I): $${Math.round(ds.payment).toLocaleString()}`)).toBeInTheDocument();
+                const fiveYearNet = [2026, 2027, 2028, 2029, 2030]
+                    .reduce((s, y) => s + 36000 - 4000 - annualDebtService(terms, y).payment, 0);
+                expect(screen.getByText(`+$${Math.round(fiveYearNet).toLocaleString()}`)).toBeInTheDocument();
+            });
+
+            it('stops the mortgage line in the year the loan is paid off', async () => {
+                const user = userEvent.setup();
+                // A 20-year loan from January 2010 makes its last payment in January 2030.
+                setQuery([], null, {
+                    ...mortgaged, loan_amount: 200000, loan_term_months: 240, loan_start_date: '2010-01-01',
+                });
+
+                renderWithRouter(<PropertyIncomeChart {...defaultProps} annualRent={36000} />);
+                await user.click(screen.getByRole('button', { name: '10 Year' }));
+
+                const payment = monthlyPayment(200000, 0.0425, 240);
+                const byYear = Object.fromEntries(chartRows().map(r => [r.year, r.mortgage as number]));
+                expect(byYear[2029]).toBeCloseTo(-payment * 12, 6);
+                expect(byYear[2030]).toBeCloseTo(-payment, 6);
+                expect(byYear[2031]).toBe(0);
+                expect(byYear[2035]).toBe(0);
+            });
+
+            it('charges principal but no interest on a zero-rate loan', async () => {
+                const user = userEvent.setup();
+                setQuery([], null, {
+                    ...mortgaged, annual_interest_rate: 0, loan_amount: 120000, loan_term_months: 120, loan_start_date: '2020-01-01',
+                });
+
+                renderWithRouter(<PropertyIncomeChart {...defaultProps} annualRent={36000} />);
+                await user.click(screen.getByRole('button', { name: '5 Year' }));
+
+                expect(chartRows()[0]).toEqual(expect.objectContaining({
+                    mortgage: -12000,
+                    netCash: 36000 - 4000 - 12000,
+                    netTaxable: 36000 - 4000,
+                }));
+            });
+
+            it('adds no mortgage bar or note for a property without a loan', async () => {
+                const user = userEvent.setup();
+                setQuery([], null, { annual_property_tax: 3000, mortgage_balance: 0, has_loan_details: false } as Partial<Property>);
+
+                renderWithRouter(<PropertyIncomeChart {...defaultProps} annualRent={36000} />);
+                await user.click(screen.getByRole('button', { name: '5 Year' }));
+
+                expect(chartRows()[0]).toEqual(expect.objectContaining({ mortgage: 0, netCash: 33000 }));
+                expect(barNames()).not.toContain('Mortgage (P&I)');
+                expect(screen.queryByText(/debt service is not included/i)).not.toBeInTheDocument();
+            });
+
+            it('notes that debt service is missing when a balance has no loan details to amortize', async () => {
+                const user = userEvent.setup();
+                setQuery([], null, { annual_property_tax: 3000, mortgage_balance: 250000, has_loan_details: false } as Partial<Property>);
+
+                renderWithRouter(<PropertyIncomeChart {...defaultProps} annualRent={36000} />);
+                await user.click(screen.getByRole('button', { name: '5 Year' }));
+
+                expect(screen.getByText(/debt service is not included/i)).toBeInTheDocument();
+                expect(screen.getByRole('link', { name: 'add loan details' })).toHaveAttribute('href', '/properties/p1');
+                // No payment is guessed from the balance.
+                expect(chartRows()[0]).toEqual(expect.objectContaining({ mortgage: 0, netCash: 33000 }));
+            });
         });
 
         it('switches the heading and returns to the trailing view', async () => {
