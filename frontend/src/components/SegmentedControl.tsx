@@ -71,6 +71,7 @@ export default function SegmentedControl<T extends string>({
                 <button
                     key={opt.value}
                     type="button"
+                    aria-pressed={value === opt.value}
                     onClick={() => onChange(opt.value)}
                     style={optionStyle(value === opt.value, variant)}
                 >

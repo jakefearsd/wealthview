@@ -63,4 +63,12 @@ describe('SegmentedControl', () => {
         expect(button).toHaveStyle({ flex: '1' });
         expect(button.style.borderRightStyle).toBe('none');
     });
+
+    it('sets aria-pressed on the selected segment only', () => {
+        render(<SegmentedControl options={OPTIONS} value="b" onChange={vi.fn()} />);
+
+        expect(screen.getByRole('button', { name: 'Option A' })).toHaveAttribute('aria-pressed', 'false');
+        expect(screen.getByRole('button', { name: 'Option B' })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('button', { name: 'Option C' })).toHaveAttribute('aria-pressed', 'false');
+    });
 });

@@ -18,6 +18,7 @@ function tabButtonStyle(active: boolean): CSSProperties {
         fontWeight: active ? 600 : 400,
         cursor: 'pointer',
         fontSize: '0.95rem',
+        whiteSpace: 'nowrap',
     };
 }
 
@@ -27,9 +28,19 @@ function tabButtonStyle(active: boolean): CSSProperties {
  */
 export default function TabBar<K extends string>({ tabs, active, onSelect, style }: TabBarProps<K>) {
     return (
-        <div style={{ display: 'flex', gap: '0.25rem', borderBottom: '1px solid #e0e0e0', ...style }}>
+        <div
+            role="tablist"
+            style={{ display: 'flex', gap: '0.25rem', borderBottom: '1px solid #e0e0e0', overflowX: 'auto', ...style }}
+        >
             {tabs.map((tab) => (
-                <button key={tab.key} style={tabButtonStyle(tab.key === active)} onClick={() => onSelect(tab.key)}>
+                <button
+                    key={tab.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab.key === active}
+                    style={tabButtonStyle(tab.key === active)}
+                    onClick={() => onSelect(tab.key)}
+                >
                     {tab.label}
                 </button>
             ))}
