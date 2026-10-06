@@ -88,6 +88,10 @@ tax-accuracy fixes in both projection engines. One schema change (V081).
   projection showed $3.87M. Accounts are now rolled forward to retirement the
   same way the projection does (contributions, then growth) before the trials
   begin. Market variation is still simulated from retirement onward only.
+- **A household's optimized spending plan now ends at the second death, like
+  the projection.** The optimizer stopped simulating at the survivor's death
+  but kept emitting yearly rows to the primary's end age, each repeating the
+  same frozen balance.
 
 ## [1.2.8] — 2026-10-04
 

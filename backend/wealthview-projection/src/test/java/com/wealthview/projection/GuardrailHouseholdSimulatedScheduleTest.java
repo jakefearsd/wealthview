@@ -92,7 +92,7 @@ class GuardrailHouseholdSimulatedScheduleTest {
     void optimize_stressedHousehold_certifiedSuccessMeasuresDisplayedScaledSchedule() {
         var result = optimizer.optimize(stressedHousehold(BigDecimal.ZERO));
         List<GuardrailYearlySpending> yearly = result.yearlySpending();
-        assertThat(yearly).hasSize(22);
+        assertThat(yearly).hasSize(21);   // 2030..2050: ends at the second death (API #20)
         assertThat(yearly.get(TRANSITION_IDX).year()).isEqualTo(2044);
 
         double preDisc = yearly.get(0).discretionary().doubleValue();
@@ -148,6 +148,21 @@ class GuardrailHouseholdSimulatedScheduleTest {
     }
 
     /**
+     * API #20: the household horizon ends at the second death (spouse born 1968, dies at 82 in
+     * 2050), the same rule the deterministic engine's loop applies. Rows past it used to be emitted
+     * up to the primary's end age (2051 here) carrying a frozen copy of the bequest balance.
+     */
+    @Test
+    void optimize_stressedHousehold_yearlySpendingEndsAtSecondDeath() {
+        var result = optimizer.optimize(stressedHousehold(BigDecimal.ZERO));
+        List<GuardrailYearlySpending> yearly = result.yearlySpending();
+
+        assertThat(yearly.getLast().year()).isEqualTo(2050);
+        assertThat(yearly).extracting(GuardrailYearlySpending::year).doesNotHaveDuplicates()
+                .allSatisfy(year -> assertThat(year).isLessThanOrEqualTo(2050));
+    }
+
+    /**
      * Test 4 (adaptation coherence): the T16/T24 with-rules disclosure pass consumes the SAME scaled
      * discretionary schedule as the no-rules terminal pass — the corridor still brackets the reported
      * recommended spending every year, the with-rules rate stays ≥ the no-rules rate, and both rise
@@ -157,7 +172,7 @@ class GuardrailHouseholdSimulatedScheduleTest {
     void optimize_stressedHouseholdAdaptive_withRulesConsumesScaledScheduleCoherently() {
         var result = optimizer.optimize(stressedHousehold(new BigDecimal("0.10")));
         List<GuardrailYearlySpending> yearly = result.yearlySpending();
-        assertThat(yearly).hasSize(22);
+        assertThat(yearly).hasSize(21);   // 2030..2050: ends at the second death (API #20)
 
         double success = result.successProbability().doubleValue();
         BigDecimal withRules = result.disclosure().successProbabilityWithRules();

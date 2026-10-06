@@ -339,7 +339,8 @@ final class GuardrailResponseBuilder {
                                                               double[] p10BalanceByYear,
                                                               double[] p25BalanceByYear) {
         var yearlySpending = new ArrayList<GuardrailYearlySpending>();
-        for (int y = 0; y < ctx.sim().years(); y++) {
+        int reportedYears = reportedYears(ctx);
+        for (int y = 0; y < reportedYears; y++) {
             int age = ctx.sim().retirementAge() + y;
             int calendarYear = ctx.sim().retirementYear() + y;
             double floor = ctx.taxIncome().adjustedFloors()[y];
@@ -359,6 +360,19 @@ final class GuardrailResponseBuilder {
         return yearlySpending;
     }
 
+    /**
+     * API #20: the years the household is modeled for -- through the survivor's (second) death when
+     * that falls inside the window, the same horizon the deterministic engine's loop ends at, else
+     * the full window. Trials stop at that index (TrialSimulator's {@code loopYears}) and only carry
+     * the bequest forward past it, so rows beyond it would repeat a frozen balance and a spending
+     * schedule nobody lives to draw. Single-person runs always report every year.
+     */
+    private static int reportedYears(OptimizationSetup ctx) {
+        int years = ctx.sim().years();
+        TrialSimulator.HouseholdSim household = ctx.sim().household();
+        return household != null ? Math.min(years, household.truncateYearIndex()) : years;
+    }
+
     private RothConversionScheduleResponse buildConvScheduleResponse(
             OptimizationSetup ctx,
             GuardrailOptimizationInput input,
@@ -369,7 +383,8 @@ final class GuardrailResponseBuilder {
         }
         var convYears = new ArrayList<ConversionYearDetail>();
         OrdinaryTaxTable[] ordinaryTables = ctx.taxIncome().ordinaryTaxTableByYear();
-        for (int y = 0; y < ctx.sim().years(); y++) {
+        int reportedYears = reportedYears(ctx);
+        for (int y = 0; y < reportedYears; y++) {
             int age = ctx.sim().retirementAge() + y;
             int calendarYear = ctx.sim().retirementYear() + y;
             if (convSchedule.conversionByYear()[y] > 0) {
