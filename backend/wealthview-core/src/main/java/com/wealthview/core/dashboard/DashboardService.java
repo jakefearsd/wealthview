@@ -18,6 +18,7 @@ import com.wealthview.core.account.AccountService;
 import com.wealthview.core.dashboard.dto.DashboardSummaryResponse;
 import com.wealthview.core.dashboard.dto.DashboardSummaryResponse.AccountSummary;
 import com.wealthview.core.dashboard.dto.DashboardSummaryResponse.AllocationEntry;
+import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.core.property.PropertyFinance;
 import com.wealthview.persistence.entity.PropertyEntity;
@@ -54,14 +55,24 @@ public class DashboardService {
         var totalInvestments = BigDecimal.ZERO;
         var totalCash = BigDecimal.ZERO;
         var accountSummaries = new ArrayList<AccountSummary>();
+        var unconvertedAccounts = new ArrayList<String>();
         var allocationMap = new HashMap<String, BigDecimal>();
 
         var balances = accountService.computeAllBalances(tenantId);
 
         for (var account : accounts) {
             var nativeBalance = balances.getOrDefault(account.getId(), BigDecimal.ZERO);
-            var accountBalanceUsd = exchangeRateService.convertToUsd(
-                    nativeBalance, account.getCurrency(), tenantId);
+            BigDecimal accountBalanceUsd;
+            try {
+                accountBalanceUsd = exchangeRateService.convertToUsd(
+                        nativeBalance, account.getCurrency(), tenantId);
+            } catch (EntityNotFoundException e) {
+                // No exchange rate for this account's currency: leave it out of the totals (adding native
+                // units to dollars would be wrong) and flag it, rather than failing the whole dashboard.
+                log.warn("Dashboard for tenant {} skips account {}: {}", tenantId, account.getId(), e.getMessage());
+                unconvertedAccounts.add(account.getName());
+                continue;
+            }
 
             if (account.isBank()) {
                 totalCash = totalCash.add(accountBalanceUsd);
@@ -82,7 +93,7 @@ public class DashboardService {
         log.info("Dashboard summary for tenant {}: net worth {}", tenantId, netWorth);
         return new DashboardSummaryResponse(
                 netWorth, totalInvestments, totalCash,
-                totalPropertyEquity, accountSummaries, allocation);
+                totalPropertyEquity, accountSummaries, allocation, unconvertedAccounts);
     }
 
     private BigDecimal computePropertySummaries(UUID tenantId,

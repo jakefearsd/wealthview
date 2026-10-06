@@ -34,7 +34,7 @@ class ExchangeRateResolverTest {
     }
 
     @Test
-    void resolveRateToUsd_unknownCurrency_pointsTheUserAtTheAdminExchangeRatesScreen() {
+    void resolveRateToUsd_unknownCurrency_tellsTheCallerToAddARateWithoutNamingAnAdminOnlyPage() {
         var tenantId = UUID.randomUUID();
         when(exchangeRateRepository.findByTenant_IdAndCurrencyCode(tenantId, "JPY"))
                 .thenReturn(Optional.empty());
@@ -42,7 +42,7 @@ class ExchangeRateResolverTest {
         assertThatThrownBy(() -> resolver.resolveRateToUsd(tenantId, "JPY"))
                 .isInstanceOf(EntityNotFoundException.class)
                 .hasMessage("No exchange rate found for JPY "
-                        + "— add one under Admin → Exchange Rates before using this currency");
+                        + "— add an exchange rate for JPY before using this currency");
     }
 
     @Test

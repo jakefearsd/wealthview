@@ -104,6 +104,13 @@ public class ExchangeRateService {
                 .toList();
     }
 
+    /** Whether amounts in {@code currency} can be converted to USD for this tenant (USD always can). */
+    @Transactional(readOnly = true)
+    public boolean hasRate(UUID tenantId, String currency) {
+        return "USD".equals(currency)
+                || exchangeRateRepository.findByTenant_IdAndCurrencyCode(tenantId, currency).isPresent();
+    }
+
     public BigDecimal convertToUsd(BigDecimal amount, String currency, UUID tenantId) {
         if ("USD".equals(currency)) {
             return amount;

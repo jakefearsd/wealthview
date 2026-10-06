@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Pageable;
@@ -77,6 +79,45 @@ class AccountControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Brokerage"))
                 .andExpect(jsonPath("$.type").value("brokerage"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"E", "US", "usd", "ZZZZ", "E1", "  "})
+    void create_malformedCurrency_returns400(String currency) throws Exception {
+        mockMvc.perform(post("/api/v1/accounts")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Brokerage", "type": "brokerage", "currency": "%s"}
+                                """.formatted(currency)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+    }
+
+    @Test
+    void update_malformedCurrency_returns400() throws Exception {
+        mockMvc.perform(put("/api/v1/accounts/" + ACCOUNT_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Brokerage", "type": "brokerage", "currency": "EURO"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void create_currencyWithoutExchangeRate_returns400WithServiceMessage() throws Exception {
+        when(accountService.create(eq(TENANT_ID), any(AccountRequest.class)))
+                .thenThrow(new IllegalArgumentException("No exchange rate found for EUR"));
+
+        mockMvc.perform(post("/api/v1/accounts")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Euro", "type": "bank", "currency": "EUR"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("No exchange rate found for EUR"));
     }
 
     @Test

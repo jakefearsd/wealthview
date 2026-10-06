@@ -21,6 +21,7 @@ import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.common.Entities;
 import com.wealthview.core.common.Money;
 import com.wealthview.core.common.PageResponse;
+import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.core.price.LatestPriceLookup;
 import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.AccountEntity;
@@ -40,16 +41,30 @@ public class AccountService {
     private final TransactionRepository transactionRepository;
     private final LatestPriceLookup latestPriceLookup;
     private final ApplicationEventPublisher eventPublisher;
+    private final ExchangeRateService exchangeRateService;
 
     public AccountService(AccountRepository accountRepository, TenantLookup tenantLookup,
                           HoldingRepository holdingRepository, TransactionRepository transactionRepository,
-                          LatestPriceLookup latestPriceLookup, ApplicationEventPublisher eventPublisher) {
+                          LatestPriceLookup latestPriceLookup, ApplicationEventPublisher eventPublisher,
+                          ExchangeRateService exchangeRateService) {
         this.accountRepository = accountRepository;
         this.tenantLookup = tenantLookup;
         this.holdingRepository = holdingRepository;
         this.transactionRepository = transactionRepository;
         this.latestPriceLookup = latestPriceLookup;
         this.eventPublisher = eventPublisher;
+        this.exchangeRateService = exchangeRateService;
+    }
+
+    /**
+     * An account in a currency with no to-USD rate would make every aggregate view (dashboard, charts)
+     * unable to convert it, so reject it up front.
+     */
+    private void requireConvertibleCurrency(UUID tenantId, String currency) {
+        if (!"USD".equals(currency) && !exchangeRateService.hasRate(tenantId, currency)) {
+            throw new IllegalArgumentException("No exchange rate found for " + currency
+                    + " — add an exchange rate for " + currency + " before using this currency");
+        }
     }
 
     @Transactional
@@ -57,6 +72,7 @@ public class AccountService {
         var tenant = tenantLookup.requireTenant(tenantId);
 
         var currency = request.currency() != null ? request.currency() : "USD";
+        requireConvertibleCurrency(tenantId, currency);
         var account = new AccountEntity(tenant, request.name(), request.type(), request.institution(), currency);
         account = accountRepository.save(account);
         log.info("Account {} created for tenant {}", account.getId(), tenantId);
@@ -83,10 +99,15 @@ public class AccountService {
         var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
                 .orElseThrow(Entities.notFound("Account"));
 
+        var currency = request.currency() != null ? request.currency() : account.getCurrency();
+        if (!currency.equals(account.getCurrency())) {
+            requireConvertibleCurrency(tenantId, currency);
+        }
+
         account.setName(request.name());
         account.setType(request.type());
         account.setInstitution(request.institution());
-        account.setCurrency(request.currency() != null ? request.currency() : account.getCurrency());
+        account.setCurrency(currency);
         account = accountRepository.save(account);
         log.info("Account {} updated for tenant {}", accountId, tenantId);
         return AccountResponse.from(account, computeBalance(account, tenantId));

@@ -19,6 +19,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import com.wealthview.core.account.dto.AccountRequest;
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.core.price.LatestPriceLookup;
 import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.AccountEntity;
@@ -58,6 +59,9 @@ class AccountServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private ExchangeRateService exchangeRateService;
+
     @InjectMocks
     private AccountService accountService;
 
@@ -81,6 +85,47 @@ class AccountServiceTest {
         assertThat(result.type()).isEqualTo("ira");
         assertThat(result.institution()).isEqualTo("Vanguard");
         assertThat(result.balance()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void create_nonUsdCurrencyWithoutRate_throwsIllegalArgument() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(exchangeRateService.hasRate(tenantId, "EUR")).thenReturn(false);
+
+        assertThatThrownBy(() -> accountService.create(tenantId,
+                new AccountRequest("Euro Cash", "bank", null, "EUR")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("EUR")
+                .hasMessageContaining("exchange rate");
+        verify(accountRepository, never()).save(any(AccountEntity.class));
+    }
+
+    @Test
+    void update_switchToNonUsdCurrencyWithoutRate_throwsIllegalArgument() {
+        var accountId = UUID.randomUUID();
+        var account = new AccountEntity(tenant, "Acct", "bank", "Inst");
+        ReflectionTestUtils.setField(account, "currency", "USD");
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId)).thenReturn(Optional.of(account));
+        when(exchangeRateService.hasRate(tenantId, "JPY")).thenReturn(false);
+
+        assertThatThrownBy(() -> accountService.update(tenantId, accountId,
+                new AccountRequest("Acct", "bank", "Inst", "JPY")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("JPY");
+    }
+
+    @Test
+    void update_unchangedNonUsdCurrencyWithoutRate_stillAllowsRename() {
+        var accountId = UUID.randomUUID();
+        var account = new AccountEntity(tenant, "Acct", "bank", "Inst");
+        ReflectionTestUtils.setField(account, "currency", "JPY");
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId)).thenReturn(Optional.of(account));
+        when(accountRepository.save(any(AccountEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var result = accountService.update(tenantId, accountId,
+                new AccountRequest("Renamed", "bank", "Inst", "JPY"));
+
+        assertThat(result.name()).isEqualTo("Renamed");
     }
 
     @Test
@@ -142,6 +187,7 @@ class AccountServiceTest {
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(account));
         when(accountRepository.save(any(AccountEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(exchangeRateService.hasRate(tenantId, "EUR")).thenReturn(true);
 
         var result = accountService.update(tenantId, accountId,
                 new AccountRequest("New Name", "ira", "New Inst", "EUR"));
@@ -278,6 +324,7 @@ class AccountServiceTest {
     @Test
     void create_withCurrency_setsAccountCurrency() {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(exchangeRateService.hasRate(tenantId, "EUR")).thenReturn(true);
         when(accountRepository.save(any(AccountEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var result = accountService.create(tenantId, new AccountRequest("Euro IRA", "ira", "Degiro", "EUR"));

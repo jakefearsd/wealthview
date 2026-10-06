@@ -7,6 +7,6 @@ public record AccountRequest(
         @NotBlank String name,
         @NotBlank @Pattern(regexp = "brokerage|ira|401k|roth|bank") String type,
         String institution,
-        String currency
+        @Pattern(regexp = "[A-Z]{3}") String currency
 ) {
 }

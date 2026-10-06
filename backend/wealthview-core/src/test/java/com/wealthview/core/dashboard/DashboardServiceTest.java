@@ -17,6 +17,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import com.wealthview.core.account.AccountService;
+import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.core.testutil.TestEntityHelper;
 import com.wealthview.persistence.entity.AccountEntity;
@@ -60,6 +61,30 @@ class DashboardServiceTest {
 
         lenient().when(exchangeRateService.convertToUsd(any(BigDecimal.class), eq("USD"), any(UUID.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    @Test
+    void getSummary_accountInCurrencyWithoutRate_isSkippedAndFlaggedInsteadOfFailingTheWholeSummary() {
+        var usdId = UUID.randomUUID();
+        var usd = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
+        TestEntityHelper.setId(usd, usdId);
+        var eurId = UUID.randomUUID();
+        var eur = new AccountEntity(tenant, "Euro Cash", "bank", "Deutsche", "EUR");
+        TestEntityHelper.setId(eur, eurId);
+
+        when(accountRepository.findByTenant_Id(eq(tenantId), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(usd, eur)));
+        when(accountService.computeAllBalances(tenantId))
+                .thenReturn(Map.of(usdId, new BigDecimal("2000"), eurId, new BigDecimal("500")));
+        when(exchangeRateService.convertToUsd(any(BigDecimal.class), eq("EUR"), eq(tenantId)))
+                .thenThrow(new EntityNotFoundException("No exchange rate found for EUR"));
+
+        var result = dashboardService.getSummary(tenantId);
+
+        assertThat(result.netWorth()).isEqualByComparingTo("2000");
+        assertThat(result.totalCash()).isEqualByComparingTo("0");
+        assertThat(result.accounts()).extracting("name").containsExactly("Brokerage");
+        assertThat(result.unconvertedAccounts()).containsExactly("Euro Cash");
     }
 
     @Test

@@ -167,4 +167,25 @@ class ExchangeRateServiceTest {
                 .isInstanceOf(EntityNotFoundException.class)
                 .hasMessageContaining("JPY");
     }
+
+    @Test
+    void hasRate_usd_returnsTrueWithoutLookup() {
+        assertThat(exchangeRateService.hasRate(tenantId, "USD")).isTrue();
+    }
+
+    @Test
+    void hasRate_storedRate_returnsTrue() {
+        when(exchangeRateRepository.findByTenant_IdAndCurrencyCode(tenantId, "EUR"))
+                .thenReturn(Optional.of(new ExchangeRateEntity(tenant, "EUR", new BigDecimal("1.08"))));
+
+        assertThat(exchangeRateService.hasRate(tenantId, "EUR")).isTrue();
+    }
+
+    @Test
+    void hasRate_noStoredRate_returnsFalse() {
+        when(exchangeRateRepository.findByTenant_IdAndCurrencyCode(tenantId, "JPY"))
+                .thenReturn(Optional.empty());
+
+        assertThat(exchangeRateService.hasRate(tenantId, "JPY")).isFalse();
+    }
 }
