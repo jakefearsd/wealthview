@@ -98,6 +98,18 @@ class UserManagementServiceTest {
     }
 
     @Test
+    void updateUserRole_viewer_updatesRole() {
+        var userId = UUID.randomUUID();
+        var user = new UserEntity(tenant, "user@test.com", "hash", "member");
+        when(userRepository.findByTenant_IdAndId(tenantId, userId)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var result = service.updateUserRole(tenantId, userId, "viewer");
+
+        assertThat(result.getRole()).isEqualTo("viewer");
+    }
+
+    @Test
     void updateUserRole_bumpsTokenGenerationToRevokeStaleRoleClaim() {
         var userId = UUID.randomUUID();
         var user = new UserEntity(tenant, "user@test.com", "hash", "admin");

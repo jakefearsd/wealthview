@@ -23,7 +23,7 @@ import com.wealthview.persistence.repository.UserRepository;
 public class UserManagementService {
 
     private static final Logger log = LoggerFactory.getLogger(UserManagementService.class);
-    private static final Set<String> VALID_ROLES = Set.of("member", "admin");
+    private static final Set<String> VALID_ROLES = Set.of("member", "admin", "viewer");
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
