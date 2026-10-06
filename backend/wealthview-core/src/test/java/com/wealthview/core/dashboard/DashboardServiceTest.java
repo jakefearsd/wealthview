@@ -17,7 +17,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import com.wealthview.core.account.AccountService;
-import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.core.testutil.TestEntityHelper;
 import com.wealthview.persistence.entity.AccountEntity;
@@ -30,6 +29,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -61,6 +62,7 @@ class DashboardServiceTest {
 
         lenient().when(exchangeRateService.convertToUsd(any(BigDecimal.class), eq("USD"), any(UUID.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(exchangeRateService.hasRate(any(UUID.class), any(String.class))).thenReturn(true);
     }
 
     @Test
@@ -76,8 +78,10 @@ class DashboardServiceTest {
                 .thenReturn(new PageImpl<>(List.of(usd, eur)));
         when(accountService.computeAllBalances(tenantId))
                 .thenReturn(Map.of(usdId, new BigDecimal("2000"), eurId, new BigDecimal("500")));
-        when(exchangeRateService.convertToUsd(any(BigDecimal.class), eq("EUR"), eq(tenantId)))
-                .thenThrow(new EntityNotFoundException("No exchange rate found for EUR"));
+        // Checked up front, never by catching convertToUsd's EntityNotFoundException: that is thrown
+        // inside the resolver's @Transactional proxy, which marks the summary's own transaction
+        // rollback-only, so the "degraded" summary failed on commit with a 500.
+        when(exchangeRateService.hasRate(tenantId, "EUR")).thenReturn(false);
 
         var result = dashboardService.getSummary(tenantId);
 
@@ -85,6 +89,21 @@ class DashboardServiceTest {
         assertThat(result.totalCash()).isEqualByComparingTo("0");
         assertThat(result.accounts()).extracting("name").containsExactly("Brokerage");
         assertThat(result.unconvertedAccounts()).containsExactly("Euro Cash");
+    }
+
+    @Test
+    void getSummary_accountInCurrencyWithoutRate_neverAttemptsTheConversion() {
+        var eurId = UUID.randomUUID();
+        var eur = new AccountEntity(tenant, "Euro Cash", "bank", "Deutsche", "EUR");
+        TestEntityHelper.setId(eur, eurId);
+        when(accountRepository.findByTenant_Id(eq(tenantId), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(eur)));
+        when(accountService.computeAllBalances(tenantId)).thenReturn(Map.of(eurId, new BigDecimal("500")));
+        when(exchangeRateService.hasRate(tenantId, "EUR")).thenReturn(false);
+
+        dashboardService.getSummary(tenantId);
+
+        verify(exchangeRateService, never()).convertToUsd(any(BigDecimal.class), eq("EUR"), any(UUID.class));
     }
 
     @Test

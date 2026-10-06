@@ -18,7 +18,6 @@ import com.wealthview.core.account.AccountService;
 import com.wealthview.core.dashboard.dto.DashboardSummaryResponse;
 import com.wealthview.core.dashboard.dto.DashboardSummaryResponse.AccountSummary;
 import com.wealthview.core.dashboard.dto.DashboardSummaryResponse.AllocationEntry;
-import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.core.property.PropertyFinance;
 import com.wealthview.persistence.entity.PropertyEntity;
@@ -61,18 +60,19 @@ public class DashboardService {
         var balances = accountService.computeAllBalances(tenantId);
 
         for (var account : accounts) {
-            var nativeBalance = balances.getOrDefault(account.getId(), BigDecimal.ZERO);
-            BigDecimal accountBalanceUsd;
-            try {
-                accountBalanceUsd = exchangeRateService.convertToUsd(
-                        nativeBalance, account.getCurrency(), tenantId);
-            } catch (EntityNotFoundException e) {
+            if (!exchangeRateService.hasRate(tenantId, account.getCurrency())) {
                 // No exchange rate for this account's currency: leave it out of the totals (adding native
                 // units to dollars would be wrong) and flag it, rather than failing the whole dashboard.
-                log.warn("Dashboard for tenant {} skips account {}: {}", tenantId, account.getId(), e.getMessage());
+                // Checked up front rather than by catching convertToUsd's EntityNotFoundException: that is
+                // thrown through the resolver's @Transactional proxy, which marks this read-only
+                // transaction rollback-only, so the summary would still fail on commit.
+                log.warn("Dashboard for tenant {} skips account {}: no exchange rate for {}",
+                        tenantId, account.getId(), account.getCurrency());
                 unconvertedAccounts.add(account.getName());
                 continue;
             }
+            var nativeBalance = balances.getOrDefault(account.getId(), BigDecimal.ZERO);
+            var accountBalanceUsd = exchangeRateService.convertToUsd(nativeBalance, account.getCurrency(), tenantId);
 
             if (account.isBank()) {
                 totalCash = totalCash.add(accountBalanceUsd);
