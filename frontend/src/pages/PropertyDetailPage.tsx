@@ -18,7 +18,7 @@ import PropertyValuationSection from '../components/PropertyValuationSection';
 import PropertyCashFlowSection from '../components/PropertyCashFlowSection';
 import PropertyRoiCard from '../components/PropertyRoiCard';
 import PropertyForm, { type PropertyFormValues } from '../components/PropertyForm';
-import { buildRequest, allocationsToState } from '../utils/propertyRequest';
+import { buildRequest, allocationsToState, validatePropertyForm } from '../utils/propertyRequest';
 import toast from 'react-hot-toast';
 
 type PropertyFormData = PropertyFormValues;
@@ -106,11 +106,12 @@ export default function PropertyDetailPage() {
         return updateProperty(id!, buildRequest(data));
     }, [id]);
 
-    const { formData, setFormData, handleSave, resetForm: crudReset, startEdit } = useCrudForm<Property, PropertyFormData>({
+    const { formData, setFormData, isSubmitting, handleSave, resetForm: crudReset, startEdit } = useCrudForm<Property, PropertyFormData>({
         updateFn,
         entityName: 'Property',
         initialFormData,
         onSuccess: onEditSuccess,
+        validate: validatePropertyForm,
         formatError: undefined,
     });
 
@@ -301,6 +302,7 @@ export default function PropertyDetailPage() {
                     onChange={(patch) => setFormData(prev => ({ ...prev, ...patch }))}
                     purchasePriceNum={parseFloat(formData.purchasePrice) || 0}
                     onSubmit={handleSave}
+                    submitting={isSubmitting}
                     onCancel={handleCancelEdit}
                 />
             )}

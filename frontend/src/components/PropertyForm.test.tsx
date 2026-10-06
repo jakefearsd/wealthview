@@ -317,4 +317,40 @@ describe('PropertyForm', () => {
 
         expect(onChange).toHaveBeenCalledWith({ annualAppreciationRate: '3.5' });
     });
+
+    it('disables Save while submitting', () => {
+        render(
+            <PropertyForm heading="New" submitLabel="Create" values={values} onChange={vi.fn()}
+                purchasePriceNum={400000} onSubmit={vi.fn()} onCancel={vi.fn()} submitting />
+        );
+
+        expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+    });
+
+    it('enables Save when not submitting', () => {
+        render(
+            <PropertyForm heading="New" submitLabel="Create" values={values} onChange={vi.fn()}
+                purchasePriceNum={400000} onSubmit={vi.fn()} onCancel={vi.fn()} />
+        );
+
+        expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled();
+    });
+
+    it.each([
+        ['150', '100'],
+        ['-5', '0'],
+        ['60', '60'],
+        ['', ''],
+    ])('clamps a typed bonus rate of "%s" to "%s"', (typed, expected) => {
+        const onChange = vi.fn();
+        render(
+            <PropertyForm heading="New" submitLabel="Create"
+                values={{ ...values, showDepreciation: true, depreciationMethod: 'cost_segregation' }}
+                onChange={onChange} purchasePriceNum={400000} onSubmit={vi.fn()} onCancel={vi.fn()} />
+        );
+
+        fireEvent.change(screen.getByDisplayValue('100'), { target: { value: typed } });
+
+        expect(onChange).toHaveBeenCalledWith({ bonusDepreciationRate: expected });
+    });
 });

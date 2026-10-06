@@ -19,6 +19,66 @@ import type { Property } from '../types/property';
 const PERCENT = 100;
 
 /**
+ * Parses a form string to a finite number, or undefined when it is blank or not a number. JSON
+ * serialises NaN as null, which the server would read as "clear this value", so a NaN must never
+ * reach the request.
+ */
+function finiteOrUndefined(value: string): number | undefined {
+    if (value.trim() === '') return undefined;
+    const n = parseFloat(value);
+    return Number.isFinite(n) ? n : undefined;
+}
+
+function finiteIntOrUndefined(value: string): number | undefined {
+    const n = finiteOrUndefined(value);
+    return n === undefined ? undefined : Math.trunc(n);
+}
+
+function percentToFraction(value: string): number | undefined {
+    const n = finiteOrUndefined(value);
+    return n === undefined ? undefined : n / PERCENT;
+}
+
+const MAX_BONUS_RATE_PERCENT = 100;
+
+/** Bonus depreciation is a percentage of the eligible basis, so it is held to 0-100. */
+export function clampBonusRate(percent: number): number {
+    return Math.min(MAX_BONUS_RATE_PERCENT, Math.max(0, percent));
+}
+
+function bonusRateFraction(value: string): number | undefined {
+    const n = finiteOrUndefined(value);
+    return n === undefined ? undefined : clampBonusRate(n) / PERCENT;
+}
+
+/**
+ * Returns the first problem that would make the server reject the form (or silently drop data), or
+ * undefined when the form is submittable. Suitable as the `validate` option of `useCrudForm`.
+ */
+export function validatePropertyForm(data: PropertyFormValues): string | undefined {
+    if (data.address.trim() === '') return 'Address is required';
+    const purchasePrice = finiteOrUndefined(data.purchasePrice);
+    if (purchasePrice === undefined || purchasePrice < 0) return 'Enter a purchase price of 0 or more';
+    if (data.purchaseDate === '') return 'Purchase date is required';
+    const currentValue = finiteOrUndefined(data.currentValue);
+    if (currentValue === undefined || currentValue < 0) return 'Enter a current value of 0 or more';
+
+    if (data.showLoanDetails && finiteOrUndefined(data.loanAmount) !== undefined) {
+        const rate = finiteOrUndefined(data.annualInterestRate);
+        if (rate === undefined || rate < 0) return 'Enter an interest rate for the loan';
+        const term = finiteOrUndefined(data.loanTermMonths);
+        if (term === undefined || term <= 0) return 'Loan term must be greater than 0 months';
+        if (data.loanStartDate === '') return 'Enter a start date for the loan';
+    }
+
+    if (data.depreciationMethod !== 'none') {
+        const life = finiteOrUndefined(data.usefulLifeYears);
+        if (life === undefined || life <= 0) return 'Useful life must be greater than 0 years';
+    }
+    return undefined;
+}
+
+/**
  * Maps the four cost-segregation buckets to API allocations, dropping any that are blank or
  * non-positive — an unfilled bucket is "not allocated", not "allocated zero".
  */
@@ -43,27 +103,27 @@ export function buildRequest(data: PropertyFormValues) {
         purchase_price: parseFloat(data.purchasePrice),
         purchase_date: data.purchaseDate,
         current_value: parseFloat(data.currentValue),
-        mortgage_balance: data.mortgageBalance ? parseFloat(data.mortgageBalance) : undefined,
+        mortgage_balance: finiteOrUndefined(data.mortgageBalance),
         property_type: data.propertyType,
         ...(data.showLoanDetails && data.loanAmount ? {
-            loan_amount: parseFloat(data.loanAmount),
-            annual_interest_rate: parseFloat(data.annualInterestRate) / PERCENT,
-            loan_term_months: parseInt(data.loanTermMonths),
-            loan_start_date: data.loanStartDate,
+            loan_amount: finiteOrUndefined(data.loanAmount),
+            annual_interest_rate: percentToFraction(data.annualInterestRate),
+            loan_term_months: finiteIntOrUndefined(data.loanTermMonths),
+            loan_start_date: data.loanStartDate || undefined,
             use_computed_balance: data.useComputedBalance,
         } : {}),
-        annual_appreciation_rate: data.annualAppreciationRate ? parseFloat(data.annualAppreciationRate) / PERCENT : undefined,
-        annual_property_tax: data.annualPropertyTax ? parseFloat(data.annualPropertyTax) : undefined,
-        annual_insurance_cost: data.annualInsuranceCost ? parseFloat(data.annualInsuranceCost) : undefined,
-        annual_maintenance_cost: data.annualMaintenanceCost ? parseFloat(data.annualMaintenanceCost) : undefined,
+        annual_appreciation_rate: percentToFraction(data.annualAppreciationRate),
+        annual_property_tax: finiteOrUndefined(data.annualPropertyTax),
+        annual_insurance_cost: finiteOrUndefined(data.annualInsuranceCost),
+        annual_maintenance_cost: finiteOrUndefined(data.annualMaintenanceCost),
         depreciation_method: data.depreciationMethod,
         in_service_date: data.depreciationMethod !== 'none' ? (data.inServiceDate || data.purchaseDate || undefined) : undefined,
-        land_value: data.landValue ? parseFloat(data.landValue) : undefined,
-        useful_life_years: data.usefulLifeYears ? parseFloat(data.usefulLifeYears) : undefined,
+        land_value: finiteOrUndefined(data.landValue),
+        useful_life_years: finiteOrUndefined(data.usefulLifeYears),
         ...(isCostSeg ? {
             cost_seg_allocations: buildCostSegAllocations(data.costSegAllocations),
-            bonus_depreciation_rate: parseFloat(data.bonusDepreciationRate) / PERCENT,
-            cost_seg_study_year: data.costSegStudyYear ? parseInt(data.costSegStudyYear) : undefined,
+            bonus_depreciation_rate: bonusRateFraction(data.bonusDepreciationRate),
+            cost_seg_study_year: finiteIntOrUndefined(data.costSegStudyYear),
         } : {}),
     };
 }

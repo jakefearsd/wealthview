@@ -5,7 +5,7 @@ import { useApiQuery } from '../hooks/useApiQuery';
 import { useCrudForm } from '../hooks/useCrudForm';
 import { useAuth } from '../context/AuthContext';
 import { hasWriteAccess } from '../utils/permissions';
-import { formatCurrency, toPercent } from '../utils/format';
+import { formatCurrency, formatDate, toPercent } from '../utils/format';
 import PropertyForm, { type PropertyFormValues } from '../components/PropertyForm';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
@@ -13,7 +13,7 @@ import EmptyState from '../components/EmptyState';
 import Button from '../components/Button';
 import StatTile from '../components/StatTile';
 import type { Property } from '../types/property';
-import { buildRequest, allocationsToState } from '../utils/propertyRequest';
+import { buildRequest, allocationsToState, validatePropertyForm } from '../utils/propertyRequest';
 
 const initialFormData: PropertyFormValues = {
     address: '',
@@ -62,13 +62,14 @@ export default function PropertiesListPage() {
         return updateProperty(id, buildRequest(data));
     }, []);
 
-    const { editingId, formData, setFormData, handleSave, handleDelete: crudHandleDelete, resetForm: crudReset, startEdit: crudStartEdit } = useCrudForm<Property, PropertyFormValues>({
+    const { editingId, formData, setFormData, isSubmitting, handleSave, handleDelete: crudHandleDelete, resetForm: crudReset, startEdit: crudStartEdit } = useCrudForm<Property, PropertyFormValues>({
         createFn,
         updateFn,
         deleteFn: deleteProperty,
         entityName: 'Property',
         initialFormData,
         onSuccess,
+        validate: validatePropertyForm,
         formatError: undefined,
     });
 
@@ -135,6 +136,7 @@ export default function PropertiesListPage() {
                     onChange={(patch) => setFormData(prev => ({ ...prev, ...patch }))}
                     purchasePriceNum={parseFloat(formData.purchasePrice) || 0}
                     onSubmit={handleSave}
+                    submitting={isSubmitting}
                     onCancel={resetForm}
                 />
             )}
@@ -171,7 +173,7 @@ export default function PropertiesListPage() {
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem' }}>
                                 <StatTile label="Purchase Price" value={formatCurrency(p.purchase_price)} />
                                 <StatTile label="Mortgage Balance" value={p.mortgage_balance ? formatCurrency(p.mortgage_balance) : 'None'} />
-                                <StatTile label="Purchase Date" value={new Date(p.purchase_date + 'T00:00:00').toLocaleDateString()} />
+                                <StatTile label="Purchase Date" value={formatDate(p.purchase_date)} />
                                 <StatTile
                                     label="Appreciation"
                                     value={`${formatCurrency(p.current_value - p.purchase_price)} (${((p.current_value - p.purchase_price) / p.purchase_price * 100).toFixed(1)}%)`}

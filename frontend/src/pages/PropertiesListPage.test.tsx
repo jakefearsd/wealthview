@@ -21,15 +21,17 @@ vi.mock('../api/properties', () => ({
 vi.mock('../utils/format', () => ({
     formatCurrency: (v: number) => `$${v.toLocaleString()}`,
     toPercent: (v: number) => v * 100,
+    formatDate: (v: string | null | undefined) => v ?? '--',
     formatCurrencyInput: (v: string | number) => String(v),
     parseCurrencyInput: (v: string) => v.replace(/,/g, ''),
 }));
 
 vi.mock('../components/PropertyForm', () => ({
-    default: ({ heading, onCancel }: { heading: string; onCancel: () => void }) => (
+    default: ({ heading, onCancel, onSubmit, submitting }: { heading: string; onCancel: () => void; onSubmit: () => void; submitting?: boolean }) => (
         <div data-testid="property-form">
             <span>{heading}</span>
             <button onClick={onCancel}>X</button>
+            <button onClick={onSubmit} disabled={submitting}>Submit</button>
         </div>
     ),
     // Re-export the types we consume in PropertiesListPage.
@@ -37,13 +39,14 @@ vi.mock('../components/PropertyForm', () => ({
     PropertyFormValues: undefined as any,
 }));
 
+const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
 vi.mock('react-hot-toast', () => ({
-    default: { success: vi.fn(), error: vi.fn() },
+    default: { success: vi.fn(), error: toastError },
 }));
 
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useAuth } from '../context/AuthContext';
-import { deleteProperty } from '../api/properties';
+import { deleteProperty, createProperty, updateProperty } from '../api/properties';
 import PropertiesListPage from './PropertiesListPage';
 import { authAs } from '../testutil/auth';
 
@@ -187,5 +190,35 @@ describe('PropertiesListPage', () => {
 
         expect(screen.queryByText('New Property')).not.toBeInTheDocument();
         expect(screen.queryByText('Edit')).not.toBeInTheDocument();
+    });
+
+    it('blocks Create and says why when required fields are blank', () => {
+        mockReturn();
+        renderWithRouter(<PropertiesListPage />);
+        fireEvent.click(screen.getByText('New Property'));
+
+        fireEvent.click(screen.getByText('Submit'));
+
+        expect(toastError).toHaveBeenCalledWith(expect.stringMatching(/address/i));
+        expect(createProperty).not.toHaveBeenCalled();
+    });
+
+    it('shows the purchase date as an ISO date', () => {
+        mockReturn();
+        renderWithRouter(<PropertiesListPage />);
+
+        expect(screen.getByText('2020-01-01')).toBeInTheDocument();
+    });
+
+    it('disables the form submit while a save is in flight, so it cannot double-submit', async () => {
+        mockReturn();
+        vi.mocked(updateProperty).mockReturnValue(new Promise(() => {}));
+        renderWithRouter(<PropertiesListPage />);
+        fireEvent.click(screen.getByText('Edit'));
+
+        fireEvent.click(screen.getByText('Submit'));
+
+        await vi.waitFor(() => expect(screen.getByText('Submit')).toBeDisabled());
+        expect(updateProperty).toHaveBeenCalledTimes(1);
     });
 });

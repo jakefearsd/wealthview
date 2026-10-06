@@ -1,5 +1,6 @@
 import { inputStyle, labelStyle } from '../utils/styles';
 import CurrencyInput from './CurrencyInput';
+import { clampBonusRate } from '../utils/propertyRequest';
 
 export interface CostSegAllocations {
     fiveYr: string;
@@ -44,9 +45,17 @@ interface Props {
     purchasePriceNum: number;
     onSubmit: () => void;
     onCancel: () => void;
+    /** True while a save is in flight; disables Save so a double-click cannot submit twice. */
+    submitting?: boolean;
 }
 
-export default function PropertyForm({ heading, submitLabel, values, onChange, purchasePriceNum, onSubmit, onCancel }: Props) {
+/** Holds the bonus-rate field to 0-100 as it is typed; blank and unparseable input pass through. */
+function clampBonusInput(raw: string): string {
+    const n = parseFloat(raw);
+    return Number.isFinite(n) ? String(clampBonusRate(n)) : raw;
+}
+
+export default function PropertyForm({ heading, submitLabel, values, onChange, purchasePriceNum, onSubmit, onCancel, submitting = false }: Props) {
     const landValueNum = parseFloat(values.landValue) || 0;
     const usefulLifeNum = parseFloat(values.usefulLifeYears) || 0;
     const depreciableBasis = purchasePriceNum - landValueNum;
@@ -268,7 +277,7 @@ export default function PropertyForm({ heading, submitLabel, values, onChange, p
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
                                         <div>
                                             <label style={labelStyle}>Bonus Depreciation Rate (%)</label>
-                                            <input type="number" step="1" min="0" max="100" value={values.bonusDepreciationRate} onChange={(e) => onChange({ bonusDepreciationRate: e.target.value })} style={inputStyle} />
+                                            <input type="number" step="1" min="0" max="100" value={values.bonusDepreciationRate} onChange={(e) => onChange({ bonusDepreciationRate: clampBonusInput(e.target.value) })} style={inputStyle} />
                                         </div>
                                         <div>
                                             <label style={labelStyle}>Study Year (optional)</label>
@@ -310,7 +319,7 @@ export default function PropertyForm({ heading, submitLabel, values, onChange, p
             )}
 
             <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-                <button onClick={onSubmit} style={{ padding: '0.5rem 1rem', background: '#2e7d32', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>{submitLabel}</button>
+                <button onClick={onSubmit} disabled={submitting} style={{ padding: '0.5rem 1rem', background: '#2e7d32', color: '#fff', border: 'none', borderRadius: '4px', cursor: submitting ? 'default' : 'pointer', opacity: submitting ? 0.6 : 1 }}>{submitLabel}</button>
                 <button onClick={onCancel} style={{ padding: '0.5rem 1rem', background: '#eee', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Cancel</button>
             </div>
         </div>

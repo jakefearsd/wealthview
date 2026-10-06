@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildRequest, buildCostSegAllocations, allocationsToState } from './propertyRequest';
+import { buildRequest, buildCostSegAllocations, allocationsToState, validatePropertyForm } from './propertyRequest';
 import type { PropertyFormValues } from '../components/PropertyForm';
 
 const baseForm: PropertyFormValues = {
@@ -236,5 +236,89 @@ describe('allocationsToState', () => {
         const original = { fiveYr: '50000', sevenYr: '25000', fifteenYr: '', twentySevenYr: '300000' };
 
         expect(allocationsToState(buildCostSegAllocations(original))).toEqual(original);
+    });
+});
+
+describe('buildRequest never sends NaN', () => {
+    const hasNaN = (req: object) => Object.values(req).some((v) => typeof v === 'number' && Number.isNaN(v));
+
+    it('drops an incomplete loan rate and term instead of sending NaN', () => {
+        const req = buildRequest(form({ showLoanDetails: true, loanAmount: '200000', annualInterestRate: '', loanTermMonths: '' }));
+
+        expect(hasNaN(req)).toBe(false);
+        expect(req.annual_interest_rate).toBeUndefined();
+        expect(req.loan_term_months).toBeUndefined();
+    });
+
+    it('drops a cleared bonus rate instead of sending NaN', () => {
+        const req = buildRequest(form({ depreciationMethod: 'cost_segregation', bonusDepreciationRate: '' }));
+
+        expect(hasNaN(req)).toBe(false);
+        expect(req.bonus_depreciation_rate).toBeUndefined();
+    });
+
+    it('drops a non-numeric optional value', () => {
+        const req = buildRequest(form({ showFinancialAssumptions: true, annualAppreciationRate: 'abc', annualPropertyTax: '-' }));
+
+        expect(hasNaN(req)).toBe(false);
+        expect(req.annual_appreciation_rate).toBeUndefined();
+        expect(req.annual_property_tax).toBeUndefined();
+    });
+
+    it.each([
+        ['150', 1],
+        ['-20', 0],
+        ['60', 0.6],
+    ])('clamps a bonus rate of %s%% to the fraction %s', (entered, expected) => {
+        const req = buildRequest(form({ depreciationMethod: 'cost_segregation', bonusDepreciationRate: entered }));
+
+        expect(req.bonus_depreciation_rate).toBe(expected);
+    });
+});
+
+describe('validatePropertyForm', () => {
+    it('accepts a complete form', () => {
+        expect(validatePropertyForm(form())).toBeUndefined();
+    });
+
+    it.each([
+        ['address', { address: '   ' }, /address/i],
+        ['purchase price', { purchasePrice: '' }, /purchase price/i],
+        ['purchase date', { purchaseDate: '' }, /purchase date/i],
+        ['current value', { currentValue: '' }, /current value/i],
+    ])('requires %s', (_name, patch, message) => {
+        expect(validatePropertyForm(form(patch))).toMatch(message);
+    });
+
+    it('rejects a negative purchase price', () => {
+        expect(validatePropertyForm(form({ purchasePrice: '-1' }))).toMatch(/purchase price/i);
+    });
+
+    const loan = { showLoanDetails: true, loanAmount: '200000', annualInterestRate: '6.5', loanTermMonths: '360', loanStartDate: '2020-06-01' };
+
+    it('accepts a complete loan', () => {
+        expect(validatePropertyForm(form(loan))).toBeUndefined();
+    });
+
+    it.each([
+        ['rate', { annualInterestRate: '' }, /interest rate/i],
+        ['term', { loanTermMonths: '' }, /term/i],
+        ['zero term', { loanTermMonths: '0' }, /term/i],
+        ['start date', { loanStartDate: '' }, /start date/i],
+    ])('requires a loan %s once a loan amount is entered', (_name, patch, message) => {
+        expect(validatePropertyForm(form({ ...loan, ...patch }))).toMatch(message);
+    });
+
+    it('ignores incomplete loan fields when no loan amount is entered', () => {
+        expect(validatePropertyForm(form({ showLoanDetails: true, loanAmount: '' }))).toBeUndefined();
+    });
+
+    it('requires a positive useful life when depreciation is on', () => {
+        expect(validatePropertyForm(form({ depreciationMethod: 'straight_line', usefulLifeYears: '0' }))).toMatch(/useful life/i);
+        expect(validatePropertyForm(form({ depreciationMethod: 'straight_line', usefulLifeYears: '' }))).toMatch(/useful life/i);
+    });
+
+    it('does not check useful life when depreciation is off', () => {
+        expect(validatePropertyForm(form({ depreciationMethod: 'none', usefulLifeYears: '0' }))).toBeUndefined();
     });
 });
