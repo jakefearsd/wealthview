@@ -71,7 +71,8 @@ export function validatePropertyForm(data: PropertyFormValues): string | undefin
         if (data.loanStartDate === '') return 'Enter a start date for the loan';
     }
 
-    if (data.depreciationMethod !== 'none') {
+    // Cost segregation hides the useful-life field, so a stale value there must not block the save.
+    if (data.depreciationMethod !== 'none' && data.depreciationMethod !== 'cost_segregation') {
         const life = finiteOrUndefined(data.usefulLifeYears);
         if (life === undefined || life <= 0) return 'Useful life must be greater than 0 years';
     }
@@ -89,6 +90,12 @@ export function buildCostSegAllocations(allocs: CostSegAllocations) {
     if (allocs.fifteenYr && parseFloat(allocs.fifteenYr) > 0) result.push({ asset_class: '15yr', allocation: parseFloat(allocs.fifteenYr) });
     if (allocs.twentySevenYr && parseFloat(allocs.twentySevenYr) > 0) result.push({ asset_class: '27_5yr', allocation: parseFloat(allocs.twentySevenYr) });
     return result;
+}
+
+/** Under cost segregation the field is hidden, so a blank or non-positive leftover is dropped instead of sent. */
+function usefulLifeForRequest(data: PropertyFormValues, isCostSeg: boolean): number | undefined {
+    const life = finiteOrUndefined(data.usefulLifeYears);
+    return isCostSeg && life !== undefined && life <= 0 ? undefined : life;
 }
 
 /**
@@ -119,7 +126,7 @@ export function buildRequest(data: PropertyFormValues) {
         depreciation_method: data.depreciationMethod,
         in_service_date: data.depreciationMethod !== 'none' ? (data.inServiceDate || data.purchaseDate || undefined) : undefined,
         land_value: finiteOrUndefined(data.landValue),
-        useful_life_years: finiteOrUndefined(data.usefulLifeYears),
+        useful_life_years: usefulLifeForRequest(data, isCostSeg),
         ...(isCostSeg ? {
             cost_seg_allocations: buildCostSegAllocations(data.costSegAllocations),
             bonus_depreciation_rate: bonusRateFraction(data.bonusDepreciationRate),

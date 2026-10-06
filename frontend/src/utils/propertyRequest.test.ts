@@ -318,6 +318,16 @@ describe('validatePropertyForm', () => {
         expect(validatePropertyForm(form({ depreciationMethod: 'straight_line', usefulLifeYears: '' }))).toMatch(/useful life/i);
     });
 
+    it('does not check useful life under cost segregation, where the field is hidden', () => {
+        expect(validatePropertyForm(form({ depreciationMethod: 'cost_segregation', usefulLifeYears: '' }))).toBeUndefined();
+        expect(validatePropertyForm(form({ depreciationMethod: 'cost_segregation', usefulLifeYears: '0' }))).toBeUndefined();
+    });
+
+    it('omits a non-positive useful life from a cost segregation request', () => {
+        expect(buildRequest(form({ depreciationMethod: 'cost_segregation', usefulLifeYears: '0' })).useful_life_years)
+            .toBeUndefined();
+    });
+
     it('does not check useful life when depreciation is off', () => {
         expect(validatePropertyForm(form({ depreciationMethod: 'none', usefulLifeYears: '0' }))).toBeUndefined();
     });
