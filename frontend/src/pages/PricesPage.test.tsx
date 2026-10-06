@@ -12,6 +12,7 @@ vi.mock('../context/AuthContext', () => ({
 
 vi.mock('../utils/format', () => ({
     formatCurrency: (v: number) => `$${v.toLocaleString()}`,
+    formatDate: (v: string) => v,
     formatCurrencyInput: (v: string | number) => String(v),
     parseCurrencyInput: (v: string) => v.replace(/,/g, ''),
 }));
@@ -112,5 +113,42 @@ describe('PricesPage', () => {
         vi.mocked(listLatestPrices).mockRejectedValueOnce(new Error('boom'));
         render(<PricesPage />);
         expect(await screen.findByText(/Failed to load prices/i)).toBeInTheDocument();
+    });
+
+    // === input normalisation and validation ===
+
+    async function openForm() {
+        render(<PricesPage />);
+        await screen.findByText('AAPL');
+    }
+
+    it('trims whitespace around the symbol before saving', async () => {
+        vi.mocked(createPrice).mockResolvedValue(aapl);
+        await openForm();
+
+        fireEvent.change(screen.getByLabelText('Symbol'), { target: { value: '  msft ' } });
+        fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-04-12' } });
+        fireEvent.change(screen.getByLabelText('Price'), { target: { value: '405' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => expect(createPrice).toHaveBeenCalledWith(
+            expect.objectContaining({ symbol: 'MSFT' })));
+    });
+
+    it('keeps Save disabled until symbol, date and price are all valid', async () => {
+        await openForm();
+        const save = screen.getByRole('button', { name: 'Save' });
+        expect(save).toBeDisabled();
+
+        fireEvent.change(screen.getByLabelText('Symbol'), { target: { value: '   ' } });
+        fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-04-12' } });
+        fireEvent.change(screen.getByLabelText('Price'), { target: { value: '405' } });
+        expect(save).toBeDisabled();
+
+        fireEvent.change(screen.getByLabelText('Symbol'), { target: { value: 'msft' } });
+        expect(save).toBeEnabled();
+
+        fireEvent.change(screen.getByLabelText('Price'), { target: { value: '' } });
+        expect(save).toBeDisabled();
     });
 });

@@ -4,7 +4,7 @@ import { useApiQuery } from '../hooks/useApiQuery';
 import { useApiMutation } from '../hooks/useApiMutation';
 import { useAuth } from '../context/AuthContext';
 import { hasAdminAccess } from '../utils/permissions';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatDate } from '../utils/format';
 import CurrencyInput from '../components/CurrencyInput';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
@@ -41,8 +41,14 @@ export default function PricesPage() {
         },
     );
 
+    // Prices are keyed by upper-case ticker, so " aapl" must be normalised or it saves a price nothing matches.
+    const normalisedSymbol = symbol.trim().toUpperCase();
+    const parsedPrice = parseFloat(price);
+    const priceValid = normalisedSymbol !== '' && date !== '' && Number.isFinite(parsedPrice) && parsedPrice >= 0;
+
     function handleAddPrice() {
-        void addPriceMutation.mutate({ symbol: symbol.toUpperCase(), date, close_price: parseFloat(price) });
+        if (!priceValid) return;
+        void addPriceMutation.mutate({ symbol: normalisedSymbol, date, close_price: parsedPrice });
     }
 
     return (
@@ -54,18 +60,18 @@ export default function PricesPage() {
                     <h3 style={{ marginBottom: '1rem' }}>Add Manual Price</h3>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'end' }}>
                         <div>
-                            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Symbol</label>
-                            <input value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder="AAPL" style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
+                            <label htmlFor="price-symbol" style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Symbol</label>
+                            <input id="price-symbol" value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder="AAPL" style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
                         </div>
                         <div>
-                            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Date</label>
-                            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
+                            <label htmlFor="price-date" style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Date</label>
+                            <input id="price-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
                         </div>
                         <div>
-                            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Price</label>
-                            <CurrencyInput value={price} onChange={setPrice} placeholder="185.50" style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
+                            <label htmlFor="price-value" style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Price</label>
+                            <CurrencyInput id="price-value" value={price} onChange={setPrice} placeholder="185.50" style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
                         </div>
-                        <Button onClick={handleAddPrice}>Save</Button>
+                        <Button onClick={handleAddPrice} disabled={!priceValid}>Save</Button>
                     </div>
                 </div>
             )}
