@@ -572,10 +572,12 @@ No demo tenant or demo user is seeded on the `prod` profile —
 `DevDataInitializer` only on `dev`. From the admin console you can:
 
 1. Create your first tenant (**Admin → Tenants → New**).
-2. Issue an invite code for that tenant — copy the code.
-3. Open `/register` in a private browser window and sign up a regular user
-   account against that invite code. That user becomes the first non-admin
-   member of the tenant.
+2. Issue an invite code for that tenant (**Create invite code** on the tenant's row,
+   or `POST /api/v1/admin/tenants/{id}/invite-codes`) — copy the code.
+3. Open `/register` in a private browser window and sign up a user account
+   against that invite code. The first user to register into a tenant with no
+   users becomes that tenant's **admin**, who can then invite further users
+   (registered as members) and manage them from `/admin`.
 
 Full lifecycle for tenants, invite codes, and the audit log:
 [`docs/administration/tenant-and-user-management.md`](../administration/tenant-and-user-management.md).

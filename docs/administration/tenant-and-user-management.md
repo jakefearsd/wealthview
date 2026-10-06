@@ -47,6 +47,7 @@ Everything under `/api/v1/admin/**` requires the `SUPER_ADMIN` role, with one ex
 | List tenants with details | `GET /api/v1/admin/tenants/details` | Adds `is_active`, `user_count`, `account_count` per tenant |
 | Get one tenant | `GET /api/v1/admin/tenants/{id}` | Same detail shape for a single tenant |
 | Enable/disable a tenant | `PUT /api/v1/admin/tenants/{id}/active` | Body: `{ "active": true }` or `{ "active": false }`. Returns `204 No Content` |
+| Create an invite code for any tenant | `POST /api/v1/admin/tenants/{id}/invite-codes` | Optional body `{ "expiry_days": 7 }`. Returns `201 Created` with the same invite-code object as the tenant endpoint. `404` for an unknown tenant, `409` for a disabled one |
 | List all users (cross-tenant) | `GET /api/v1/admin/users` | Every user with `role`, `tenant_id`, `tenant_name`, `is_active` |
 | Reset a user's password | `PUT /api/v1/admin/users/{userId}/password` | Body: `{ "new_password": "..." }`, 12--64 chars, rejected if it is a known common password. `204 No Content` |
 | Activate/deactivate a user | `PUT /api/v1/admin/users/{userId}/active` | Body: `{ "active": false }`. `204 No Content` |
@@ -71,7 +72,7 @@ Tenants, Stock Splits, System Config) only when the logged-in role is `super_adm
 |---|---|---|
 | Dashboard | super-admin only | System stats and recent login activity |
 | Users | everyone who reaches `/admin` | Manage users (see [Managing Users](#managing-users)) |
-| Tenants | super-admin only | Create tenants, enable/disable them |
+| Tenants | super-admin only | Create tenants, enable/disable them, create an invite code for a tenant |
 | Prices | everyone who reaches `/admin` | Price browser, manual entry, Finnhub/Yahoo sync |
 | Stock Splits | super-admin only | Review, add, and un-apply splits |
 | Exchange Rates | everyone who reaches `/admin` | Per-currency manual rates |
@@ -181,9 +182,28 @@ valid code.
    emailed automatically. The UI offers a copy-to-clipboard button.
 4. **Consumption:** the invitee registers at `/register` with their email, a password, and
    the code. On success the code records `consumed_by` / `consumed_at`, and the new user
-   joins **the code's tenant** with the role `member`.
+   joins **the code's tenant**. The role is `member`, except that the first user to
+   register into a tenant that has no users becomes that tenant's `admin` (see
+   [Bootstrapping a New Tenant](#bootstrapping-a-new-tenant)).
 5. **Terminal states:** a code that is consumed, revoked, or expired cannot be used or
    reactivated. Registration attempts against one fail with `InvalidInviteCodeException`.
+
+### Bootstrapping a New Tenant
+
+A tenant created by a super-admin starts with no users, so nobody inside it can mint invite
+codes. The super-admin therefore creates the first code:
+
+1. `POST /api/v1/admin/tenants` (or **Admin → Tenants**) to create the tenant.
+2. `POST /api/v1/admin/tenants/{id}/invite-codes` (or **Create invite code** on the tenant's
+   row) to mint a code. The admin UI shows the new code with its expiry and a copy button.
+3. The invitee registers with the code. Because the tenant has no users yet, they become its
+   `admin`.
+4. That admin uses `POST /api/v1/tenant/invite-codes` for everyone else; those users register
+   as `member`.
+
+The super-admin endpoint refuses a disabled tenant (`409`) — enable it first. The "first user"
+rule only checks whether the tenant currently has any users, so it applies again only if every
+user has been removed.
 
 ### Managing Invite Codes
 

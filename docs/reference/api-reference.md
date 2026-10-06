@@ -563,8 +563,13 @@ which also accepts `admin`.
 | `/api/v1/admin/tenants/details`       | GET    | List with user and account counts  |
 | `/api/v1/admin/tenants/{id}`          | GET    | One tenant with its counts         |
 | `/api/v1/admin/tenants/{id}/active`   | PUT    | Enable or disable a tenant (204)   |
+| `/api/v1/admin/tenants/{id}/invite-codes` | POST | Create an invite code for that tenant (201) |
 
-Create takes `{ "name": "..." }`; the active toggle takes `{ "active": true }`.
+Create takes `{ "name": "..." }`; the active toggle takes `{ "active": true }`. The invite-code
+POST body is optional (`{ "expiry_days": 14 }`, default 7) and the response is the same invite-code
+object as `POST /api/v1/tenant/invite-codes`; an unknown tenant is 404 and a disabled tenant is 409.
+The first user to register into a tenant that has no users gets the `admin` role; later registrations
+are `member`.
 
 ### Users
 

@@ -48,6 +48,13 @@ tax-accuracy fixes in both projection engines. One schema change (V081).
   (for example "12%") instead of blank.
 
 ### Fixed
+- A super admin can now actually get a user into a tenant they create:
+  `POST /api/v1/admin/tenants/{id}/invite-codes` (and a **Create invite code**
+  action on each tenant in the admin Tenants section) mints a code for any
+  active tenant, and the first user to register into a tenant that has no users
+  becomes its `admin` instead of a `member`, so the new tenant can invite and
+  manage its own users. Previously tenants could only be seeded by inserting
+  invite codes by hand.
 - Selling taxable lots to pay a tax bill (conversion tax, or seeding and
   refilling the Monte Carlo cash reserve) now realizes a taxable gain in that
   year, in both engines; losses offset the year's gains.

@@ -44,7 +44,7 @@ There is no separate "name" field — your email is your identity in WealthView.
 
 Invite codes are single-use and expire after 7 days by default (an admin can choose a different expiry when generating one). If your code is invalid, revoked, already used, or expired, you will see *"Invalid or expired invite code"* — ask your admin for a new one.
 
-Everyone who registers with an invite code joins as a **Member**. An admin can promote you afterwards.
+Everyone who registers with an invite code joins as a **Member**, and an admin can promote you afterwards. The one exception is a brand-new tenant with no users yet: the first person to register into it becomes its **Admin**.
 
 > **Two-factor authentication:** the web app currently has no MFA setup or challenge screens. If your deployment enables MFA for an account, sign in from the mobile app instead.
 
