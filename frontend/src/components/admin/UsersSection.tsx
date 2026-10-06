@@ -119,7 +119,8 @@ export default function UsersSection() {
     }
 
     if (loading) return <div>Loading...</div>;
-    if (error) return <ErrorState message={error} onRetry={refetchUsers} />;
+    // A failed refetch keeps the list already on screen; only a failed first load shows the error card.
+    if (error && !(isSuperAdmin ? adminUsers : tenantUsers)) return <ErrorState message={error} onRetry={refetchUsers} />;
 
     return (
         <div>

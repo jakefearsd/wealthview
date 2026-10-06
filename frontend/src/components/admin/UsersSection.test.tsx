@@ -211,6 +211,14 @@ describe('UsersSection', () => {
         expect(screen.queryByText('No users found')).not.toBeInTheDocument();
     });
 
+    it('keeps the user list on screen when a refetch fails', () => {
+        setupMocks({ adminError: 'Request failed' });
+        render(<UsersSection />);
+
+        expect(screen.getByText('jake@example.com')).toBeInTheDocument();
+        expect(screen.queryByText('Request failed')).not.toBeInTheDocument();
+    });
+
     it('shows the tenant query error to a tenant admin, ignoring the all-users query', () => {
         mockUseAuth.mockReturnValue(authAs('admin'));
         setupMocks({ tenant: null, tenantError: 'Tenant list failed', adminError: 'Forbidden' });

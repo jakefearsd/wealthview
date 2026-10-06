@@ -91,6 +91,14 @@ describe('ProjectionComparePage', () => {
         expect(refetch).toHaveBeenCalled();
     });
 
+    it('keeps the comparison form on screen when a refetch fails', () => {
+        mockUseApiQuery.mockReturnValue({ data: SCENARIOS, loading: false, error: 'Boom', refetch: vi.fn() });
+        renderPage();
+
+        expect(screen.getByRole('button', { name: 'Compare' })).toBeInTheDocument();
+        expect(screen.queryByText('Boom')).not.toBeInTheDocument();
+    });
+
     it('renders dropdowns and compare button', () => {
         renderPage();
 

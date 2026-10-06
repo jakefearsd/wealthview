@@ -388,6 +388,14 @@ describe('IncomeSourcesPage', () => {
 
             expect(refetch).toHaveBeenCalled();
         });
+
+        it('keeps the income sources on screen when a refetch fails', () => {
+            mockUseApiQuery.mockReturnValue({ data: [ssSource], loading: false, error: 'Boom', refetch: vi.fn() });
+            renderWithRouter(<IncomeSourcesPage />);
+
+            expect(screen.getByText('My Social Security')).toBeInTheDocument();
+            expect(screen.queryByText('Boom')).not.toBeInTheDocument();
+        });
     });
 
     describe('deleting', () => {

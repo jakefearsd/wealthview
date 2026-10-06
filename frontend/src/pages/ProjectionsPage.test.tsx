@@ -159,6 +159,15 @@ describe('ProjectionsPage', () => {
         expect(refetch).toHaveBeenCalled();
     });
 
+    it('keeps the scenario list on screen when a refetch fails', () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockUseApiQuery.mockReturnValue({ data: mockScenarios, loading: false, error: 'Boom', refetch: vi.fn() } as any);
+        renderWithRouter(<ProjectionsPage />);
+
+        expect(screen.getByRole('link', { name: 'Early Retirement' })).toBeInTheDocument();
+        expect(screen.queryByText('Boom')).not.toBeInTheDocument();
+    });
+
     it('formats the retire and created dates as plain calendar dates', () => {
         renderList([makeScenario({
             id: '9', name: 'Dated', retirement_date: '2030-01-01', created_at: '2026-10-05T03:30:00Z',

@@ -48,7 +48,7 @@ export default function DashboardSection() {
     }
 
     if (statsLoading) return <div>Loading dashboard...</div>;
-    if (statsError) return <ErrorState message={statsError} onRetry={refetchStats} />;
+    if (statsError && !stats) return <ErrorState message={statsError} onRetry={refetchStats} />;
 
     return (
         <div>

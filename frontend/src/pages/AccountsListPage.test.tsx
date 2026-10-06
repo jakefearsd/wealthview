@@ -117,6 +117,14 @@ describe('AccountsListPage', () => {
         expect(screen.getByText('boom')).toBeInTheDocument();
     });
 
+    it('keeps the account list on screen when a refetch fails', () => {
+        mockReturn({ error: 'boom' });
+        renderWithRouter(<AccountsListPage />);
+
+        expect(screen.getByText('Fidelity Brokerage')).toBeInTheDocument();
+        expect(screen.queryByText('boom')).not.toBeInTheDocument();
+    });
+
     it('submits the create form', async () => {
         mockReturn();
         mockCreateAccount.mockResolvedValue(sampleAccount);

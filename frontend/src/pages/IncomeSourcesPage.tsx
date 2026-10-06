@@ -224,7 +224,7 @@ export default function IncomeSourcesPage() {
     }
 
     if (loading) return <LoadingState message="Loading income sources..." />;
-    if (error) return <ErrorState message={error} onRetry={refetch} />;
+    if (error && !sources) return <ErrorState message={error} onRetry={refetch} />;
 
     const linkableProperties = properties ?? [];
     const grouped = (sources ?? []).reduce<Record<string, IncomeSource[]>>((acc, s) => {

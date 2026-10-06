@@ -269,6 +269,14 @@ describe('ProjectionDetailPage', () => {
             expect(refetch).toHaveBeenCalled();
         });
 
+        it('keeps the loaded scenario on screen when a refetch fails', () => {
+            mockUseApiQuery.mockReturnValue({ data: mockScenario, loading: false, error: 'Bad gateway', refetch: vi.fn() });
+            renderPage();
+
+            expect(screen.getByRole('button', { name: /run projection/i })).toBeInTheDocument();
+            expect(screen.queryByText('Bad gateway')).not.toBeInTheDocument();
+        });
+
         it('shows "not found" when the scenario loads as null', () => {
             mockUseApiQuery.mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
             renderPage();

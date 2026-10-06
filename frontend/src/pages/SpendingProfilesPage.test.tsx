@@ -284,6 +284,14 @@ describe('SpendingProfilesPage', () => {
 
             expect(refetch).toHaveBeenCalled();
         });
+
+        it('keeps the profiles on screen when a refetch fails', () => {
+            mockUseApiQuery.mockReturnValue({ data: mockProfiles, loading: false, error: 'Boom', refetch: vi.fn() });
+            renderWithRouter(<SpendingProfilesPage />);
+
+            expect(screen.getByText('Conservative')).toBeInTheDocument();
+            expect(screen.queryByText('Boom')).not.toBeInTheDocument();
+        });
     });
 
     describe('deleting a profile', () => {

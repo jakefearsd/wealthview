@@ -154,7 +154,7 @@ export default function SpendingProfilesPage() {
     }
 
     if (loading) return <LoadingState message="Loading spending profiles..." />;
-    if (error) return <ErrorState message={error} onRetry={refetch} />;
+    if (error && !profiles) return <ErrorState message={error} onRetry={refetch} />;
 
     const { name, essential_expenses: essentialExpenses, discretionary_expenses: discretionaryExpenses, spending_tiers: spendingTiers } = formData;
 

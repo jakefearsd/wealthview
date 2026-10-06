@@ -79,6 +79,14 @@ describe('DashboardPage', () => {
         expect(screen.getByText('Network error')).toBeInTheDocument();
     });
 
+    it('keeps the dashboard on screen when a refetch fails', () => {
+        mockUseApiQuery.mockReturnValue({ data: mockSummary, loading: false, error: 'Network error', refetch: vi.fn() });
+        renderWithRouter(<DashboardPage />);
+
+        expect(screen.getByText('Main taxable')).toBeInTheDocument();
+        expect(screen.queryByText('Network error')).not.toBeInTheDocument();
+    });
+
     it('returns null when data is null and not loading', () => {
         mockUseApiQuery.mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
         const { container } = renderWithRouter(<DashboardPage />);

@@ -168,6 +168,14 @@ describe('PropertiesListPage', () => {
         expect(refetch).toHaveBeenCalled();
     });
 
+    it('keeps the property list on screen when a refetch fails', () => {
+        mockReturn({ error: 'Failed to load' });
+        renderWithRouter(<PropertiesListPage />);
+
+        expect(screen.getByText(sampleProperty.address)).toBeInTheDocument();
+        expect(screen.queryByText('Failed to load')).not.toBeInTheDocument();
+    });
+
     it('shows an empty state when there are no properties', () => {
         mockReturn({ data: [] });
         renderWithRouter(<PropertiesListPage />);

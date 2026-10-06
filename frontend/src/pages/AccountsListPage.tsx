@@ -94,7 +94,7 @@ export default function AccountsListPage() {
 
     // Only block on the first load: a refetch keeps the stale list on screen instead of blanking the page.
     if (loading && !data) return <LoadingState message="Loading accounts..." />;
-    if (error) return <ErrorState message={error} onRetry={refetch} />;
+    if (error && !data) return <ErrorState message={error} onRetry={refetch} />;
 
     return (
         <div>

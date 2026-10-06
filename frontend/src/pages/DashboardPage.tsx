@@ -18,7 +18,7 @@ export default function DashboardPage() {
 
     // Only block on the first load; a refetch keeps the dashboard on screen.
     if (loading && !data) return <LoadingState message="Loading dashboard..." />;
-    if (error) return <ErrorState message={error} onRetry={refetch} />;
+    if (error && !data) return <ErrorState message={error} onRetry={refetch} />;
     if (!data) return null;
 
     return (

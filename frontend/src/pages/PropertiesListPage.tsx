@@ -119,7 +119,7 @@ export default function PropertiesListPage() {
     }
 
     if (loading) return <LoadingState message="Loading properties..." />;
-    if (error) return <ErrorState message={error} onRetry={refetch} />;
+    if (error && !properties) return <ErrorState message={error} onRetry={refetch} />;
 
     return (
         <div>

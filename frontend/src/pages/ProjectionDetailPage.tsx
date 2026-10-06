@@ -108,7 +108,7 @@ export default function ProjectionDetailPage() {
     );
 
     if (loading) return <LoadingState message="Loading scenario..." />;
-    if (error) return <ErrorState message={error} onRetry={refetch} />;
+    if (error && !scenario) return <ErrorState message={error} onRetry={refetch} />;
     if (!scenario) return <EmptyState title="Scenario not found" message="This scenario may have been deleted." />;
 
     const retirementYear = scenario.retirement_date ? yearOf(scenario.retirement_date) : null;

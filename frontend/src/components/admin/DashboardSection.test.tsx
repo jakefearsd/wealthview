@@ -101,6 +101,21 @@ describe('DashboardSection', () => {
         expect(refetch).toHaveBeenCalled();
     });
 
+    it('keeps the stats on screen when a refetch fails', () => {
+        let call = 0;
+        mockUseApiQuery.mockImplementation(() => {
+            call++;
+            return call % 2 === 1
+                ? { data: stats, loading: false, error: 'Stats unavailable', refetch: vi.fn() }
+                : { data: activity, loading: false, error: null, refetch: vi.fn() };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any;
+        render(<DashboardSection />);
+
+        expect(screen.getByText('12 MB')).toBeInTheDocument();
+        expect(screen.queryByText('Stats unavailable')).not.toBeInTheDocument();
+    });
+
     it('shows the error rather than "No login activity recorded" when the activity call fails', () => {
         let call = 0;
         mockUseApiQuery.mockImplementation(() => {

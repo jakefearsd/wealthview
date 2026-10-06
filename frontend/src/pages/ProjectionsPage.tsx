@@ -46,7 +46,7 @@ export default function ProjectionsPage() {
     }
 
     if (loading) return <LoadingState message="Loading scenarios..." />;
-    if (error) return <ErrorState message={error} onRetry={refetch} />;
+    if (error && !scenarios) return <ErrorState message={error} onRetry={refetch} />;
 
     return (
         <div>
