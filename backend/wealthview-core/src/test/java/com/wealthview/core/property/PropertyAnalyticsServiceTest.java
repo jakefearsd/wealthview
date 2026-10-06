@@ -609,6 +609,26 @@ class PropertyAnalyticsServiceTest {
     }
 
     @Test
+    void getAnalytics_investmentWithPaidOffLoan_netCashFlowChargesNoMortgage() {
+        var property = createProperty("investment", "400000", "350000");
+        property.setAnnualPropertyTax(new BigDecimal("6000"));
+        property.setAnnualInsuranceCost(new BigDecimal("2400"));
+        property.setAnnualMaintenanceCost(new BigDecimal("1200"));
+        property.setLoanAmount(new BigDecimal("160000"));
+        property.setAnnualInterestRate(new BigDecimal("0.07"));
+        property.setLoanTermMonths(360);
+        property.setLoanStartDate(LocalDate.of(1990, 1, 1));
+        mockProperty(property);
+        mockEmptyValuations(property);
+        mockLinkedIncomeSources(property, new BigDecimal("30000"));
+
+        var result = analyticsService.getAnalytics(tenantId, property.getId(), null);
+
+        // The loan paid off in 2020, so no mortgage payment is charged: 30000 - 9600.
+        assertThat(result.annualNetCashFlow()).isEqualByComparingTo("20400");
+    }
+
+    @Test
     void getAnalytics_investmentWithNullEntityFields_fallsBackToAdHocRecords() {
         // All entity fields null → existing behavior using ad-hoc records
         var property = createProperty("investment", "400000", "350000");

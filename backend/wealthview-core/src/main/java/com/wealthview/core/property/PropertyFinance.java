@@ -2,6 +2,7 @@ package com.wealthview.core.property;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
 import com.wealthview.core.common.Money;
@@ -25,16 +26,9 @@ import com.wealthview.persistence.entity.PropertyEntity;
  */
 public final class PropertyFinance {
 
-    private static final BigDecimal MONTHS_PER_YEAR = new BigDecimal("12");
+    private static final int MONTHS_PER_YEAR = 12;
 
     private PropertyFinance() {
-    }
-
-    /** One year of mortgage payments split into its interest and principal parts. */
-    public record AnnualDebtService(BigDecimal interest, BigDecimal principal) {
-        public BigDecimal total() {
-            return interest.add(principal);
-        }
     }
 
     public static BigDecimal effectiveCurrentMortgageBalance(PropertyEntity property) {
@@ -52,39 +46,33 @@ public final class PropertyFinance {
     }
 
     /**
-     * The interest/principal split of one year of mortgage payments starting at
-     * {@code asOf}. Empty when the property has no loan details or the loan is
-     * already paid off.
+     * The interest/principal split of the next twelve scheduled mortgage payments after
+     * {@code asOf}, or fewer when the loan pays off sooner: interest follows the amortization
+     * schedule payment by payment, and no payment past payoff is charged. Empty when the
+     * property has no loan details or the loan is already paid off.
      */
-    public static Optional<AnnualDebtService> annualDebtService(PropertyEntity property, LocalDate asOf) {
+    public static Optional<DebtService> annualDebtService(PropertyEntity property, LocalDate asOf) {
         if (!property.hasLoanDetails()) {
             return Optional.empty();
         }
-        var remaining = remainingBalance(property, asOf);
-        if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
-            return Optional.empty();
-        }
-        var interest = Money.scale(remaining.multiply(property.getAnnualInterestRate()));
-        var annualPayment = AmortizationCalculator.monthlyPayment(
-                property.getLoanAmount(), property.getAnnualInterestRate(), property.getLoanTermMonths())
-                .multiply(MONTHS_PER_YEAR);
-        var principal = annualPayment.subtract(interest).max(BigDecimal.ZERO);
-        return Optional.of(new AnnualDebtService(interest, principal));
+        int termMonths = property.getLoanTermMonths();
+        long monthsElapsed = ChronoUnit.MONTHS.between(property.getLoanStartDate(), asOf);
+        int paymentsMade = Math.clamp(monthsElapsed, 0, Math.max(termMonths, 0));
+        var debtService = AmortizationCalculator.debtServiceForPayments(
+                property.getLoanAmount(), property.getAnnualInterestRate(), termMonths,
+                paymentsMade + 1, paymentsMade + MONTHS_PER_YEAR);
+        return debtService.total().signum() > 0 ? Optional.of(debtService) : Optional.empty();
     }
 
     /**
-     * The annualized mortgage payment (monthly payment &times; 12) for a property with
-     * loan details, or {@link BigDecimal#ZERO} when there are none. Consolidates the
-     * {@code monthlyPayment(...).multiply(12)} clump that recurred across the ROI and
-     * analytics services.
+     * The mortgage payments due over the next twelve months for a property with loan details
+     * (monthly payment &times; 12, or fewer payments once the loan pays off), or
+     * {@link BigDecimal#ZERO} when there are none or the loan is paid off.
      */
     public static BigDecimal annualMortgagePayment(PropertyEntity property) {
-        if (!property.hasLoanDetails()) {
-            return BigDecimal.ZERO;
-        }
-        return AmortizationCalculator.monthlyPayment(
-                property.getLoanAmount(), property.getAnnualInterestRate(), property.getLoanTermMonths())
-                .multiply(MONTHS_PER_YEAR);
+        return annualDebtService(property, LocalDate.now())
+                .map(DebtService::total)
+                .orElse(BigDecimal.ZERO);
     }
 
     /**

@@ -26,6 +26,7 @@ import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.core.projection.dto.ScenarioRequest;
 import com.wealthview.core.projection.dto.ScenarioResponse;
 import com.wealthview.core.projection.dto.SpendingProfileResponse;
+import com.wealthview.core.property.DebtService;
 import com.wealthview.core.property.PropertyFinance;
 import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
@@ -403,7 +404,7 @@ public class ScenarioCrudService {
         }
         var expenses = PropertyFinance.annualOperatingExpenses(property)
                 .add(PropertyFinance.annualDebtService(property, LocalDate.now())
-                        .map(PropertyFinance.AnnualDebtService::total)
+                        .map(DebtService::total)
                         .orElse(BigDecimal.ZERO));
         return grossAnnual.subtract(expenses).max(BigDecimal.ZERO);
     }

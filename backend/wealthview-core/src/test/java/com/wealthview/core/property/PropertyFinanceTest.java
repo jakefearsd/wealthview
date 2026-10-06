@@ -5,7 +5,6 @@ import java.time.LocalDate;
 
 import org.junit.jupiter.api.Test;
 
-import com.wealthview.core.common.Money;
 import com.wealthview.persistence.entity.PropertyEntity;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -92,23 +91,29 @@ class PropertyFinanceTest {
     // ── annualDebtService ──────────────────────────────────────────────────
 
     @Test
-    void annualDebtService_withActiveLoan_splitsInterestAndPrincipal() {
+    void annualDebtService_withActiveLoan_followsTheScheduleForTheNextTwelvePayments() {
         var property = propertyWithLoan();
         var asOf = LocalDate.of(2024, 6, 1);
 
         var debtService = PropertyFinance.annualDebtService(property, asOf);
 
+        // 48 payments made by June 2024, so the next twelve are payments 49..60.
+        var expected = AmortizationCalculator.debtServiceForPayments(LOAN_AMOUNT, RATE, TERM_MONTHS, 49, 60);
+        assertThat(debtService).contains(expected);
+        assertThat(debtService.get().total()).isEqualByComparingTo(
+                AmortizationCalculator.monthlyPayment(LOAN_AMOUNT, RATE, TERM_MONTHS).multiply(new BigDecimal("12")));
+    }
+
+    @Test
+    void annualDebtService_loanPayingOffWithinTheYear_chargesOnlyTheRemainingPayments() {
+        var property = propertyWithLoan();
+        var asOf = LOAN_START.plusMonths(TERM_MONTHS - 5);
+
+        var debtService = PropertyFinance.annualDebtService(property, asOf);
+
         assertThat(debtService).isPresent();
-        var remaining = AmortizationCalculator.remainingBalance(
-                LOAN_AMOUNT, RATE, TERM_MONTHS, LOAN_START, asOf);
-        var expectedInterest = Money.scale(remaining.multiply(RATE));
-        var expectedPayment = AmortizationCalculator.monthlyPayment(LOAN_AMOUNT, RATE, TERM_MONTHS)
-                .multiply(new BigDecimal("12"));
-        var expectedPrincipal = expectedPayment.subtract(expectedInterest).max(BigDecimal.ZERO);
-        assertThat(debtService.get().interest()).isEqualByComparingTo(expectedInterest);
-        assertThat(debtService.get().principal()).isEqualByComparingTo(expectedPrincipal);
-        assertThat(debtService.get().total())
-                .isEqualByComparingTo(expectedInterest.add(expectedPrincipal));
+        assertThat(debtService.get().total()).isEqualByComparingTo(
+                AmortizationCalculator.monthlyPayment(LOAN_AMOUNT, RATE, TERM_MONTHS).multiply(new BigDecimal("5")));
     }
 
     @Test
@@ -141,6 +146,28 @@ class PropertyFinanceTest {
         var expected = AmortizationCalculator.monthlyPayment(LOAN_AMOUNT, RATE, TERM_MONTHS)
                 .multiply(new BigDecimal("12"));
         assertThat(payment).isEqualByComparingTo(expected);
+    }
+
+    @Test
+    void annualMortgagePayment_loanInItsFinalMonths_chargesOnlyTheRemainingPayments() {
+        var property = propertyWithLoan();
+        property.setLoanStartDate(LocalDate.now().minusMonths(TERM_MONTHS - 3));
+
+        var payment = PropertyFinance.annualMortgagePayment(property);
+
+        var expected = AmortizationCalculator.monthlyPayment(LOAN_AMOUNT, RATE, TERM_MONTHS)
+                .multiply(new BigDecimal("3"));
+        assertThat(payment).isEqualByComparingTo(expected);
+    }
+
+    @Test
+    void annualMortgagePayment_loanPaidOff_isZero() {
+        var property = propertyWithLoan();
+        property.setLoanStartDate(LocalDate.now().minusMonths(TERM_MONTHS + 1));
+
+        var payment = PropertyFinance.annualMortgagePayment(property);
+
+        assertThat(payment).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
     @Test

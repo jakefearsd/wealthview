@@ -42,7 +42,78 @@ public final class AmortizationCalculator {
             return loanAmount;
         }
 
-        int paymentsMade = (int) Math.min(monthsBetween, termMonths);
+        return balanceAfterPayments(loanAmount, annualRate, termMonths, (int) Math.min(monthsBetween, termMonths));
+    }
+
+    /**
+     * The interest/principal split of payments {@code firstPayment..lastPayment} (1-based,
+     * inclusive), clamped to the loan's term. Each payment's interest is the monthly rate times
+     * the balance outstanding before it (the same closed-form balance as
+     * {@link #remainingBalance}); its principal is the rest of the fixed monthly payment.
+     *
+     * @return the split, or {@link DebtService#NONE} when no payment falls in the range
+     */
+    public static DebtService debtServiceForPayments(BigDecimal loanAmount, BigDecimal annualRate,
+                                                     int termMonths, int firstPayment, int lastPayment) {
+        int first = Math.max(1, firstPayment);
+        int last = Math.min(termMonths, lastPayment);
+        if (termMonths <= 0 || last < first) {
+            return DebtService.NONE;
+        }
+
+        var total = monthlyPayment(loanAmount, annualRate, termMonths).multiply(new BigDecimal(last - first + 1));
+        var interest = annualRate.compareTo(BigDecimal.ZERO) == 0
+                ? BigDecimal.ZERO
+                : Money.scale(scheduledInterest(loanAmount, annualRate, termMonths, first, last));
+        return new DebtService(interest, total.subtract(interest).max(BigDecimal.ZERO));
+    }
+
+    /**
+     * Sum of {@code r * B(k-1)} for payments {@code first..last} at a non-zero rate. Equal to calling
+     * {@link #balanceAfterPayments} per payment, but advances {@code (1+r)^p} one step at a time
+     * instead of recomputing both powers for every payment.
+     */
+    private static BigDecimal scheduledInterest(BigDecimal loanAmount, BigDecimal annualRate,
+                                                int termMonths, int first, int last) {
+        var monthlyRate = annualRate.divide(MONTHLY_RATE_DIVISOR, MC);
+        var onePlusR = BigDecimal.ONE.add(monthlyRate);
+        var onePlusRtoN = pow(onePlusR, termMonths);
+        var denominator = onePlusRtoN.subtract(BigDecimal.ONE);
+        var onePlusRtoP = pow(onePlusR, first - 1);
+
+        var interest = BigDecimal.ZERO;
+        for (int k = first; k <= last; k++) {
+            var openingBalance = loanAmount.multiply(onePlusRtoN.subtract(onePlusRtoP), MC)
+                    .divide(denominator, MC)
+                    .setScale(Money.SCALE, Money.ROUNDING);
+            interest = interest.add(monthlyRate.multiply(openingBalance, MC));
+            onePlusRtoP = onePlusRtoP.multiply(onePlusR, MC);
+        }
+        return interest;
+    }
+
+    /**
+     * The interest/principal split of the payments that fall in {@code calendarYear}. Payment
+     * {@code k} falls {@code k} months after the loan's start month (the same timing
+     * {@link #remainingBalance} uses), so the start year and the payoff year count only the
+     * payments made in them, and years before the first payment or after payoff are
+     * {@link DebtService#NONE}.
+     */
+    public static DebtService debtServiceForYear(BigDecimal loanAmount, BigDecimal annualRate,
+                                                 int termMonths, LocalDate startDate, int calendarYear) {
+        int startMonthIndex = startDate.getYear() * MONTHS_PER_YEAR + startDate.getMonthValue() - 1;
+        int yearFirstMonthIndex = calendarYear * MONTHS_PER_YEAR;
+        return debtServiceForPayments(loanAmount, annualRate, termMonths,
+                yearFirstMonthIndex - startMonthIndex,
+                yearFirstMonthIndex + MONTHS_PER_YEAR - 1 - startMonthIndex);
+    }
+
+    /** {@code B = P * [(1+r)^n - (1+r)^p] / [(1+r)^n - 1]} after {@code paymentsMade} payments. */
+    private static BigDecimal balanceAfterPayments(BigDecimal loanAmount, BigDecimal annualRate,
+                                                   int termMonths, int paymentsMade) {
+        if (paymentsMade <= 0) {
+            return loanAmount;
+        }
 
         if (paymentsMade >= termMonths) {
             return BigDecimal.ZERO;

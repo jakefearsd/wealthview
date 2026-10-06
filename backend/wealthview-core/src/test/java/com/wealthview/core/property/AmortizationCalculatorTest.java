@@ -1,6 +1,7 @@
 package com.wealthview.core.property;
 
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 
@@ -9,8 +10,22 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 class AmortizationCalculatorTest {
+
+    private static final BigDecimal LOAN = new BigDecimal("300000");
+    private static final BigDecimal RATE = new BigDecimal("0.065");
+    private static final LocalDate START = LocalDate.of(2024, 1, 1);
+    private static final BigDecimal CENT = new BigDecimal("0.01");
+
+    private static BigDecimal payment() {
+        return AmortizationCalculator.monthlyPayment(LOAN, RATE, 360);
+    }
+
+    private static BigDecimal balanceAfter(int payments) {
+        return AmortizationCalculator.remainingBalance(LOAN, RATE, 360, START, START.plusMonths(payments));
+    }
 
     @Test
     void remainingBalance_day1_equalsLoanAmount() {
@@ -140,5 +155,89 @@ class AmortizationCalculatorTest {
                 0, LocalDate.of(2020, 1, 1), LocalDate.of(2024, 1, 1));
 
         assertThat(balance).isEqualByComparingTo("0");
+    }
+
+    // ── debt service per year / per payment range ─────────────────────────
+
+    @Test
+    void debtServiceForPayments_firstTwelve_interestIsRateTimesEachOpeningBalance() {
+        var debt = AmortizationCalculator.debtServiceForPayments(LOAN, RATE, 360, 1, 12);
+
+        var monthlyRate = RATE.divide(new BigDecimal("12"), MathContext.DECIMAL128);
+        var expectedInterest = BigDecimal.ZERO;
+        for (int k = 1; k <= 12; k++) {
+            expectedInterest = expectedInterest.add(monthlyRate.multiply(balanceAfter(k - 1)));
+        }
+        assertThat(debt.interest()).isCloseTo(expectedInterest, within(CENT));
+        assertThat(debt.total()).isEqualByComparingTo(payment().multiply(new BigDecimal("12")));
+        // Principal repaid is the drop in balance over those payments.
+        assertThat(debt.principal()).isCloseTo(LOAN.subtract(balanceAfter(12)),
+                within(CENT));
+    }
+
+    @Test
+    void debtServiceForPayments_rangePastTerm_isClampedToTheFinalPayments() {
+        var debt = AmortizationCalculator.debtServiceForPayments(LOAN, RATE, 360, 358, 369);
+
+        assertThat(debt.total()).isEqualByComparingTo(payment().multiply(new BigDecimal("3")));
+    }
+
+    @Test
+    void debtServiceForYear_fullYear_chargesTwelvePayments() {
+        var debt = AmortizationCalculator.debtServiceForYear(LOAN, RATE, 360, START, 2026);
+
+        // Payments 24..35 fall in 2026 (payment k lands k months after the January 2024 start).
+        var expected = AmortizationCalculator.debtServiceForPayments(LOAN, RATE, 360, 24, 35);
+        assertThat(debt).isEqualTo(expected);
+        assertThat(debt.total()).isEqualByComparingTo(payment().multiply(new BigDecimal("12")));
+    }
+
+    @Test
+    void debtServiceForYear_laterYear_chargesLessInterestAndMorePrincipal() {
+        var early = AmortizationCalculator.debtServiceForYear(LOAN, RATE, 360, START, 2026);
+        var late = AmortizationCalculator.debtServiceForYear(LOAN, RATE, 360, START, 2046);
+
+        assertThat(late.interest()).isLessThan(early.interest());
+        assertThat(late.principal()).isGreaterThan(early.principal());
+    }
+
+    @Test
+    void debtServiceForYear_startYear_countsOnlyPaymentsAfterTheStartMonth() {
+        var debt = AmortizationCalculator.debtServiceForYear(LOAN, RATE, 360, START, 2024);
+
+        // February through December 2024.
+        assertThat(debt.total()).isEqualByComparingTo(payment().multiply(new BigDecimal("11")));
+    }
+
+    @Test
+    void debtServiceForYear_payoffYear_countsOnlyPaymentsUpToPayoff() {
+        var debt = AmortizationCalculator.debtServiceForYear(LOAN, RATE, 360, START, 2054);
+
+        // The 360th payment lands in January 2054.
+        assertThat(debt.total()).isEqualByComparingTo(payment());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"2023", "2055", "2070"})
+    void debtServiceForYear_beforeFirstPaymentOrAfterPayoff_isZero(int year) {
+        var debt = AmortizationCalculator.debtServiceForYear(LOAN, RATE, 360, START, year);
+
+        assertThat(debt.total()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void debtServiceForYear_zeroRate_isAllPrincipal() {
+        var debt = AmortizationCalculator.debtServiceForYear(
+                new BigDecimal("120000"), BigDecimal.ZERO, 120, START, 2026);
+
+        assertThat(debt.interest()).isEqualByComparingTo("0");
+        assertThat(debt.principal()).isEqualByComparingTo("12000");
+    }
+
+    @Test
+    void debtServiceForYear_nonPositiveTerm_isZero() {
+        var debt = AmortizationCalculator.debtServiceForYear(LOAN, RATE, 0, START, 2026);
+
+        assertThat(debt.total()).isEqualByComparingTo("0");
     }
 }
