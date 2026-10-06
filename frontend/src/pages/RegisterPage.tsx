@@ -42,8 +42,9 @@ export default function RegisterPage() {
                 </div>
                 <div style={{ marginBottom: '1rem' }}>
                     <label htmlFor="password" style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>Password</label>
-                    <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6}
+                    <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} maxLength={64} aria-describedby="password-hint"
                         style={{ width: '100%', padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
+                    <div id="password-hint" style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.25rem' }}>8–64 characters. Common passwords are rejected.</div>
                 </div>
                 <div style={{ marginBottom: '1.5rem' }}>
                     <label htmlFor="inviteCode" style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>Invite Code</label>

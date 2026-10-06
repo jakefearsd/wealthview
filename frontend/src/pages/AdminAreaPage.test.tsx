@@ -91,17 +91,28 @@ describe('AdminAreaPage', () => {
         expect(screen.queryByTestId('section-dashboard')).toBeNull();
     });
 
-    it('renders only the always-visible nav items when role is null', () => {
-        mockUseAuth.mockReturnValue(authValue(null));
+    it.each(['member', 'viewer', null])('shows a not-authorised message instead of the admin area for role %s', (role) => {
+        mockUseAuth.mockReturnValue(authValue(role));
 
         renderWithRouter(<AdminAreaPage />);
 
-        expect(screen.getByTestId('section-users')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Users' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Prices' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Exchange Rates' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Invite Codes' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Audit Log' })).toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: 'Dashboard' })).toBeNull();
+        expect(screen.getByRole('alert')).toHaveTextContent(/not authori[sz]ed/i);
+        expect(screen.queryByTestId('section-users')).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Users' })).toBeNull();
+    });
+
+    it('marks the selected sidebar item with aria-current', async () => {
+        const user = userEvent.setup();
+        mockUseAuth.mockReturnValue(authValue('super_admin'));
+
+        renderWithRouter(<AdminAreaPage />);
+
+        expect(screen.getByRole('button', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page');
+        expect(screen.getByRole('button', { name: 'Tenants' })).not.toHaveAttribute('aria-current');
+
+        await user.click(screen.getByRole('button', { name: 'Tenants' }));
+
+        expect(screen.getByRole('button', { name: 'Tenants' })).toHaveAttribute('aria-current', 'page');
+        expect(screen.getByRole('button', { name: 'Dashboard' })).not.toHaveAttribute('aria-current');
     });
 });

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { hasAdminAccess } from '../utils/permissions';
 import DashboardSection from '../components/admin/DashboardSection';
 import UsersSection from '../components/admin/UsersSection';
 import TenantsSection from '../components/admin/TenantsSection';
@@ -43,6 +44,15 @@ export default function AdminAreaPage() {
         (item) => !item.superAdminOnly || role === 'super_admin'
     );
 
+    if (!hasAdminAccess(role)) {
+        return (
+            <div role="alert" style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', maxWidth: '600px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                <h2 style={{ marginBottom: '0.5rem' }}>Not authorised</h2>
+                <p style={{ color: '#666' }}>You need an administrator role to view this area.</p>
+            </div>
+        );
+    }
+
     function renderSection() {
         switch (activeSection) {
             case 'dashboard': return <DashboardSection />;
@@ -72,6 +82,7 @@ export default function AdminAreaPage() {
                     <button
                         key={item.key}
                         onClick={() => setActiveSection(item.key)}
+                        aria-current={activeSection === item.key ? 'page' : undefined}
                         style={{
                             display: 'block',
                             width: '100%',

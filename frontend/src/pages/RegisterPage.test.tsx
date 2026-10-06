@@ -123,4 +123,14 @@ describe('RegisterPage', () => {
         resolveRegister(AUTH_RESPONSE);
         await waitFor(() => expect(navigate).toHaveBeenCalledWith('/'));
     });
+
+    it('limits the password to the 8-64 characters the server accepts and says so', () => {
+        renderRegisterPage();
+
+        const password = screen.getByLabelText(/password/i);
+        expect(password).toHaveAttribute('minLength', '8');
+        expect(password).toHaveAttribute('maxLength', '64');
+        expect(screen.getByText(/8.64 characters/)).toBeInTheDocument();
+        expect(password).toHaveAccessibleDescription(/8.64 characters/);
+    });
 });
