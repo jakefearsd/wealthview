@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router';
 import ProjectionComparePage from './ProjectionComparePage';
@@ -18,6 +18,8 @@ vi.mock('react-hot-toast', () => ({
 vi.mock('../hooks/useApiQuery', () => ({
     useApiQuery: () => hoisted.useApiQuery(),
 }));
+
+vi.mock('recharts');
 
 vi.mock('../api/projections', () => ({
     listScenarios: vi.fn(),
@@ -127,5 +129,46 @@ describe('ProjectionComparePage', () => {
 
         await vi.waitFor(() => expect(toastError).toHaveBeenCalledWith('Compare failed'));
         expect(screen.queryByText('Summary')).not.toBeInTheDocument();
+    });
+
+    it('keeps chart series names tied to the compared scenarios when a dropdown changes afterwards', async () => {
+        mockCompare.mockResolvedValue(COMPARE_RESPONSE);
+        renderPage();
+        const user = userEvent.setup();
+
+        const selects = screen.getAllByRole('combobox');
+        await user.selectOptions(selects[0], '1');
+        await user.selectOptions(selects[1], '2');
+        await user.click(screen.getByRole('button', { name: 'Compare' }));
+        await screen.findByText('Summary');
+
+        // Re-pointing a dropdown without re-comparing must not relabel the existing lines.
+        await user.selectOptions(selects[0], '2');
+
+        const entries = within(screen.getByTestId('tooltip')).getAllByTestId('tooltip-entry')
+            .map(e => e.textContent);
+        expect(entries).toContain('Plan A');
+        expect(entries).toContain('Plan B');
+    });
+
+    it('associates each scenario label with its dropdown', () => {
+        renderPage();
+
+        expect(screen.getByLabelText(/Scenario 1/)).toBe(screen.getAllByRole('combobox')[0]);
+        expect(screen.getByLabelText(/Scenario 3/)).toBe(screen.getAllByRole('combobox')[2]);
+    });
+
+    it('wraps the summary table in a horizontally scrollable container', async () => {
+        mockCompare.mockResolvedValue(COMPARE_RESPONSE);
+        renderPage();
+        const user = userEvent.setup();
+
+        const selects = screen.getAllByRole('combobox');
+        await user.selectOptions(selects[0], '1');
+        await user.selectOptions(selects[1], '2');
+        await user.click(screen.getByRole('button', { name: 'Compare' }));
+        await screen.findByText('Summary');
+
+        expect(screen.getByRole('table').parentElement!.style.overflowX).toBe('auto');
     });
 });
