@@ -1,10 +1,28 @@
 import { useRef, useLayoutEffect } from 'react';
-import { formatCurrencyInput, parseCurrencyInput } from '../utils/format';
+import { formatCurrencyInput } from '../utils/format';
 import type { InputHTMLAttributes } from 'react';
 
 interface CurrencyInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value' | 'type' | 'inputMode'> {
     value: string | number;
     onChange: (rawValue: string) => void;
+}
+
+/** Most decimal places kept: prices and cost basis are numeric(19,4). */
+const MAX_DECIMALS = 4;
+
+/**
+ * Reduce whatever was typed or pasted to a raw numeric string: digits, at most one '.', and a
+ * leading '-'. Letters, currency symbols and grouping commas are dropped, so state never holds
+ * text that parseFloat would turn into NaN or silently truncate ("12k" -> 12).
+ */
+function toRawNumber(display: string): string {
+    const negative = display.trimStart().startsWith('-');
+    const cleaned = display.replace(/[^0-9.]/g, '');
+    const dot = cleaned.indexOf('.');
+    const numeric = dot === -1
+        ? cleaned
+        : `${cleaned.slice(0, dot + 1)}${cleaned.slice(dot + 1).replace(/\./g, '').slice(0, MAX_DECIMALS)}`;
+    return negative ? `-${numeric}` : numeric;
 }
 
 export default function CurrencyInput({ value, onChange, ...rest }: CurrencyInputProps) {
@@ -29,7 +47,7 @@ export default function CurrencyInput({ value, onChange, ...rest }: CurrencyInpu
             const before = val.slice(0, pos - 2); // skip comma AND the digit before it
             const after = val.slice(pos);
             const newVal = before + after;
-            const raw = parseCurrencyInput(newVal);
+            const raw = toRawNumber(newVal);
             const newFormatted = formatCurrencyInput(raw);
             const digitsBefore = before.replace(/[^0-9.]/g, '').length;
             let digits = 0;
@@ -47,7 +65,7 @@ export default function CurrencyInput({ value, onChange, ...rest }: CurrencyInpu
             const before = val.slice(0, pos);
             const after = val.slice(pos + 2); // skip comma AND the digit after it
             const newVal = before + after;
-            const raw = parseCurrencyInput(newVal);
+            const raw = toRawNumber(newVal);
             const newFormatted = formatCurrencyInput(raw);
             const digitsBefore = before.replace(/[^0-9.]/g, '').length;
             let digits = 0;
@@ -69,7 +87,7 @@ export default function CurrencyInput({ value, onChange, ...rest }: CurrencyInpu
         // Count digits (and dots) before cursor in the current displayed value
         const digitsBefore = el.value.slice(0, cursorPos).replace(/[^0-9.]/g, '').length;
 
-        const raw = parseCurrencyInput(el.value);
+        const raw = toRawNumber(el.value);
         const newFormatted = formatCurrencyInput(raw);
 
         // Find cursor position in new formatted string with same digit count before it

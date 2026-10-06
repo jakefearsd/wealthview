@@ -115,4 +115,69 @@ describe('CurrencyInput', () => {
         // No keyDown handling for non-special keys -> no onChange.
         expect(onChange).not.toHaveBeenCalled();
     });
+
+    it('drops letters so typed text never reaches state', async () => {
+        const user = userEvent.setup();
+        const onChange = vi.fn();
+        render(<Harness onChange={onChange} />);
+
+        const input = screen.getByTestId('ci') as HTMLInputElement;
+        await user.type(input, 'abc');
+
+        expect(input.value).toBe('');
+        expect(onChange).toHaveBeenLastCalledWith('');
+    });
+
+    it('keeps only the digits of mixed input like "12k"', async () => {
+        const user = userEvent.setup();
+        const onChange = vi.fn();
+        render(<Harness onChange={onChange} />);
+
+        await user.type(screen.getByTestId('ci'), '12k');
+
+        expect(onChange).toHaveBeenLastCalledWith('12');
+    });
+
+    it('strips currency symbols and grouping from a pasted "$1,234.56"', async () => {
+        const user = userEvent.setup();
+        const onChange = vi.fn();
+        render(<Harness onChange={onChange} />);
+
+        const input = screen.getByTestId('ci') as HTMLInputElement;
+        await user.click(input);
+        await user.paste('$1,234.56');
+
+        expect(onChange).toHaveBeenLastCalledWith('1234.56');
+        expect(input.value).toBe('1,234.56');
+    });
+
+    it('allows only one decimal point and a leading minus', async () => {
+        const user = userEvent.setup();
+        const onChange = vi.fn();
+        render(<Harness onChange={onChange} />);
+
+        const input = screen.getByTestId('ci') as HTMLInputElement;
+        await user.click(input);
+        await user.paste('-1.2.3-4');
+
+        expect(onChange).toHaveBeenLastCalledWith('-1.234');
+    });
+
+    it('shows and stores up to four decimals so the display matches what is saved', async () => {
+        const user = userEvent.setup();
+        const onChange = vi.fn();
+        render(<Harness onChange={onChange} />);
+
+        const input = screen.getByTestId('ci') as HTMLInputElement;
+        await user.type(input, '185.50256');
+
+        expect(input.value).toBe('185.5025');
+        expect(onChange).toHaveBeenLastCalledWith('185.5025');
+    });
+
+    it('displays a four-decimal bound value without truncating or padding it', () => {
+        render(<Harness initial="185.5025" />);
+
+        expect((screen.getByTestId('ci') as HTMLInputElement).value).toBe('185.5025');
+    });
 });
