@@ -507,7 +507,7 @@ Guardrail profiles are spending profiles — a scenario has **at most one** acti
    - The **Data Table** now includes additional columns: Essential, Discretionary, Income, Net Need, Surplus/Deficit, and Discretionary After Cuts.
    - Tax liability reflects the tax treatment of each income source (Social Security via the IRS provisional-income formula, rental income with passive loss deductions including depreciation).
    - In early retirement years before Social Security starts, the net spending need is higher because there's no SS income offset. After Social Security kicks in at age 67, the net need drops and surplus increases.
-   - **Rental income is reported NET** of property expenses (tax, insurance, maintenance, mortgage interest), not gross.
+   - **Rental income is reported NET** of property expenses (tax, insurance, maintenance) and mortgage principal and interest, not gross. In the projection years, the mortgage follows the loan's amortization schedule and stops after payoff.
 
 ---
 

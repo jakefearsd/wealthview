@@ -140,7 +140,16 @@ Tick **One-time payment (e.g., deferred compensation, inheritance)** for a lump 
 
 For **Rental Property** income, a **Link to Property (optional)** dropdown appears listing your properties with their current values. The help text: *"Link to a property to pull depreciation data into projections. Leave unlinked for hypothetical planning."*
 
-When linked, the **Annual Amount** field is relabelled **Annual Rent Amount**, and the projection engine nets the property's expenses and applies its depreciation as a deduction against the rental income — which can turn a cash-flow-positive rental into a taxable loss that shields other income. See [Rental Properties](rental-properties.md).
+When linked, the **Annual Amount** field is relabelled **Annual Rent Amount**. The projection engine then subtracts the property's expenses from the rent and deducts its depreciation, which can turn a cash-flow-positive rental into a taxable loss that shields other income. See [Rental Properties](rental-properties.md).
+
+Mortgage payments follow the loan's amortization schedule, using the **Loan Details** on the property:
+
+- Each projected year's cash flow subtracts that year's principal and interest.
+- Only the interest is deducted from taxable rental income. It falls each year as the loan is paid down.
+- Payments stop after the payoff year, and the payoff year counts only the months up to the final payment.
+- The payment is a fixed dollar amount. Projections are in today's dollars, so its real cost shrinks with inflation each year, like a pension without a cost-of-living increase.
+
+If the property has a mortgage balance but no loan details, the projection has no payment to work with. It leaves the mortgage out and shows a warning on the projection, so add the loan details to include it.
 
 ---
 

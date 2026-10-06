@@ -152,7 +152,9 @@ Two different views, in two different places:
 **Rent vs Expenses** (Income Sources page, under a property-linked income source) — the fuller picture. A segmented control switches between **Trailing 12 Mo**, **5 Year**, **10 Year**, **15 Year**, and **20 Year**.
 
 - In **Trailing 12 Mo** mode you get tiles for **Total Income**, **Total Expenses**, and **Net Cash Flow**, with monthly bars broken out by expense category (Mortgage, Tax, Insurance, Maintenance, HOA, CapEx, Mgmt Fee) alongside a Rent Estimate and Net Cash Flow.
-- In the multi-year modes the title changes to **Projected Cash Flow & Depreciation** and you get **Rental Income**, **Operating Expenses**, **Depreciation**, and **Net Cash Flow** bars, with tiles for each running total. Hovering a year shows **Taxable Income**, marked *(tax loss)* when depreciation pushes it negative.
+- In the multi-year modes the title changes to **Projected Cash Flow & Depreciation**. You get **Rental Income**, **Operating Expenses**, **Mortgage (P&I)**, **Depreciation**, and **Net Cash Flow** bars, with tiles for each running total. Total Expenses includes the mortgage. Hovering a year shows the year's principal and interest with the interest share, and the **Taxable Income**. Taxable Income is rent minus operating expenses, mortgage interest and depreciation, marked *(tax loss)* when it goes negative.
+  - Rent and operating expenses grow with the income source's inflation rate. The mortgage payment does not grow: it follows the loan's amortization schedule from your **Loan Details**, and the payoff year counts only the months up to the final payment.
+  - If the property has a mortgage balance but no loan details, a note says debt service isn't included. Add loan details to include it.
 
 That view carries an explanation worth internalizing: *"Depreciation is a non-cash tax deduction that reduces taxable income but does not affect cash flow. Years where depreciation exceeds net income create a tax loss that can shield other income from taxes."*
 
@@ -257,7 +259,7 @@ This card only appears for properties typed **Investment** that have enough data
 | **Cap Rate** | Annual NOI ÷ property value. Measures return independent of financing. |
 | **Cash-on-Cash Return** | Annual net cash flow ÷ cash invested. Your actual return accounting for leverage. |
 | **Annual NOI** | Net Operating Income: rental income minus operating expenses, excluding mortgage. |
-| **Net Cash Flow** | Cash remaining after all expenses including mortgage payments. |
+| **Net Cash Flow** | Cash remaining after all expenses, including the mortgage payments due over the next 12 months. A paid-off loan has none. |
 | **Cash Invested** | Your out-of-pocket investment: purchase price minus loan amount. |
 
 Rental income here is the sum of the annual amounts on income sources linked to this property. Operating expenses come from your **Financial Assumptions** fields if you've set any; otherwise WealthView falls back to summing your logged expenses over the selected window (excluding the mortgage category, since NOI is defined before financing).

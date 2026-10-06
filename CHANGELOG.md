@@ -107,6 +107,26 @@ tax-accuracy fixes in both projection engines. One schema change (V081).
   Monte Carlo seeded the full reserve anyway and created the difference from
   nothing, so a tiny portfolio could show a rising balance while paying for its
   spending.
+- **Rental mortgages now follow their amortization schedule everywhere.**
+  - *Retirement projections and the optimizer:* a property-linked rental used to
+    repeat this year's mortgage payment in every projected year. It kept paying
+    after payoff and kept deducting this year's interest for decades. Now each year
+    charges that year's scheduled principal and interest, stops at payoff (the
+    payoff year counts only its own months), and deducts only that year's interest.
+    The payment is fixed in dollars, so in the projection's today's-dollars frame
+    it shrinks with inflation like a pension with no cost-of-living increase. For
+    a mortgaged rental, projected cash flow rises in later years and taxable rental
+    income rises as the interest falls. If a property has a mortgage balance but no
+    loan details, its payments still can't be modelled; the projection now says so
+    in its warnings instead of leaving them out silently.
+  - *Investment Metrics card and Hold vs. Sell:* the annual mortgage payment
+    counts only the payments due over the next 12 months. A paid-off loan no
+    longer reduces net cash flow or cash-on-cash return.
+  - *Rent vs Expenses chart, 5-20 year view:* the chart now includes the mortgage
+    as its own bar. Net cash flow subtracts principal and interest, and taxable
+    income subtracts only the interest. The payment is not inflated and stops at
+    payoff. If a property has a balance but no loan details, the chart shows a note
+    instead of guessing a payment.
 - **Backend misc fixes from the bug hunt:**
   - A wrong-verb request (for example `GET /auth/login`) now returns 405, an unsupported
     content type 415 and a missing required query parameter 400, instead of a 500.
