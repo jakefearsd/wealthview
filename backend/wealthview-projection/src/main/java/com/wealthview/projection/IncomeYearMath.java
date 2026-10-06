@@ -89,4 +89,18 @@ final class IncomeYearMath {
         BigDecimal deflator = CompoundGrowth.factor(scenarioInflationRate, steps);
         return grown.divide(deflator, SCALE, ROUNDING);
     }
+
+    /**
+     * The REAL (today's-dollars) value of a FIXED-NOMINAL amount paid in the year
+     * {@code yearsFromBase} (the same 1-indexed calendar clock as {@link #realAmount}): deflated by
+     * scenario inflation over {@code yearsFromBase - 1} steps, exactly as {@link #realAmount} erodes
+     * a source with no COLA. Used for a rental's mortgage principal and interest, whose payment is
+     * fixed in nominal dollars, so its real burden shrinks every year until payoff.
+     */
+    static BigDecimal realFixedNominal(BigDecimal nominal, int yearsFromBase, BigDecimal scenarioInflationRate) {
+        if (nominal.signum() == 0 || yearsFromBase <= 1 || scenarioInflationRate.signum() == 0) {
+            return nominal;
+        }
+        return nominal.divide(CompoundGrowth.factor(scenarioInflationRate, yearsFromBase - 1), SCALE, ROUNDING);
+    }
 }

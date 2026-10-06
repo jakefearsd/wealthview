@@ -47,7 +47,7 @@ class IncomeContributionCalculator {
         for (var source : sources) {
             int sourceAge = IncomeYearMath.resolveSourceAge(source, age, household, taxYear);
             if (ProjectionIncomeSourceInput.isActiveForAge(source, sourceAge)) {
-                BigDecimal amount = computeAmount(source, yearsFromBase, scenarioInflationRate);
+                BigDecimal amount = computeAmount(source, yearsFromBase, scenarioInflationRate, taxYear);
                 if (IncomeYearMath.isBoundaryAge(source, sourceAge)) {
                     amount = amount.divide(TWO, SCALE, ROUNDING);
                 }
@@ -58,24 +58,26 @@ class IncomeContributionCalculator {
     }
 
     private BigDecimal computeAmount(ProjectionIncomeSourceInput source, int yearsFromBase,
-                                     BigDecimal scenarioInflationRate) {
+                                     BigDecimal scenarioInflationRate, int taxYear) {
         BigDecimal gross = IncomeYearMath.realAmount(source, yearsFromBase, scenarioInflationRate);
         if (source.incomeType() == IncomeSourceType.RENTAL_PROPERTY) {
-            gross = gross.subtract(sumExpenses(source));
+            gross = gross.subtract(sumExpenses(source, yearsFromBase, scenarioInflationRate, taxYear));
         }
         return gross;
     }
 
-    private BigDecimal sumExpenses(ProjectionIncomeSourceInput source) {
-        BigDecimal total = BigDecimal.ZERO;
+    /**
+     * Operating expenses and property tax (constant real), plus {@code taxYear}'s scheduled mortgage
+     * principal and interest -- fixed nominal, so deflated to today's dollars like a source with no
+     * COLA, and zero once the loan is paid off.
+     */
+    private BigDecimal sumExpenses(ProjectionIncomeSourceInput source, int yearsFromBase,
+                                   BigDecimal scenarioInflationRate, int taxYear) {
+        BigDecimal total = IncomeYearMath.realFixedNominal(
+                source.mortgageInterestIn(taxYear).add(source.mortgagePrincipalIn(taxYear)),
+                yearsFromBase, scenarioInflationRate);
         if (source.annualOperatingExpenses() != null) {
             total = total.add(source.annualOperatingExpenses());
-        }
-        if (source.annualMortgageInterest() != null) {
-            total = total.add(source.annualMortgageInterest());
-        }
-        if (source.annualMortgagePrincipal() != null) {
-            total = total.add(source.annualMortgagePrincipal());
         }
         if (source.annualPropertyTax() != null) {
             total = total.add(source.annualPropertyTax());

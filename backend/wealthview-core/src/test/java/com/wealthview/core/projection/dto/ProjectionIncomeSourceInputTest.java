@@ -1,6 +1,7 @@
 package com.wealthview.core.projection.dto;
 
 import java.math.BigDecimal;
+import java.util.Map;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -73,5 +74,39 @@ class ProjectionIncomeSourceInputTest {
         assertThat(ProjectionIncomeSourceInput.isActiveForAge(src, 69)).isFalse();
         assertThat(ProjectionIncomeSourceInput.isActiveForAge(src, 70)).isTrue();
         assertThat(ProjectionIncomeSourceInput.isActiveForAge(src, 71)).isFalse();
+    }
+
+    private ProjectionIncomeSourceInput rentalWithSchedule(Map<Integer, BigDecimal> interest,
+                                                           Map<Integer, BigDecimal> principal) {
+        return new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), "Rental", IncomeSourceType.RENTAL_PROPERTY,
+                new BigDecimal("30000"), 0, null, BigDecimal.ZERO,
+                /* oneTime */ false, "rental_passive",
+                null, interest, principal, null, null, null);
+    }
+
+    @Test
+    void mortgageInterestIn_yearOnSchedule_returnsThatYearsNominalInterest() {
+        var src = rentalWithSchedule(Map.of(2026, new BigDecimal("9000"), 2027, new BigDecimal("8800")),
+                Map.of(2026, new BigDecimal("3000"), 2027, new BigDecimal("3200")));
+
+        assertThat(src.mortgageInterestIn(2027)).isEqualByComparingTo("8800");
+        assertThat(src.mortgagePrincipalIn(2027)).isEqualByComparingTo("3200");
+    }
+
+    @Test
+    void mortgageInterestIn_yearOffSchedule_isZero() {
+        var src = rentalWithSchedule(Map.of(2026, new BigDecimal("9000")), Map.of(2026, new BigDecimal("3000")));
+
+        assertThat(src.mortgageInterestIn(2040)).isEqualByComparingTo("0");
+        assertThat(src.mortgagePrincipalIn(2040)).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void mortgageInterestIn_noSchedule_isZero() {
+        var src = rentalWithSchedule(null, null);
+
+        assertThat(src.mortgageInterestIn(2026)).isEqualByComparingTo("0");
+        assertThat(src.mortgagePrincipalIn(2026)).isEqualByComparingTo("0");
     }
 }

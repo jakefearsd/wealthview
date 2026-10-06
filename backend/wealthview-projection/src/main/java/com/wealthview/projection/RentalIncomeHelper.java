@@ -19,9 +19,14 @@ final class RentalIncomeHelper {
     /**
      * Computes the net taxable rental income for a single source in a single year,
      * applying inflation, expenses, depreciation, mortgage interest, and passive loss rules.
+     * The interest is {@code calendarYear}'s entry in the source's nominal mortgage schedule
+     * (zero after payoff), deflated to today's dollars over {@code yearsFromBase} calendar
+     * years since the projection's base year (0 = the base year) at
+     * {@code scenarioInflationRate}.
      */
     static RentalYearResult computeForSource(ProjectionIncomeSourceInput source,
                                              int yearIndex, int calendarYear,
+                                             int yearsFromBase, double scenarioInflationRate,
                                              double magi, BigDecimal priorSuspendedLoss,
                                              RentalLossCalculator calculator) {
         double gross = source.annualAmount().doubleValue();
@@ -39,7 +44,8 @@ final class RentalIncomeHelper {
                 depreciation = depBd.doubleValue();
             }
         }
-        double mortgageInterest = nullSafe(source.annualMortgageInterest());
+        double mortgageInterest = realFixedNominal(
+                source.mortgageInterestIn(calendarYear).doubleValue(), yearsFromBase, scenarioInflationRate);
         double netRentalIncome = gross - expenses - mortgageInterest - depreciation;
 
         var lossResult = calculator.applyLossRules(
@@ -52,6 +58,19 @@ final class RentalIncomeHelper {
         return new RentalYearResult(
                 lossResult.netTaxableIncome().doubleValue(),
                 lossResult.lossSuspended());
+    }
+
+    /**
+     * The real (today's-dollars) value of a fixed-nominal amount paid {@code yearsFromBase} calendar
+     * years after the projection's base year (0 = the base year) -- the double-precision, 0-indexed
+     * counterpart of {@link IncomeYearMath#realFixedNominal}, on the same clock
+     * {@link IncomeProjector} deflates every other source with.
+     */
+    static double realFixedNominal(double nominal, int yearsFromBase, double scenarioInflationRate) {
+        if (yearsFromBase <= 0 || scenarioInflationRate <= 0) {
+            return nominal;
+        }
+        return nominal / CompoundGrowth.factor(scenarioInflationRate, yearsFromBase);
     }
 
     static double nullSafe(BigDecimal value) {

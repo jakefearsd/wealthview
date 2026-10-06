@@ -86,14 +86,17 @@ final class IncomeProjector {
                 double amount = active.gross();
 
                 // For rental properties, subtract all cash outflows to get net cash flow,
-                // matching IncomeSourceProcessor: operating expenses, mortgage interest,
-                // property tax, AND mortgage principal (principal reduces available cash even
-                // though it is not tax-deductible).
+                // matching IncomeSourceProcessor: operating expenses, property tax, and this
+                // calendar year's scheduled mortgage interest AND principal (principal reduces
+                // available cash even though it is not tax-deductible). The mortgage payment is
+                // fixed nominal, so it is deflated to today's dollars and stops after payoff.
                 if (source.incomeType() == IncomeSourceType.RENTAL_PROPERTY) {
                     amount -= nullSafe(source.annualOperatingExpenses());
-                    amount -= nullSafe(source.annualMortgageInterest());
                     amount -= nullSafe(source.annualPropertyTax());
-                    amount -= nullSafe(source.annualMortgagePrincipal());
+                    amount -= RentalIncomeHelper.realFixedNominal(
+                            source.mortgageInterestIn(clock.calendarYear())
+                                    .add(source.mortgagePrincipalIn(clock.calendarYear())).doubleValue(),
+                            clock.yearsFromBase(), ctx.scenarioInflationRate());
                     amount = Math.max(0, amount);
                 }
 
@@ -190,8 +193,8 @@ final class IncomeProjector {
                     continue;
                 }
                 var rentalResult = RentalIncomeHelper.computeForSource(
-                        source, y, clock.calendarYear(), baseOtherIncome,
-                        suspendedBySource.get(source), calculator);
+                        source, y, clock.calendarYear(), clock.yearsFromBase(), ctx.scenarioInflationRate(),
+                        baseOtherIncome, suspendedBySource.get(source), calculator);
                 suspendedBySource.put(source, rentalResult.newSuspendedLoss());
                 yearAdjustment += rentalResult.netTaxableIncome();
             }

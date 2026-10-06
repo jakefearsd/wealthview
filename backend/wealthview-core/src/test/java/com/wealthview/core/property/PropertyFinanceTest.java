@@ -2,6 +2,7 @@ package com.wealthview.core.property;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.Test;
 
@@ -133,6 +134,35 @@ class PropertyFinanceTest {
         var debtService = PropertyFinance.annualDebtService(property, afterTerm);
 
         assertThat(debtService).isEmpty();
+    }
+
+    // ── debtServiceByYear ──────────────────────────────────────────────────
+
+    @Test
+    void debtServiceByYear_withLoan_followsTheScheduleEachYearThroughPayoff() {
+        var property = propertyWithLoan();
+
+        var schedule = PropertyFinance.debtServiceByYear(property, 2026);
+
+        // The 360th payment of a June 2020 loan lands in June 2050.
+        assertThat(schedule.keySet()).containsExactlyElementsOf(
+                IntStream.rangeClosed(2026, 2050).boxed().toList());
+        for (int year = 2026; year <= 2050; year++) {
+            assertThat(schedule.get(year)).isEqualTo(AmortizationCalculator.debtServiceForYear(
+                    LOAN_AMOUNT, RATE, TERM_MONTHS, LOAN_START, year));
+        }
+        assertThat(schedule.get(2050).total()).isEqualByComparingTo(
+                AmortizationCalculator.monthlyPayment(LOAN_AMOUNT, RATE, TERM_MONTHS).multiply(new BigDecimal("6")));
+    }
+
+    @Test
+    void debtServiceByYear_withoutLoanDetails_isEmpty() {
+        assertThat(PropertyFinance.debtServiceByYear(propertyWithoutLoan(), 2026)).isEmpty();
+    }
+
+    @Test
+    void debtServiceByYear_loanPaidOffBeforeFromYear_isEmpty() {
+        assertThat(PropertyFinance.debtServiceByYear(propertyWithLoan(), 2051)).isEmpty();
     }
 
     // ── annualMortgagePayment ──────────────────────────────────────────────

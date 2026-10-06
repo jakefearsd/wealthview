@@ -420,7 +420,7 @@ class RothConversionOptimizerTest {
                 java.util.UUID.randomUUID(), "Rental Property", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "rental_passive",
-                new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("10000"), null, null,
                 new BigDecimal("3000"), "straight_line", depreciationByYear);
 
         var withRentals = testBuilder()
@@ -455,7 +455,7 @@ class RothConversionOptimizerTest {
                 java.util.UUID.randomUUID(), "Cost Seg Property", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "rental_active_reps",
-                new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("10000"), null, null,
                 new BigDecimal("3000"), "cost_seg", depreciationByYear);
 
         var optimizer = testBuilder()
@@ -490,7 +490,7 @@ class RothConversionOptimizerTest {
                 java.util.UUID.randomUUID(), "Passive Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "rental_passive",
-                new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("10000"), null, null,
                 new BigDecimal("3000"), "straight_line", depreciationByYear);
 
         var withCarryforward = testBuilder()
@@ -523,14 +523,14 @@ class RothConversionOptimizerTest {
                 java.util.UUID.randomUUID(), "Active REPS", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "rental_active_reps",
-                new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("10000"), null, null,
                 new BigDecimal("3000"), "straight_line", depreciationByYear);
 
         var passiveSource = new ProjectionIncomeSourceInput(
                 java.util.UUID.randomUUID(), "Passive Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "rental_passive",
-                new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("10000"), null, null,
                 new BigDecimal("3000"), "straight_line", depreciationByYear);
 
         var activeOptimizer = testBuilder()
@@ -573,7 +573,7 @@ class RothConversionOptimizerTest {
                 java.util.UUID.randomUUID(), "Passive Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "rental_passive",
-                new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("10000"), null, null,
                 new BigDecimal("3000"), "straight_line", depByYear);
 
         // Same property as active REPS — full deduction regardless of MAGI
@@ -581,7 +581,7 @@ class RothConversionOptimizerTest {
                 java.util.UUID.randomUUID(), "Active REPS", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "rental_active_reps",
-                new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("10000"), null, null,
                 new BigDecimal("3000"), "straight_line", depByYear);
 
         var passiveOpt = testBuilder()
@@ -622,7 +622,7 @@ class RothConversionOptimizerTest {
                 java.util.UUID.randomUUID(), "High Depreciation", IncomeSourceType.RENTAL_PROPERTY,
                 BigDecimal.ZERO, 62, null,
                 BigDecimal.ZERO, false, "rental_active_reps",
-                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO, null, null,
                 BigDecimal.ZERO, "cost_seg", depByYear);
 
         var withLosses = testBuilder()
@@ -866,7 +866,7 @@ class RothConversionOptimizerTest {
                 java.util.UUID.randomUUID(), "REPS Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "rental_active_reps",
-                new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("10000"), null, null,
                 new BigDecimal("3000"), "straight_line", depreciationByYear);
 
         var withLargeRepsLoss = testBuilder()
@@ -982,7 +982,7 @@ class RothConversionOptimizerTest {
                 java.util.UUID.randomUUID(), "Large Passive Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "rental_passive",
-                new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("10000"), null, null,
                 new BigDecimal("3000"), "straight_line", depreciationByYear);
 
         var optimizer = testBuilder()
@@ -1152,7 +1152,7 @@ class RothConversionOptimizerTest {
                 java.util.UUID.randomUUID(), "Passive Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "rental_passive",
-                new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("10000"), null, null,
                 new BigDecimal("3000"), "straight_line", depByYear);
 
         // Moderate other income at $50K taxable income, pushing MAGI near $110K with conversions

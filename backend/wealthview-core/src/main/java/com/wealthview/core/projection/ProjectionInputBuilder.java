@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 
@@ -274,8 +275,8 @@ public class ProjectionInputBuilder {
 
     private ProjectionIncomeSourceInput toIncomeSourceInput(IncomeSourceEntity source, BigDecimal amount) {
         BigDecimal annualOpEx = null;
-        BigDecimal annualMortgageInterest = null;
-        BigDecimal annualMortgagePrincipal = null;
+        Map<Integer, BigDecimal> mortgageInterestByYear = null;
+        Map<Integer, BigDecimal> mortgagePrincipalByYear = null;
         BigDecimal annualPropertyTax = null;
         String depreciationMethod = null;
         Map<Integer, BigDecimal> depreciationByYear = null;
@@ -287,10 +288,17 @@ public class ProjectionInputBuilder {
                     property.getAnnualInsuranceCost(), property.getAnnualMaintenanceCost()));
             annualPropertyTax = property.getAnnualPropertyTax();
 
-            var debtService = PropertyFinance.annualDebtService(property, LocalDate.now());
-            if (debtService.isPresent()) {
-                annualMortgageInterest = debtService.get().interest();
-                annualMortgagePrincipal = debtService.get().principal();
+            // The amortization schedule from the projection's base year through payoff, nominal per
+            // calendar year: the engines charge each year's own interest and principal (none after
+            // payoff) and deflate them as fixed-nominal outflows.
+            var debtSchedule = PropertyFinance.debtServiceByYear(property, LocalDate.now().getYear());
+            if (!debtSchedule.isEmpty()) {
+                mortgageInterestByYear = new TreeMap<>();
+                mortgagePrincipalByYear = new TreeMap<>();
+                for (var entry : debtSchedule.entrySet()) {
+                    mortgageInterestByYear.put(entry.getKey(), entry.getValue().interest());
+                    mortgagePrincipalByYear.put(entry.getKey(), entry.getValue().principal());
+                }
             }
 
             depreciationMethod = property.getDepreciationMethod();
@@ -305,8 +313,7 @@ public class ProjectionInputBuilder {
                 source.getId(), source.getName(), IncomeSourceType.fromString(source.getIncomeType()),
                 amount, source.getStartAge(), source.getEndAge(),
                 source.getInflationRate(), source.isOneTime(), source.getTaxTreatment(),
-                annualOpEx, annualMortgageInterest, annualMortgagePrincipal, annualPropertyTax,
+                annualOpEx, mortgageInterestByYear, mortgagePrincipalByYear, annualPropertyTax,
                 depreciationMethod, depreciationByYear, source.getOwner(), source.getSurvivorPercent());
     }
-
 }

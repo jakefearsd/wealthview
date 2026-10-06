@@ -165,7 +165,9 @@ class IncomeSourceProcessor {
 
             String sourceKey = source.id().toString();
             var result = switch (source.incomeType()) {
-                case RENTAL_PROPERTY -> processRentalIncome(source, amount, taxYear, magi, suspendedLoss, multiplier);
+                case RENTAL_PROPERTY -> processRentalIncome(source, amount,
+                        new RentalYear(taxYear, yearsFromBase, scenarioInflationRate),
+                        magi, suspendedLoss, multiplier);
                 case SOCIAL_SECURITY -> processSocialSecurityIncome(amount);
                 case PART_TIME_WORK  -> processEmploymentIncome(source, amount, taxYear);
                 default              -> processDefaultIncome(source, amount);
@@ -254,15 +256,29 @@ class IncomeSourceProcessor {
 
     // --- Per-type processing methods ---
 
+    /**
+     * The calendar clock a rental's year is evaluated on: {@code taxYear} picks that year's entry
+     * from the nominal mortgage schedule and {@code yearsFromBase}/{@code scenarioInflationRate}
+     * deflate it to today's dollars (see {@link IncomeYearMath#realFixedNominal}).
+     */
+    private record RentalYear(int taxYear, int yearsFromBase, BigDecimal scenarioInflationRate) {
+
+        BigDecimal real(BigDecimal nominal) {
+            return IncomeYearMath.realFixedNominal(nominal, yearsFromBase, scenarioInflationRate);
+        }
+    }
+
     private RentalResult processRentalIncome(
             ProjectionIncomeSourceInput source, BigDecimal nominal,
-            int taxYear, BigDecimal magi, BigDecimal suspendedLoss,
+            RentalYear year, BigDecimal magi, BigDecimal suspendedLoss,
             BigDecimal transitionMultiplier) {
 
+        int taxYear = year.taxYear();
         BigDecimal opExp = source.annualOperatingExpenses() != null
                 ? source.annualOperatingExpenses() : BigDecimal.ZERO;
-        BigDecimal mortInt = source.annualMortgageInterest() != null
-                ? source.annualMortgageInterest() : BigDecimal.ZERO;
+        // Mortgage P&I follows the amortization schedule (none after payoff) and, being fixed in
+        // nominal dollars, is deflated to today's dollars like a source with no COLA.
+        BigDecimal mortInt = year.real(source.mortgageInterestIn(taxYear));
         BigDecimal propTax = source.annualPropertyTax() != null
                 ? source.annualPropertyTax() : BigDecimal.ZERO;
         BigDecimal expenses = opExp.add(mortInt).add(propTax)
@@ -276,8 +292,7 @@ class IncomeSourceProcessor {
         }
 
         // Principal reduces cash flow but is NOT tax-deductible
-        BigDecimal mortPrincipal = source.annualMortgagePrincipal() != null
-                ? source.annualMortgagePrincipal() : BigDecimal.ZERO;
+        BigDecimal mortPrincipal = year.real(source.mortgagePrincipalIn(taxYear));
         BigDecimal principalScaled = mortPrincipal
                 .multiply(transitionMultiplier).setScale(SCALE, ROUNDING);
 

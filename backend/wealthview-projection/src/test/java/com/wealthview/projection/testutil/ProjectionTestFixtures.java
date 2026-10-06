@@ -3,6 +3,8 @@ package com.wealthview.projection.testutil;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 
 import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealReturnMatrix;
@@ -49,6 +51,19 @@ public final class ProjectionTestFixtures {
                     { 0.30,  0.25,  0.00, -0.010},
                     { 0.02, -0.03,  0.07,  0.012},
             });
+
+    /**
+     * A mortgage interest or principal schedule (nominal, keyed by calendar year) paying the same
+     * {@code amount} every year {@code fromYear..toYear}, for tests that need a debt-service
+     * figure in every projected year rather than a real amortization schedule.
+     */
+    public static Map<Integer, BigDecimal> levelSchedule(String amount, int fromYear, int toYear) {
+        var schedule = new TreeMap<Integer, BigDecimal>();
+        for (int year = fromYear; year <= toYear; year++) {
+            schedule.put(year, bd(amount));
+        }
+        return schedule;
+    }
 
     public static HypotheticalAccountInput acct(String balance, String contribution, String expectedReturn) {
         return new HypotheticalAccountInput(bd(balance), bd(contribution), bd(expectedReturn), "taxable");

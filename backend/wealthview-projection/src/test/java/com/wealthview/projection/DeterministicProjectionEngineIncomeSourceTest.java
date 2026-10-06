@@ -18,6 +18,7 @@ import static com.wealthview.projection.testutil.ProjectionTestFixtures.acct;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.createInput;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTax;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.incomeSource;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.levelSchedule;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.oneTimeIncomeSource;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.retiredAt66BirthYear;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -429,7 +430,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
                 UUID.randomUUID(), "Rental Property", IncomeSourceType.RENTAL_PROPERTY,
                 bd("24000"), 60, null, BigDecimal.ZERO, false,
                 "rental_passive",
-                bd("6000"), bd("4000"), null, bd("3000"),
+                bd("6000"), levelSchedule("4000", currentYear, currentYear + 40), null, bd("3000"),
                 "straight_line", depreciationSchedule);
 
         var input = createInput(

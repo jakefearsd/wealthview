@@ -19,6 +19,7 @@ import com.wealthview.projection.testutil.FlatTaxStubs;
 import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.levelSchedule;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -687,8 +688,8 @@ class MonteCarloSpendingOptimizerTest {
                 new BigDecimal("100000"), 62, null,
                 BigDecimal.ZERO, false, "rental_passive",
                 new BigDecimal("25000"),   // operating expenses (insurance + maintenance)
-                new BigDecimal("20000"),   // mortgage interest
-                null,                      // annualMortgagePrincipal
+                levelSchedule("20000", 2030, 2058),   // mortgage interest
+                null,                      // mortgagePrincipalByYear
                 new BigDecimal("15000"),   // property tax
                 null, null);
 
@@ -717,10 +718,12 @@ class MonteCarloSpendingOptimizerTest {
                 .filter(y -> y.age() == 65)
                 .findFirst().orElseThrow();
 
-        // Real terms: gross deflated over 3 years at 3% ($100k/1.03^3 ≈ $91.5k) minus real $60k ≈ $31.5k.
+        // Real terms: gross deflated over 3 years at 3% ($100k/1.03^3 ≈ $91.5k), minus the constant-real
+        // $40k of operating expenses and property tax, minus the $20k fixed-NOMINAL mortgage interest
+        // deflated the same way ($20k/1.03^3 ≈ $18.3k) ≈ $33.2k.
         assertThat(atAge65.incomeOffset().doubleValue())
                 .as("Rental income at non-boundary age should be net of expenses (real terms)")
-                .isCloseTo(31514, org.assertj.core.data.Offset.offset(1000.0));
+                .isCloseTo(33211, org.assertj.core.data.Offset.offset(1000.0));
     }
 
     @Test
@@ -1510,8 +1513,8 @@ class MonteCarloSpendingOptimizerTest {
                 new BigDecimal("100000"), 60, null,
                 BigDecimal.ZERO, false, "rental_passive",
                 null,                      // no operating expenses (keep simple)
-                new BigDecimal("30000"),   // mortgage interest
-                new BigDecimal("20000"),   // mortgage principal — must be deducted
+                levelSchedule("30000", 2028, 2058),   // mortgage interest
+                levelSchedule("20000", 2028, 2058),   // mortgage principal — must be deducted
                 new BigDecimal("10000"),   // property tax
                 null, null);
 
@@ -1533,11 +1536,12 @@ class MonteCarloSpendingOptimizerTest {
                 .findFirst().orElseThrow();
 
         // Real terms: gross deflated to today's dollars over 3 years at 3% ($100k/1.03^3 = $91,514),
-        // then real/constant expenses+principal ($60k) deducted -> $31,514. Principal is still deducted
-        // (without it the offset would be ~$51,514).
+        // minus the constant-real $10k property tax, minus the fixed-NOMINAL $50k of mortgage interest
+        // and principal deflated the same way ($50k/1.03^3 = $45,757) -> $35,757. Principal is still
+        // deducted (without it the offset would be ~$53,060).
         assertThat(atAge65.incomeOffset().doubleValue())
                 .as("Income offset must deduct mortgage principal (real terms)")
-                .isCloseTo(31514, org.assertj.core.data.Offset.offset(500.0));
+                .isCloseTo(35757, org.assertj.core.data.Offset.offset(500.0));
     }
 
     @Test

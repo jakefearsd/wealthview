@@ -7,6 +7,15 @@ import java.util.UUID;
 /**
  * The engine-facing (fully resolved) shape of one scenario-linked income source.
  *
+ * @param mortgageInterestByYear for a rental linked to a property with loan details, the NOMINAL
+ *              mortgage interest paid in each calendar year per the amortization schedule (the
+ *              start and payoff years count only their own payments; no entry after payoff).
+ *              Keyed like {@code depreciationByYear}; the engines convert each year's amount to
+ *              real terms as a fixed-nominal outflow. {@code null} when there is no amortizable
+ *              mortgage.
+ * @param mortgagePrincipalByYear the matching NOMINAL principal repaid each calendar year (a cash
+ *              outflow that is not tax-deductible). {@code null} when there is no amortizable
+ *              mortgage.
  * @param owner Household/survivor modeling (sub-project A): {@code "primary"} or {@code "spouse"}.
  *              Every existing constructor defaults this to {@code "primary"}.
  * @param survivorPercent Fraction of this source the survivor keeps from the first-death
@@ -26,8 +35,8 @@ public record ProjectionIncomeSourceInput(
         boolean oneTime,
         String taxTreatment,
         BigDecimal annualOperatingExpenses,
-        BigDecimal annualMortgageInterest,
-        BigDecimal annualMortgagePrincipal,
+        Map<Integer, BigDecimal> mortgageInterestByYear,
+        Map<Integer, BigDecimal> mortgagePrincipalByYear,
         BigDecimal annualPropertyTax,
         String depreciationMethod,
         Map<Integer, BigDecimal> depreciationByYear,
@@ -44,12 +53,26 @@ public record ProjectionIncomeSourceInput(
     public ProjectionIncomeSourceInput(
             UUID id, String name, IncomeSourceType incomeType, BigDecimal annualAmount,
             int startAge, Integer endAge, BigDecimal inflationRate, boolean oneTime, String taxTreatment,
-            BigDecimal annualOperatingExpenses, BigDecimal annualMortgageInterest,
-            BigDecimal annualMortgagePrincipal, BigDecimal annualPropertyTax,
+            BigDecimal annualOperatingExpenses, Map<Integer, BigDecimal> mortgageInterestByYear,
+            Map<Integer, BigDecimal> mortgagePrincipalByYear, BigDecimal annualPropertyTax,
             String depreciationMethod, Map<Integer, BigDecimal> depreciationByYear) {
         this(id, name, incomeType, annualAmount, startAge, endAge, inflationRate, oneTime, taxTreatment,
-                annualOperatingExpenses, annualMortgageInterest, annualMortgagePrincipal, annualPropertyTax,
+                annualOperatingExpenses, mortgageInterestByYear, mortgagePrincipalByYear, annualPropertyTax,
                 depreciationMethod, depreciationByYear, "primary", BigDecimal.ONE);
+    }
+
+    /** The NOMINAL mortgage interest paid in {@code calendarYear}; zero when none is scheduled. */
+    public BigDecimal mortgageInterestIn(int calendarYear) {
+        return scheduledIn(mortgageInterestByYear, calendarYear);
+    }
+
+    /** The NOMINAL mortgage principal repaid in {@code calendarYear}; zero when none is scheduled. */
+    public BigDecimal mortgagePrincipalIn(int calendarYear) {
+        return scheduledIn(mortgagePrincipalByYear, calendarYear);
+    }
+
+    private static BigDecimal scheduledIn(Map<Integer, BigDecimal> schedule, int calendarYear) {
+        return schedule == null ? BigDecimal.ZERO : schedule.getOrDefault(calendarYear, BigDecimal.ZERO);
     }
 
     /**

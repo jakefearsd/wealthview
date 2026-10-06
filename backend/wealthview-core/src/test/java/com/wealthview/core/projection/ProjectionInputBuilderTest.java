@@ -1,13 +1,13 @@
 package com.wealthview.core.projection;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,6 +28,7 @@ import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.core.projection.household.LifeExpectancy;
 import com.wealthview.core.projection.mortality.MortalityTable;
 import com.wealthview.core.projection.mortality.MortalityTableProvider;
+import com.wealthview.core.property.AmortizationCalculator;
 import com.wealthview.core.property.DepreciationCalculator;
 import com.wealthview.core.testutil.ScenarioMother;
 import com.wealthview.persistence.entity.AccountEntity;
@@ -375,13 +376,57 @@ class ProjectionInputBuilderTest {
         var input = result.incomeSources().getFirst();
         assertThat(input.annualPropertyTax()).isEqualByComparingTo("5000");
         assertThat(input.annualOperatingExpenses()).isEqualByComparingTo("3600");
-        assertThat(input.annualMortgageInterest()).isNull();
+        assertThat(input.mortgageInterestByYear()).isNull();
     }
 
     @Test
-    void build_rentalWithLoan_populatesMortgageInterest() {
+    void build_rentalWithLoan_carriesTheNominalDebtServiceScheduleThroughPayoff() {
         var scenario = ScenarioMother.scenario(tenant);
+        var property = mortgagedRental();
+        var incomeSource = new IncomeSourceEntity(
+                tenant, "Rental Income", "rental_property",
+                new BigDecimal("30000"), 0, null,
+                BigDecimal.ZERO, false, "taxable");
+        incomeSource.setProperty(property);
+        var link = new ScenarioIncomeSourceEntity(scenario, incomeSource, null);
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of(link));
 
+        var result = builder.build(scenario, tenantId);
+
+        var input = result.incomeSources().getFirst();
+        int currentYear = LocalDate.now().getYear();
+        var thisYear = AmortizationCalculator.debtServiceForYear(
+                new BigDecimal("300000"), new BigDecimal("0.065"), 360, LocalDate.of(2020, 1, 1), currentYear);
+        assertThat(input.mortgageInterestIn(currentYear)).isEqualByComparingTo(thisYear.interest());
+        assertThat(input.mortgagePrincipalIn(currentYear)).isEqualByComparingTo(thisYear.principal());
+        // The 360th payment of a January 2020 loan lands in January 2050; nothing is charged after.
+        assertThat(input.mortgageInterestByYear()).containsOnlyKeys(
+                IntStream.rangeClosed(currentYear, 2050).boxed().toList());
+        assertThat(input.mortgagePrincipalIn(2051)).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void build_rentalWithLoan_interestShrinksAndPrincipalGrowsAlongTheSchedule() {
+        var scenario = ScenarioMother.scenario(tenant);
+        var incomeSource = new IncomeSourceEntity(
+                tenant, "Rental Income", "rental_property",
+                new BigDecimal("30000"), 0, null,
+                BigDecimal.ZERO, false, "taxable");
+        incomeSource.setProperty(mortgagedRental());
+        var link = new ScenarioIncomeSourceEntity(scenario, incomeSource, null);
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of(link));
+
+        var result = builder.build(scenario, tenantId);
+
+        var input = result.incomeSources().getFirst();
+        int currentYear = LocalDate.now().getYear();
+        assertThat(input.mortgageInterestIn(2045)).isLessThan(input.mortgageInterestIn(currentYear));
+        assertThat(input.mortgagePrincipalIn(2045)).isGreaterThan(input.mortgagePrincipalIn(currentYear));
+    }
+
+    private PropertyEntity mortgagedRental() {
         var property = new PropertyEntity(tenant, "456 Oak Ave",
                 new BigDecimal("400000"), LocalDate.of(2020, 1, 1),
                 new BigDecimal("400000"), new BigDecimal("280000"));
@@ -390,61 +435,7 @@ class ProjectionInputBuilderTest {
         property.setAnnualInterestRate(new BigDecimal("0.065"));
         property.setLoanTermMonths(360);
         property.setLoanStartDate(LocalDate.of(2020, 1, 1));
-
-        var incomeSource = new IncomeSourceEntity(
-                tenant, "Rental Income", "rental_property",
-                new BigDecimal("30000"), 0, null,
-                BigDecimal.ZERO, false, "taxable");
-        incomeSource.setProperty(property);
-
-        var link = new ScenarioIncomeSourceEntity(scenario, incomeSource, null);
-
-        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
-                .thenReturn(List.of(link));
-
-        var result = builder.build(scenario, tenantId);
-
-        assertThat(result.incomeSources()).hasSize(1);
-        var input = result.incomeSources().getFirst();
-        assertThat(input.annualMortgageInterest()).isNotNull();
-        assertThat(input.annualMortgageInterest()).isPositive();
-    }
-
-    @Test
-    void build_withMortgagedProperty_setsMortgagePrincipalOnIncomeSource() {
-        var scenario = ScenarioMother.scenario(tenant);
-
-        var property = new PropertyEntity(tenant, "456 Oak Ave",
-                new BigDecimal("400000"), LocalDate.of(2020, 1, 1),
-                new BigDecimal("400000"), new BigDecimal("280000"));
-        property.setDepreciationMethod("none");
-        property.setLoanAmount(new BigDecimal("300000"));
-        property.setAnnualInterestRate(new BigDecimal("0.065"));
-        property.setLoanTermMonths(360);
-        property.setLoanStartDate(LocalDate.of(2020, 1, 1));
-
-        var incomeSource = new IncomeSourceEntity(
-                tenant, "Rental Income", "rental_property",
-                new BigDecimal("30000"), 0, null,
-                BigDecimal.ZERO, false, "taxable");
-        incomeSource.setProperty(property);
-
-        var link = new ScenarioIncomeSourceEntity(scenario, incomeSource, null);
-        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
-                .thenReturn(List.of(link));
-
-        var result = builder.build(scenario, tenantId);
-
-        var input = result.incomeSources().getFirst();
-        // annualMortgagePrincipal = fullAnnualPayment - annualInterest; both must be > 0
-        assertThat(input.annualMortgagePrincipal()).isNotNull();
-        assertThat(input.annualMortgagePrincipal()).isPositive();
-        // principal + interest should equal full annual payment (within rounding)
-        var fullAnnualPayment = com.wealthview.core.property.AmortizationCalculator.monthlyPayment(
-                new BigDecimal("300000"), new BigDecimal("0.065"), 360)
-                .multiply(new BigDecimal("12"));
-        assertThat(input.annualMortgageInterest().add(input.annualMortgagePrincipal()))
-                .isEqualByComparingTo(fullAnnualPayment.setScale(4, java.math.RoundingMode.HALF_UP));
+        return property;
     }
 
     @Test
@@ -467,7 +458,7 @@ class ProjectionInputBuilderTest {
         assertThat(result.incomeSources()).hasSize(1);
         var input = result.incomeSources().getFirst();
         assertThat(input.annualOperatingExpenses()).isNull();
-        assertThat(input.annualMortgageInterest()).isNull();
+        assertThat(input.mortgageInterestByYear()).isNull();
         assertThat(input.annualPropertyTax()).isNull();
     }
 
@@ -497,7 +488,7 @@ class ProjectionInputBuilderTest {
         assertThat(result.incomeSources()).hasSize(1);
         var input = result.incomeSources().getFirst();
         assertThat(input.annualOperatingExpenses()).isNull();
-        assertThat(input.annualMortgageInterest()).isNull();
+        assertThat(input.mortgageInterestByYear()).isNull();
         assertThat(input.annualPropertyTax()).isNull();
     }
 

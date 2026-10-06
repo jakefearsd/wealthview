@@ -22,6 +22,7 @@ import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -257,8 +258,8 @@ class IncomeSourceProcessorTest {
                 new BigDecimal("24000"), 65, null,
                 BigDecimal.ZERO, false, "active_participation",
                 new BigDecimal("3600"),   // annualOperatingExpenses (insurance+maintenance)
-                new BigDecimal("9600"),   // annualMortgageInterest
-                null,                     // annualMortgagePrincipal
+                Map.of(2028, new BigDecimal("9600")),   // mortgageInterestByYear
+                null,                     // mortgagePrincipalByYear
                 new BigDecimal("5000"),   // annualPropertyTax
                 null, null);
 
@@ -285,11 +286,11 @@ class IncomeSourceProcessorTest {
         var rentalA = new ProjectionIncomeSourceInput(
                 UUID.randomUUID(), "Rental A", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("24000"), 65, null, BigDecimal.ZERO, false, "rental_passive",
-                new BigDecimal("3600"), new BigDecimal("9600"), null, new BigDecimal("5000"), null, null);
+                new BigDecimal("3600"), Map.of(2028, new BigDecimal("9600")), null, new BigDecimal("5000"), null, null);
         var rentalB = new ProjectionIncomeSourceInput(
                 UUID.randomUUID(), "Rental B", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("18000"), 65, null, BigDecimal.ZERO, false, "rental_passive",
-                new BigDecimal("2000"), new BigDecimal("6000"), null, new BigDecimal("3000"), null, null);
+                new BigDecimal("2000"), Map.of(2028, new BigDecimal("6000")), null, new BigDecimal("3000"), null, null);
 
         when(rentalLossCalculator.applyLossRules(any(), eq("rental_passive"), any(), any(), any()))
                 .thenReturn(new RentalLossCalculator.LossResult(
@@ -406,8 +407,8 @@ class IncomeSourceProcessorTest {
                 new BigDecimal("96000"), 60, null,
                 BigDecimal.ZERO, false, "active_participation",
                 new BigDecimal("5500"),   // annualOperatingExpenses
-                new BigDecimal("26000"),  // annualMortgageInterest
-                new BigDecimal("22500"),  // annualMortgagePrincipal — cash flow only, NOT tax
+                Map.of(2033, new BigDecimal("26000")),  // mortgageInterestByYear
+                Map.of(2033, new BigDecimal("22500")),  // mortgagePrincipalByYear — cash flow only, NOT tax
                 new BigDecimal("14000"),  // annualPropertyTax
                 null, null);
 
@@ -435,8 +436,8 @@ class IncomeSourceProcessorTest {
                 new BigDecimal("24000"), 65, null,
                 BigDecimal.ZERO, false, "active_participation",
                 new BigDecimal("6000"),   // annualOperatingExpenses
-                null,                     // annualMortgageInterest
-                null,                     // annualMortgagePrincipal — null should not NPE
+                null,                     // mortgageInterestByYear
+                null,                     // mortgagePrincipalByYear — null should not NPE
                 null,                     // annualPropertyTax
                 null, null);
 
@@ -453,6 +454,83 @@ class IncomeSourceProcessorTest {
         assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("18000"));
     }
 
+    // --- Mortgage debt service follows the amortization schedule ---
+
+    private static ProjectionIncomeSourceInput mortgagedRental(Map<Integer, BigDecimal> interest,
+                                                              Map<Integer, BigDecimal> principal) {
+        return mortgagedRental(interest, principal, BigDecimal.ZERO);
+    }
+
+    /** Rent indexed at {@code rentGrowth}; matching scenario inflation keeps its real gross at 36,000. */
+    private static ProjectionIncomeSourceInput mortgagedRental(Map<Integer, BigDecimal> interest,
+                                                              Map<Integer, BigDecimal> principal,
+                                                              BigDecimal rentGrowth) {
+        return new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), "Rental", IncomeSourceType.RENTAL_PROPERTY,
+                new BigDecimal("36000"), 60, null,
+                rentGrowth, false, "active_participation",
+                new BigDecimal("4000"), interest, principal, null, null, null);
+    }
+
+    private static ProjectionIncomeSourceInput noColaPension(String amount) {
+        return makeSource(IncomeSourceType.PENSION, new BigDecimal(amount), 60, null, BigDecimal.ZERO, "taxable");
+    }
+
+    private void passNetTaxableThroughLossRules() {
+        when(rentalLossCalculator.applyLossRules(any(), eq("active_participation"), any(), any(), any()))
+                .thenAnswer(inv -> new RentalLossCalculator.LossResult(
+                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, inv.getArgument(0)));
+    }
+
+    @Test
+    void process_rentalAfterMortgagePayoff_chargesNoPrincipalOrInterest() {
+        passNetTaxableThroughLossRules();
+        var rental = mortgagedRental(Map.of(2030, new BigDecimal("1000")), Map.of(2030, new BigDecimal("11000")));
+
+        var result = processor.process(List.of(rental), 67, 2, 2031,
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO, 2030);
+
+        assertThat(result.totalCashInflow()).isEqualByComparingTo("32000");
+        assertThat(result.totalTaxableIncome()).isEqualByComparingTo("32000");
+        assertThat(result.rentalPropertyDetails().getFirst().mortgageInterest()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void process_rentalMortgage_chargesThatYearsInterestAndPrincipalAndDeductsOnlyInterest() {
+        passNetTaxableThroughLossRules();
+        var rental = mortgagedRental(
+                Map.of(2030, new BigDecimal("9000"), 2031, new BigDecimal("8800")),
+                Map.of(2030, new BigDecimal("3000"), 2031, new BigDecimal("3200")));
+
+        var result = processor.process(List.of(rental), 67, 2, 2031,
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO, 2030);
+
+        // cash = 36000 - 4000 - 8800 - 3200; taxable = 36000 - 4000 - 8800
+        assertThat(result.totalCashInflow()).isEqualByComparingTo("20000");
+        assertThat(result.totalTaxableIncome()).isEqualByComparingTo("23200");
+        assertThat(result.rentalPropertyDetails().getFirst().mortgageInterest()).isEqualByComparingTo("8800");
+    }
+
+    @Test
+    void process_rentalMortgage_deflatesTheFixedNominalPaymentLikeANoColaSource() {
+        passNetTaxableThroughLossRules();
+        var inflation = new BigDecimal("0.03");
+        var rental = mortgagedRental(Map.of(2028, new BigDecimal("9000")), Map.of(2028, new BigDecimal("3000")),
+                inflation);
+
+        var result = processor.process(List.of(rental), 67, 3, 2028,
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, inflation, 2026);
+
+        // Two years after the base year, each nominal dollar of P&I is worth 1/1.03^2 today --
+        // the same erosion a pension with no COLA gets.
+        var realInterest = processor.computeRealAmount(noColaPension("9000"), 3, inflation);
+        var realPrincipal = processor.computeRealAmount(noColaPension("3000"), 3, inflation);
+        assertThat(result.totalCashInflow()).isCloseTo(
+                new BigDecimal("32000").subtract(realInterest).subtract(realPrincipal), within(new BigDecimal("0.01")));
+        assertThat(result.totalTaxableIncome()).isCloseTo(
+                new BigDecimal("32000").subtract(realInterest), within(new BigDecimal("0.01")));
+    }
+
     // --- Rental transition multiplier on expenses ---
 
     @Test
@@ -463,8 +541,8 @@ class IncomeSourceProcessorTest {
                 new BigDecimal("24000"), 65, 70,
                 BigDecimal.ZERO, false, "active_participation",
                 new BigDecimal("3600"),   // annualOperatingExpenses
-                new BigDecimal("9600"),   // annualMortgageInterest
-                null,                     // annualMortgagePrincipal
+                Map.of(2031, new BigDecimal("9600")),   // mortgageInterestByYear
+                null,                     // mortgagePrincipalByYear
                 new BigDecimal("5000"),   // annualPropertyTax
                 null, null);
 
@@ -493,8 +571,8 @@ class IncomeSourceProcessorTest {
                 new BigDecimal("24000"), 65, 70,
                 BigDecimal.ZERO, false, "active_participation",
                 new BigDecimal("3600"),
-                new BigDecimal("9600"),
-                null,                     // annualMortgagePrincipal
+                Map.of(2026, new BigDecimal("9600")),
+                null,                     // mortgagePrincipalByYear
                 new BigDecimal("5000"),
                 null, null);
 
@@ -529,7 +607,7 @@ class IncomeSourceProcessorTest {
                 rentalId, "123 Main St Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("24000"), 65, null,
                 BigDecimal.ZERO, false, "rental_active_reps",
-                new BigDecimal("3600"), new BigDecimal("9600"),
+                new BigDecimal("3600"), Map.of(2026, new BigDecimal("9600")),
                 null, null, "straight_line",
                 Map.of(2026, new BigDecimal("14545")));
 
@@ -814,8 +892,8 @@ class IncomeSourceProcessorTest {
                 false,
                 taxTreatment,
                 null,   // annualOperatingExpenses
-                null,   // annualMortgageInterest
-                null,   // annualMortgagePrincipal
+                null,   // mortgageInterestByYear
+                null,   // mortgagePrincipalByYear
                 null,   // annualPropertyTax
                 null,   // depreciationMethod
                 null    // depreciationByYear

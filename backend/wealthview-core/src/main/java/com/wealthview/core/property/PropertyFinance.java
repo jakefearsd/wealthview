@@ -3,7 +3,10 @@ package com.wealthview.core.property;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
+import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 
 import com.wealthview.core.common.Money;
 import com.wealthview.persistence.entity.PropertyEntity;
@@ -73,6 +76,30 @@ public final class PropertyFinance {
         return annualDebtService(property, LocalDate.now())
                 .map(DebtService::total)
                 .orElse(BigDecimal.ZERO);
+    }
+
+    /**
+     * The nominal interest and principal paid in each calendar year from {@code fromYear} through
+     * the payoff year, per the amortization schedule (partial start and payoff years count only
+     * their own payments). Empty when the property has no loan details or the loan is paid off
+     * before {@code fromYear}.
+     */
+    public static Map<Integer, DebtService> debtServiceByYear(PropertyEntity property, int fromYear) {
+        if (!property.hasLoanDetails()) {
+            return Map.of();
+        }
+        var startDate = property.getLoanStartDate();
+        int payoffYear = startDate.plusMonths(Math.max(property.getLoanTermMonths(), 0)).getYear();
+        var schedule = new TreeMap<Integer, DebtService>();
+        for (int year = fromYear; year <= payoffYear; year++) {
+            var debtService = AmortizationCalculator.debtServiceForYear(
+                    property.getLoanAmount(), property.getAnnualInterestRate(),
+                    property.getLoanTermMonths(), startDate, year);
+            if (debtService.total().signum() > 0) {
+                schedule.put(year, debtService);
+            }
+        }
+        return Collections.unmodifiableMap(schedule);
     }
 
     /**

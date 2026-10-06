@@ -158,8 +158,8 @@ final class SurvivorIncomeAdjuster {
         return new ProjectionIncomeSourceInput(
                 source.id(), source.name(), source.incomeType(), newAmount,
                 source.startAge(), source.endAge(), source.inflationRate(), source.oneTime(),
-                source.taxTreatment(), source.annualOperatingExpenses(), source.annualMortgageInterest(),
-                source.annualMortgagePrincipal(), source.annualPropertyTax(), source.depreciationMethod(),
+                source.taxTreatment(), source.annualOperatingExpenses(), source.mortgageInterestByYear(),
+                source.mortgagePrincipalByYear(), source.annualPropertyTax(), source.depreciationMethod(),
                 source.depreciationByYear(), survivorOwner, source.survivorPercent());
     }
 }

@@ -32,6 +32,7 @@ import static com.wealthview.projection.testutil.ProjectionTestFixtures.createRe
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTax;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTaxAndIrmaa;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.incomeSource;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.levelSchedule;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.oneTimeIncomeSource;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.property;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.retiredAt66BirthYear;
@@ -816,7 +817,7 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
                 UUID.randomUUID(), "Rental", IncomeSourceType.RENTAL_PROPERTY,
                 bd("24000"), 60, null, BigDecimal.ZERO, false,
                 "rental_passive",
-                bd("6000"), bd("4000"), null, bd("3000"),
+                bd("6000"), levelSchedule("4000", currentYear, currentYear + 40), null, bd("3000"),
                 "straight_line", depSchedule);
 
         var input = createInput(

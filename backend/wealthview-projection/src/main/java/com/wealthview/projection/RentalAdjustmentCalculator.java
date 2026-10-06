@@ -25,10 +25,27 @@ final class RentalAdjustmentCalculator {
     private final RentalLossCalculator rentalLossCalculator;
     private final int birthYear;
     private final int retirementAge;
+    private final int baseYear;
+    private final double scenarioInflationRate;
 
+    /** No real-terms clock: mortgage interest is taken at its nominal schedule value. */
     RentalAdjustmentCalculator(List<ProjectionIncomeSourceInput> incomeSources,
                                RentalLossCalculator rentalLossCalculator,
                                int birthYear, int retirementAge) {
+        this(incomeSources, rentalLossCalculator, birthYear, retirementAge, 0, 0.0);
+    }
+
+    /**
+     * A calculator that deflates each calendar year's fixed-nominal mortgage interest to today's dollars.
+     *
+     * @param baseYear              the projection's base ("today") year, from which each calendar
+     *                              year's fixed-nominal mortgage interest is deflated
+     * @param scenarioInflationRate the deflation rate (the scenario's inflation)
+     */
+    RentalAdjustmentCalculator(List<ProjectionIncomeSourceInput> incomeSources,
+                               RentalLossCalculator rentalLossCalculator,
+                               int birthYear, int retirementAge,
+                               int baseYear, double scenarioInflationRate) {
         this.rentalSources = incomeSources != null
                 ? incomeSources.stream()
                         .filter(s -> s.incomeType() == IncomeSourceType.RENTAL_PROPERTY)
@@ -37,6 +54,8 @@ final class RentalAdjustmentCalculator {
         this.rentalLossCalculator = rentalLossCalculator;
         this.birthYear = birthYear;
         this.retirementAge = retirementAge;
+        this.baseYear = baseYear;
+        this.scenarioInflationRate = scenarioInflationRate;
     }
 
     /** True when there are no rental sources to account for. */
@@ -77,7 +96,8 @@ final class RentalAdjustmentCalculator {
                 continue;
             }
             var rentalResult = RentalIncomeHelper.computeForSource(
-                    source, yearIndex, calendarYear, magi,
+                    source, yearIndex, calendarYear, Math.max(0, calendarYear - baseYear),
+                    scenarioInflationRate, magi,
                     suspended.getOrDefault(source, BigDecimal.ZERO),
                     rentalLossCalculator);
             suspended.put(source, rentalResult.newSuspendedLoss());

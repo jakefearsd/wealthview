@@ -66,6 +66,8 @@ final class JointConversionSearch {
                         ctx.taxIncome().essentialFloor(),
                         input.traditionalExhaustionBuffer(), ctx.portfolio().withdrawalOrder())
                 .rentals(input.incomeSources(), new RentalLossCalculator())
+                .realTermsClock(input.baseYear(),
+                        input.inflationRate() != null ? input.inflationRate().doubleValue() : 0.0)
                 .dynamicSequencingBracketRate(input.dynamicSequencingBracketRate() != null
                         ? input.dynamicSequencingBracketRate().doubleValue() : 0.0)
                 .earlyAccessAge(ctx.sim().earlyAccessAge())

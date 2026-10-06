@@ -64,13 +64,10 @@ final class RothConversionOptimizer {
                             double essentialFloor,
                             FilingStatus filingStatus, FederalTaxCalculator taxCalculator,
                             String withdrawalOrder,
-                            List<ProjectionIncomeSourceInput> incomeSources,
-                            RentalLossCalculator rentalLossCalculator,
+                            RentalAdjustmentCalculator rentalAdjustmentCalculator,
                             double rmdBracketHeadroom,
                             double dynamicSequencingBracketRate,
                             int earlyAccessAge) {
-        var rentalAdjustmentCalculator = new RentalAdjustmentCalculator(
-                incomeSources, rentalLossCalculator, birthYear, retirementAge);
         this.config = new RothConversionConfig(
                 initTraditional, initRoth, initTaxable,
                 otherIncomeByYear, taxableIncomeByYear,
@@ -229,6 +226,8 @@ final class RothConversionOptimizer {
         private String withdrawalOrder;
         private List<ProjectionIncomeSourceInput> incomeSources;
         private RentalLossCalculator rentalLossCalculator;
+        private int baseYear;
+        private double inflationRate;
 
         Builder portfolio(double traditional, double roth, double taxable) {
             this.traditional = traditional;
@@ -280,6 +279,17 @@ final class RothConversionOptimizer {
             return this;
         }
 
+        /**
+         * The real-terms clock the rental adjustment deflates each calendar year's fixed-nominal
+         * mortgage interest on: the projection's base year and the scenario inflation rate. Left
+         * unset, interest is taken at its nominal schedule value.
+         */
+        Builder realTermsClock(int baseYear, double inflationRate) {
+            this.baseYear = baseYear;
+            this.inflationRate = inflationRate;
+            return this;
+        }
+
         Builder dynamicSequencingBracketRate(double rate) {
             this.dynamicSequencingBracketRate = rate;
             return this;
@@ -297,7 +307,9 @@ final class RothConversionOptimizer {
                     birthYear, retirementAge, endAge, exhaustionBuffer,
                     conversionBracketRate, rmdTargetBracketRate, returnMean,
                     essentialFloor, filingStatus, taxCalculator,
-                    withdrawalOrder, incomeSources, rentalLossCalculator,
+                    withdrawalOrder,
+                    new RentalAdjustmentCalculator(incomeSources, rentalLossCalculator,
+                            birthYear, retirementAge, baseYear, inflationRate),
                     rmdBracketHeadroom, dynamicSequencingBracketRate, earlyAccessAge);
         }
     }
