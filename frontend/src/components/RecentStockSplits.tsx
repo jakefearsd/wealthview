@@ -2,6 +2,7 @@ import { useApiQuery } from '../hooks/useApiQuery';
 import { listStockSplits } from '../api/stockSplits';
 import type { StockSplit } from '../api/stockSplits';
 import { cardStyle, tableStyle, thStyle, tdStyle } from '../utils/styles';
+import { formatDate } from '../utils/format';
 
 interface Props {
     /** Optional symbol filter — when set, only that symbol's splits are shown. */
@@ -60,7 +61,7 @@ export default function RecentStockSplits({ symbol, title }: Props) {
                         {splits.map((s) => (
                             <tr key={s.id}>
                                 <td style={tdStyle}>{s.symbol}</td>
-                                <td style={tdStyle}>{s.effective_date}</td>
+                                <td style={tdStyle}>{formatDate(s.effective_date)}</td>
                                 <td style={tdStyle}>{s.numerator}:{s.denominator}</td>
                                 <td style={tdStyle}>
                                     <span style={{

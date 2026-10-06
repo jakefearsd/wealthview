@@ -1,6 +1,7 @@
 import { getDashboardSummary } from '../api/dashboard';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { formatCurrency } from '../utils/format';
+import { accountTypeLabel } from '../utils/accountTypes';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
@@ -13,10 +14,11 @@ import RecentStockSplits from '../components/RecentStockSplits';
 const COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f', '#0097a7'];
 
 export default function DashboardPage() {
-    const { data, loading, error } = useApiQuery(getDashboardSummary);
+    const { data, loading, error, refetch } = useApiQuery(getDashboardSummary);
 
-    if (loading) return <LoadingState message="Loading dashboard..." />;
-    if (error) return <ErrorState message={error} onRetry={() => window.location.reload()} />;
+    // Only block on the first load; a refetch keeps the dashboard on screen.
+    if (loading && !data) return <LoadingState message="Loading dashboard..." />;
+    if (error) return <ErrorState message={error} onRetry={refetch} />;
     if (!data) return null;
 
     return (
@@ -49,7 +51,7 @@ export default function DashboardPage() {
                             {data.accounts.map((acct, i) => (
                                 <tr key={i} style={trHoverStyle}>
                                     <td style={tdStyle}>{acct.name}</td>
-                                    <td style={tdStyle}>{acct.type}</td>
+                                    <td style={tdStyle}>{accountTypeLabel(acct.type)}</td>
                                     <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(acct.balance)}</td>
                                 </tr>
                             ))}
@@ -62,7 +64,7 @@ export default function DashboardPage() {
                     {data.allocation.length > 0 ? (
                         <ResponsiveContainer width="100%" height={250}>
                             <PieChart>
-                                <Pie data={data.allocation} dataKey="value" nameKey="category" cx="50%" cy="50%" outerRadius={90} label={(props) => {
+                                <Pie data={data.allocation.map((a) => ({ ...a, category: accountTypeLabel(a.category) }))} dataKey="value" nameKey="category" cx="50%" cy="50%" outerRadius={90} label={(props) => {
                                     const entry = (props as { payload?: { category: string; percentage: number } }).payload;
                                     return entry ? `${entry.category} ${entry.percentage}%` : '';
                                 }}>

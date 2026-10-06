@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithRouter } from '../test-utils';
 import type { DashboardSummary } from '../types/dashboard';
@@ -49,8 +49,9 @@ const mockSummary: DashboardSummary = {
     total_cash: 50000,
     total_property_equity: 150000,
     accounts: [
-        { name: 'Brokerage', type: 'brokerage', balance: 250000 },
-        { name: 'IRA', type: 'ira', balance: 50000 },
+        { name: 'Main taxable', type: 'brokerage', balance: 250000 },
+        { name: 'Rollover', type: 'ira', balance: 50000 },
+        { name: 'Work plan', type: '401k', balance: 20000 },
     ],
     allocation: [
         { category: 'Investments', value: 300000, percentage: 60 },
@@ -106,8 +107,8 @@ describe('DashboardPage', () => {
         mockUseApiQuery.mockReturnValue({ data: mockSummary, loading: false, error: null, refetch: vi.fn() });
         renderWithRouter(<DashboardPage />);
 
-        expect(screen.getByText('Brokerage')).toBeInTheDocument();
-        expect(screen.getByText('IRA')).toBeInTheDocument();
+        expect(screen.getByText('Main taxable')).toBeInTheDocument();
+        expect(screen.getByText('Rollover')).toBeInTheDocument();
         expect(screen.getByText('Name')).toBeInTheDocument();
         expect(screen.getByText('Type')).toBeInTheDocument();
         expect(screen.getByText('Balance')).toBeInTheDocument();
@@ -123,5 +124,33 @@ describe('DashboardPage', () => {
         renderWithRouter(<DashboardPage />);
 
         expect(screen.getByText('No allocation data')).toBeInTheDocument();
+    });
+
+    it('labels account types the same way as the Accounts page', () => {
+        mockUseApiQuery.mockReturnValue({ data: mockSummary, loading: false, error: null, refetch: vi.fn() });
+        renderWithRouter(<DashboardPage />);
+
+        expect(screen.getByText('IRA')).toBeInTheDocument();
+        expect(screen.getByText('401(k)')).toBeInTheDocument();
+        expect(screen.getByText('Brokerage')).toBeInTheDocument();
+        expect(screen.queryByText('401k')).not.toBeInTheDocument();
+    });
+
+    it('retries by refetching instead of reloading the page', () => {
+        const refetch = vi.fn();
+        mockUseApiQuery.mockReturnValue({ data: null, loading: false, error: 'Network error', refetch });
+        renderWithRouter(<DashboardPage />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+        expect(refetch).toHaveBeenCalled();
+    });
+
+    it('keeps the dashboard on screen while a refetch is in flight', () => {
+        mockUseApiQuery.mockReturnValue({ data: mockSummary, loading: true, error: null, refetch: vi.fn() });
+        renderWithRouter(<DashboardPage />);
+
+        expect(screen.queryByText('Loading dashboard...')).not.toBeInTheDocument();
+        expect(screen.getByTestId('summary-card-Net Worth')).toBeInTheDocument();
     });
 });

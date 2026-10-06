@@ -50,4 +50,12 @@ describe('DataExportPage', () => {
             expect(downloadCsv).toHaveBeenCalledWith('accounts');
         });
     });
+
+    it('lists what the JSON export contains instead of claiming it has all your data', () => {
+        render(<DataExportPage />);
+
+        expect(screen.queryByText(/all your data/i)).not.toBeInTheDocument();
+        expect(screen.getByText(/accounts, transactions, holdings and properties/i)).toBeInTheDocument();
+        expect(screen.getByText(/Prices, projections and spending profiles are not included/i)).toBeInTheDocument();
+    });
 });

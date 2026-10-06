@@ -24,7 +24,7 @@ export default function DataExportPage() {
             <div style={cardStyle}>
                 <h3 style={{ marginBottom: '1rem' }}>Full Export (JSON)</h3>
                 <p style={{ color: '#666', marginBottom: '1rem' }}>
-                    Download all your data (accounts, transactions, holdings, properties) as a single JSON file.
+                    Download your accounts, transactions, holdings and properties as a single JSON file. Prices, projections and spending profiles are not included.
                 </p>
                 <button
                     onClick={() => handleDownload('JSON')}
@@ -45,7 +45,7 @@ export default function DataExportPage() {
             <div style={{ ...cardStyle, marginTop: '1.5rem' }}>
                 <h3 style={{ marginBottom: '1rem' }}>CSV Export</h3>
                 <p style={{ color: '#666', marginBottom: '1rem' }}>
-                    Download individual data tables as CSV files.
+                    Download the accounts, transactions, holdings or properties table as a CSV file.
                 </p>
                 <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                     {csvEntities.map((entity) => (
