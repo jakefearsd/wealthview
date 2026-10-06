@@ -11,9 +11,10 @@ interface SummaryCardProps {
 
 export default function SummaryCard({ label, value, valueColor, subtext, description, large }: SummaryCardProps) {
     return (
-        <div style={cardStyle}>
+        <div style={{ ...cardStyle, minWidth: 0 }}>
             <div style={{ color: '#666', fontSize: '0.85rem' }}>{label}</div>
-            <div style={{ fontSize: large ? '1.75rem' : '1.25rem', fontWeight: large ? 700 : 600, color: valueColor ?? '#1a1a2e' }}>
+            {/* overflowWrap lets a long figure such as $13,135,122.30 break inside its grid tile instead of spilling out. */}
+            <div style={{ fontSize: large ? '1.75rem' : '1.25rem', fontWeight: large ? 700 : 600, color: valueColor ?? '#1a1a2e', overflowWrap: 'anywhere' }}>
                 {value}
             </div>
             {subtext && <div style={{ color: '#666', fontSize: '0.75rem', marginTop: '0.25rem' }}>{subtext}</div>}

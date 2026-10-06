@@ -15,6 +15,12 @@ describe('SummaryCard', () => {
         expect(valueEl).toHaveStyle({ color: '#2e7d32' });
     });
 
+    it('lets a long value wrap inside its tile instead of spilling out', () => {
+        render(<SummaryCard label="Final Balance" value="$13,135,122.30" />);
+
+        expect(screen.getByText('$13,135,122.30')).toHaveStyle({ overflowWrap: 'anywhere' });
+    });
+
     it('renders optional subtext', () => {
         render(<SummaryCard label="Peak" value="$1,000,000" subtext="(year 2045)" />);
         expect(screen.getByText('(year 2045)')).toBeInTheDocument();
