@@ -832,10 +832,11 @@ final class TrialSimulator {
             return 0;
         }
         double annualSpending = (floors[0] + discretionary[0]) * seedFactor;
-        double cashBalance = annualSpending * config.cashReserveYears();
-        double cashFromTaxable = Math.min(cashBalance, tp.taxable());
+        double target = annualSpending * config.cashReserveYears();
+        double cashFromTaxable = Math.min(target, tp.taxable());
         tp.sellTaxableForTax(cashFromTaxable);
-        double remaining = cashBalance - cashFromTaxable;
+        double funded = cashFromTaxable;
+        double remaining = target - cashFromTaxable;
         if (remaining > 0) {
             // Household task 6: draw from traditional (proportional across owners), then Roth for any
             // remainder, flooring Roth at zero — the same taxable→trad→roth seed cascade, generalized
@@ -844,10 +845,13 @@ final class TrialSimulator {
             double fromTrad = Math.min(remaining, tradTotal);
             tp.debitPair(TRAD_P, TRAD_S, fromTrad);
             remaining -= fromTrad;
-            double rothTotal = tp.rothTotal();
-            tp.debitPair(ROTH_P, ROTH_S, Math.min(remaining, Math.max(0, rothTotal)));
+            double fromRoth = Math.min(remaining, Math.max(0, tp.rothTotal()));
+            tp.debitPair(ROTH_P, ROTH_S, fromRoth);
+            funded += fromTrad + fromRoth;
         }
-        return cashBalance;
+        // API #22: the reserve holds only what the pools actually gave up. Returning the full target
+        // conjured the shortfall out of nothing whenever the portfolio was smaller than the reserve.
+        return funded;
     }
 
     /**

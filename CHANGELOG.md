@@ -92,6 +92,11 @@ tax-accuracy fixes in both projection engines. One schema change (V081).
   the projection.** The optimizer stopped simulating at the survivor's death
   but kept emitting yearly rows to the primary's end age, each repeating the
   same frozen balance.
+- **The optimizer's cash reserve can no longer exceed the portfolio.** When
+  the reserve (years × first-year spending) was larger than the accounts, the
+  Monte Carlo seeded the full reserve anyway and created the difference from
+  nothing, so a tiny portfolio could show a rising balance while paying for its
+  spending.
 - **Backend misc fixes from the bug hunt:**
   - A wrong-verb request (for example `GET /auth/login`) now returns 405, an unsupported
     content type 415 and a missing required query parameter 400, instead of a 500.

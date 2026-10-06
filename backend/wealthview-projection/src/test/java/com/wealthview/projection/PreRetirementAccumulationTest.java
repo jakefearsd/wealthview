@@ -74,4 +74,27 @@ class PreRetirementAccumulationTest {
         // first retirement year's median must reflect that, not today's $30,000.
         assertThat(first.portfolioBalanceMedian()).isGreaterThan(bd("3000000"));
     }
+
+    @Test
+    void optimize_p4Accumulator_reportsTheRequestedEssentialFloorUnclamped() {
+        // API #22's P4 shape: $15k traditional + $30k/yr, a $0 Roth + $7k/yr, retiring in 33 years,
+        // a $30k essential floor. Seeded from today's $15k, verifyEssentialFloor (audit C6) clamped
+        // the floor to 0 and every yearly row reported essential_floor 0; seeded at retirement the
+        // portfolio carries the floor, so the rows report the 30,000 the user asked for.
+        var accounts = List.<ProjectionAccountInput>of(
+                account("15000", "30000", "traditional"), account("0", "7000", "roth"));
+        var optimizer = new MonteCarloSpendingOptimizer(null, ProjectionTestFixtures.TEST_CMA_MATRIX);
+        var input = zeroInflationNoFee(accounts)
+                .withBaseYear(1997)
+                .withEssentialFloor(bd("30000"))
+                .withCashReserveYears(2)
+                .withCashReturnRate(bd("0.015"))
+                .build();
+
+        var result = optimizer.optimize(input);
+
+        assertThat(result.disclosure().floorReduced()).isFalse();
+        assertThat(result.yearlySpending())
+                .allSatisfy(row -> assertThat(row.essentialFloor()).isEqualByComparingTo(bd("30000")));
+    }
 }

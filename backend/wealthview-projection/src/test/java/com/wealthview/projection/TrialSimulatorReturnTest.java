@@ -71,6 +71,21 @@ class TrialSimulatorReturnTest {
     }
 
     @Test
+    void simulateTrial_cashReserveLargerThanPortfolio_seedsOnlyWhatThePoolsHold() {
+        // API #22 (P4): a 2-year reserve of 80 = 160 against a 100 portfolio used to seed 160 of cash
+        // -- 60 conjured from nothing -- so the "balance" rose while spending was drawn. The reserve
+        // can only hold what the pools actually gave up: with no return and no spending, the total
+        // stays 100.
+        var config = config(100, 0, 0, 2,
+                new double[]{0.0}, new double[]{0.0}, new double[]{0.0});
+
+        var result = simulator.simulateTrial(
+                new double[]{0}, new double[]{0}, new double[]{0}, new double[]{80}, 1, config);
+
+        assertThat(result.finalBalance()).isLessThanOrEqualTo(100.0 + 1e-6);
+    }
+
+    @Test
     void simulateTrial_essentialFloorUnfundableInAYear_marksNotSuccess() {
         var sim = new TrialSimulator();
         // Tiny portfolio, no income, a floor larger than the portfolio can ever supply → shortfall.
