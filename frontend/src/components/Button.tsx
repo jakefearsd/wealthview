@@ -15,7 +15,7 @@ const variantStyles: Record<string, React.CSSProperties> = {
     primary: { background: '#1976d2', color: '#fff', border: 'none' },
     secondary: { background: 'transparent', color: '#1976d2', border: '1px solid #1976d2' },
     danger: { background: '#d32f2f', color: '#fff', border: 'none' },
-    warning: { background: '#ff9800', color: '#fff', border: 'none' },
+    warning: { background: '#b45309', color: '#fff', border: 'none' },
     neutral: { background: '#757575', color: '#fff', border: 'none' },
 };
 
