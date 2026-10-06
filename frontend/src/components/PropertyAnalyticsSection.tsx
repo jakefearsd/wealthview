@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { formatCurrency, formatDate } from '../utils/format';
+import { formatDollarAxis } from '../utils/chartFormatters';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
 import HelpText from './HelpText';
 import InfoSection from './InfoSection';
@@ -40,6 +41,9 @@ export default function PropertyAnalyticsSection({
     }, [propertyId, depreciationMethod, depreciationInputsKey]);
 
     const currentYear = new Date().getFullYear();
+    // The first schedule row is a partial year (mid-month convention), so the header uses the largest
+    // (full-year) amount rather than row 0.
+    const fullYearDepreciation = Math.max(0, ...(depreciationSchedule?.schedule.map((row) => row.annual_depreciation) ?? []));
 
     return (
         <>
@@ -115,7 +119,7 @@ export default function PropertyAnalyticsSection({
                         <ResponsiveContainer width="100%" height={300}>
                             <LineChart data={analytics.equity_growth}>
                                 <XAxis dataKey="month" />
-                                <YAxis />
+                                <YAxis tickFormatter={formatDollarAxis} />
                                 <Tooltip formatter={(value) => formatCurrency(Number(value))} />
                                 <Legend />
                                 <Line type="monotone" dataKey="equity" name="Equity" stroke="#2e7d32" strokeWidth={2} dot={false} />
@@ -177,7 +181,7 @@ export default function PropertyAnalyticsSection({
                             <span>Bonus Rate: {(depreciationSchedule.bonus_depreciation_rate * 100).toFixed(0)}%</span>
                         )}
                         {depreciationSchedule.depreciation_method !== 'cost_segregation' && (
-                            <span>Annual: {formatCurrency(depreciationSchedule.schedule[0]?.annual_depreciation ?? 0)}</span>
+                            <span>Annual: {formatCurrency(fullYearDepreciation)}</span>
                         )}
                     </div>
 

@@ -18,7 +18,24 @@ vi.mock('../utils/styles', () => ({
     trHoverStyle: {},
 }));
 
-vi.mock('recharts');
+const { yAxisProps } = vi.hoisted(() => ({ yAxisProps: { tickFormatter: undefined as undefined | ((v: number) => string) } }));
+// Local factory instead of the shared mock: this file needs to see the YAxis tickFormatter prop.
+vi.mock('recharts', () => {
+    const Passthrough = ({ children }: { children?: React.ReactNode }) => <div>{children}</div>;
+    const Nothing = () => null;
+    return {
+        ResponsiveContainer: Passthrough,
+        LineChart: Passthrough,
+        Line: Nothing,
+        XAxis: Nothing,
+        Tooltip: Nothing,
+        Legend: Nothing,
+        YAxis: (props: { tickFormatter?: (v: number) => string }) => {
+            yAxisProps.tickFormatter = props.tickFormatter;
+            return null;
+        },
+    };
+});
 
 vi.mock('./HelpText', () => ({
     default: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
@@ -113,5 +130,45 @@ describe('PropertyAnalyticsSection', () => {
         rerender(<PropertyAnalyticsSection {...props} depreciationInputsKey="land-60000" />);
 
         expect(getDepreciationSchedule).toHaveBeenCalledTimes(2);
+    });
+
+    const baseProps = {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        analytics: analytics as any,
+        analyticsYear: 2026,
+        analyticsYearOptions: [2026],
+        onYearChange: vi.fn(),
+        propertyId: 'p-1',
+    };
+
+    it('shows the full-year depreciation in the header, not the partial first year', async () => {
+        vi.mocked(getDepreciationSchedule).mockResolvedValue({
+            depreciation_method: 'straight_line',
+            depreciable_basis: 360000,
+            useful_life_years: 27.5,
+            in_service_date: '2018-07-01',
+            bonus_depreciation_rate: null,
+            cost_seg_allocations: null,
+            class_breakdowns: null,
+            schedule: [
+                { tax_year: 2018, annual_depreciation: 6000, cumulative_taken: 6000, remaining_basis: 354000 },
+                { tax_year: 2019, annual_depreciation: 13090.91, cumulative_taken: 19090.91, remaining_basis: 340909.09 },
+                { tax_year: 2020, annual_depreciation: 13090.91, cumulative_taken: 32181.82, remaining_basis: 327818.18 },
+            ],
+        } as never);
+        render(<PropertyAnalyticsSection {...baseProps} depreciationMethod="straight_line" />);
+
+        expect(await screen.findByText('Annual: $13,090.91')).toBeInTheDocument();
+    });
+
+    it('formats the equity growth Y axis as compact dollars', () => {
+        const withGrowth = {
+            ...analytics,
+            equity_growth: [{ month: '2026-01', equity: 600000, property_value: 900000, mortgage_balance: 300000 }],
+        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        render(<PropertyAnalyticsSection {...baseProps} analytics={withGrowth as any} depreciationMethod="none" />);
+
+        expect(yAxisProps.tickFormatter?.(600000)).toBe('$600k');
     });
 });
