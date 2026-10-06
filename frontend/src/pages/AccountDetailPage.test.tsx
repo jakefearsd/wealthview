@@ -15,7 +15,8 @@ vi.mock('../api/transactions', () => ({ listTransactions: vi.fn(), deleteTransac
 vi.mock('../api/holdings', () => ({ listHoldings: vi.fn(), updateHolding: vi.fn() }));
 
 vi.mock('../utils/format', () => ({
-    formatCurrency: (v: number) => `$${v.toLocaleString()}`,
+    formatCurrency: (v: number, c = 'USD') => `${c === 'USD' ? '$' : `${c} `}${v.toLocaleString()}`,
+    formatDate: (v: string) => v.slice(0, 10),
     formatCurrencyInput: (v: string | number) => String(v),
     parseCurrencyInput: (v: string) => v.replace(/,/g, ''),
 }));
@@ -46,7 +47,7 @@ vi.mock('react-hot-toast', () => ({
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useAuth } from '../context/AuthContext';
 import { updateHolding } from '../api/holdings';
-import { deleteTransaction } from '../api/transactions';
+import { deleteTransaction, listTransactions } from '../api/transactions';
 import AccountDetailPage from './AccountDetailPage';
 import { authAs } from '../testutil/auth';
 
@@ -86,9 +87,18 @@ const txn = {
 
 function setupMocks({
     acctLoading = false,
+    acct = account as unknown,
+    acctError = null,
     holdings = [holding],
+    holdError = null,
     transactions = [txn],
-}: { acctLoading?: boolean; holdings?: unknown[]; transactions?: unknown[] } = {}) {
+    txnTotal = transactions.length,
+    txnError = null,
+    refetch = vi.fn(),
+}: {
+    acctLoading?: boolean; acct?: unknown; acctError?: string | null; holdings?: unknown[]; holdError?: string | null;
+    transactions?: unknown[]; txnTotal?: number; txnError?: string | null; refetch?: () => void;
+} = {}) {
     let call = 0;
     // The page issues three queries per render, always in this order. Cycling with modulo (rather
     // than a monotonic counter) keeps the mapping correct across RE-renders — without it the first
@@ -96,9 +106,9 @@ function setupMocks({
     mockUseApiQuery.mockImplementation(() => {
         const idx = call % 3;
         call++;
-        if (idx === 0) return { data: account, loading: acctLoading, error: null, refetch: vi.fn() };
-        if (idx === 1) return { data: holdings, loading: false, error: null, refetch: vi.fn() };
-        return { data: { data: transactions, total: transactions.length, page: 0, page_size: 50 }, loading: false, error: null, refetch: vi.fn() };
+        if (idx === 0) return { data: acct, loading: acctLoading, error: acctError, refetch };
+        if (idx === 1) return { data: holdings, loading: false, error: holdError, refetch };
+        return { data: { data: transactions, total: txnTotal, page: 0, size: 50 }, loading: false, error: txnError, refetch };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }) as any;
 }
@@ -152,7 +162,7 @@ describe('AccountDetailPage', () => {
     });
 
     it('shows loading state while account loads', () => {
-        setupMocks({ acctLoading: true });
+        setupMocks({ acctLoading: true, acct: null });
         renderPage();
         expect(screen.getByText(/Loading/i)).toBeInTheDocument();
     });
@@ -259,6 +269,7 @@ describe('AccountDetailPage', () => {
     // === transactions ===
 
     it('deletes a transaction and refetches the list', async () => {
+        vi.spyOn(window, 'confirm').mockReturnValue(true);
         setupMocks();
         vi.mocked(deleteTransaction).mockResolvedValue(undefined as never);
         renderPage();
@@ -268,5 +279,125 @@ describe('AccountDetailPage', () => {
 
         await waitFor(() => expect(deleteTransaction).toHaveBeenCalledWith('t-1'));
         await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Transaction deleted'));
+    });
+
+    it('does not delete a transaction when the confirmation is dismissed', () => {
+        vi.spyOn(window, 'confirm').mockReturnValue(false);
+        setupMocks();
+        renderPage();
+
+        fireEvent.click(screen.getAllByRole('button', { name: /Delete/i })[0]);
+
+        expect(deleteTransaction).not.toHaveBeenCalled();
+    });
+
+    it('lists transactions newest first regardless of the order the API returned', () => {
+        setupMocks({
+            transactions: [
+                { ...txn, id: 't-old', date: '2025-01-05', symbol: 'OLD' },
+                { ...txn, id: 't-new', date: '2026-06-30', symbol: 'NEW' },
+                { ...txn, id: 't-mid', date: '2025-12-31', symbol: 'MID' },
+            ],
+        });
+        renderPage();
+
+        const rows = screen.getAllByRole('row').map((r) => r.textContent ?? '');
+        const order = ['NEW', 'MID', 'OLD'].map((sym) => rows.findIndex((r) => r.includes(sym)));
+        expect(order).toEqual([...order].sort((a, b) => a - b));
+    });
+
+    it('shows how many transactions are loaded and fetches the next page on Load more', async () => {
+        setupMocks({ txnTotal: 120 });
+        vi.mocked(listTransactions).mockResolvedValue({
+            data: [{ ...txn, id: 't-2', date: '2024-01-01', symbol: 'MSFT', created_at: '2024-01-01T00:00:00Z' }], total: 120, page: 1, size: 50,
+        });
+        renderPage();
+        expect(screen.getByText('Showing 1 of 120 transactions')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
+
+        await waitFor(() => expect(listTransactions).toHaveBeenCalledWith('acc-1', 1, 50));
+        expect(await screen.findByText('MSFT')).toBeInTheDocument();
+        expect(screen.getByText('Showing 2 of 120 transactions')).toBeInTheDocument();
+    });
+
+    it('offers no Load more once every transaction is loaded', () => {
+        setupMocks();
+        renderPage();
+
+        expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
+    });
+
+    // === load failures ===
+
+    it('renders an error with retry when the account fails to load', () => {
+        const refetch = vi.fn();
+        setupMocks({ acct: null, acctError: 'Network Error', refetch });
+        renderPage();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+        expect(screen.getByText('Network Error')).toBeInTheDocument();
+        expect(refetch).toHaveBeenCalled();
+    });
+
+    it('says the account was not found only when there is no error and no account', () => {
+        setupMocks({ acct: null });
+        renderPage();
+
+        expect(screen.getByText('Account not found')).toBeInTheDocument();
+    });
+
+    it('shows an error rather than "No transactions" when the transaction request failed', () => {
+        setupMocks({ transactions: [], txnError: 'boom' });
+        renderPage();
+
+        expect(screen.getByText('boom')).toBeInTheDocument();
+        expect(screen.queryByText('No transactions')).not.toBeInTheDocument();
+    });
+
+    it('shows an error rather than "No holdings" when the holdings request failed', () => {
+        setupMocks({ holdings: [], holdError: 'holdings down' });
+        renderPage();
+
+        expect(screen.getByText('holdings down')).toBeInTheDocument();
+        expect(screen.queryByText('No holdings')).not.toBeInTheDocument();
+    });
+
+    // === currency, labels and refetch ===
+
+    it('formats amounts in the account currency and names it in the header', () => {
+        setupMocks({ acct: { ...account, currency: 'EUR' }, holdings: [{ ...holding, current_price: 180.5, market_value: 1805 }] });
+        renderPage();
+
+        expect(screen.getByText('EUR 180.5')).toBeInTheDocument();
+        expect(screen.getAllByText('EUR 1,500').length).toBeGreaterThan(0);
+        expect(screen.getByText(/· EUR/)).toBeInTheDocument();
+    });
+
+    it('labels the account type and capitalises the transaction type', () => {
+        setupMocks({ acct: { ...account, type: '401k' } });
+        renderPage();
+
+        expect(screen.getByText(/401\(k\) - Fidelity/)).toBeInTheDocument();
+        expect(screen.getByText('Buy')).toBeInTheDocument();
+    });
+
+    it('keeps the page on screen while a refetch is in flight', () => {
+        setupMocks({ acctLoading: true });
+        renderPage();
+
+        expect(screen.queryByText(/Loading account details/i)).not.toBeInTheDocument();
+        expect(screen.getByText('Fidelity Brokerage', { selector: 'h2' })).toBeInTheDocument();
+    });
+
+    it('blocks saving a holding edit with a blank quantity', () => {
+        setupMocks();
+        renderPage();
+        fireEvent.click(within(holdingRow()).getByRole('button', { name: 'Edit' }));
+
+        fireEvent.change(screen.getByLabelText('Quantity for AAPL'), { target: { value: '' } });
+
+        expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
     });
 });

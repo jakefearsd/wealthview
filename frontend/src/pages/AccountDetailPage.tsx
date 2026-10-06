@@ -7,23 +7,75 @@ import { useApiQuery } from '../hooks/useApiQuery';
 import { useApiMutation } from '../hooks/useApiMutation';
 import { useAuth } from '../context/AuthContext';
 import { hasWriteAccess } from '../utils/permissions';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatDate } from '../utils/format';
+import { accountTypeLabel, capitalize } from '../utils/accountTypes';
 import CurrencyInput from '../components/CurrencyInput';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
 import LoadingState from '../components/LoadingState';
 import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
 import TheoreticalPortfolioChart from '../components/TheoreticalPortfolioChart';
 import TransactionForm from '../components/TransactionForm';
 import Button from '../components/Button';
+import type { Transaction } from '../types/transaction';
+
+const TXN_PAGE_SIZE = 50;
+
+function isNotFound(err: unknown): boolean {
+    return (err as { response?: { status?: number } } | null)?.response?.status === 404;
+}
+
+/** Newest first; the API does not guarantee an order, so every loaded page is sorted client-side. */
+function byDateDesc(a: Transaction, b: Transaction): number {
+    return b.date.localeCompare(a.date) || (b.created_at ?? '').localeCompare(a.created_at ?? '');
+}
 
 export default function AccountDetailPage() {
     const { id } = useParams<{ id: string }>();
     const { role } = useAuth();
     const canWrite = hasWriteAccess(role);
 
-    const { data: account, loading: acctLoading } = useApiQuery(() => getAccount(id!));
-    const { data: holdings, loading: holdLoading, refetch: refetchHoldings } = useApiQuery(() => listHoldings(id!));
-    const { data: txnPage, loading: txnLoading, refetch: refetchTxns } = useApiQuery(() => listTransactions(id!, 0, 50));
+    // A 404 resolves to null (rendered as "not found"); any other failure stays an error with a retry.
+    const { data: account, loading: acctLoading, error: acctError, refetch: refetchAccount } = useApiQuery(
+        () => getAccount(id!).catch((err: unknown) => {
+            if (isNotFound(err)) return null;
+            throw err;
+        }),
+    );
+    const { data: holdings, loading: holdLoading, error: holdError, refetch: refetchHoldings } = useApiQuery(() => listHoldings(id!));
+    const { data: txnPage, loading: txnLoading, error: txnError, refetch: fetchFirstTxnPage } = useApiQuery(
+        () => listTransactions(id!, 0, TXN_PAGE_SIZE),
+    );
+    const currency = account?.currency ?? 'USD';
+    const money = (value: number) => formatCurrency(value, currency);
+
+    // Pages after the first are appended here; a refetch of page 0 resets them.
+    const [extraTxns, setExtraTxns] = useState<Transaction[]>([]);
+    const [pagesLoaded, setPagesLoaded] = useState(1);
+
+    function refetchTxns() {
+        setExtraTxns([]);
+        setPagesLoaded(1);
+        fetchFirstTxnPage();
+    }
+
+    const loadMoreMutation = useApiMutation(
+        (page: number) => listTransactions(id!, page, TXN_PAGE_SIZE),
+        {
+            onSuccess: (result, page) => {
+                setExtraTxns((prev) => [...prev, ...result.data]);
+                setPagesLoaded(page + 1);
+            },
+        },
+    );
+
+    const transactions = (() => {
+        const seen = new Set<string>();
+        return [...(txnPage?.data ?? []), ...extraTxns]
+            .filter((t) => !seen.has(t.id) && seen.add(t.id))
+            .sort(byDateDesc);
+    })();
+    const totalTxns = txnPage?.total ?? transactions.length;
 
     const [showAdd, setShowAdd] = useState(false);
     const [editingTxnId, setEditingTxnId] = useState<string | null>(null);
@@ -40,6 +92,7 @@ export default function AccountDetailPage() {
     );
 
     function handleDeleteTxn(txnId: string) {
+        if (!window.confirm('Delete this transaction? Holdings and balances will be recalculated.')) return;
         void deleteTxnMutation.mutate(txnId);
     }
 
@@ -65,25 +118,49 @@ export default function AccountDetailPage() {
         },
     );
 
+    const editQtyNum = parseFloat(editQty);
+    const editCostNum = parseFloat(editCostBasis);
+    const holdingEditValid = Number.isFinite(editQtyNum) && editQtyNum >= 0
+        && Number.isFinite(editCostNum) && editCostNum >= 0;
+
     function handleSaveHolding(holdingId: string, symbol: string) {
+        if (!holdingEditValid) return;
         void saveHoldingMutation.mutate({ holdingId, symbol });
     }
 
-    if (acctLoading || holdLoading || txnLoading) return <LoadingState message="Loading account details..." />;
+    // Block only on the first load; a refetch keeps the stale page (and the chart's state) on screen.
+    if ((acctLoading && !account) || (holdLoading && !holdings) || (txnLoading && !txnPage)) {
+        return <LoadingState message="Loading account details..." />;
+    }
+    if (acctError) return <ErrorState message={acctError} onRetry={refetchAccount} />;
+    if (!account) {
+        return (
+            <EmptyState
+                title="Account not found"
+                action={<Link to="/accounts" style={{ color: '#1976d2' }}>Back to accounts</Link>}
+            />
+        );
+    }
 
     return (
         <div>
             <div style={{ marginBottom: '1.5rem' }}>
-                <Link to="/accounts" style={{ color: '#1976d2', textDecoration: 'none' }}>Accounts</Link> / {account?.name}
+                <Link to="/accounts" style={{ color: '#1976d2', textDecoration: 'none' }}>Accounts</Link> / {account.name}
             </div>
-            <h2 style={{ marginBottom: '0.5rem' }}>{account?.name}</h2>
-            <div style={{ color: '#666', marginBottom: '2rem' }}>{account?.type} {account?.institution ? `- ${account.institution}` : ''}</div>
+            <h2 style={{ marginBottom: '0.5rem' }}>{account.name}</h2>
+            <div style={{ color: '#666', marginBottom: '2rem' }}>
+                {accountTypeLabel(account.type)}{account.institution ? ` - ${account.institution}` : ''}
+                {account.currency !== 'USD' ? ` · ${account.currency}` : ''}
+            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
                 <div style={cardStyle}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                         <h3>Holdings</h3>
                     </div>
+                    {holdError ? (
+                        <ErrorState message={holdError} onRetry={refetchHoldings} />
+                    ) : (
                     <table style={tableStyle}>
                         <thead>
                             <tr>
@@ -110,26 +187,26 @@ export default function AccountDetailPage() {
                                     {editingHoldingId === h.id ? (
                                         <>
                                             <td style={{ ...tdStyle, textAlign: 'right' }}>
-                                                <input type="number" value={editQty} onChange={(e) => setEditQty(e.target.value)} style={{ width: '80px', padding: '0.25rem', textAlign: 'right' }} />
+                                                <input type="number" min="0" step="any" aria-label={`Quantity for ${h.symbol}`} value={editQty} onChange={(e) => setEditQty(e.target.value)} style={{ width: '80px', padding: '0.25rem', textAlign: 'right' }} />
                                             </td>
-                                            <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>{h.current_price != null ? `$${h.current_price.toFixed(2)}` : '—'}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>{h.current_price != null ? money(h.current_price) : '—'}</td>
                                             <td style={{ ...tdStyle, textAlign: 'right' }}>
-                                                <CurrencyInput value={editCostBasis} onChange={setEditCostBasis} style={{ width: '100px', padding: '0.25rem', textAlign: 'right' }} />
+                                                <CurrencyInput aria-label={`Cost basis for ${h.symbol}`} value={editCostBasis} onChange={setEditCostBasis} style={{ width: '100px', padding: '0.25rem', textAlign: 'right' }} />
                                             </td>
-                                            <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>{h.market_value != null ? formatCurrency(h.market_value) : '—'}</td>
-                                            <td style={{ ...tdStyle, textAlign: 'right', color: glColor }}>{h.gain_loss != null ? formatCurrency(h.gain_loss) : '—'}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>{h.market_value != null ? money(h.market_value) : '—'}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right', color: glColor }}>{h.gain_loss != null ? money(h.gain_loss) : '—'}</td>
                                             <td style={{ ...tdStyle, textAlign: 'center' }}>
-                                                <button onClick={() => handleSaveHolding(h.id, h.symbol)} style={{ background: 'none', border: 'none', color: '#2e7d32', cursor: 'pointer', marginRight: '0.25rem' }}>Save</button>
+                                                <button onClick={() => handleSaveHolding(h.id, h.symbol)} disabled={!holdingEditValid} title={holdingEditValid ? undefined : 'Quantity and cost basis must be numbers of zero or more'} style={{ background: 'none', border: 'none', color: '#2e7d32', cursor: holdingEditValid ? 'pointer' : 'not-allowed', opacity: holdingEditValid ? 1 : 0.5, marginRight: '0.25rem' }}>Save</button>
                                                 <button onClick={() => setEditingHoldingId(null)} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}>Cancel</button>
                                             </td>
                                         </>
                                     ) : (
                                         <>
                                             <td style={{ ...tdStyle, textAlign: 'right' }}>{h.quantity}</td>
-                                            <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>{h.current_price != null ? `$${h.current_price.toFixed(2)}` : '—'}</td>
-                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(h.cost_basis)}</td>
-                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{h.market_value != null ? formatCurrency(h.market_value) : '—'}</td>
-                                            <td style={{ ...tdStyle, textAlign: 'right', color: glColor }}>{h.gain_loss != null ? formatCurrency(h.gain_loss) : '—'}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>{h.current_price != null ? money(h.current_price) : '—'}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{money(h.cost_basis)}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{h.market_value != null ? money(h.market_value) : '—'}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right', color: glColor }}>{h.gain_loss != null ? money(h.gain_loss) : '—'}</td>
                                             {canWrite && (
                                                 <td style={{ ...tdStyle, textAlign: 'center' }}>
                                                     <button onClick={() => startEditHolding(h)} style={{ background: 'none', border: 'none', color: '#1976d2', cursor: 'pointer' }}>Edit</button>
@@ -150,9 +227,9 @@ export default function AccountDetailPage() {
                                         <td style={tdStyle}>Total</td>
                                         <td style={tdStyle}></td>
                                         <td style={tdStyle}></td>
-                                        <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(totalCost)}</td>
-                                        <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(totalValue)}</td>
-                                        <td style={{ ...tdStyle, textAlign: 'right', color: glColor }}>{formatCurrency(totalGL)}</td>
+                                        <td style={{ ...tdStyle, textAlign: 'right' }}>{money(totalCost)}</td>
+                                        <td style={{ ...tdStyle, textAlign: 'right' }}>{money(totalValue)}</td>
+                                        <td style={{ ...tdStyle, textAlign: 'right', color: glColor }}>{money(totalGL)}</td>
                                         {canWrite && <td style={tdStyle}></td>}
                                     </tr>
                                 );
@@ -160,6 +237,7 @@ export default function AccountDetailPage() {
                             {holdings?.length === 0 && <tr><td colSpan={canWrite ? 7 : 6}><EmptyState title="No holdings" /></td></tr>}
                         </tbody>
                     </table>
+                    )}
                 </div>
 
                 <div>
@@ -171,7 +249,7 @@ export default function AccountDetailPage() {
                 </div>
             </div>
 
-            {account && account.type !== 'bank' && (
+            {account.type !== 'bank' && (
                 <TheoreticalPortfolioChart accountId={id!} accountType={account.type} />
             )}
 
@@ -189,6 +267,10 @@ export default function AccountDetailPage() {
                     />
                 )}
 
+                {txnError ? (
+                    <ErrorState message={txnError} onRetry={refetchTxns} />
+                ) : (
+                <>
                 <table style={tableStyle}>
                     <thead>
                         <tr>
@@ -201,7 +283,7 @@ export default function AccountDetailPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {txnPage?.data.map((txn) => (
+                        {transactions.map((txn) => (
                             editingTxnId === txn.id ? (
                                 <tr key={txn.id}>
                                     <td colSpan={canWrite ? 6 : 5} style={{ padding: 0 }}>
@@ -215,23 +297,38 @@ export default function AccountDetailPage() {
                                 </tr>
                             ) : (
                                 <tr key={txn.id} style={trHoverStyle}>
-                                    <td style={tdStyle}>{txn.date}</td>
-                                    <td style={tdStyle}>{txn.type}</td>
+                                    <td style={tdStyle}>{formatDate(txn.date)}</td>
+                                    <td style={tdStyle}>{capitalize(txn.type)}</td>
                                     <td style={tdStyle}>{txn.symbol || '-'}</td>
                                     <td style={{ ...tdStyle, textAlign: 'right' }}>{txn.quantity ?? '-'}</td>
-                                    <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(txn.amount)}</td>
+                                    <td style={{ ...tdStyle, textAlign: 'right' }}>{money(txn.amount)}</td>
                                     {canWrite && (
                                         <td style={{ ...tdStyle, textAlign: 'center' }}>
-                                            <button onClick={() => setEditingTxnId(txn.id)} style={{ background: 'none', border: 'none', color: '#1976d2', cursor: 'pointer', marginRight: '0.5rem' }}>Edit</button>
+                                            <button onClick={() => setEditingTxnId(txn.id)} aria-label={`Edit ${txn.type} transaction`} style={{ background: 'none', border: 'none', color: '#1976d2', cursor: 'pointer', marginRight: '0.5rem' }}>Edit</button>
                                             <button onClick={() => handleDeleteTxn(txn.id)} style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer' }}>Delete</button>
                                         </td>
                                     )}
                                 </tr>
                             )
                         ))}
-                        {txnPage?.data.length === 0 && <tr><td colSpan={canWrite ? 6 : 5}><EmptyState title="No transactions" /></td></tr>}
+                        {transactions.length === 0 && <tr><td colSpan={canWrite ? 6 : 5}><EmptyState title="No transactions" /></td></tr>}
                     </tbody>
                 </table>
+                {totalTxns > transactions.length && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1rem', color: '#666', fontSize: '0.9rem' }}>
+                        <span>Showing {transactions.length} of {totalTxns} transactions</span>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => void loadMoreMutation.mutate(pagesLoaded)}
+                            disabled={loadMoreMutation.loading}
+                        >
+                            {loadMoreMutation.loading ? 'Loading...' : 'Load more'}
+                        </Button>
+                    </div>
+                )}
+                </>
+                )}
             </div>
         </div>
     );
