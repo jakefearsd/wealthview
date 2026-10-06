@@ -1,10 +1,12 @@
 package com.wealthview.core.property;
 
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -14,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.wealthview.core.common.Entities;
+import com.wealthview.core.common.Money;
 import com.wealthview.core.property.dto.EquityGrowthPoint;
 import com.wealthview.core.property.dto.MortgageProgress;
 import com.wealthview.core.property.dto.PropertyAnalyticsResponse;
@@ -163,13 +166,14 @@ public class PropertyAnalyticsService {
         var points = new ArrayList<EquityGrowthPoint>();
         var startMonth = YearMonth.from(property.getPurchaseDate());
         var endMonth = YearMonth.now();
-        var currentValue = property.getCurrentValue();
+        var today = LocalDate.now();
 
         var current = startMonth;
         while (!current.isAfter(endMonth)) {
             var monthDate = current.atDay(1);
 
-            var propertyValue = findValueForMonth(current, valuations, currentValue);
+            var propertyValue = findValueForMonth(current, valuations,
+                    interpolatedValue(property, monthDate, today));
 
             var mortgageBalance = PropertyFinance.mortgageBalanceAsOf(property, monthDate);
 
@@ -186,6 +190,25 @@ public class PropertyAnalyticsService {
         }
 
         return points;
+    }
+
+    /**
+     * Estimated property value at {@code date} when no recorded valuation covers it: a straight line from
+     * the purchase price on the purchase date to the current value today. Without this, every historical
+     * month was valued at today's value, overstating past equity.
+     */
+    private static BigDecimal interpolatedValue(PropertyEntity property, LocalDate date, LocalDate today) {
+        var purchasePrice = property.getPurchasePrice();
+        var currentValue = property.getCurrentValue();
+        var purchaseDate = property.getPurchaseDate();
+        var totalDays = ChronoUnit.DAYS.between(purchaseDate, today);
+        if (totalDays <= 0 || !date.isBefore(today) || YearMonth.from(date).equals(YearMonth.from(today))) {
+            return currentValue;
+        }
+        var elapsedDays = Math.clamp(ChronoUnit.DAYS.between(purchaseDate, date), 0L, totalDays);
+        var fraction = new BigDecimal(elapsedDays).divide(new BigDecimal(totalDays), MathContext.DECIMAL128);
+        return purchasePrice.add(currentValue.subtract(purchasePrice).multiply(fraction))
+                .setScale(Money.SCALE, Money.ROUNDING);
     }
 
     private BigDecimal findValueForMonth(YearMonth month, List<PropertyValuationEntity> valuations,

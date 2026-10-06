@@ -359,6 +359,28 @@ class PropertyAnalyticsServiceTest {
     }
 
     @Test
+    void getAnalytics_equityGrowthWithoutValuations_interpolatesValueFromPurchasePriceToCurrentValue() {
+        var property = createProperty("primary_residence", "520000", "450000");
+        property.setPurchaseDate(LocalDate.of(2018, 7, 1));
+        property.setLoanAmount(new BigDecimal("360000"));
+        property.setAnnualInterestRate(new BigDecimal("0.04"));
+        property.setLoanTermMonths(360);
+        property.setLoanStartDate(LocalDate.of(2018, 7, 1));
+        mockProperty(property);
+        mockEmptyValuations(property);
+
+        var result = analyticsService.getAnalytics(tenantId, property.getId(), null);
+
+        var points = result.equityGrowth();
+        // At purchase, equity is purchase price minus the loan, not today's value minus the loan.
+        assertThat(points.getFirst().propertyValue()).isEqualByComparingTo("450000");
+        assertThat(points.getFirst().equity()).isEqualByComparingTo("90000");
+        assertThat(points.getLast().propertyValue()).isEqualByComparingTo("520000");
+        assertThat(points).extracting("propertyValue")
+                .isSortedAccordingTo((a, b) -> ((BigDecimal) a).compareTo((BigDecimal) b));
+    }
+
+    @Test
     void getAnalytics_paidOffLoan_mortgageProgressShowsComplete() {
         var property = createProperty("primary_residence", "500000", "200000");
         property.setPurchaseDate(LocalDate.of(1990, 1, 1));
