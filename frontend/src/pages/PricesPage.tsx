@@ -107,7 +107,7 @@ export default function PricesPage() {
                             {latestPrices.map((p) => (
                                 <tr key={p.symbol} style={trHoverStyle}>
                                     <td style={{ ...tdStyle, fontWeight: 500 }}>{p.symbol}</td>
-                                    <td style={tdStyle}>{p.date}</td>
+                                    <td style={tdStyle}>{formatDate(p.date)}</td>
                                     <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(p.close_price)}</td>
                                     <td style={{ ...tdStyle, color: '#666', fontSize: '0.85rem' }}>{p.source}</td>
                                 </tr>
@@ -132,7 +132,7 @@ export default function PricesPage() {
                             {recentPrices.map((p, i) => (
                                 <tr key={i} style={trHoverStyle}>
                                     <td style={tdStyle}>{p.symbol}</td>
-                                    <td style={tdStyle}>{p.date}</td>
+                                    <td style={tdStyle}>{formatDate(p.date)}</td>
                                     <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(p.close_price)}</td>
                                 </tr>
                             ))}
