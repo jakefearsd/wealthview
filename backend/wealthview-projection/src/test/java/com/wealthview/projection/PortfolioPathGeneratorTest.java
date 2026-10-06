@@ -311,4 +311,31 @@ class PortfolioPathGeneratorTest {
         assertAllClose(paths.taxableReturns()[0], 0.05);
         assertAllClose(paths.traditionalReturns()[0], 0.06);
     }
+
+    @Test
+    void generate_zeroBalancePoolWithANegativeContribution_givesItNoWeight() {
+        // Raw contribution weights 2 / -1 extrapolated the blend to 2*0.05 - 0.09 = 0.01.
+        var model = PoolReturnModel.from(List.of(
+                new HypotheticalAccountInput(BigDecimal.ZERO, new BigDecimal("10000"),
+                        new BigDecimal("0.05"), "roth"),
+                new HypotheticalAccountInput(BigDecimal.ZERO, new BigDecimal("-5000"),
+                        new BigDecimal("0.09"), "roth")), 0.0);
+
+        var paths = PortfolioPathGenerator.generate(1, 3, model, FLAT_US_MATRIX, new Random(1L), 0.0);
+
+        assertAllClose(paths.rothReturns()[0], 0.05);
+    }
+
+    @Test
+    void generate_zeroBalancePoolWithOnlyNegativeContributions_usesEqualWeightMean() {
+        var model = PoolReturnModel.from(List.of(
+                new HypotheticalAccountInput(BigDecimal.ZERO, new BigDecimal("-1000"),
+                        new BigDecimal("0.05"), "roth"),
+                new HypotheticalAccountInput(BigDecimal.ZERO, new BigDecimal("-3000"),
+                        new BigDecimal("0.07"), "roth")), 0.0);
+
+        var paths = PortfolioPathGenerator.generate(1, 3, model, FLAT_US_MATRIX, new Random(1L), 0.0);
+
+        assertAllClose(paths.rothReturns()[0], 0.06);
+    }
 }

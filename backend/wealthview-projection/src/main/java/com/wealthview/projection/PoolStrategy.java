@@ -804,17 +804,21 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
 
     /**
      * Per-account blend weights for {@link #computeWeightedReturn}: opening balances when any is
-     * positive, else annual contributions when any is positive, else one each (equal weight).
-     * Never all-zero for a non-empty list, so the blend is always defined.
+     * positive, else positive annual contributions when any is positive, else one each (equal
+     * weight). A negative contribution (a planned pre-retirement withdrawal) weighs zero: weighting
+     * by it could cancel the positive ones to a zero total (a divide by zero) or extrapolate the
+     * blend past every account's own return. Never all-zero for a non-empty list, so the blend is
+     * always defined.
      */
     private static List<BigDecimal> blendWeights(List<ProjectionAccountInput> accounts) {
         if (sumInitialBalances(accounts).signum() > 0) {
             return accounts.stream().map(ProjectionAccountInput::initialBalance).toList();
         }
-        boolean anyContribution = accounts.stream()
-                .anyMatch(account -> account.annualContribution().signum() > 0);
-        if (anyContribution) {
-            return accounts.stream().map(ProjectionAccountInput::annualContribution).toList();
+        List<BigDecimal> contributionWeights = accounts.stream()
+                .map(account -> account.annualContribution().max(BigDecimal.ZERO))
+                .toList();
+        if (contributionWeights.stream().anyMatch(weight -> weight.signum() > 0)) {
+            return contributionWeights;
         }
         return accounts.stream().map(account -> BigDecimal.ONE).toList();
     }

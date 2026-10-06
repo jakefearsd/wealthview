@@ -182,6 +182,39 @@ class PoolStrategyReturnTest {
     }
 
     @Test
+    void create_zeroBalancesWithContributionsSummingToZero_doesNotDivideByZero() {
+        // A legacy negative contribution (a planned pre-retirement withdrawal) can cancel a positive
+        // one. Weighting by the raw contributions summed the weights to zero and threw on the divide.
+        var pool = PoolStrategy.create(List.<ProjectionAccountInput>of(
+                new HypotheticalAccountInput(BigDecimal.ZERO, bd("10000"), bd("0.05"), "roth"),
+                new HypotheticalAccountInput(BigDecimal.ZERO, bd("-10000"), bd("0.09"), "roth")),
+                zeroInflationConfig());
+
+        assertThat(pool.getWeightedReturn()).isEqualByComparingTo(bd("0.05"));
+    }
+
+    @Test
+    void create_zeroBalancesWithANegativeContribution_givesItNoWeight() {
+        // Raw weights 10000 / -5000 extrapolated the blend to 2*0.05 - 0.09 = 0.01.
+        var pool = PoolStrategy.create(List.<ProjectionAccountInput>of(
+                new HypotheticalAccountInput(BigDecimal.ZERO, bd("10000"), bd("0.05"), "roth"),
+                new HypotheticalAccountInput(BigDecimal.ZERO, bd("-5000"), bd("0.09"), "roth")),
+                zeroInflationConfig());
+
+        assertThat(pool.getWeightedReturn()).isEqualByComparingTo(bd("0.05"));
+    }
+
+    @Test
+    void create_zeroBalancesAndOnlyNegativeContributions_weightedReturnIsEqualWeightMean() {
+        var pool = PoolStrategy.create(List.<ProjectionAccountInput>of(
+                new HypotheticalAccountInput(BigDecimal.ZERO, bd("-1000"), bd("0.05"), "taxable"),
+                new HypotheticalAccountInput(BigDecimal.ZERO, bd("-3000"), bd("0.07"), "roth")),
+                zeroInflationConfig());
+
+        assertThat(pool.getWeightedReturn()).isEqualByComparingTo(bd("0.06"));
+    }
+
+    @Test
     void multiPool_poolWithNoAccounts_growsAtHouseholdBalanceWeightedReturn() {
         // No taxable account: money that lands in the taxable pool later (RMD excess, surplus
         // reinvestment) grows at the household's overall return, (300k*0.04 + 100k*0.08)/400k = 0.05.

@@ -105,19 +105,23 @@ final class PortfolioPathGenerator {
         return real;
     }
 
-    /** Normalized blend weights: balance share, else contribution share, else equal (non-empty list). */
+    /**
+     * Normalized blend weights: balance share, else positive-contribution share, else equal
+     * (non-empty list). A negative contribution weighs zero, as in the deterministic
+     * {@code PoolStrategy}, so it can neither cancel the total nor extrapolate the blend.
+     */
     private static double[] blendWeights(List<AccountReturnSource> accounts, double poolBalance) {
         double[] weights = new double[accounts.size()];
         double contributions = 0;
         for (var account : accounts) {
-            contributions += account.contribution();
+            contributions += Math.max(account.contribution(), 0);
         }
         for (int i = 0; i < weights.length; i++) {
             var account = accounts.get(i);
             if (poolBalance > 0) {
                 weights[i] = account.balance() / poolBalance;
             } else if (contributions > 0) {
-                weights[i] = account.contribution() / contributions;
+                weights[i] = Math.max(account.contribution(), 0) / contributions;
             } else {
                 weights[i] = 1.0 / weights.length;
             }
