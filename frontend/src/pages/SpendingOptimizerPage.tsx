@@ -19,6 +19,8 @@ import SegmentedControl, { type SegmentedControlOption } from '../components/Seg
 type OptimizerState = 'configure' | 'running' | 'results';
 
 export interface PhaseDiagnostic {
+    /** Position in the profile's phase list; phase names are not guaranteed unique. */
+    phaseIndex: number;
     phaseName: string;
     targetSpending: number;
     avgRecommended: number;
@@ -43,7 +45,7 @@ export function computePlanDiagnostics(
     const phaseDiags: PhaseDiagnostic[] = [];
     const warnings: string[] = [];
 
-    for (const phase of phases) {
+    for (const [phaseIndex, phase] of phases.entries()) {
         if (phase.target_spending == null || phase.target_spending <= 0) continue;
 
         const phaseYears = yearlySpending.filter(y => {
@@ -58,6 +60,7 @@ export function computePlanDiagnostics(
         const achievementPct = (avgRecommended / phase.target_spending) * 100;
 
         phaseDiags.push({
+            phaseIndex,
             phaseName: phase.name,
             targetSpending: phase.target_spending,
             avgRecommended,

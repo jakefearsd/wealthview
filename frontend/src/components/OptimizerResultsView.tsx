@@ -241,52 +241,54 @@ export default function OptimizerResultsView({
             {diagnostics.phases.length > 0 && (
                 <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
                     <h3 style={{ marginBottom: '1rem' }}>Phase Achievement</h3>
-                    <table style={tableStyle}>
-                        <thead>
-                            <tr>
-                                <th style={thStyle}>Phase</th>
-                                <th style={thStyle}>Ages</th>
-                                <th style={{ ...thStyle, textAlign: 'right' }}>Target</th>
-                                <th style={{ ...thStyle, textAlign: 'right' }}>Avg Recommended</th>
-                                <th style={{ ...thStyle, width: '35%' }}>Achievement</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {diagnostics.phases.map(p => {
-                                const barColor = p.achievementPct >= 90 ? '#4caf50'
-                                    : p.achievementPct >= 70 ? '#ff9800' : '#ef5350';
-                                const phase = result.phases.find(ph => ph.name === p.phaseName);
-                                const ageRange = phase
-                                    ? `${phase.start_age}\u2013${phase.end_age ?? '\u221E'}`
-                                    : '';
-                                return (
-                                    <tr key={p.phaseName} style={trHoverStyle}>
-                                        <td style={tdStyle}>{p.phaseName}</td>
-                                        <td style={{ ...tdStyle, color: '#888' }}>{ageRange}</td>
-                                        <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(p.targetSpending)}</td>
-                                        <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(p.avgRecommended)}</td>
-                                        <td style={tdStyle}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <div data-testid={`progress-bar-${p.phaseName}`} style={{
-                                                    flex: 1, height: '0.75rem', background: '#eee',
-                                                    borderRadius: '4px', overflow: 'hidden',
-                                                }}>
-                                                    <div style={{
-                                                        width: `${Math.min(100, p.achievementPct)}%`,
-                                                        height: '100%', background: barColor,
-                                                        borderRadius: '4px',
-                                                    }} />
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={tableStyle}>
+                            <thead>
+                                <tr>
+                                    <th style={thStyle}>Phase</th>
+                                    <th style={thStyle}>Ages</th>
+                                    <th style={{ ...thStyle, textAlign: 'right' }}>Target</th>
+                                    <th style={{ ...thStyle, textAlign: 'right' }}>Avg Recommended</th>
+                                    <th style={{ ...thStyle, width: '35%' }}>Achievement</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {diagnostics.phases.map(p => {
+                                    const barColor = p.achievementPct >= 90 ? '#4caf50'
+                                        : p.achievementPct >= 70 ? '#ff9800' : '#ef5350';
+                                    const phase = result.phases[p.phaseIndex];
+                                    const ageRange = phase
+                                        ? `${phase.start_age}\u2013${phase.end_age ?? '\u221E'}`
+                                        : '';
+                                    return (
+                                        <tr key={p.phaseIndex} style={trHoverStyle}>
+                                            <td style={tdStyle}>{p.phaseName}</td>
+                                            <td style={{ ...tdStyle, color: '#888' }}>{ageRange}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(p.targetSpending)}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(p.avgRecommended)}</td>
+                                            <td style={tdStyle}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    <div data-testid={`progress-bar-${p.phaseName}`} style={{
+                                                        flex: 1, height: '0.75rem', background: '#eee',
+                                                        borderRadius: '4px', overflow: 'hidden',
+                                                    }}>
+                                                        <div style={{
+                                                            width: `${Math.min(100, p.achievementPct)}%`,
+                                                            height: '100%', background: barColor,
+                                                            borderRadius: '4px',
+                                                        }} />
+                                                    </div>
+                                                    <span style={{ fontSize: '0.8rem', fontWeight: 600, minWidth: '3rem', textAlign: 'right' }}>
+                                                        {Math.round(p.achievementPct)}%
+                                                    </span>
                                                 </div>
-                                                <span style={{ fontSize: '0.8rem', fontWeight: 600, minWidth: '3rem', textAlign: 'right' }}>
-                                                    {Math.round(p.achievementPct)}%
-                                                </span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
 
@@ -295,7 +297,7 @@ export default function OptimizerResultsView({
                 <p style={{ fontSize: '0.85rem', color: '#555', marginBottom: '0.75rem', lineHeight: 1.5 }}>
                     Portfolio balance projections across thousands of market simulations. The dark line shows the
                     median outcome. The shaded bands show the range between pessimistic (10th percentile) and
-                    median (50th percentile) scenarios. The red dashed line is the worst-case floor.
+                    median (50th percentile) scenarios. The red dashed line is the 10th percentile (pessimistic) path.
                 </p>
                 <PortfolioFanChart yearlySpending={result.yearly_spending} />
             </div>
@@ -390,8 +392,6 @@ export default function OptimizerResultsView({
                 </div>
             )}
 
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-            </div>
         </div>
     );
 }

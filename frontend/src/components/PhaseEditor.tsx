@@ -133,7 +133,7 @@ export default function PhaseEditor({ phases, onPhasesChange }: PhaseEditorProps
                     onDrop={e => handleDrop(e, i)}
                     onDragEnd={handleDragEnd}
                     style={{
-                        display: 'flex', alignItems: 'center', gap: '0.75rem',
+                        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem',
                         padding: '0.75rem', background: dragOverIndex === i ? '#e3f2fd' : '#f9f9f9',
                         borderRadius: '4px', marginBottom: '0.5rem',
                         border: dragOverIndex === i ? '2px dashed #1976d2' : '1px solid #eee',
@@ -143,12 +143,14 @@ export default function PhaseEditor({ phases, onPhasesChange }: PhaseEditorProps
                         title="Drag to reorder">&#x2630;</span>
                     <input style={phaseNameInputStyle} type="text" value={phase.name}
                         onChange={e => updatePhase(i, 'name', e.target.value)}
-                        placeholder="Phase name" />
+                        placeholder="Phase name" aria-label={`Phase ${i + 1} name`} />
                     <span style={smallLabelStyle}>Start</span>
                     <input style={smallInputStyle} type="number" value={phase.start_age}
+                        aria-label={`Phase ${i + 1} start age`}
                         onChange={e => updatePhase(i, 'start_age', Number(e.target.value))} />
                     <span style={smallLabelStyle}>End</span>
                     <input style={smallInputStyle} type="number" value={phase.end_age ?? ''}
+                        aria-label={`Phase ${i + 1} end age`}
                         onChange={e => updatePhase(i, 'end_age', e.target.value ? Number(e.target.value) : null)}
                         placeholder="--" />
                     <span style={smallLabelStyle}>$ Target</span>
@@ -158,10 +160,11 @@ export default function PhaseEditor({ phases, onPhasesChange }: PhaseEditorProps
                             style={smallAdornedInputStyle}
                             value={phase.target_spending ?? ''}
                             placeholder="Annual"
+                            aria-label={`Phase ${i + 1} annual target spending`}
                             onChange={v => updatePhase(i, 'target_spending', v === '' ? null : Number(v))}
                         />
                     </div>
-                    <button onClick={() => removePhase(i)}
+                    <button onClick={() => removePhase(i)} aria-label={`Remove phase ${i + 1}`}
                         style={{ padding: '0.25rem 0.5rem', background: '#ef5350', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>
                         Remove
                     </button>

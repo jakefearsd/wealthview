@@ -3,9 +3,10 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('./CurrencyInput', () => ({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    default: ({ value, onChange, placeholder, style }: any) => (
+    default: ({ value, onChange, placeholder, style, 'aria-label': ariaLabel }: any) => (
         <input
             data-testid="currency-input"
+            aria-label={ariaLabel}
             placeholder={placeholder}
             value={value ?? ''}
             style={style}
@@ -196,5 +197,24 @@ describe('PhaseEditor', () => {
 
         fireEvent.dragEnd(first);
         expect(second).not.toHaveStyle({ background: '#e3f2fd' });
+    });
+
+    it('gives every phase input an accessible name', () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        render(<PhaseEditor phases={[phase1] as any} onPhasesChange={vi.fn()} />);
+
+        expect(screen.getByRole('textbox', { name: 'Phase 1 name' })).toBeInTheDocument();
+        expect(screen.getByRole('spinbutton', { name: 'Phase 1 start age' })).toBeInTheDocument();
+        expect(screen.getByRole('spinbutton', { name: 'Phase 1 end age' })).toBeInTheDocument();
+        expect(screen.getByRole('textbox', { name: 'Phase 1 annual target spending' })).toBeInTheDocument();
+    });
+
+    it('lets a phase row wrap instead of overflowing a narrow viewport', () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        render(<PhaseEditor phases={[phase1] as any} onPhasesChange={vi.fn()} />);
+
+        const row = screen.getByDisplayValue('Go-Go').parentElement!;
+
+        expect(row.style.flexWrap).toBe('wrap');
     });
 });

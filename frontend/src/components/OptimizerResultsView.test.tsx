@@ -207,6 +207,65 @@ describe('OptimizerResultsView', () => {
         expect(screen.queryByTestId('fixed-return-share-note')).not.toBeInTheDocument();
     });
 
+    describe('phase achievement table', () => {
+        const dupPhases = [
+            { name: 'Phase 2', start_age: 62, end_age: 70, priority_weight: 2, target_spending: 80000 },
+            { name: 'Phase 2', start_age: 75, end_age: null, priority_weight: 2, target_spending: 50000 },
+        ];
+
+        it('matches each row to its own phase by position when names repeat', () => {
+            vi.mocked(computePlanDiagnostics).mockReturnValueOnce({
+                warnings: [],
+                failureRateSeverity: 'good',
+                phases: [
+                    { phaseIndex: 0, phaseName: 'Phase 2', targetSpending: 80000, avgRecommended: 70000, achievementPct: 87.5 },
+                    { phaseIndex: 1, phaseName: 'Phase 2', targetSpending: 50000, avgRecommended: 50000, achievementPct: 100 },
+                ],
+            } as never);
+            render(
+                <OptimizerResultsView
+                    result={{ ...baseResult, phases: dupPhases }}
+                    onReoptimize={vi.fn()}
+                    retirementDate="2035-01-01"
+                />
+            );
+
+            const rows = screen.getByText('Phase Achievement').closest('div')!.querySelectorAll('tbody tr');
+
+            expect(rows).toHaveLength(2);
+            expect(rows[0]).toHaveTextContent('62\u201370');
+            expect(rows[1]).toHaveTextContent('75\u2013\u221E');
+        });
+
+        it('scrolls horizontally instead of overflowing on narrow screens', () => {
+            vi.mocked(computePlanDiagnostics).mockReturnValueOnce({
+                warnings: [],
+                failureRateSeverity: 'good',
+                phases: [{ phaseIndex: 0, phaseName: 'Go-go', targetSpending: 80000, avgRecommended: 80000, achievementPct: 100 }],
+            } as never);
+            render(
+                <OptimizerResultsView
+                    result={{ ...baseResult, phases: [dupPhases[0]] }}
+                    onReoptimize={vi.fn()}
+                    retirementDate="2035-01-01"
+                />
+            );
+
+            const table = screen.getByText('Phase Achievement').closest('div')!.querySelector('table')!;
+
+            expect(table.parentElement!.style.overflowX).toBe('auto');
+        });
+    });
+
+    it('describes the red fan-chart line as the 10th percentile path, not a worst case', () => {
+        render(
+            <OptimizerResultsView result={baseResult} onReoptimize={vi.fn()} retirementDate="2035-01-01" />
+        );
+
+        expect(screen.getByText(/red dashed line is the 10th percentile \(pessimistic\) path/)).toBeInTheDocument();
+        expect(screen.queryByText(/worst-case floor/)).not.toBeInTheDocument();
+    });
+
     describe('stochastic mortality (sub-project B)', () => {
         const stochasticMortality = {
             lifetime_success_probability: 0.94,
