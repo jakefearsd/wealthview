@@ -7,12 +7,15 @@ import { useAuth } from '../context/AuthContext';
 import { hasWriteAccess } from '../utils/permissions';
 import type { Account, AccountRequest } from '../types/account';
 import { cardStyle, inputFieldStyle, selectStyle } from '../utils/styles';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatDate } from '../utils/format';
+import { accountTypeLabel } from '../utils/accountTypes';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import Button from '../components/Button';
 import StatTile from '../components/StatTile';
+
+const CURRENCY_CODE = /^[A-Z]{3}$/;
 
 export default function AccountsListPage() {
     const { role } = useAuth();
@@ -24,6 +27,13 @@ export default function AccountsListPage() {
     const [institution, setInstitution] = useState('');
     const [currency, setCurrency] = useState('USD');
     const { data, loading, error, refetch } = useApiQuery(() => listAccounts(0, 100));
+
+    const trimmedCurrency = currency.trim();
+    // A blank currency falls back to USD on save; anything else must be a 3-letter ISO-4217-shaped code,
+    // because a malformed one (e.g. "US") makes Intl.NumberFormat throw when the balance is rendered.
+    const currencyValid = trimmedCurrency === '' || CURRENCY_CODE.test(trimmedCurrency);
+    const nameValid = name.trim() !== '';
+    const canSubmit = nameValid && currencyValid;
 
     function resetForm() {
         setName('');
@@ -57,11 +67,12 @@ export default function AccountsListPage() {
     );
 
     function handleSave() {
+        if (!canSubmit) return;
         const request: AccountRequest = {
-            name,
+            name: name.trim(),
             type,
-            institution: institution || undefined,
-            currency: currency || 'USD',
+            institution: institution.trim() || undefined,
+            currency: trimmedCurrency || 'USD',
         };
         void saveMutation.mutate({ id: editingId, request });
     }
@@ -74,12 +85,15 @@ export default function AccountsListPage() {
         },
     );
 
-    function handleDelete(id: string) {
-        if (!confirm('Delete this account?')) return;
-        void deleteMutation.mutate(id);
+    function handleDelete(account: Account) {
+        if (!confirm(
+            `Delete "${account.name}" and all of its transactions and holdings? This cannot be undone.`,
+        )) return;
+        void deleteMutation.mutate(account.id);
     }
 
-    if (loading) return <LoadingState message="Loading accounts..." />;
+    // Only block on the first load: a refetch keeps the stale list on screen instead of blanking the page.
+    if (loading && !data) return <LoadingState message="Loading accounts..." />;
     if (error) return <ErrorState message={error} onRetry={refetch} />;
 
     return (
@@ -93,25 +107,32 @@ export default function AccountsListPage() {
                 <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
                     <h3 style={{ marginBottom: '1rem' }}>{editingId ? 'Edit Account' : 'Create Account'}</h3>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem' }}>
-                        <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} style={inputFieldStyle} />
-                        <select value={type} onChange={(e) => setType(e.target.value)} style={selectStyle}>
+                        <input placeholder="Name" aria-label="Account name" value={name} onChange={(e) => setName(e.target.value)} style={inputFieldStyle} />
+                        <select aria-label="Account type" value={type} onChange={(e) => setType(e.target.value)} style={selectStyle}>
                             <option value="brokerage">Brokerage</option>
                             <option value="ira">IRA</option>
                             <option value="401k">401(k)</option>
                             <option value="roth">Roth IRA</option>
                             <option value="bank">Bank</option>
                         </select>
-                        <input placeholder="Institution" value={institution} onChange={(e) => setInstitution(e.target.value)} style={inputFieldStyle} />
+                        <input placeholder="Institution" aria-label="Institution" value={institution} onChange={(e) => setInstitution(e.target.value)} style={inputFieldStyle} />
                         <input
                             placeholder="Currency (e.g. USD, EUR)"
+                            aria-label="Currency"
+                            aria-invalid={!currencyValid}
                             value={currency}
                             onChange={(e) => setCurrency(e.target.value.toUpperCase())}
                             maxLength={3}
                             style={inputFieldStyle}
                         />
                     </div>
+                    {!currencyValid && (
+                        <div role="alert" style={{ color: '#c62828', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                            Currency must be a 3-letter code such as USD or EUR.
+                        </div>
+                    )}
                     <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-                        <Button onClick={handleSave} style={{ background: '#2e7d32' }}>{editingId ? 'Save' : 'Create'}</Button>
+                        <Button onClick={handleSave} disabled={!canSubmit} style={{ background: '#2e7d32' }}>{editingId ? 'Save' : 'Create'}</Button>
                         <Button onClick={resetForm} variant="secondary" style={{ background: '#eee', color: '#333', border: 'none' }}>Cancel</Button>
                     </div>
                 </div>
@@ -129,7 +150,7 @@ export default function AccountsListPage() {
                                     color: account.type === 'roth' ? '#2e7d32' : account.type === 'ira' || account.type === '401k' ? '#e65100' : account.type === 'bank' ? '#6a1b9a' : '#1565c0',
                                     borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, whiteSpace: 'nowrap',
                                 }}>
-                                    {account.type === '401k' ? '401(k)' : account.type === 'ira' ? 'IRA' : account.type === 'roth' ? 'Roth IRA' : account.type.charAt(0).toUpperCase() + account.type.slice(1)}
+                                    {accountTypeLabel(account.type)}
                                 </span>
                                 {account.currency !== 'USD' && (
                                     <span style={{
@@ -150,13 +171,13 @@ export default function AccountsListPage() {
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem' }}>
                                 <StatTile label="Institution" value={account.institution || 'Not specified'} />
-                                <StatTile label="Created" value={new Date(account.created_at).toLocaleDateString()} />
+                                <StatTile label="Created" value={formatDate(account.created_at)} />
                             </div>
                         </Link>
                         {canWrite && (
                             <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #eee', display: 'flex', gap: '0.5rem' }}>
                                 <Button onClick={() => startEdit(account)} size="sm">Edit</Button>
-                                <Button onClick={() => handleDelete(account.id)} variant="danger" size="sm">Delete</Button>
+                                <Button onClick={() => handleDelete(account)} variant="danger" size="sm">Delete</Button>
                             </div>
                         )}
                     </div>

@@ -20,6 +20,7 @@ vi.mock('../api/accounts', () => ({
 
 vi.mock('../utils/format', () => ({
     formatCurrency: (v: number) => `$${v.toLocaleString()}`,
+    formatDate: (v: string) => v.slice(0, 10),
 }));
 
 vi.mock('../utils/styles', () => ({
@@ -248,5 +249,81 @@ describe('AccountsListPage', () => {
 
         await waitFor(() => expect(toastError).toHaveBeenCalled());
         expect(screen.getByText('Fidelity Brokerage')).toBeInTheDocument();
+    });
+
+    // === validation and refetch behaviour ===
+
+    it('disables Create and shows an inline error while the currency is not a 3-letter code', () => {
+        renderList([]);
+        fireEvent.click(screen.getByRole('button', { name: 'New Account' }));
+        fireEvent.change(screen.getByPlaceholderText('Name'), { target: { value: 'Cash' } });
+
+        fireEvent.change(screen.getByLabelText('Currency'), { target: { value: 'us' } });
+
+        expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+        expect(screen.getByRole('alert')).toHaveTextContent(/3-letter/);
+    });
+
+    it('uppercases the currency and enables Create once it is a valid code', async () => {
+        mockCreateAccount.mockResolvedValue(sampleAccount as never);
+        renderList([]);
+        fireEvent.click(screen.getByRole('button', { name: 'New Account' }));
+        fireEvent.change(screen.getByPlaceholderText('Name'), { target: { value: 'Euro cash' } });
+
+        fireEvent.change(screen.getByLabelText('Currency'), { target: { value: 'eur' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+        await waitFor(() => expect(createAccount).toHaveBeenCalledWith(
+            expect.objectContaining({ currency: 'EUR' })));
+    });
+
+    it('rejects a whitespace-only currency instead of sending it', () => {
+        renderList([]);
+        fireEvent.click(screen.getByRole('button', { name: 'New Account' }));
+        fireEvent.change(screen.getByPlaceholderText('Name'), { target: { value: 'Cash' } });
+
+        fireEvent.change(screen.getByLabelText('Currency'), { target: { value: ' E ' } });
+
+        expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+    });
+
+    it('disables Create while the name is blank', () => {
+        renderList([]);
+        fireEvent.click(screen.getByRole('button', { name: 'New Account' }));
+
+        fireEvent.change(screen.getByPlaceholderText('Name'), { target: { value: '   ' } });
+
+        expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+    });
+
+    it('keeps the list on screen while a refetch is in flight', () => {
+        mockReturn({ loading: true });
+
+        renderWithRouter(<AccountsListPage />);
+
+        expect(screen.getByText('Fidelity Brokerage')).toBeInTheDocument();
+        expect(screen.queryByText(/Loading accounts/i)).not.toBeInTheDocument();
+    });
+
+    it('warns that the delete also removes transactions and holdings and cannot be undone', () => {
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+        renderList();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+        expect(confirmSpy).toHaveBeenCalledWith(expect.stringMatching(/transactions and holdings.*cannot be undone/));
+        confirmSpy.mockRestore();
+    });
+
+    it('labels account types consistently, e.g. 401(k) rather than the raw enum', () => {
+        renderList([{ ...sampleAccount, type: '401k' }]);
+
+        expect(screen.getByText('401(k)')).toBeInTheDocument();
+    });
+
+    it('shows the created date as YYYY-MM-DD', () => {
+        renderList();
+
+        expect(screen.getByText('2026-01-01')).toBeInTheDocument();
     });
 });
