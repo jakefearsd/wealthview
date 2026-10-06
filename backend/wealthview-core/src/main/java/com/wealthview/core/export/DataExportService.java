@@ -62,14 +62,15 @@ public class DataExportService {
 
     public String exportAccountsCsv(UUID tenantId) {
         log.info("Starting accounts CSV export for tenant {}", tenantId);
-        return toCsv("id,name,type,institution,created_at",
+        return toCsv("id,name,type,institution,created_at,currency",
                 accountRepository.findByTenant_Id(tenantId),
                 a -> String.join(",",
                         String.valueOf(a.getId()),
                         csvEscape(a.getName()),
                         csvEscape(a.getType()),
                         csvEscape(a.getInstitution()),
-                        String.valueOf(a.getCreatedAt())));
+                        String.valueOf(a.getCreatedAt()),
+                        csvEscape(a.getCurrency())));
     }
 
     public String exportTransactionsCsv(UUID tenantId) {

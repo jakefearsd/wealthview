@@ -104,8 +104,18 @@ class DataExportServiceTest {
 
         String csv = dataExportService.exportAccountsCsv(tenantId);
 
-        assertThat(csv).startsWith("id,name,type,institution,created_at\n");
+        assertThat(csv).startsWith("id,name,type,institution,created_at,currency\n");
         assertThat(csv).contains("Brokerage,taxable,Fidelity");
+    }
+
+    @Test
+    void exportAccountsCsv_nonUsdAccount_includesItsCurrency() {
+        var euroAccount = new AccountEntity(tenant, "Euro Cash", "bank", "Deutsche", "EUR");
+        when(accountRepository.findByTenant_Id(tenantId)).thenReturn(List.of(euroAccount));
+
+        String csv = dataExportService.exportAccountsCsv(tenantId);
+
+        assertThat(csv.lines().toList().get(1)).endsWith(",EUR");
     }
 
     @Test
@@ -150,7 +160,7 @@ class DataExportServiceTest {
 
         String csv = dataExportService.exportAccountsCsv(tenantId);
 
-        assertThat(csv).isEqualTo("id,name,type,institution,created_at\n");
+        assertThat(csv).isEqualTo("id,name,type,institution,created_at,currency\n");
     }
 
     @Test
