@@ -221,7 +221,7 @@ function YahooTab() {
                 borderRadius: '4px',
                 padding: '0.75rem 1rem',
                 marginBottom: '1.5rem',
-                color: '#e65100',
+                color: '#bf360c',
                 fontSize: '0.9rem',
             }}>
                 Yahoo Finance scraping may break without notice. Use as a fallback for symbols Finnhub doesn't cover.

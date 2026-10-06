@@ -44,7 +44,7 @@ export default function TaxSavingsSummary({ schedule }: Props) {
             {!schedule.exhaustion_target_met && (
                 <div style={{
                     background: '#fff8e1', border: '1px solid #ffe082', borderRadius: '6px',
-                    padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.85rem', color: '#e65100',
+                    padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.85rem', color: '#bf360c',
                 }}>
                     <strong>Warning:</strong> Traditional IRA exhaustion target was not met. The
                     conversion schedule may not fully eliminate RMDs before the target age. Consider

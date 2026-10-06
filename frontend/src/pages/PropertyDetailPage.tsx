@@ -312,7 +312,7 @@ export default function PropertyDetailPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
                         <h2>{property.address}</h2>
                         <span style={badgeStyle(
-                            property.property_type === 'investment' ? '#e65100' : property.property_type === 'vacation' ? '#1b5e20' : '#1565c0',
+                            property.property_type === 'investment' ? '#bf360c' : property.property_type === 'vacation' ? '#1b5e20' : '#1565c0',
                             property.property_type === 'investment' ? '#fff3e0' : property.property_type === 'vacation' ? '#e8f5e9' : '#e3f2fd'
                         )}>
                             {property.property_type === 'primary_residence' ? 'Primary Residence' : property.property_type === 'investment' ? 'Investment' : 'Vacation'}
@@ -449,7 +449,7 @@ export default function PropertyDetailPage() {
                                         <span style={{
                                             padding: '0.1rem 0.4rem',
                                             background: exp.frequency === 'annual' ? '#fff3e0' : '#e3f2fd',
-                                            color: exp.frequency === 'annual' ? '#e65100' : '#1565c0',
+                                            color: exp.frequency === 'annual' ? '#bf360c' : '#1565c0',
                                             borderRadius: '4px',
                                             fontSize: '0.75rem',
                                             fontWeight: 600,

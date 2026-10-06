@@ -291,7 +291,7 @@ export default function PropertyForm({ heading, submitLabel, values, onChange, p
                                         ) : (
                                             <>
                                                 {costSegMismatch && (
-                                                    <div style={{ color: '#e65100', fontWeight: 600, marginBottom: '0.5rem' }}>
+                                                    <div style={{ color: '#bf360c', fontWeight: 600, marginBottom: '0.5rem' }}>
                                                         Allocations total (${costSegSum.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) does not equal depreciable basis (${depreciableBasis.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                                                     </div>
                                                 )}

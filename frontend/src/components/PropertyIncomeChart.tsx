@@ -16,6 +16,9 @@ import SegmentedControl from './SegmentedControl';
 import type { MonthlyCashFlowDetailEntry, DepreciationScheduleResponse, Property } from '../types/property';
 import type { RechartsTooltipEntry } from '../types/recharts';
 
+// Recharts colours legend text with the series fill; the orange "Net Cash Flow" series fails 4.5:1 as text.
+const legendTextFormatter = (value: string) => <span style={{ color: '#333' }}>{value}</span>;
+
 const CATEGORY_CONFIG: Record<string, { label: string; color: string }> = {
     mortgage: { label: 'Mortgage', color: '#1976d2' },
     tax: { label: 'Tax', color: '#ed6c02' },
@@ -219,7 +222,7 @@ function forwardTooltipContent(label: string | number | undefined, payload: Arra
                 <div style={{ fontWeight: 600, color: row.netCash >= 0 ? '#2e7d32' : '#d32f2f' }}>
                     Net Cash Flow: {formatCurrency(row.netCash)}
                 </div>
-                <div style={{ fontWeight: 600, color: row.netTaxable >= 0 ? '#e65100' : '#2e7d32', fontSize: '0.8rem' }}>
+                <div style={{ fontWeight: 600, color: row.netTaxable >= 0 ? '#bf360c' : '#2e7d32', fontSize: '0.8rem' }}>
                     Taxable Income: {formatCurrency(row.netTaxable)}
                     {row.netTaxable < 0 && <span style={{ color: '#2e7d32', fontWeight: 400 }}> (tax loss)</span>}
                 </div>
@@ -342,7 +345,7 @@ function TrailingView({ data, monthlyRent, propertyId }: { data: MonthlyCashFlow
                         tickFormatter={(v: number) => `$${Math.abs(v / 1000).toFixed(1)}k`}
                     />
                     <Tooltip content={<ChartTooltip renderContent={trailingTooltipContent} />} />
-                    <Legend />
+                    <Legend formatter={legendTextFormatter} />
                     <ReferenceLine y={0} stroke="#999" strokeWidth={1} />
                     <Bar dataKey="income" name="Rent Estimate" fill="#2e7d32" stackId="pos" />
                     {categories.map(cat => (
@@ -423,7 +426,7 @@ function ForwardView({
                         tickFormatter={(v: number) => `$${Math.abs(v / 1000).toFixed(0)}k`}
                     />
                     <Tooltip content={<ChartTooltip<ForwardRow> renderContent={forwardTooltipContent} />} />
-                    <Legend />
+                    <Legend formatter={legendTextFormatter} />
                     <ReferenceLine y={0} stroke="#999" strokeWidth={1} />
                     <Bar dataKey="income" name="Rental Income" fill="#2e7d32" stackId="pos" />
                     <Bar dataKey="expenses" name="Operating Expenses" fill="#d32f2f" stackId="neg" />

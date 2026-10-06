@@ -90,7 +90,7 @@ export default function TaxBreakdownChart({ data, retirementYear, hasStateTax }:
                                     </div>
                                 )}
                                 {hasStateTax && d.state_tax > 0 && (
-                                    <div style={{ color: '#e65100' }}>
+                                    <div style={{ color: '#bf360c' }}>
                                         State Tax: {formatCurrency(d.state_tax)}
                                     </div>
                                 )}
@@ -125,7 +125,7 @@ export default function TaxBreakdownChart({ data, retirementYear, hasStateTax }:
                         );
                     }} />
                 } />
-                <Legend />
+                <Legend inactiveColor="#757575" />
                 {retirementYear && <ReferenceLine yAxisId="dollars" x={retirementYear} stroke="#ff9800" strokeDasharray="5 5" label="Retire" />}
                 <Bar yAxisId="dollars" dataKey="federal_tax" stackId="tax" fill="#d32f2f" name="Federal (Ordinary)" />
                 <Bar yAxisId="dollars" dataKey="capital_gains_tax" stackId="tax" fill="#6a1b9a" name="Cap-Gains Tax" hide={!hasCapGains} />

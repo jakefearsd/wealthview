@@ -295,7 +295,7 @@ export default function ProjectionDetailPage() {
                                     key={i}
                                     style={{
                                         background: '#fff8e1', border: '1px solid #ffe082', borderRadius: '4px',
-                                        padding: '0.6rem 0.9rem', marginBottom: '0.5rem', color: '#e65100', fontSize: '0.85rem',
+                                        padding: '0.6rem 0.9rem', marginBottom: '0.5rem', color: '#bf360c', fontSize: '0.85rem',
                                     }}
                                 >
                                     {warning}
@@ -389,7 +389,7 @@ export default function ProjectionDetailPage() {
                                 <SummaryCard
                                     label="Total State Tax"
                                     value={formatCurrency(taxMetrics.totalStateTax)}
-                                    valueColor="#e65100"
+                                    valueColor="#bf360c"
                                     subtext="Cumulative state tax over retirement"
                                 />
                             )}

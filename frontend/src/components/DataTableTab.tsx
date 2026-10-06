@@ -41,7 +41,7 @@ export default function DataTableTab({
                         onClick={() => setShowPoolDetails(!showPoolDetails)}
                         style={{
                             padding: '0.4rem 0.8rem',
-                            background: showPoolDetails ? '#e65100' : '#757575',
+                            background: showPoolDetails ? '#bf360c' : '#757575',
                             color: '#fff',
                             border: 'none',
                             borderRadius: '4px',
@@ -142,7 +142,7 @@ export default function DataTableTab({
                                     <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(y.end_balance)}</td>
                                     {hasPoolData && (
                                         <>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#e65100' }}>{y.traditional_balance != null ? formatCurrency(y.traditional_balance) : '-'}</td>
+                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#bf360c' }}>{y.traditional_balance != null ? formatCurrency(y.traditional_balance) : '-'}</td>
                                             <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>{y.roth_balance != null ? formatCurrency(y.roth_balance) : '-'}</td>
                                             <td style={{ padding: '0.5rem', textAlign: 'right', color: '#1976d2' }}>{y.taxable_balance != null ? formatCurrency(y.taxable_balance) : '-'}</td>
                                             <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.roth_conversion_amount ? formatCurrency(y.roth_conversion_amount) : '-'}</td>

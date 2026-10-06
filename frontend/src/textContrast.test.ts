@@ -14,6 +14,7 @@ const FORBIDDEN_TEXT_COLOURS: Array<[string, RegExp]> = [
     ['#888 text (3.5:1)', /color:\s*['"]#(888|888888)['"]/i],
     ['#9ca3af text (~2.5:1)', /color:\s*['"]#9ca3af['"]/i],
     ['#ccc text (~1.5:1)', /color:\s*['"]#(ccc|cccccc)['"]/i],
+    ['#e65100 text (3.78:1)', /(color:\s*['"]|valueColor=")#e65100['"]/i],
 ];
 
 describe('text contrast', () => {

@@ -53,7 +53,7 @@ export default function OptimizerResultsView({
                     padding: '1rem', display: 'flex', justifyContent: 'space-between',
                     alignItems: 'center', marginBottom: '1.5rem',
                 }}>
-                    <span style={{ color: '#e65100' }}>This profile is stale &mdash; the scenario has changed since optimization.</span>
+                    <span style={{ color: '#bf360c' }}>This profile is stale &mdash; the scenario has changed since optimization.</span>
                     <button onClick={onReoptimize}
                         style={{ padding: '0.35rem 0.75rem', background: '#ff9800', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>
                         Re-optimize
@@ -64,7 +64,7 @@ export default function OptimizerResultsView({
             {result.floor_reduced && (
                 <div data-testid="floor-reduced-banner" style={{
                     background: '#fff8e1', border: '1px solid #ffe082', borderRadius: '8px',
-                    padding: '1rem', marginBottom: '1.5rem', color: '#e65100', fontSize: '0.9rem',
+                    padding: '1rem', marginBottom: '1.5rem', color: '#bf360c', fontSize: '0.9rem',
                 }}>
                     Your essential floor exceeds what the portfolio can sustain at this confidence. Results measure a
                     REDUCED floor; against your original floor, success is {pct(result.original_floor_success_probability, 0)}.
@@ -77,7 +77,7 @@ export default function OptimizerResultsView({
                     border: `1px solid ${diagnostics.failureRateSeverity === 'danger' ? '#ef9a9a' : '#ffe082'}`,
                     borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem',
                 }}>
-                    <div style={{ fontWeight: 600, marginBottom: '0.5rem', color: diagnostics.failureRateSeverity === 'danger' ? '#c62828' : '#e65100' }}>
+                    <div style={{ fontWeight: 600, marginBottom: '0.5rem', color: diagnostics.failureRateSeverity === 'danger' ? '#c62828' : '#bf360c' }}>
                         Plan Warnings
                     </div>
                     <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
@@ -230,7 +230,7 @@ export default function OptimizerResultsView({
             <div data-testid="tax-disclaimer" style={{
                 padding: '0.75rem 1rem', marginBottom: '1.5rem',
                 background: '#fff3e0', border: '1px solid #ffe0b2', borderRadius: '6px',
-                fontSize: '0.8rem', color: '#e65100',
+                fontSize: '0.8rem', color: '#bf360c',
             }}>
                 <strong>Note:</strong> Spending recommendations account for income tax on
                 traditional account withdrawals using your scenario&apos;s filing status and

@@ -85,7 +85,7 @@ export default function PropertyValuationSection({
                                     <td style={tdStyle}>{formatCurrency(v.value)}</td>
                                     <td style={tdStyle}>
                                         <span style={badgeStyle(
-                                            v.source === 'zillow' ? '#e65100' : v.source === 'appraisal' ? '#1b5e20' : '#444',
+                                            v.source === 'zillow' ? '#bf360c' : v.source === 'appraisal' ? '#1b5e20' : '#444',
                                             v.source === 'zillow' ? '#fff3e0' : v.source === 'appraisal' ? '#e8f5e9' : '#f5f5f5'
                                         )}>{v.source}</span>
                                     </td>

@@ -157,7 +157,7 @@ export default function PropertyRoiCard({ propertyId, incomeSource }: PropertyRo
                         </div>
 
                         <div style={columnStyle}>
-                            <h5 style={{ margin: '0 0 0.75rem', color: '#e65100' }}>Sell & Invest</h5>
+                            <h5 style={{ margin: '0 0 0.75rem', color: '#bf360c' }}>Sell & Invest</h5>
                             <div style={metricStyle}>
                                 <span style={{ color: '#666' }}>Gross Proceeds</span>
                                 <span>{formatCurrency(analysis.sell.gross_proceeds)}</span>
@@ -191,7 +191,7 @@ export default function PropertyRoiCard({ propertyId, incomeSource }: PropertyRo
                         padding: '0.75rem 1rem',
                         borderRadius: '8px',
                         background: analysis.advantage === 'hold' ? '#e8f5e9' : '#fff3e0',
-                        color: analysis.advantage === 'hold' ? '#2e7d32' : '#e65100',
+                        color: analysis.advantage === 'hold' ? '#2e7d32' : '#bf360c',
                         fontWeight: 700,
                         fontSize: '0.95rem',
                         textAlign: 'center' as const,

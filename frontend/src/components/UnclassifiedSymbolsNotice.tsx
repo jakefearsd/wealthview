@@ -85,7 +85,7 @@ export default function UnclassifiedSymbolsNotice({ symbols, onReclassified }: P
                 disabled={!canApply}
                 style={{
                     marginTop: '0.75rem', padding: '0.5rem 1rem', borderRadius: '4px', border: 'none',
-                    background: '#e65100', color: '#fff', fontWeight: 600,
+                    background: '#bf360c', color: '#fff', fontWeight: 600,
                     cursor: canApply ? 'pointer' : 'not-allowed', opacity: canApply ? 1 : 0.6,
                 }}
             >

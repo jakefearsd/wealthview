@@ -63,7 +63,7 @@ const TYPE_COLORS: Record<string, string> = {
     social_security: '#1565c0',
     pension: '#6a1b9a',
     rental_property: '#2e7d32',
-    part_time_work: '#e65100',
+    part_time_work: '#bf360c',
     annuity: '#00838f',
     other: '#546e7a',
 };

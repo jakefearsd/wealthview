@@ -115,7 +115,7 @@ export default function ScenarioBasicsSection({ fields, setField, profiles, guar
                     )}
                 </select>
                 {spendingPlanSelection === 'guardrail' && !guardrailProfile && (
-                    <div style={{ fontSize: '0.8rem', color: '#e65100', marginTop: '0.25rem' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#bf360c', marginTop: '0.25rem' }}>
                         Guardrail profile no longer available. Please select another spending plan.
                     </div>
                 )}

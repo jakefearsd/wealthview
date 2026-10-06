@@ -147,7 +147,7 @@ export default function AccountsListPage() {
                                 <span style={{
                                     padding: '0.2rem 0.6rem',
                                     background: account.type === 'roth' ? '#e8f5e9' : account.type === 'ira' || account.type === '401k' ? '#fff3e0' : account.type === 'bank' ? '#f3e5f5' : '#e3f2fd',
-                                    color: account.type === 'roth' ? '#2e7d32' : account.type === 'ira' || account.type === '401k' ? '#e65100' : account.type === 'bank' ? '#6a1b9a' : '#1565c0',
+                                    color: account.type === 'roth' ? '#2e7d32' : account.type === 'ira' || account.type === '401k' ? '#bf360c' : account.type === 'bank' ? '#6a1b9a' : '#1565c0',
                                     borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, whiteSpace: 'nowrap',
                                 }}>
                                     {accountTypeLabel(account.type)}

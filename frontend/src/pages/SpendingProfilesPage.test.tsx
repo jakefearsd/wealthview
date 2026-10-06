@@ -384,6 +384,6 @@ describe('SpendingProfilesPage', () => {
         const value = (await screen.findByText('15.0%')) as HTMLElement;
 
         expect(value).not.toHaveStyle({ color: '#d32f2f' });
-        expect(value).toHaveStyle({ color: '#e65100' });
+        expect(value).toHaveStyle({ color: '#bf360c' });
     });
 });

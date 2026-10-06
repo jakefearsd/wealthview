@@ -27,7 +27,7 @@ function getStatusColor(status: string): { background: string; color: string } {
     switch (status) {
         case 'Active': return { background: '#e8f5e9', color: '#2e7d32' };
         case 'Used': return { background: '#e3f2fd', color: '#1565c0' };
-        case 'Expired': return { background: '#fff3e0', color: '#e65100' };
+        case 'Expired': return { background: '#fff3e0', color: '#bf360c' };
         case 'Revoked': return { background: '#ffebee', color: '#c62828' };
         default: return { background: '#f5f5f5', color: '#666' };
     }

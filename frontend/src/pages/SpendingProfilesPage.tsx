@@ -50,7 +50,7 @@ const initialFormData: CreateSpendingProfileRequest = {
     spending_tiers: [],
 };
 
-const FAILURE_RATE_COLORS = { good: '#2e7d32', caution: '#e65100', danger: '#d32f2f' } as const;
+const FAILURE_RATE_COLORS = { good: '#2e7d32', caution: '#bf360c', danger: '#d32f2f' } as const;
 
 interface GuardrailWithScenario {
     profile: GuardrailProfileResponse;
@@ -318,7 +318,7 @@ export default function SpendingProfilesPage() {
                                         </div>
                                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                                             {g.stale && (
-                                                <span style={{ fontSize: '0.75rem', color: '#e65100', background: '#fff3e0', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
+                                                <span style={{ fontSize: '0.75rem', color: '#bf360c', background: '#fff3e0', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
                                                     Stale
                                                 </span>
                                             )}

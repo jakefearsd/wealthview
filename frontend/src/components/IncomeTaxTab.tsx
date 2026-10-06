@@ -99,7 +99,7 @@ export default function IncomeTaxTab({
                                         <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>
                                             {y.rental_loss_applied != null && y.rental_loss_applied > 0 ? formatCurrency(y.rental_loss_applied) : '-'}
                                         </td>
-                                        <td style={{ padding: '0.5rem', textAlign: 'right', color: '#e65100' }}>
+                                        <td style={{ padding: '0.5rem', textAlign: 'right', color: '#bf360c' }}>
                                             {y.suspended_loss_carryforward != null && y.suspended_loss_carryforward > 0 ? formatCurrency(y.suspended_loss_carryforward) : '-'}
                                         </td>
                                         <td style={{ padding: '0.5rem', textAlign: 'right' }}>
@@ -114,7 +114,7 @@ export default function IncomeTaxTab({
                                             </td>
                                         )}
                                         {hasStateTax && (
-                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#e65100' }}>
+                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#bf360c' }}>
                                                 {y.state_tax != null ? formatCurrency(y.state_tax) : '-'}
                                             </td>
                                         )}
@@ -191,7 +191,7 @@ export default function IncomeTaxTab({
                                             <td style={{ padding: '0.3rem 0.75rem', textAlign: 'right', color: '#2e7d32' }}>
                                                 {d.loss_applied_to_income > 0 ? formatCurrency(d.loss_applied_to_income) : '-'}
                                             </td>
-                                            <td style={{ padding: '0.3rem 0.75rem', textAlign: 'right', color: '#e65100' }}>
+                                            <td style={{ padding: '0.3rem 0.75rem', textAlign: 'right', color: '#bf360c' }}>
                                                 {d.suspended_loss_carryforward > 0 ? formatCurrency(d.suspended_loss_carryforward) : '-'}
                                             </td>
                                             <td colSpan={detailColSpan}></td>

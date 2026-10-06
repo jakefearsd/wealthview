@@ -201,7 +201,7 @@ export default function BalanceChart({ data, retirementYear }: BalanceChartProps
                             x={crossoverLabel!}
                             stroke="#e65100"
                             strokeDasharray="3 3"
-                            label={{ value: `Spending > Growth (age ${crossover!.age})`, position: "insideTopLeft", fontSize: 11, fill: "#e65100" }}
+                            label={{ value: `Spending > Growth (age ${crossover!.age})`, position: "insideTopLeft", fontSize: 11, fill: "#bf360c" }}
                         />
                     )}
                     {!hasPoolData && (
