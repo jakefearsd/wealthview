@@ -35,6 +35,21 @@ describe('formatCurrency', () => {
         expect(formatCurrency(1000, 'EUR')).toContain('1,000.00');
         expect(formatCurrency(1000, 'EUR')).toMatch(/€/);
     });
+
+    it.each(['US', 'E1', '  ', ''])('falls back to USD instead of throwing for malformed code %j', (code) => {
+        expect(formatCurrency(1234.5, code)).toBe('$1,234.50');
+    });
+
+    it('prints sub-cent negatives as zero rather than "-$0.00"', () => {
+        expect(formatCurrency(-0.001)).toBe('$0.00');
+        expect(formatCurrency(-0)).toBe('$0.00');
+        expect(formatCurrency(0.004)).toBe('$0.00');
+    });
+
+    it('keeps the sign on negatives that round to at least a cent', () => {
+        expect(formatCurrency(-0.005)).toBe('-$0.01');
+        expect(formatCurrency(-12.5)).toBe('-$12.50');
+    });
 });
 
 describe('parseCurrencyInput', () => {
@@ -66,8 +81,14 @@ describe('formatCurrencyInput', () => {
         expect(formatCurrencyInput('1234.56')).toBe('1,234.56');
     });
 
-    it('truncates more than two decimal places to two', () => {
-        expect(formatCurrencyInput('100.999')).toBe('100.99');
+    it('preserves up to four decimal places (prices and cost basis are numeric(19,4))', () => {
+        expect(formatCurrencyInput('185.5025')).toBe('185.5025');
+        expect(formatCurrencyInput('1234.5')).toBe('1,234.5');
+    });
+
+    it('truncates more than four decimal places to four, without padding zeros', () => {
+        expect(formatCurrencyInput('100.99999')).toBe('100.9999');
+        expect(formatCurrencyInput('100.5')).toBe('100.5');
     });
 
     it('strips leading zeros from positive numbers', () => {
@@ -112,6 +133,18 @@ describe('formatCompactCurrency', () => {
     it('formats millions with one decimal place', () => {
         expect(formatCompactCurrency(1_500_000)).toBe('$1.5M');
         expect(formatCompactCurrency(1_000_000)).toBe('$1.0M');
+    });
+
+    it('picks the unit after rounding so boundaries never print "$1000k" or "$1000"', () => {
+        expect(formatCompactCurrency(999_500)).toBe('$1.0M');
+        expect(formatCompactCurrency(999_999)).toBe('$1.0M');
+        expect(formatCompactCurrency(999.6)).toBe('$1k');
+        expect(formatCompactCurrency(-999_500)).toBe('-$1.0M');
+        expect(formatCompactCurrency(999_499)).toBe('$999k');
+    });
+
+    it('does not print a sign for values that round to zero', () => {
+        expect(formatCompactCurrency(-0.4)).toBe('$0');
     });
 
     it('formats thousands with no decimal places', () => {

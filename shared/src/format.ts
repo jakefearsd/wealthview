@@ -3,8 +3,19 @@ export function toPercent(decimal: number): number {
     return parseFloat((decimal * 100).toPrecision(10));
 }
 
+/**
+ * Format as currency ("$1,234.50"). A malformed currency code (Intl throws RangeError for "US",
+ * "E1", "  ") falls back to USD rather than crashing the page. Values below half a cent are
+ * normalised to zero so a sub-cent negative never prints "-$0.00".
+ */
 export function formatCurrency(value: number, currency: string = 'USD'): string {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
+    const normalised = Math.abs(value) < 0.005 ? 0 : value;
+    try {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(normalised);
+    } catch (error) {
+        if (!(error instanceof RangeError)) throw error;
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(normalised);
+    }
 }
 
 const NULLISH_PLACEHOLDER = '--';
@@ -27,9 +38,10 @@ export function formatWholeCurrency(value: number | null | undefined): string {
 export function formatCompactCurrency(value: number | null | undefined): string {
     if (value == null) return NULLISH_PLACEHOLDER;
     const abs = Math.abs(value);
-    const sign = value < 0 ? '-' : '';
-    if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
-    if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}k`;
+    const sign = value < 0 && Math.round(abs) > 0 ? '-' : '';
+    // Pick the unit after rounding so 999,500 is "$1.0M" (not "$1000k") and 999.6 is "$1k".
+    if (abs >= 1_000_000 || Math.round(abs / 1_000) >= 1_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
+    if (abs >= 1_000 || Math.round(abs) >= 1_000) return `${sign}$${Math.round(abs / 1_000)}k`;
     return `${sign}$${Math.round(abs)}`;
 }
 
@@ -44,7 +56,11 @@ export function parseCurrencyInput(display: string): string {
     return display.replace(/,/g, '');
 }
 
-/** Format a raw numeric value (string or number) with commas for display in an input field. */
+/**
+ * Format a raw numeric value (string or number) with commas for display in an input field.
+ * Shows what was typed up to four decimal places (prices and cost basis are numeric(19,4)),
+ * never padding zeros.
+ */
 export function formatCurrencyInput(value: string | number): string {
     const str = String(value);
     if (str === '' || str === '-') return str;
@@ -59,7 +75,7 @@ export function formatCurrencyInput(value: string | number): string {
     }
     const formatted = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     if (parts.length > 1) {
-        const dec = parts[1].length > 2 ? parts[1].slice(0, 2) : parts[1];
+        const dec = parts[1].slice(0, 4);
         return `${formatted}.${dec}`;
     }
     return formatted;
