@@ -259,6 +259,51 @@ describe('ScenarioForm', () => {
         expect(labeledInput(label).value).toBe(display);
     });
 
+    describe('other income', () => {
+        it('is editable without any Roth conversion strategy active', () => {
+            setupMocks();
+            render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
+
+            expect(labeledInput('Other Income').value).toBe('');
+        });
+
+        it('is sent even when no Roth conversion is configured, since it affects taxes either way', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+            fireEvent.change(labeledInput('Other Income'), { target: { value: '30000' } });
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            expect(onSubmit.mock.calls[0][0].other_income).toBe(30000);
+        });
+
+        it('sends null when blank', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            expect(onSubmit.mock.calls[0][0].other_income).toBeNull();
+        });
+
+        it('hydrates a saved other_income', () => {
+            setupMocks();
+            const scenario = makeScenario({});
+            scenario.params_json = JSON.stringify({ other_income: 12000 });
+            render(<ScenarioForm initialValues={scenario} onSubmit={vi.fn()} submitLabel="Save" />);
+
+            expect(labeledInput('Other Income').value).toBe('12000');
+        });
+    });
+
     it('hydrates a null expected_return to a blank override and omits it on submit', async () => {
         setupMocks();
         const onSubmit = vi.fn().mockResolvedValue(undefined);

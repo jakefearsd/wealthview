@@ -10,11 +10,12 @@ export interface ScenarioTaxSectionProps {
 
 /**
  * Tax configuration: filing status (always shown — it sets the brackets and deduction for every
- * scenario, not only ones with Roth conversions), state selection plus the SALT/itemized inputs it
+ * scenario, not only ones with Roth conversions), other income (likewise tax-relevant with or
+ * without conversions), state selection plus the SALT/itemized inputs it
  * unlocks, and the heirs' tax rate.
  */
 export default function ScenarioTaxSection({ fields, setField }: ScenarioTaxSectionProps) {
-    const { state, primaryResidencePropertyTax, primaryResidenceMortgageInterest, heirTaxRate } = fields;
+    const { state, primaryResidencePropertyTax, primaryResidenceMortgageInterest, heirTaxRate, otherIncome } = fields;
 
     return (
         <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', marginBottom: '1rem' }}>
@@ -32,6 +33,16 @@ export default function ScenarioTaxSection({ fields, setField }: ScenarioTaxSect
                         <option value="single">Single</option>
                         <option value="married_filing_jointly">Married Filing Jointly</option>
                     </select>
+                </FormField>
+                <FormField
+                    label="Other Income"
+                    helpText="Annual non-portfolio income (salary, rental income) that is taxed alongside your withdrawals and Roth conversions, pushing them into higher brackets."
+                >
+                    <CurrencyInput
+                        style={inputStyle}
+                        value={otherIncome || ''}
+                        onChange={v => setField('otherIncome', Number(v) || 0)}
+                    />
                 </FormField>
                 <FormField label="State" helpText="State income tax applied to projections. Enables SALT deduction and itemized vs standard deduction comparison.">
                     <select style={inputStyle} value={state} onChange={e => setField('state', e.target.value)}>

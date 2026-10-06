@@ -13,8 +13,6 @@ export interface RothConversionSectionProps {
     onTargetBracketRateChange: (value: number) => void;
     rothConversionStartYear: number | null;
     onRothConversionStartYearChange: (value: number | null) => void;
-    otherIncome: number;
-    onOtherIncomeChange: (value: number) => void;
 }
 
 export default function RothConversionSection({
@@ -26,8 +24,6 @@ export default function RothConversionSection({
     onTargetBracketRateChange,
     rothConversionStartYear,
     onRothConversionStartYearChange,
-    otherIncome,
-    onOtherIncomeChange,
 }: RothConversionSectionProps) {
     return (
         <>
@@ -83,11 +79,6 @@ export default function RothConversionSection({
                             <label style={labelStyle}>Conversion Start Year</label>
                             <input style={inputStyle} type="number" value={rothConversionStartYear ?? ''} onChange={e => onRothConversionStartYearChange(e.target.value ? Number(e.target.value) : null)} placeholder="e.g., 2035" />
                             <HelpText>Calendar year when Roth conversions begin. Leave blank to start immediately.</HelpText>
-                        </div>
-                        <div>
-                            <label style={labelStyle}>Other Income</label>
-                            <CurrencyInput style={inputStyle} value={otherIncome || ''} onChange={v => onOtherIncomeChange(Number(v) || 0)} />
-                            <HelpText>Non-retirement income (salary, rental income) that affects which tax bracket your conversions fall into.</HelpText>
                         </div>
                     </>
                 )}

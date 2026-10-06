@@ -267,7 +267,8 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 // Always sent: filing status sets the brackets and deduction for every scenario,
                 // not only ones with Roth conversions.
                 filing_status: effectiveFilingStatus(fields),
-                other_income: (rothConversionStrategy === 'fill_bracket' || annualRothConversion > 0) ? otherIncome : null,
+                // Always sent: other income shifts the tax bracket for every scenario, not only ones with conversions.
+                other_income: otherIncome > 0 ? otherIncome : null,
                 annual_roth_conversion: rothConversionStrategy === 'fixed_amount' && annualRothConversion > 0 ? annualRothConversion : null,
                 withdrawal_order: withdrawalOrder !== 'taxable_first' ? withdrawalOrder : null,
                 ...(withdrawalOrder === 'dynamic_sequencing' ? {
@@ -355,8 +356,6 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 onTargetBracketRateChange={v => setField('targetBracketRate', v)}
                 rothConversionStartYear={rothConversionStartYear}
                 onRothConversionStartYearChange={v => setField('rothConversionStartYear', v)}
-                otherIncome={otherIncome}
-                onOtherIncomeChange={v => setField('otherIncome', v)}
             />
 
             <ScenarioTaxSection fields={fields} setField={setField} />

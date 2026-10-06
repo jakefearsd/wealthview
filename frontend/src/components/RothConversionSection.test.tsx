@@ -34,8 +34,6 @@ const baseProps = {
     onTargetBracketRateChange: vi.fn(),
     rothConversionStartYear: null,
     onRothConversionStartYearChange: vi.fn(),
-    otherIncome: 0,
-    onOtherIncomeChange: vi.fn(),
 };
 
 describe('RothConversionSection', () => {
@@ -66,13 +64,13 @@ describe('RothConversionSection', () => {
         render(<RothConversionSection {...baseProps} annualRothConversion={0} />);
         // When no conversion is happening, the advanced fields should be hidden
         expect(screen.queryByText('Conversion Start Year')).not.toBeInTheDocument();
-        expect(screen.queryByText('Other Income')).not.toBeInTheDocument();
     });
 
     it('does not own the filing status, which lives in Tax Configuration for every scenario', () => {
         render(<RothConversionSection {...baseProps} rothConversionStrategy="fill_bracket" />);
         expect(screen.getByText('Conversion Start Year')).toBeInTheDocument();
         expect(screen.queryByText('Filing Status')).not.toBeInTheDocument();
+        expect(screen.queryByText('Other Income')).not.toBeInTheDocument();
     });
 
     it('exposes the strategy cards as a labelled radio group operable from the keyboard', () => {
