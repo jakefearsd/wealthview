@@ -54,7 +54,7 @@ public class DepreciationCalculator {
     public Map<Integer, BigDecimal> computeStraightLine(BigDecimal purchasePrice, BigDecimal landValue,
                                                          LocalDate inServiceDate, BigDecimal usefulLifeYears) {
         var depreciableBasis = purchasePrice.subtract(landValue);
-        if (depreciableBasis.compareTo(BigDecimal.ZERO) <= 0) {
+        if (depreciableBasis.compareTo(BigDecimal.ZERO) <= 0 || usefulLifeYears.signum() <= 0) {
             return Map.of();
         }
 

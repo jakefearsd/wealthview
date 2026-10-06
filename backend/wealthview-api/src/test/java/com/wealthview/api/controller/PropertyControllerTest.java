@@ -115,6 +115,78 @@ class PropertyControllerTest {
                 .andExpect(jsonPath("$.address").value("123 Main St"));
     }
 
+    private void assertCreateRejected(String extraFields) throws Exception {
+        mockMvc.perform(post("/api/v1/properties")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"address": "123 Main St", "purchase_price": 300000,
+                                 "purchase_date": "2020-06-01", "current_value": 350000,
+                                 %s}
+                                """.formatted(extraFields)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+        verifyNoInteractions(propertyService);
+    }
+
+    @Test
+    void create_zeroLoanTermMonths_returns400() throws Exception {
+        assertCreateRejected("\"loan_amount\": 80000, \"annual_interest_rate\": 0.05, "
+                + "\"loan_term_months\": 0, \"loan_start_date\": \"2020-01-01\"");
+    }
+
+    @Test
+    void create_zeroUsefulLifeYears_returns400() throws Exception {
+        assertCreateRejected("\"depreciation_method\": \"straight_line\", "
+                + "\"in_service_date\": \"2020-01-01\", \"useful_life_years\": 0");
+    }
+
+    @Test
+    void create_negativeUsefulLifeYears_returns400() throws Exception {
+        assertCreateRejected("\"useful_life_years\": -5");
+    }
+
+    @Test
+    void create_interestRateAboveOne_returns400() throws Exception {
+        assertCreateRejected("\"annual_interest_rate\": 5");
+    }
+
+    @Test
+    void create_negativeInterestRate_returns400() throws Exception {
+        assertCreateRejected("\"annual_interest_rate\": -0.05");
+    }
+
+    @Test
+    void create_appreciationRateAbsurd_returns400() throws Exception {
+        assertCreateRejected("\"annual_appreciation_rate\": 50");
+    }
+
+    @Test
+    void create_bonusDepreciationRateAboveOne_returns400() throws Exception {
+        assertCreateRejected("\"bonus_depreciation_rate\": 5");
+    }
+
+    @Test
+    void create_negativeLandValue_returns400() throws Exception {
+        assertCreateRejected("\"land_value\": -1");
+    }
+
+    @Test
+    void create_negativeAnnualPropertyTax_returns400() throws Exception {
+        assertCreateRejected("\"annual_property_tax\": -1");
+    }
+
+    @Test
+    void create_missingPurchaseDate_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/properties")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"address": "123 Main St", "purchase_price": 300000, "current_value": 350000}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
     @Test
     void create_withFinancialFields_returnsFieldsInResponse() throws Exception {
         when(propertyService.create(eq(TENANT_ID), any(PropertyRequest.class)))

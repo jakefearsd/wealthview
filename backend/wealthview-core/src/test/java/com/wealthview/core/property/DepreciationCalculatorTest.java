@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import com.wealthview.core.property.dto.CostSegAllocation;
 
@@ -15,6 +17,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class DepreciationCalculatorTest {
 
     private final DepreciationCalculator calculator = new DepreciationCalculator();
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "-5"})
+    void computeStraightLine_nonPositiveUsefulLife_returnsEmptyScheduleInsteadOfDividingByZero(String life) {
+        var schedule = calculator.computeStraightLine(
+                new BigDecimal("300000"), new BigDecimal("50000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal(life));
+
+        assertThat(schedule).isEmpty();
+    }
 
     @Test
     void computeStraightLine_fullYear_returnsCorrectAnnualAmount() {

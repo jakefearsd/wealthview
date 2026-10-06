@@ -52,6 +52,9 @@ class PropertyDepreciationService {
             throw new IllegalArgumentException(
                     "in_service_date is required when depreciation method is " + method);
         }
+        if (request.landValue() != null && request.landValue().compareTo(request.purchasePrice()) > 0) {
+            throw new IllegalArgumentException("land_value cannot exceed purchase_price");
+        }
         property.setDepreciationMethod(method);
         property.setInServiceDate(request.inServiceDate());
         property.setLandValue(request.landValue());

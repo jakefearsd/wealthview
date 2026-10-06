@@ -123,4 +123,22 @@ class AmortizationCalculatorTest {
         assertThat(balance.setScale(2, RoundingMode.HALF_UP))
                 .isEqualByComparingTo("300000.00");
     }
+
+    @ParameterizedTest
+    @CsvSource({"0, 0.05", "0, 0", "-12, 0.05"})
+    void monthlyPayment_nonPositiveTerm_returnsZeroInsteadOfDividingByZero(int termMonths, String rate) {
+        var payment = AmortizationCalculator.monthlyPayment(
+                new BigDecimal("80000"), new BigDecimal(rate), termMonths);
+
+        assertThat(payment).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void remainingBalance_zeroTerm_returnsZeroInsteadOfDividingByZero() {
+        var balance = AmortizationCalculator.remainingBalance(
+                new BigDecimal("80000"), BigDecimal.ZERO,
+                0, LocalDate.of(2020, 1, 1), LocalDate.of(2024, 1, 1));
+
+        assertThat(balance).isEqualByComparingTo("0");
+    }
 }

@@ -30,6 +30,12 @@ public final class AmortizationCalculator {
      */
     public static BigDecimal remainingBalance(BigDecimal loanAmount, BigDecimal annualRate,
                                                int termMonths, LocalDate startDate, LocalDate asOfDate) {
+        if (termMonths <= 0) {
+            // A stored non-positive term has no amortisation schedule; treat the loan as fully repaid
+            // rather than dividing by zero.
+            return BigDecimal.ZERO;
+        }
+
         long monthsBetween = ChronoUnit.MONTHS.between(startDate, asOfDate);
 
         if (monthsBetween <= 0) {
@@ -71,11 +77,15 @@ public final class AmortizationCalculator {
      * @param loanAmount principal
      * @param annualRate annual interest rate as decimal (e.g., 0.065 for 6.5%)
      * @param termMonths total loan term in months
-     * @return monthly payment, or null if any input is null
+     * @return monthly payment, or null if any input is null; zero for a non-positive term
      */
     public static BigDecimal monthlyPayment(BigDecimal loanAmount, BigDecimal annualRate, int termMonths) {
         if (loanAmount == null || annualRate == null) {
             return null;
+        }
+
+        if (termMonths <= 0) {
+            return BigDecimal.ZERO.setScale(Money.SCALE, Money.ROUNDING);
         }
 
         if (annualRate.compareTo(BigDecimal.ZERO) == 0) {

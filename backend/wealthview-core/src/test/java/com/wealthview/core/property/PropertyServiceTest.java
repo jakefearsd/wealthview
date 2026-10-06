@@ -405,6 +405,21 @@ class PropertyServiceTest extends PropertyServiceTestSupport {
     }
 
     @Test
+    void create_landValueExceedsPurchasePrice_throwsIllegalArgument() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+
+        var request = new PropertyRequest("123 Main St", new BigDecimal("100000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                null, null, null, null, null, "investment",
+                null, null, null, null,
+                LocalDate.of(2020, 6, 15), new BigDecimal("500000"), "straight_line", new BigDecimal("27.5"), null, null, null);
+
+        assertThatThrownBy(() -> propertyService.create(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("land_value");
+    }
+
+    @Test
     void create_withNullDepreciationMethod_defaultsToNone() {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
