@@ -166,7 +166,7 @@ export default function NearTermSpendingGuide({ yearlySpending, retirementDate }
                             }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.75rem' }}>
                                     <div>
-                                        <span style={{ fontSize: '1rem', fontWeight: 700, color: '#1976d2' }}>
+                                        <span style={{ fontSize: '1rem', fontWeight: 700, color: '#1565c0' }}>
                                             Year 1
                                         </span>
                                         <span style={{ fontSize: '0.85rem', color: '#666', marginLeft: '0.5rem' }}>

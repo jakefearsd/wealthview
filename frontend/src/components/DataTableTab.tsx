@@ -145,7 +145,7 @@ export default function DataTableTab({
                                         <>
                                             <td style={{ padding: '0.5rem', textAlign: 'right', color: '#bf360c' }}>{y.traditional_balance != null ? formatCurrency(y.traditional_balance) : '-'}</td>
                                             <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>{y.roth_balance != null ? formatCurrency(y.roth_balance) : '-'}</td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#1976d2' }}>{y.taxable_balance != null ? formatCurrency(y.taxable_balance) : '-'}</td>
+                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#1565c0' }}>{y.taxable_balance != null ? formatCurrency(y.taxable_balance) : '-'}</td>
                                             <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.roth_conversion_amount ? formatCurrency(y.roth_conversion_amount) : '-'}</td>
                                             <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>{y.tax_liability ? formatCurrency(y.tax_liability) : '-'}</td>
                                         </>

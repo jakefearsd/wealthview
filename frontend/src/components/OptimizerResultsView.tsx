@@ -206,7 +206,7 @@ export default function OptimizerResultsView({
                                 </div>
                             </div>
                             <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontSize: '0.75rem', color: '#1976d2' }}>Median (p50)</div>
+                                <div style={{ fontSize: '0.75rem', color: '#1565c0' }}>Median (p50)</div>
                                 <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{fmt(result.median_final_balance)}</div>
                             </div>
                         </div>

@@ -6,6 +6,7 @@ import {
 import type { GuardrailYearlySpending, GuardrailPhase } from '../types/projection';
 import { formatDollarAxis, formatDollarTooltip } from '../utils/chartFormatters';
 import ChartTooltip from './ChartTooltip';
+import { legendTextFormatter } from './legendTextFormatter';
 
 interface Props {
     yearlySpending: GuardrailYearlySpending[];
@@ -51,17 +52,17 @@ export default function SpendingCorridorChart({ yearlySpending, phases }: Props)
                                     <div style={{ color: '#2563eb' }}>
                                         Recommended: {formatDollarTooltip(d.recommended)}
                                     </div>
-                                    <div style={{ color: '#94a3b8' }}>
+                                    <div style={{ color: '#64748b' }}>
                                         Corridor High: {formatDollarTooltip(d.corridorHigh)}
                                     </div>
-                                    <div style={{ color: '#94a3b8' }}>
+                                    <div style={{ color: '#64748b' }}>
                                         Corridor Low: {formatDollarTooltip(d.corridorLow)}
                                     </div>
                                     <div style={{ color: '#dc2626' }}>
                                         Essential Floor: {formatDollarTooltip(d.essentialFloor)}
                                     </div>
                                     {d.incomeOffset > 0 && (
-                                        <div style={{ color: '#22c55e' }}>
+                                        <div style={{ color: '#15803d' }}>
                                             Income Offset: {formatDollarTooltip(d.incomeOffset)}
                                         </div>
                                     )}
@@ -69,7 +70,7 @@ export default function SpendingCorridorChart({ yearlySpending, phases }: Props)
                             );
                         }} />
                     } />
-                    <Legend />
+                    <Legend formatter={legendTextFormatter} />
 
                     {/* Corridor band */}
                     <Area

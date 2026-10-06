@@ -5,6 +5,7 @@ import {
 import { formatCurrency } from '../utils/format';
 import { formatDollarAxis } from '../utils/chartFormatters';
 import type { ProjectionYear } from '../types/projection';
+import { legendTextFormatter } from './legendTextFormatter';
 
 interface SpendingChartProps {
     data: ProjectionYear[];
@@ -57,7 +58,7 @@ export default function SpendingChart({ data }: SpendingChartProps) {
                         return d ? `${y} (age ${d.age})` : String(year);
                     }}
                 />
-                <Legend />
+                <Legend formatter={legendTextFormatter} />
                 <Area type="monotone" dataKey="essential_expenses" stackId="spending" stroke="#ef5350" fill="url(#colorEssential)" name="Essential Expenses" />
                 <Area type="monotone" dataKey="discretionary_after_cuts" stackId="spending" stroke="#ffa726" fill="url(#colorDiscretionary)" name="Discretionary (After Cuts)" />
                 <Area type="monotone" dataKey="withdrawals" stroke="#1976d2" strokeWidth={2} fill="none" name="Withdrawal" />

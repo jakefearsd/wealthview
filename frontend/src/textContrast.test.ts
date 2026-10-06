@@ -15,6 +15,13 @@ const FORBIDDEN_TEXT_COLOURS: Array<[string, RegExp]> = [
     ['#9ca3af text (~2.5:1)', /color:\s*['"]#9ca3af['"]/i],
     ['#ccc text (~1.5:1)', /color:\s*['"]#(ccc|cccccc)['"]/i],
     ['#ef5350 text (3.48:1)', /\bcolor:[^\n]*['"]#ef5350['"]/i],
+    ['#ffa726 text (~2:1)', /\bcolor:[^\n]*['"]#ffa726['"]/i],
+    ['#94a3b8 text (2.6:1)', /\bcolor:[^\n]*['"]#94a3b8['"]/i],
+    ['#818cf8 text (~3.0:1)', /\bcolor:[^\n]*['"]#818cf8['"]/i],
+    ['#c7d2fe text (~1.5:1)', /\bcolor:[^\n]*['"]#c7d2fe['"]/i],
+    ['#e2e8f0 text (~1.2:1)', /\bcolor:[^\n]*['"]#e2e8f0['"]/i],
+    ['#22c55e text (2.3:1)', /\bcolor:[^\n]*['"]#22c55e['"]/i],
+    ['#1976d2 data cells on the #fff8e1 retired-row tint (4.33:1)', /textAlign:\s*'right',\s*color:\s*'#1976d2'/],
     ['#e65100 text (3.78:1)', /(color:\s*['"]|valueColor=")#e65100['"]/i],
 ];
 
@@ -46,4 +53,20 @@ describe('button contrast', () => {
 
         expect(offenders).toEqual([]);
     });
+});
+
+// Recharts paints legend text in the series colour. These charts use pale series (orange, slate, indigo),
+// so their legends must pass a formatter that renders the label in dark grey.
+const LEGEND_CHART_FILES = ['SpendingChart', 'SpendingCorridorChart', 'PortfolioFanChart'];
+
+describe('chart legend contrast', () => {
+    for (const name of LEGEND_CHART_FILES) {
+        it(`${name} renders legend text in a readable colour`, () => {
+            const text = sources[`./components/${name}.tsx`];
+
+            expect(text).toBeDefined();
+            expect(text).not.toMatch(/<Legend\s*\/>/);
+            expect(text).toMatch(/<Legend formatter=\{legendTextFormatter\}/);
+        });
+    }
 });

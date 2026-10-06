@@ -51,7 +51,7 @@ export default function ConversionScheduleTable({ years }: Props) {
                             <td style={{
                                 ...localTdStyle,
                                 fontWeight: y.conversion_amount > 0 ? 600 : 400,
-                                color: y.conversion_amount > 0 ? '#1976d2' : '#666',
+                                color: y.conversion_amount > 0 ? '#1565c0' : '#666',
                             }}>
                                 {y.conversion_amount > 0 ? fmt(y.conversion_amount) : '--'}
                             </td>

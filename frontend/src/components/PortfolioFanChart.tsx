@@ -6,6 +6,7 @@ import {
 import type { GuardrailYearlySpending } from '../types/projection';
 import { formatDollarAxis, formatDollarTooltip } from '../utils/chartFormatters';
 import ChartTooltip from './ChartTooltip';
+import { legendTextFormatter } from './legendTextFormatter';
 
 interface Props {
     yearlySpending: GuardrailYearlySpending[];
@@ -63,7 +64,7 @@ export default function PortfolioFanChart({ yearlySpending }: Props) {
                             );
                         }} />
                     } />
-                    <Legend />
+                    <Legend formatter={legendTextFormatter} />
 
                     {/* Outer band: p10 to p50 */}
                     <Area

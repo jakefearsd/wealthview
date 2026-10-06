@@ -8,6 +8,7 @@ import { getCashFlowDetail, getDepreciationSchedule, getProperty } from '../api/
 import { useApiQuery } from '../hooks/useApiQuery';
 import { trailingTwelveMonthRange } from '../utils/dateRange';
 import { formatCurrency } from '../utils/format';
+import { legendTextFormatter } from './legendTextFormatter';
 import { MONTH_ABBREVIATIONS } from '../utils/chartFormatters';
 import { cardStyle } from '../utils/styles';
 import StatTile from './StatTile';
@@ -15,9 +16,6 @@ import ChartTooltip from './ChartTooltip';
 import SegmentedControl from './SegmentedControl';
 import type { MonthlyCashFlowDetailEntry, DepreciationScheduleResponse, Property } from '../types/property';
 import type { RechartsTooltipEntry } from '../types/recharts';
-
-// Recharts colours legend text with the series fill; the orange "Net Cash Flow" series fails 4.5:1 as text.
-const legendTextFormatter = (value: string) => <span style={{ color: '#333' }}>{value}</span>;
 
 const CATEGORY_CONFIG: Record<string, { label: string; color: string }> = {
     mortgage: { label: 'Mortgage', color: '#1976d2' },
