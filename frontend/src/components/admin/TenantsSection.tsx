@@ -1,16 +1,20 @@
 import { useState } from 'react';
-import { listTenantDetails, createTenant, setTenantActive } from '../../api/admin';
+import toast from 'react-hot-toast';
+import { listTenantDetails, createTenant, setTenantActive, generateTenantInviteCode } from '../../api/admin';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { useApiMutation } from '../../hooks/useApiMutation';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
 import { formatDate } from '../../utils/format';
 import Button from '../Button';
 import ErrorState from '../ErrorState';
+import LinkButton from '../LinkButton';
 import VisuallyHidden from '../VisuallyHidden';
+import type { InviteCode } from '../../types/tenant';
 
 export default function TenantsSection() {
     const { data: tenants, loading, error, refetch } = useApiQuery(listTenantDetails);
     const [newName, setNewName] = useState('');
+    const [generated, setGenerated] = useState<{ tenantName: string; invite: InviteCode } | null>(null);
 
     const createMutation = useApiMutation(
         (name: string) => createTenant(name),
@@ -41,6 +45,25 @@ export default function TenantsSection() {
         void toggleActiveMutation.mutate({ id, nextActive: !currentActive });
     }
 
+    const inviteMutation = useApiMutation(
+        (input: { id: string; name: string }) => generateTenantInviteCode(input.id),
+        {
+            successMessage: 'Invite code created',
+            onSuccess: (invite, input) => setGenerated({ tenantName: input.name, invite }),
+        },
+    );
+
+    function handleCreateInvite(id: string, name: string) {
+        void inviteMutation.mutate({ id, name });
+    }
+
+    function handleCopy(code: string) {
+        navigator.clipboard.writeText(code).then(
+            () => toast.success('Code copied to clipboard'),
+            () => toast.error('Failed to copy'),
+        );
+    }
+
     if (loading) return <div>Loading...</div>;
     if (error && !tenants) return <ErrorState message={error} onRetry={refetch} />;
 
@@ -63,6 +86,24 @@ export default function TenantsSection() {
                     </Button>
                 </div>
             </div>
+
+            {generated && (
+                <div role="status" style={{ ...cardStyle, marginBottom: '2rem' }}>
+                    <h3 style={{ marginBottom: '0.5rem' }}>Invite code for {generated.tenantName}</h3>
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <code style={{ fontFamily: 'monospace', fontSize: '1rem' }}>{generated.invite.code}</code>
+                        <span style={{ fontSize: '0.85rem', color: '#666' }}>
+                            Expires {formatDate(generated.invite.expires_at)}
+                        </span>
+                        <LinkButton onClick={() => handleCopy(generated.invite.code)} aria-label="Copy invite code">
+                            Copy
+                        </LinkButton>
+                    </div>
+                    <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.5rem' }}>
+                        The first user to register with a code in a tenant with no users becomes that tenant&apos;s admin.
+                    </p>
+                </div>
+            )}
 
             <div style={cardStyle}>
                 <h3 style={{ marginBottom: '1rem' }}>Tenants</h3>
@@ -98,6 +139,15 @@ export default function TenantsSection() {
                                     {formatDate(t.created_at)}
                                 </td>
                                 <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                    <LinkButton
+                                        onClick={() => handleCreateInvite(t.id, t.name)}
+                                        disabled={!t.is_active || inviteMutation.loading}
+                                        aria-label={`Create invite code for ${t.name}`}
+                                        title={t.is_active ? undefined : 'Enable the tenant to create invite codes'}
+                                        style={{ marginRight: '0.75rem' }}
+                                    >
+                                        Create invite code
+                                    </LinkButton>
                                     <button
                                         onClick={() => handleToggleActive(t.id, t.is_active)}
                                         style={{

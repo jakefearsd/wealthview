@@ -10,8 +10,9 @@ const mocks = {
     put: vi.mocked(client.put),
 };
 
-import { listTenantDetails, getTenantDetail, createTenant, setTenantActive } from './admin';
+import { listTenantDetails, getTenantDetail, createTenant, setTenantActive, generateTenantInviteCode } from './admin';
 import type { TenantDetail } from '../types/admin';
+import type { InviteCode } from '../types/tenant';
 
 const TENANT: TenantDetail = {
     id: 't1',
@@ -60,6 +61,24 @@ describe('api/admin', () => {
         await setTenantActive('t1', false);
 
         expect(mocks.put).toHaveBeenCalledWith('/admin/tenants/t1/active', { active: false });
+    });
+
+    it('generateTenantInviteCode POSTs to the tenant invite path without a body by default', async () => {
+        const invite = { id: 'i1', code: 'ABC' } as InviteCode;
+        mocks.post.mockResolvedValue({ data: invite });
+
+        const result = await generateTenantInviteCode('t1');
+
+        expect(result).toEqual(invite);
+        expect(mocks.post).toHaveBeenCalledWith('/admin/tenants/t1/invite-codes', undefined);
+    });
+
+    it('generateTenantInviteCode sends expiry_days when given', async () => {
+        mocks.post.mockResolvedValue({ data: {} });
+
+        await generateTenantInviteCode('t1', 30);
+
+        expect(mocks.post).toHaveBeenCalledWith('/admin/tenants/t1/invite-codes', { expiry_days: 30 });
     });
 
     it('propagates server errors', async () => {
