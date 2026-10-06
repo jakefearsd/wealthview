@@ -80,11 +80,14 @@ export function useCrudForm<T, FormData>(options: UseCrudFormOptions<T, FormData
         try {
             await deleteFn(id);
             toast.success(`${entityName} deleted`);
+            // Every caller's onSuccess closes the form, so clear the edit state with it; otherwise
+            // editingId outlives the deleted row and the next "new" opens as an edit of a ghost.
+            resetForm();
             onSuccess();
         } catch (err: unknown) {
             toast.error(formatError ? formatError(err, 'delete') : extractErrorMessage(err));
         }
-    }, [deleteFn, entityName, onSuccess, formatError]);
+    }, [deleteFn, entityName, onSuccess, formatError, resetForm]);
 
     return {
         editingId,

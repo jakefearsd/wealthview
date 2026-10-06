@@ -278,4 +278,41 @@ describe('useCrudForm', () => {
 
         expect(options.onSuccess).toHaveBeenCalledTimes(1);
     });
+
+    it('resets the form after deleting the item being edited, so a later "new" is not an edit of a ghost', async () => {
+        const options = createOptions();
+        const { result } = renderHook(() => useCrudForm<unknown, TestFormData>(options));
+        act(() => result.current.startEdit('id-1', { name: 'Edited', value: 5 }));
+
+        await act(async () => {
+            await result.current.handleDelete('id-1');
+        });
+
+        expect(result.current.editingId).toBeNull();
+        expect(result.current.formData).toEqual(initialFormData);
+    });
+
+    it('also clears the form after deleting a different item, because onSuccess closes the form', async () => {
+        const options = createOptions();
+        const { result } = renderHook(() => useCrudForm<unknown, TestFormData>(options));
+        act(() => result.current.startEdit('id-1', { name: 'Edited', value: 5 }));
+
+        await act(async () => {
+            await result.current.handleDelete('id-2');
+        });
+
+        expect(result.current.editingId).toBeNull();
+    });
+
+    it('keeps the form when the delete fails', async () => {
+        const options = createOptions({ deleteFn: vi.fn().mockRejectedValue(new Error('nope')) });
+        const { result } = renderHook(() => useCrudForm<unknown, TestFormData>(options));
+        act(() => result.current.startEdit('id-1', { name: 'Edited', value: 5 }));
+
+        await act(async () => {
+            await result.current.handleDelete('id-1');
+        });
+
+        expect(result.current.editingId).toBe('id-1');
+    });
 });
