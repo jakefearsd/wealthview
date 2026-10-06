@@ -62,6 +62,10 @@ describe('DataExportPage', () => {
 
         expect(screen.queryByText(/all your data/i)).not.toBeInTheDocument();
         expect(screen.getByText(/accounts, transactions, holdings and properties/i)).toBeInTheDocument();
-        expect(screen.getByText(/Prices, projections and spending profiles are not included/i)).toBeInTheDocument();
+        const omitted = screen.getByText(/Only those four tables are included/i);
+        for (const item of ['prices', 'exchange rates', 'income sources', 'property expenses', 'valuations',
+            'projection scenarios', 'spending profiles']) {
+            expect(omitted).toHaveTextContent(item);
+        }
     });
 });

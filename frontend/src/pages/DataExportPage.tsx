@@ -24,7 +24,7 @@ export default function DataExportPage() {
             <div style={cardStyle}>
                 <h3 style={{ marginBottom: '1rem' }}>Full Export (JSON)</h3>
                 <p style={{ color: '#666', marginBottom: '1rem' }}>
-                    Download your accounts, transactions, holdings and properties as a single JSON file. Prices, projections and spending profiles are not included.
+                    Download your accounts, transactions, holdings and properties as a single JSON file. Only those four tables are included. Not included: prices, exchange rates, income sources, property expenses, rental income and valuations, projection scenarios, spending profiles and optimizer profiles.
                 </p>
                 <button
                     onClick={() => handleDownload('JSON')}
