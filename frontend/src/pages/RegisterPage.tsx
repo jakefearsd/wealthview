@@ -31,9 +31,9 @@ export default function RegisterPage() {
     }
 
     return (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f5f5f5' }}>
+        <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f5f5f5' }}>
             <form onSubmit={handleSubmit} style={{ background: '#fff', padding: '2rem', borderRadius: '8px', width: '380px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-                <h2 style={{ marginBottom: '1.5rem' }}>Register for WealthView</h2>
+                <h1 style={{ fontSize: '1.5em', marginTop: '0.83em', marginBottom: '1.5rem' }}>Register for WealthView</h1>
                 {error && <div role="alert" style={{ color: '#d32f2f', marginBottom: '1rem', padding: '0.5rem', background: '#fde', borderRadius: '4px' }}>{error}</div>}
                 <div style={{ marginBottom: '1rem' }}>
                     <label htmlFor="email" style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>Email</label>
@@ -58,6 +58,6 @@ export default function RegisterPage() {
                     Already have an account? <Link to="/login">Sign In</Link>
                 </p>
             </form>
-        </div>
+        </main>
     );
 }

@@ -48,6 +48,13 @@ describe('RegisterPage', () => {
         vi.clearAllMocks();
     });
 
+    it('wraps the form in a main landmark under a level-one heading', () => {
+        renderRegisterPage();
+
+        expect(screen.getByRole('main')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { level: 1, name: 'Register for WealthView' })).toBeInTheDocument();
+    });
+
     it('renders registration form with invite code field', () => {
         renderRegisterPage();
         expect(screen.getByLabelText(/email/i)).toBeInTheDocument();

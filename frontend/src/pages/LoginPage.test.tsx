@@ -20,6 +20,13 @@ function renderLoginPage() {
 }
 
 describe('LoginPage', () => {
+    it('wraps the form in a main landmark under a level-one heading', () => {
+        renderLoginPage();
+
+        expect(screen.getByRole('main')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { level: 1, name: 'Login to WealthView' })).toBeInTheDocument();
+    });
+
     it('renders login form', () => {
         renderLoginPage();
         expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
