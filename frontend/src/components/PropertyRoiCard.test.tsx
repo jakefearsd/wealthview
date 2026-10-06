@@ -78,4 +78,35 @@ describe('PropertyRoiCard', () => {
             expect(matches.length).toBeGreaterThan(0);
         });
     });
+
+    it('shows an error message when the analysis call fails', async () => {
+        vi.mocked(getRoiAnalysis).mockRejectedValue(new Error('Server exploded'));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        render(<PropertyRoiCard propertyId="p-1" incomeSource={incomeSource as any} />);
+
+        expect(await screen.findByRole('alert')).toHaveTextContent(/hold vs\. sell/i);
+        expect(screen.queryByText(/is better by/)).not.toBeInTheDocument();
+    });
+
+    it('prints a zero tax without a minus sign', async () => {
+        vi.mocked(getRoiAnalysis).mockResolvedValue({
+            ...analysis,
+            sell: { ...analysis.sell, capital_gains_tax: 0, depreciation_recapture_tax: 0 },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        render(<PropertyRoiCard propertyId="p-1" incomeSource={incomeSource as any} />);
+
+        const label = await screen.findByText('Capital Gains Tax');
+        expect(label.parentElement).toHaveTextContent('Capital Gains Tax$0');
+        expect(label.parentElement).not.toHaveTextContent('-$0');
+    });
+
+    it('still prints a positive tax with a minus sign', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        render(<PropertyRoiCard propertyId="p-1" incomeSource={incomeSource as any} />);
+
+        const label = await screen.findByText('Capital Gains Tax');
+        expect(label.parentElement).toHaveTextContent('-$15,000');
+    });
 });

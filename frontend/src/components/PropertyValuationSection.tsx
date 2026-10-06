@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatDate } from '../utils/format';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
 import Button from './Button';
+import { useModalDialog } from '../hooks/useModalDialog';
 import type { PropertyValuation, ZillowSearchResult } from '../types/property';
 
 interface PropertyValuationSectionProps {
@@ -80,7 +81,7 @@ export default function PropertyValuationSection({
                         <tbody>
                             {valuations?.map((v) => (
                                 <tr key={v.id} style={trHoverStyle}>
-                                    <td style={tdStyle}>{v.valuation_date}</td>
+                                    <td style={tdStyle}>{formatDate(v.valuation_date)}</td>
                                     <td style={tdStyle}>{formatCurrency(v.value)}</td>
                                     <td style={tdStyle}>
                                         <span style={badgeStyle(
@@ -110,49 +111,74 @@ export default function PropertyValuationSection({
             )}
 
             {zillowCandidates && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0,0,0,0.5)', display: 'flex',
-                    alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-                }}>
-                    <div style={{ ...cardStyle, maxWidth: '600px', width: '90%', maxHeight: '80vh', overflow: 'auto' }}>
-                        <h3 style={{ marginBottom: '0.5rem' }}>Multiple Properties Found</h3>
-                        <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1rem' }}>
-                            Zillow found multiple properties matching this address. Please select the correct one:
-                        </p>
-                        <div style={{ display: 'grid', gap: '0.75rem' }}>
-                            {zillowCandidates.map((c) => (
-                                <button
-                                    key={c.zpid}
-                                    onClick={() => onSelectZpid(c.zpid)}
-                                    style={{
-                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                        padding: '1rem', background: '#f9f9f9', border: '1px solid #ddd',
-                                        borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%',
-                                    }}
-                                >
-                                    <div>
-                                        <div style={{ fontWeight: 600 }}>{c.address}</div>
-                                        <div style={{ fontSize: '0.8rem', color: '#888' }}>ZPID: {c.zpid}</div>
-                                    </div>
-                                    <div style={{ fontWeight: 600, color: '#2e7d32', fontSize: '1.1rem' }}>
-                                        {formatCurrency(c.zestimate)}
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                        <button
-                            onClick={onDismissCandidates}
-                            style={{
-                                marginTop: '1rem', padding: '0.5rem 1rem', background: '#eee',
-                                border: 'none', borderRadius: '4px', cursor: 'pointer', width: '100%',
-                            }}
-                        >
-                            Cancel
-                        </button>
-                    </div>
-                </div>
+                <CandidateDialog
+                    candidates={zillowCandidates}
+                    onSelectZpid={onSelectZpid}
+                    onDismiss={onDismissCandidates}
+                />
             )}
         </>
+    );
+}
+
+interface CandidateDialogProps {
+    candidates: ZillowSearchResult[];
+    onSelectZpid: (zpid: string) => void;
+    onDismiss: () => void;
+}
+
+function CandidateDialog({ candidates, onSelectZpid, onDismiss }: CandidateDialogProps) {
+    const dialogRef = useModalDialog<HTMLDivElement>(onDismiss);
+
+    return (
+        <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.5)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+            <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="zillow-candidates-title"
+                tabIndex={-1}
+                style={{ ...cardStyle, maxWidth: '600px', width: '90%', maxHeight: '80vh', overflow: 'auto' }}
+            >
+                <h3 id="zillow-candidates-title" style={{ marginBottom: '0.5rem' }}>Multiple Properties Found</h3>
+                <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1rem' }}>
+                    Zillow found multiple properties matching this address. Please select the correct one:
+                </p>
+                <div style={{ display: 'grid', gap: '0.75rem' }}>
+                    {candidates.map((c) => (
+                        <button
+                            key={c.zpid}
+                            onClick={() => onSelectZpid(c.zpid)}
+                            style={{
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                padding: '1rem', background: '#f9f9f9', border: '1px solid #ddd',
+                                borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%',
+                            }}
+                        >
+                            <div>
+                                <div style={{ fontWeight: 600 }}>{c.address}</div>
+                                <div style={{ fontSize: '0.8rem', color: '#888' }}>ZPID: {c.zpid}</div>
+                            </div>
+                            <div style={{ fontWeight: 600, color: '#2e7d32', fontSize: '1.1rem' }}>
+                                {formatCurrency(c.zestimate)}
+                            </div>
+                        </button>
+                    ))}
+                </div>
+                <button
+                    onClick={onDismiss}
+                    style={{
+                        marginTop: '1rem', padding: '0.5rem 1rem', background: '#eee',
+                        border: 'none', borderRadius: '4px', cursor: 'pointer', width: '100%',
+                    }}
+                >
+                    Cancel
+                </button>
+            </div>
+        </div>
     );
 }

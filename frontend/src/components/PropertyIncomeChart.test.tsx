@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderWithRouter } from '../test-utils';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { MonthlyCashFlowDetailEntry, DepreciationScheduleResponse, Property } from '../types/property';
@@ -90,16 +91,24 @@ describe('PropertyIncomeChart', () => {
         it('shows a placeholder instead of a chart when no records are logged', () => {
             setQuery([]);
 
-            render(<PropertyIncomeChart {...defaultProps} />);
+            renderWithRouter(<PropertyIncomeChart {...defaultProps} />);
 
             expect(screen.getByText(/No income or expense data logged/)).toBeInTheDocument();
             expect(screen.queryByTestId('bar-chart')).not.toBeInTheDocument();
         });
 
+        it('links the empty-state hint to this property\'s detail page, not the list', () => {
+            setQuery([]);
+
+            renderWithRouter(<PropertyIncomeChart {...defaultProps} />);
+
+            expect(screen.getByRole('link', { name: 'property detail page' })).toHaveAttribute('href', '/properties/p1');
+        });
+
         it('shows the loading placeholder while the property data is in flight', () => {
             setQuery(null, null, null, true);
 
-            render(<PropertyIncomeChart {...defaultProps} />);
+            renderWithRouter(<PropertyIncomeChart {...defaultProps} />);
 
             expect(screen.getByText('Loading property data...')).toBeInTheDocument();
         });
@@ -107,7 +116,7 @@ describe('PropertyIncomeChart', () => {
         it('plots expenses below the zero line and rent above it', () => {
             setQuery([entry('2026-04', { mortgage: 1200, insurance: 150 })]);
 
-            render(<PropertyIncomeChart {...defaultProps} />);
+            renderWithRouter(<PropertyIncomeChart {...defaultProps} />);
 
             expect(chartRows()).toEqual([
                 expect.objectContaining({
@@ -123,7 +132,7 @@ describe('PropertyIncomeChart', () => {
         it('orders expense bars by category config, not by appearance in the data', () => {
             setQuery([entry('2026-04', { capex: 100, mortgage: 1200, tax: 300 })]);
 
-            render(<PropertyIncomeChart {...defaultProps} />);
+            renderWithRouter(<PropertyIncomeChart {...defaultProps} />);
 
             expect(barNames()).toEqual([
                 'Rent Estimate', 'Mortgage', 'Tax', 'CapEx', 'Net Cash Flow',
@@ -136,7 +145,7 @@ describe('PropertyIncomeChart', () => {
                 entry('2026-04', { mortgage: 1000, tax: 500 }),
             ]);
 
-            render(<PropertyIncomeChart {...defaultProps} />);
+            renderWithRouter(<PropertyIncomeChart {...defaultProps} />);
 
             expect(screen.getByText('$4,400')).toBeInTheDocument();
             expect(screen.getByText('$2,500')).toBeInTheDocument();
@@ -146,7 +155,7 @@ describe('PropertyIncomeChart', () => {
         it('flags a negative net cash flow without a plus sign', () => {
             setQuery([entry('2026-04', { mortgage: 5000 })]);
 
-            render(<PropertyIncomeChart {...defaultProps} />);
+            renderWithRouter(<PropertyIncomeChart {...defaultProps} />);
 
             expect(screen.getByText('-$2,800')).toBeInTheDocument();
         });
@@ -157,7 +166,7 @@ describe('PropertyIncomeChart', () => {
             const user = userEvent.setup();
             setQuery([], null, { annual_property_tax: 1000 } as Partial<Property>);
 
-            render(<PropertyIncomeChart {...defaultProps} annualRent={12000} inflationRate={0.1} />);
+            renderWithRouter(<PropertyIncomeChart {...defaultProps} annualRent={12000} inflationRate={0.1} />);
             await user.click(screen.getByRole('button', { name: '5 Year' }));
 
             const rows = chartRows();
@@ -177,7 +186,7 @@ describe('PropertyIncomeChart', () => {
             const user = userEvent.setup();
             setQuery([]);
 
-            render(<PropertyIncomeChart {...defaultProps} />);
+            renderWithRouter(<PropertyIncomeChart {...defaultProps} />);
             await user.click(screen.getByRole('button', { name: '5 Year' }));
 
             expect(chartRows()[0]).toEqual(expect.objectContaining({ income: 2200 * 12 }));
@@ -195,7 +204,7 @@ describe('PropertyIncomeChart', () => {
             } as DepreciationScheduleResponse;
             setQuery([], schedule, { annual_property_tax: 2000 } as Partial<Property>);
 
-            render(<PropertyIncomeChart {...defaultProps} annualRent={12000} />);
+            renderWithRouter(<PropertyIncomeChart {...defaultProps} annualRent={12000} />);
             await user.click(screen.getByRole('button', { name: '5 Year' }));
 
             const rows = chartRows();
@@ -224,7 +233,7 @@ describe('PropertyIncomeChart', () => {
             } as DepreciationScheduleResponse;
             setQuery([], schedule, null);
 
-            render(<PropertyIncomeChart {...defaultProps} annualRent={12000} />);
+            renderWithRouter(<PropertyIncomeChart {...defaultProps} annualRent={12000} />);
             await user.click(screen.getByRole('button', { name: '10 Year' }));
 
             expect(screen.getByText('10yr Depreciation')).toBeInTheDocument();
@@ -236,7 +245,7 @@ describe('PropertyIncomeChart', () => {
             const user = userEvent.setup();
             setQuery([], { schedule: [] } as unknown as DepreciationScheduleResponse, null);
 
-            render(<PropertyIncomeChart {...defaultProps} annualRent={12000} />);
+            renderWithRouter(<PropertyIncomeChart {...defaultProps} annualRent={12000} />);
             await user.click(screen.getByRole('button', { name: '10 Year' }));
 
             expect(screen.queryByText('10yr Depreciation')).not.toBeInTheDocument();
@@ -248,7 +257,7 @@ describe('PropertyIncomeChart', () => {
             const user = userEvent.setup();
             setQuery([entry('2026-04', { mortgage: 1200 })]);
 
-            render(<PropertyIncomeChart {...defaultProps} />);
+            renderWithRouter(<PropertyIncomeChart {...defaultProps} />);
             expect(screen.getByText(/Rent vs Expenses/)).toBeInTheDocument();
 
             await user.click(screen.getByRole('button', { name: '20 Year' }));

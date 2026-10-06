@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router';
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
     ReferenceLine, CartesianGrid,
@@ -278,6 +279,7 @@ export default function PropertyIncomeChart({
                 <TrailingView
                     data={trailingData}
                     monthlyRent={monthlyRentEstimate}
+                    propertyId={propertyId}
                 />
             ) : (
                 <ForwardView
@@ -295,13 +297,13 @@ export default function PropertyIncomeChart({
 
 // --- Trailing 12-month sub-view ---
 
-function TrailingView({ data, monthlyRent }: { data: MonthlyCashFlowDetailEntry[] | null; monthlyRent: number }) {
+function TrailingView({ data, monthlyRent, propertyId }: { data: MonthlyCashFlowDetailEntry[] | null; monthlyRent: number; propertyId: string }) {
     if (!data || data.length === 0) {
         return (
             <div style={{ textAlign: 'center', padding: '1.5rem', color: '#999', fontSize: '0.9rem' }}>
                 No income or expense data logged on this property yet.
                 <br />
-                <span style={{ fontSize: '0.8rem' }}>Add records on the <a href="/properties" style={{ color: '#1976d2' }}>property detail page</a> to see the breakdown here.</span>
+                <span style={{ fontSize: '0.8rem' }}>Add records on the <Link to={`/properties/${propertyId}`} style={{ color: '#1976d2' }}>property detail page</Link> to see the breakdown here.</span>
             </div>
         );
     }

@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('../utils/format', () => ({
     formatCurrency: (v: number) => `$${v.toLocaleString()}`,
+    formatDate: (v: string | null | undefined) => v ?? '--',
 }));
 
 vi.mock('../utils/styles', () => ({
@@ -81,5 +82,62 @@ describe('PropertyValuationSection', () => {
             />
         );
         expect(screen.getByText('123 Oak')).toBeInTheDocument();
+    });
+
+    describe('Zillow candidate dialog', () => {
+        function renderDialog(onDismiss = vi.fn()) {
+            render(
+                <PropertyValuationSection
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    valuations={[] as any}
+                    canWrite={true}
+                    refreshing={false}
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    zillowCandidates={[zillowCandidate] as any}
+                    onRefreshValuation={vi.fn()}
+                    onSelectZpid={vi.fn()}
+                    onDismissCandidates={onDismiss}
+                />
+            );
+            return onDismiss;
+        }
+
+        it('is an accessible modal dialog with a name', () => {
+            renderDialog();
+
+            const dialog = screen.getByRole('dialog', { name: 'Multiple Properties Found' });
+            expect(dialog).toHaveAttribute('aria-modal', 'true');
+        });
+
+        it('moves focus into the dialog', () => {
+            renderDialog();
+
+            expect(screen.getByRole('dialog')).toContainElement(document.activeElement as HTMLElement);
+        });
+
+        it('closes on Escape', () => {
+            const onDismiss = renderDialog();
+
+            fireEvent.keyDown(document, { key: 'Escape' });
+
+            expect(onDismiss).toHaveBeenCalled();
+        });
+    });
+
+    it('shows valuation dates as ISO dates', () => {
+        render(
+            <PropertyValuationSection
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                valuations={[valuation] as any}
+                canWrite={false}
+                refreshing={false}
+                zillowCandidates={null}
+                onRefreshValuation={vi.fn()}
+                onSelectZpid={vi.fn()}
+                onDismissCandidates={vi.fn()}
+            />
+        );
+
+        expect(screen.getByRole('cell', { name: '2026-04-10' })).toBeInTheDocument();
     });
 });

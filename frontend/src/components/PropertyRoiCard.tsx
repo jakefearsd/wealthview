@@ -27,6 +27,11 @@ const DEFAULT_PARAMS: RoiParams = {
     expenseInflation: 0.03,
 };
 
+/** A cost shown as a deduction: "-$1,000", but plain "$0.00" for zero rather than "-$0.00". */
+function deduction(amount: number): string {
+    return amount > 0 ? `-${formatCurrency(amount)}` : formatCurrency(amount);
+}
+
 export default function PropertyRoiCard({ propertyId, incomeSource }: PropertyRoiCardProps) {
     const [years, setYears] = useState(10);
     const [investmentReturn, setInvestmentReturn] = useState('7');
@@ -52,10 +57,12 @@ export default function PropertyRoiCard({ propertyId, incomeSource }: PropertyRo
         return () => clearTimeout(timer);
     }, [years, investmentReturn, rentGrowth, expenseInflation]);
 
-    const { data: analysis, loading } = useApiQuery<RoiAnalysisResponse | null>(
-        () => getRoiAnalysis(propertyId, incomeSource.id, params).catch(() => null),
+    const { data, loading, error } = useApiQuery<RoiAnalysisResponse>(
+        () => getRoiAnalysis(propertyId, incomeSource.id, params),
         [propertyId, incomeSource.id, params],
     );
+    // A failed call leaves the previous result in `data`; those numbers are for other inputs, so hide them.
+    const analysis = error ? null : data;
 
     const inputStyle = {
         padding: '0.3rem 0.5rem',
@@ -118,6 +125,12 @@ export default function PropertyRoiCard({ propertyId, incomeSource }: PropertyRo
                 </div>
             </div>
 
+            {error && (
+                <div role="alert" style={{ padding: '0.75rem 1rem', marginBottom: '1rem', borderRadius: '8px', background: '#fef2f2', color: '#b91c1c', fontSize: '0.9rem' }}>
+                    Could not calculate the hold vs. sell analysis. {error}
+                </div>
+            )}
+
             {analysis && (
                 <>
                     <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
@@ -151,17 +164,17 @@ export default function PropertyRoiCard({ propertyId, incomeSource }: PropertyRo
                             </div>
                             <div style={metricStyle}>
                                 <span style={{ color: '#666' }}>Selling Costs (6%)</span>
-                                <span style={{ color: '#d32f2f' }}>-{formatCurrency(analysis.sell.selling_costs)}</span>
+                                <span style={{ color: '#d32f2f' }}>{deduction(analysis.sell.selling_costs)}</span>
                             </div>
                             <div style={metricStyle}>
                                 <span style={{ color: '#666' }}>Depreciation Recapture Tax</span>
                                 <span style={{ color: '#d32f2f' }}>
-                                    {analysis.sell.depreciation_recapture_tax > 0 ? `-${formatCurrency(analysis.sell.depreciation_recapture_tax)}` : '$0'}
+                                    {deduction(analysis.sell.depreciation_recapture_tax)}
                                 </span>
                             </div>
                             <div style={metricStyle}>
                                 <span style={{ color: '#666' }}>Capital Gains Tax</span>
-                                <span style={{ color: '#d32f2f' }}>-{formatCurrency(analysis.sell.capital_gains_tax)}</span>
+                                <span style={{ color: '#d32f2f' }}>{deduction(analysis.sell.capital_gains_tax)}</span>
                             </div>
                             <div style={metricStyle}>
                                 <span style={{ color: '#666' }}>Net Proceeds (Invested)</span>
