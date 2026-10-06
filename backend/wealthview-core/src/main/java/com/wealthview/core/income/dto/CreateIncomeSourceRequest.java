@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -13,8 +14,8 @@ public record CreateIncomeSourceRequest(
         @NotBlank String name,
         @NotBlank String incomeType,
         @NotNull @DecimalMin("0") BigDecimal annualAmount,
-        @Min(0) int startAge,
-        @Min(0) Integer endAge,
+        @Min(0) @Max(120) int startAge,
+        @Min(0) @Max(120) Integer endAge,
         @DecimalMin("0") @DecimalMax("1") BigDecimal inflationRate,
         Boolean oneTime,
         String taxTreatment,
@@ -23,4 +24,4 @@ public record CreateIncomeSourceRequest(
         String owner,
         // Non-SS survivor continuation fraction (0-1, ignored for SS-typed sources); null -> 1.0.
         @DecimalMin("0") @DecimalMax("1") BigDecimal survivorPercent
-) {}
+) implements IncomeAgeWindow {}

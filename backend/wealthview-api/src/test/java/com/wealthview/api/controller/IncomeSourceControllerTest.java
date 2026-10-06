@@ -174,4 +174,67 @@ class IncomeSourceControllerTest {
                 .andExpect(jsonPath("$.property_id").value(propertyId.toString()))
                 .andExpect(jsonPath("$.property_address").value("123 Elm St"));
     }
+
+    private void assertIncomeSourceRejected(String fields) throws Exception {
+        mockMvc.perform(post("/api/v1/income-sources")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"Pension\", \"income_type\": \"pension\", \"annual_amount\": 1000, "
+                                + fields + "}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+    }
+
+    @Test
+    void create_endAgeBeforeStartAge_returns400() throws Exception {
+        assertIncomeSourceRejected("\"start_age\": 70, \"end_age\": 60");
+    }
+
+    @Test
+    void create_startAgeAbsurd_returns400() throws Exception {
+        assertIncomeSourceRejected("\"start_age\": 250");
+    }
+
+    @Test
+    void create_survivorPercentAboveOne_returns400() throws Exception {
+        assertIncomeSourceRejected("\"start_age\": 65, \"survivor_percent\": 1.5");
+    }
+
+    @Test
+    void create_negativeAmount_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/income-sources")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Pension", "income_type": "pension", "annual_amount": -1, "start_age": 65}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void update_endAgeBeforeStartAge_returns400() throws Exception {
+        mockMvc.perform(put("/api/v1/income-sources/{id}", SOURCE_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Pension", "income_type": "pension", "annual_amount": 1000,
+                                 "start_age": 70, "end_age": 60, "tax_treatment": "taxable"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void create_endAgeEqualToStartAge_returns201() throws Exception {
+        when(incomeSourceService.create(eq(TENANT_ID), any(CreateIncomeSourceRequest.class)))
+                .thenReturn(sampleResponse());
+
+        mockMvc.perform(post("/api/v1/income-sources")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Bonus", "income_type": "other", "annual_amount": 1000,
+                                 "start_age": 65, "end_age": 65, "one_time": true}
+                                """))
+                .andExpect(status().isCreated());
+    }
 }

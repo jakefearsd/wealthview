@@ -4,10 +4,13 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 /**
  * {@code trialCount} and {@code confidenceLevel} are bounded (T18a-5c): too few trials make the
@@ -21,24 +24,24 @@ import jakarta.validation.constraints.Min;
 public record GuardrailOptimizationRequest(
         UUID scenarioId,
         String name,
-        BigDecimal essentialFloor,
-        BigDecimal terminalBalanceTarget,
-        BigDecimal returnMean,
+        @DecimalMin("0") BigDecimal essentialFloor,
+        @DecimalMin("0") BigDecimal terminalBalanceTarget,
+        @DecimalMin("-1") @DecimalMax("1") BigDecimal returnMean,
         @Min(100) @Max(50000) Integer trialCount,
         @DecimalMin("0.5") @DecimalMax("0.999") BigDecimal confidenceLevel,
-        List<GuardrailPhaseInput> phases,
-        BigDecimal portfolioFloor,
-        BigDecimal maxAnnualAdjustmentRate,
-        Integer phaseBlendYears,
-        String riskTolerance,
-        Integer cashReserveYears,
-        BigDecimal cashReturnRate,
+        @Size(min = 1) List<@Valid GuardrailPhaseInput> phases,
+        @DecimalMin("0") BigDecimal portfolioFloor,
+        @DecimalMin("0") @DecimalMax("1") BigDecimal maxAnnualAdjustmentRate,
+        @Min(0) @Max(30) Integer phaseBlendYears,
+        @Pattern(regexp = "conservative|moderate|aggressive") String riskTolerance,
+        @Min(0) @Max(30) Integer cashReserveYears,
+        @DecimalMin("-1") @DecimalMax("1") BigDecimal cashReturnRate,
         Boolean optimizeConversions,
-        BigDecimal conversionBracketRate,
-        BigDecimal rmdTargetBracketRate,
-        Integer traditionalExhaustionBuffer,
-        BigDecimal rmdBracketHeadroom,
-        BigDecimal dynamicSequencingBracketRate,
+        @DecimalMin("0") @DecimalMax("0.5") BigDecimal conversionBracketRate,
+        @DecimalMin("0") @DecimalMax("0.5") BigDecimal rmdTargetBracketRate,
+        @Min(0) @Max(30) Integer traditionalExhaustionBuffer,
+        @DecimalMin("0") BigDecimal rmdBracketHeadroom,
+        @DecimalMin("0") @DecimalMax("0.5") BigDecimal dynamicSequencingBracketRate,
         // T24: per-profile toggle for the sustainability search gate; see #gateOnAdaptiveRules().
         Boolean gateOnAdaptiveRules
 ) {

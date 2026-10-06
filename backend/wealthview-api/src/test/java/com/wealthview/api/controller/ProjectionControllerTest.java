@@ -422,4 +422,87 @@ class ProjectionControllerTest {
                 .andExpect(jsonPath("$.tax_space").doesNotExist())
                 .andExpect(jsonPath("$.terminal_value").value(org.hamcrest.Matchers.nullValue()));
     }
+
+    private void assertScenarioRejected(String extraFields) throws Exception {
+        mockMvc.perform(post("/api/v1/projections")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Plan", "retirement_date": "2055-01-01", "end_age": 90,
+                                 "inflation_rate": 0.03, "birth_year": 1990, %s,
+                                 "accounts": [{"initial_balance": 100000, "annual_contribution": 10000,
+                                               "expected_return": 0.07}]}
+                                """.formatted(extraFields)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+    }
+
+    @Test
+    void create_inflationRateAboveBound_returns400() throws Exception {
+        assertScenarioRejected("\"inflation_rate\": 5");
+    }
+
+    @Test
+    void create_inflationRateBelowBound_returns400() throws Exception {
+        assertScenarioRejected("\"inflation_rate\": -0.5");
+    }
+
+    @Test
+    void create_unknownFilingStatus_returns400() throws Exception {
+        assertScenarioRejected("\"filing_status\": \"martian\"");
+    }
+
+    @Test
+    void create_unknownWithdrawalStrategy_returns400() throws Exception {
+        assertScenarioRejected("\"withdrawal_strategy\": \"yolo\"");
+    }
+
+    @Test
+    void create_unknownWithdrawalOrder_returns400() throws Exception {
+        assertScenarioRejected("\"withdrawal_order\": \"random\"");
+    }
+
+    @Test
+    void create_unknownRothConversionStrategy_returns400() throws Exception {
+        assertScenarioRejected("\"roth_conversion_strategy\": \"wizard\"");
+    }
+
+    @Test
+    void create_blankName_returns400() throws Exception {
+        assertScenarioRejected("\"name\": \"\"");
+    }
+
+    @Test
+    void create_negativeInitialBalance_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/projections")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Plan", "retirement_date": "2055-01-01", "end_age": 90,
+                                 "inflation_rate": 0.03, "birth_year": 1990,
+                                 "accounts": [{"initial_balance": -50000, "annual_contribution": 10000,
+                                               "expected_return": 0.07}]}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void create_knownEnumValues_returns201() throws Exception {
+        when(scenarioCrudService.createScenario(eq(TENANT_ID), any()))
+                .thenReturn(sampleScenario());
+
+        mockMvc.perform(post("/api/v1/projections")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Plan", "retirement_date": "2055-01-01", "end_age": 90,
+                                 "inflation_rate": 0.03, "birth_year": 1990,
+                                 "filing_status": "married_filing_jointly",
+                                 "withdrawal_strategy": "vanguard_dynamic_spending",
+                                 "withdrawal_order": "dynamic_sequencing",
+                                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.22,
+                                 "accounts": []}
+                                """))
+                .andExpect(status().isCreated());
+    }
 }

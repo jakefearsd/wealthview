@@ -152,7 +152,7 @@ public class TestDataHelper {
                 "inflation_rate", 0.03,
                 "birth_year", 1990,
                 "withdrawal_rate", 0.04,
-                "withdrawal_strategy", "fixed",
+                "withdrawal_strategy", "fixed_percentage",
                 "accounts", List.of(Map.of(
                         "initial_balance", 100000,
                         "annual_contribution", 20000,

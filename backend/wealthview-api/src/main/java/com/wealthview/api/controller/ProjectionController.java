@@ -45,7 +45,7 @@ public class ProjectionController {
     @PostMapping
     public ResponseEntity<ScenarioResponse> create(
             @AuthenticationPrincipal TenantUserPrincipal principal,
-            @RequestBody ScenarioRequest request) {
+            @Valid @RequestBody ScenarioRequest request) {
         log.info("Creating projection scenario '{}' for tenant {} with {} accounts",
                 request.name(), principal.tenantId(), request.accounts() != null ? request.accounts().size() : 0);
         var result = scenarioCrudService.createScenario(principal.tenantId(), request);
@@ -76,7 +76,7 @@ public class ProjectionController {
     public ResponseEntity<ScenarioResponse> update(
             @AuthenticationPrincipal TenantUserPrincipal principal,
             @PathVariable UUID id,
-            @RequestBody ScenarioRequest request) {
+            @Valid @RequestBody ScenarioRequest request) {
         return ResponseEntity.ok(scenarioCrudService.updateScenario(principal.tenantId(), id, request));
     }
 

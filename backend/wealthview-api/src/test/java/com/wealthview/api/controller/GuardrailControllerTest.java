@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -123,6 +124,82 @@ class GuardrailControllerTest {
                 .andExpect(jsonPath("$.yearly_spending[0].age").value(62));
     }
 
+    private void assertOptimizeRejected(String overrides) throws Exception {
+        var body = """
+                {"scenario_id": "%s", "name": "Plan", "essential_floor": 30000, "terminal_balance_target": 0,
+                 "phases": [{"name": "Early", "start_age": 62, "end_age": 72, "priority_weight": 3}]%s}
+                """.formatted(SCENARIO_ID, overrides);
+
+        mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(guardrailProfileService);
+    }
+
+    @Test
+    void optimize_emptyPhases_returns400() throws Exception {
+        var body = """
+                {"scenario_id": "%s", "name": "Plan", "essential_floor": 30000, "terminal_balance_target": 0,
+                 "phases": []}
+                """.formatted(SCENARIO_ID);
+
+        mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void optimize_phaseEndingBeforeItStarts_returns400() throws Exception {
+        var body = """
+                {"scenario_id": "%s", "name": "Plan", "essential_floor": 30000, "terminal_balance_target": 0,
+                 "phases": [{"name": "Early", "start_age": 80, "end_age": 70, "priority_weight": 3}]}
+                """.formatted(SCENARIO_ID);
+
+        mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void optimize_negativeEssentialFloor_returns400() throws Exception {
+        var body = """
+                {"scenario_id": "%s", "name": "Plan", "essential_floor": -10000, "terminal_balance_target": 0,
+                 "phases": [{"name": "Early", "start_age": 62, "end_age": 72, "priority_weight": 3}]}
+                """.formatted(SCENARIO_ID);
+
+        mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void optimize_unknownRiskTolerance_returns400() throws Exception {
+        assertOptimizeRejected(", \"risk_tolerance\": \"yolo\"");
+    }
+
+    @Test
+    void optimize_adjustmentRateAboveOne_returns400() throws Exception {
+        assertOptimizeRejected(", \"max_annual_adjustment_rate\": 5.0");
+    }
+
+    @Test
+    void optimize_absurdCashReserveYears_returns400() throws Exception {
+        assertOptimizeRejected(", \"cash_reserve_years\": 500");
+    }
+
+    @Test
+    void optimize_conversionBracketRateAbsurd_returns400() throws Exception {
+        assertOptimizeRejected(", \"conversion_bracket_rate\": 0.99");
+    }
+
     @Test
     void optimize_scenarioNotFound_returns404() throws Exception {
         when(guardrailProfileService.optimize(eq(TENANT_ID), eq(SCENARIO_ID),
@@ -131,7 +208,7 @@ class GuardrailControllerTest {
 
         var request = new GuardrailOptimizationRequest(
                 SCENARIO_ID, "Plan", new BigDecimal("30000"),
-                BigDecimal.ZERO, null, null, null, List.of(),
+                BigDecimal.ZERO, null, null, null, List.of(new GuardrailPhaseInput("Early", 62, 72, 3)),
                 null, null, null, null,
                 null, null,
                 null, null, null, null, null, null);
@@ -219,7 +296,7 @@ class GuardrailControllerTest {
 
         var request = new GuardrailOptimizationRequest(
                 SCENARIO_ID, "Plan", new BigDecimal("30000"),
-                BigDecimal.ZERO, null, 5000, new BigDecimal("0.95"), List.of(),
+                BigDecimal.ZERO, null, 5000, new BigDecimal("0.95"), List.of(new GuardrailPhaseInput("Early", 62, 72, 3)),
                 null, null, null, null,
                 null, null,
                 null, null, null, null, null, null);
@@ -347,7 +424,7 @@ class GuardrailControllerTest {
 
         var request = new GuardrailOptimizationRequest(
                 SCENARIO_ID, "Plan", new BigDecimal("30000"),
-                BigDecimal.ZERO, null, null, null, List.of(),
+                BigDecimal.ZERO, null, null, null, List.of(new GuardrailPhaseInput("Early", 62, 72, 3)),
                 null, null, null, null,
                 null, null,
                 null, null, null, null, null, null);

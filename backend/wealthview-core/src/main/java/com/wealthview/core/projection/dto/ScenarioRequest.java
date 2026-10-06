@@ -5,37 +5,46 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+
 /**
  * Request body for both scenario create and update — the two endpoints take
  * an identical payload. Implements {@link ScenarioParamsSource} so the params
  * blob is serialized through {@link ScenarioParams}.
  */
 public record ScenarioRequest(
-        String name,
+        @NotBlank String name,
         LocalDate retirementDate,
         Integer endAge,
-        BigDecimal inflationRate,
-        Integer birthYear,
-        BigDecimal withdrawalRate,
-        String withdrawalStrategy,
-        BigDecimal dynamicCeiling,
-        BigDecimal dynamicFloor,
-        String filingStatus,
-        BigDecimal otherIncome,
-        BigDecimal annualRothConversion,
+        @DecimalMin("-0.05") @DecimalMax("0.20") BigDecimal inflationRate,
+        @Min(1900) @Max(2100) Integer birthYear,
+        @DecimalMin("0") @DecimalMax("1") BigDecimal withdrawalRate,
+        @Pattern(regexp = "(fixed_percentage|dynamic_percentage|vanguard_dynamic_spending)?") String withdrawalStrategy,
+        @DecimalMin("-1") @DecimalMax("1") BigDecimal dynamicCeiling,
+        @DecimalMin("-1") @DecimalMax("1") BigDecimal dynamicFloor,
+        @Pattern(regexp = "(single|married_filing_jointly)?") String filingStatus,
+        @DecimalMin("0") BigDecimal otherIncome,
+        @DecimalMin("0") BigDecimal annualRothConversion,
+        @Pattern(regexp = "(taxable_first|traditional_first|roth_first|pro_rata|dynamic_sequencing)?")
         String withdrawalOrder,
-        BigDecimal dynamicSequencingBracketRate,
-        String rothConversionStrategy,
-        BigDecimal targetBracketRate,
+        @DecimalMin("0") @DecimalMax("0.5") BigDecimal dynamicSequencingBracketRate,
+        @Pattern(regexp = "(fixed_amount|fill_bracket)?") String rothConversionStrategy,
+        @DecimalMin("0") @DecimalMax("0.5") BigDecimal targetBracketRate,
         Integer rothConversionStartYear,
         String state,
-        BigDecimal primaryResidencePropertyTax,
-        BigDecimal primaryResidenceMortgageInterest,
+        @DecimalMin("0") BigDecimal primaryResidencePropertyTax,
+        @DecimalMin("0") BigDecimal primaryResidenceMortgageInterest,
         BigDecimal dividendYield,
         BigDecimal feeRate,
         Boolean includeDepressionYears,
         BigDecimal interestYield,
-        Integer spouseBirthYear,
+        @Min(1900) @Max(2100) Integer spouseBirthYear,
         Integer primaryDeathAge,
         Integer spouseDeathAge,
         BigDecimal survivorSpendingFactor,
@@ -47,7 +56,7 @@ public record ScenarioRequest(
         Integer birthMonth,
         Integer spouseBirthMonth,
         BigDecimal heirTaxRate,
-        List<CreateProjectionAccountRequest> accounts,
+        List<@Valid CreateProjectionAccountRequest> accounts,
         UUID spendingProfileId,
         Boolean useGuardrailProfile,
         List<ScenarioIncomeSourceInput> incomeSources) implements ScenarioParamsSource {

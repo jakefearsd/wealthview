@@ -246,4 +246,56 @@ class SpendingProfileControllerTest {
                 .andExpect(jsonPath("$.spending_tiers").isArray())
                 .andExpect(jsonPath("$.spending_tiers.length()").value(0));
     }
+
+    private void assertProfileRejected(String body) throws Exception {
+        mockMvc.perform(post("/api/v1/spending-profiles")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+    }
+
+    @Test
+    void create_negativeExpenses_returns400() throws Exception {
+        assertProfileRejected("""
+                {"name": "Plan", "essential_expenses": -5000, "discretionary_expenses": -100}
+                """);
+    }
+
+    @Test
+    void create_blankName_returns400() throws Exception {
+        assertProfileRejected("""
+                {"name": "", "essential_expenses": 5000, "discretionary_expenses": 100}
+                """);
+    }
+
+    @Test
+    void create_tierEndingBeforeItStarts_returns400() throws Exception {
+        assertProfileRejected("""
+                {"name": "Plan", "essential_expenses": 5000, "discretionary_expenses": 100,
+                 "spending_tiers": [{"name": "Late", "start_age": 80, "end_age": 60,
+                                     "essential_expenses": 1000, "discretionary_expenses": 0}]}
+                """);
+    }
+
+    @Test
+    void create_tierAgeAbsurd_returns400() throws Exception {
+        assertProfileRejected("""
+                {"name": "Plan", "essential_expenses": 5000, "discretionary_expenses": 100,
+                 "spending_tiers": [{"name": "Old", "start_age": 250,
+                                     "essential_expenses": 1000, "discretionary_expenses": 0}]}
+                """);
+    }
+
+    @Test
+    void update_negativeExpenses_returns400() throws Exception {
+        mockMvc.perform(put("/api/v1/spending-profiles/{id}", PROFILE_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Plan", "essential_expenses": -1, "discretionary_expenses": 0}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
 }

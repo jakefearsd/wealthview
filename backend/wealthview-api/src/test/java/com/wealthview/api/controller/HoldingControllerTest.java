@@ -141,4 +141,34 @@ class HoldingControllerTest {
                                 """.formatted(ACCOUNT_ID)))
                 .andExpect(status().isBadRequest());
     }
+
+    private void assertHoldingRejected(String fields) throws Exception {
+        mockMvc.perform(post("/api/v1/holdings")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"account_id\": \"" + ACCOUNT_ID + "\", " + fields + "}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+    }
+
+    @Test
+    void createManual_negativeQuantity_returns400() throws Exception {
+        assertHoldingRejected("\"symbol\": \"AAPL\", \"quantity\": -5, \"cost_basis\": 100");
+    }
+
+    @Test
+    void createManual_negativeCostBasis_returns400() throws Exception {
+        assertHoldingRejected("\"symbol\": \"AAPL\", \"quantity\": 5, \"cost_basis\": -100");
+    }
+
+    @Test
+    void update_negativeQuantity_returns400() throws Exception {
+        mockMvc.perform(put("/api/v1/holdings/{id}", HOLDING_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"account_id": "%s", "symbol": "AAPL", "quantity": -1, "cost_basis": 100}
+                                """.formatted(ACCOUNT_ID)))
+                .andExpect(status().isBadRequest());
+    }
 }

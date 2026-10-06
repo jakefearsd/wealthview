@@ -3,6 +3,9 @@ package com.wealthview.core.projection.dto;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+
 /**
  * Request body for creating (or replacing, in a scenario update) a projection account.
  *
@@ -12,10 +15,10 @@ import java.util.UUID;
  */
 public record CreateProjectionAccountRequest(
         UUID linkedAccountId,
-        BigDecimal initialBalance,
-        BigDecimal annualContribution,
-        BigDecimal expectedReturn,
-        BigDecimal costBasis,
+        @DecimalMin("0") BigDecimal initialBalance,
+        @DecimalMin("0") BigDecimal annualContribution,
+        @DecimalMin("-1") @DecimalMax("1") BigDecimal expectedReturn,
+        @DecimalMin("0") BigDecimal costBasis,
         AllocationDto allocation,
         String accountType,
         String owner) {

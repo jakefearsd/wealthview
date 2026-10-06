@@ -3,6 +3,7 @@ package com.wealthview.api.controller;
 import java.util.List;
 import java.util.UUID;
 
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -34,7 +35,7 @@ public class SpendingProfileController {
     @PostMapping
     public ResponseEntity<SpendingProfileResponse> create(
             @AuthenticationPrincipal TenantUserPrincipal principal,
-            @RequestBody CreateSpendingProfileRequest request) {
+            @Valid @RequestBody CreateSpendingProfileRequest request) {
         var result = spendingProfileService.createProfile(principal.tenantId(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
@@ -56,7 +57,7 @@ public class SpendingProfileController {
     public ResponseEntity<SpendingProfileResponse> update(
             @AuthenticationPrincipal TenantUserPrincipal principal,
             @PathVariable UUID id,
-            @RequestBody UpdateSpendingProfileRequest request) {
+            @Valid @RequestBody UpdateSpendingProfileRequest request) {
         return ResponseEntity.ok(spendingProfileService.updateProfile(principal.tenantId(), id, request));
     }
 

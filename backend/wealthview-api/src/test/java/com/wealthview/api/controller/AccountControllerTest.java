@@ -261,4 +261,13 @@ class AccountControllerTest {
                         .with(authenticatedAdmin()))
                 .andExpect(errorEnvelope(HttpStatus.NOT_FOUND));
     }
+
+    @Test
+    void create_overlongName_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/accounts")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"" + "x".repeat(5000) + "\", \"type\": \"brokerage\"}"))
+                .andExpect(status().isBadRequest());
+    }
 }

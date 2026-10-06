@@ -203,4 +203,48 @@ class TransactionControllerTest {
                                 """))
                 .andExpect(status().isBadRequest());
     }
+
+    private void assertTransactionRejected(String fields) throws Exception {
+        mockMvc.perform(post("/api/v1/accounts/{accountId}/transactions", ACCOUNT_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\": \"2025-01-15\", " + fields + "}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+    }
+
+    @Test
+    void create_buyWithZeroQuantity_returns400() throws Exception {
+        assertTransactionRejected("\"type\": \"buy\", \"symbol\": \"AAPL\", \"quantity\": 0, \"amount\": 100");
+    }
+
+    @Test
+    void create_sellWithoutQuantity_returns400() throws Exception {
+        assertTransactionRejected("\"type\": \"sell\", \"symbol\": \"AAPL\", \"amount\": 100");
+    }
+
+    @Test
+    void create_negativeAmount_returns400() throws Exception {
+        assertTransactionRejected("\"type\": \"buy\", \"symbol\": \"AAPL\", \"quantity\": 1, \"amount\": -100");
+    }
+
+    @Test
+    void create_overlongSymbol_returns400() throws Exception {
+        assertTransactionRejected("\"type\": \"buy\", \"symbol\": \"" + "A".repeat(200)
+                + "\", \"quantity\": 1, \"amount\": 100");
+    }
+
+    @Test
+    void create_dividendWithoutQuantity_returns201() throws Exception {
+        when(transactionService.create(eq(TENANT_ID), eq(ACCOUNT_ID), any(TransactionRequest.class)))
+                .thenReturn(sampleResponse());
+
+        mockMvc.perform(post("/api/v1/accounts/{accountId}/transactions", ACCOUNT_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"date": "2025-01-15", "type": "dividend", "symbol": "AAPL", "amount": 12.5}
+                                """))
+                .andExpect(status().isCreated());
+    }
 }
