@@ -107,6 +107,21 @@ describe('SpendingOptimizerPage', () => {
         expect(screen.getByRole('button', { name: /run optimization/i })).toBeInTheDocument();
     });
 
+    it('shows the retirement year from the date string, not a timezone-shifted parse', async () => {
+        const originalTz = process.env.TZ;
+        process.env.TZ = 'America/Los_Angeles';
+        try {
+            renderPage();
+
+            await waitFor(() => {
+                expect(screen.getByText('Spending Optimizer')).toBeInTheDocument();
+            });
+            expect(screen.getByText(/Retirement:/).parentElement).toHaveTextContent('Retirement: 2030');
+        } finally {
+            if (originalTz === undefined) delete process.env.TZ; else process.env.TZ = originalTz;
+        }
+    });
+
     it('shows risk tolerance selector with three options', async () => {
         renderPage();
 

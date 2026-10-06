@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { GuardrailYearlySpending } from '../types/projection';
 import NearTermSpendingGuide from './NearTermSpendingGuide';
 
@@ -124,5 +124,23 @@ describe('NearTermSpendingGuide', () => {
             <NearTermSpendingGuide yearlySpending={fiveYears} retirementDate="2020-01-01" />,
         );
         expect(screen.getByText(/Your spending guide for the next 5 years/)).toBeInTheDocument();
+    });
+
+    describe('in a timezone west of UTC', () => {
+        const originalTz = process.env.TZ;
+        afterEach(() => {
+            vi.useRealTimers();
+            if (originalTz === undefined) delete process.env.TZ; else process.env.TZ = originalTz;
+        });
+
+        it('counts years to a 1 January retirement date from the calendar year, not the UTC-shifted one', () => {
+            process.env.TZ = 'America/Los_Angeles';
+            vi.useFakeTimers({ toFake: ['Date'] });
+            vi.setSystemTime(new Date('2027-06-15T19:00:00Z'));
+
+            render(<NearTermSpendingGuide yearlySpending={fiveYears} retirementDate="2030-01-01" />);
+
+            expect(screen.getByText(/You retire in/)).toHaveTextContent('You retire in 3 years');
+        });
     });
 });

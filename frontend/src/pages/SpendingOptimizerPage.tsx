@@ -5,7 +5,7 @@ import { getScenario, optimizeSpending, getGuardrailProfile, reoptimize } from '
 import type { Scenario, GuardrailPhase, GuardrailProfileResponse, GuardrailOptimizationRequest, GuardrailYearlySpending } from '../types/projection';
 import { useApiMutation } from '../hooks/useApiMutation';
 import { cardStyle, inputStyle } from '../utils/styles';
-import { formatWholeCurrency } from '../utils/format';
+import { formatWholeCurrency, yearOf } from '../utils/format';
 import { defaultOptimizerConfig, fromProfile, toRequest, type OptimizerConfig, type RiskTolerance } from '../utils/optimizerConfig';
 import LoadingState from '../components/LoadingState';
 import CurrencyInput from '../components/CurrencyInput';
@@ -255,7 +255,7 @@ export default function SpendingOptimizerPage() {
                 </div>
                 <div style={{ display: 'flex', gap: '1.5rem', color: '#555', flexWrap: 'wrap', marginBottom: '0.35rem' }}>
                     <span><strong style={{ color: '#666' }}>Inflation:</strong> {(scenario.inflation_rate * 100).toFixed(1)}%</span>
-                    <span><strong style={{ color: '#666' }}>Retirement:</strong> {new Date(scenario.retirement_date).getFullYear()}</span>
+                    <span><strong style={{ color: '#666' }}>Retirement:</strong> {yearOf(scenario.retirement_date)}</span>
                     <span><strong style={{ color: '#666' }}>End Age:</strong> {scenario.end_age}</span>
                 </div>
                 {scenario.accounts.length > 0 && (() => {

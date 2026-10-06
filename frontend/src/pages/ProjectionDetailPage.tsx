@@ -3,7 +3,7 @@ import { useParams, useSearchParams, Link, useNavigate } from 'react-router';
 import { getScenario, runProjection, updateScenario } from '../api/projections';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useApiMutation } from '../hooks/useApiMutation';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, todayIso, yearOf } from '../utils/format';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
 import {
     findPeakBalance,
@@ -103,7 +103,7 @@ export default function ProjectionDetailPage() {
     if (loading) return <LoadingState message="Loading scenario..." />;
     if (!scenario) return <EmptyState title="Scenario not found" message="This scenario may have been deleted." />;
 
-    const retirementYear = scenario.retirement_date ? new Date(scenario.retirement_date).getFullYear() : null;
+    const retirementYear = scenario.retirement_date ? yearOf(scenario.retirement_date) : null;
     const hasPoolData = result?.yearly_data.some(y => y.traditional_balance !== null) ?? false;
     const hasSpendingData = result?.yearly_data.some(y => y.essential_expenses !== null) ?? false;
     const hasIncomeSourceData = result?.yearly_data.some(y =>
@@ -125,7 +125,7 @@ export default function ProjectionDetailPage() {
 
     const handleDownloadCsv = () => {
         if (!result) return;
-        const date = new Date().toISOString().slice(0, 10);
+        const date = todayIso();
         const name = scenario.name.replace(/[^a-zA-Z0-9 -]/g, '').replace(/ /g, '-');
         const csv = buildProjectionCsv(result.yearly_data, {
             hasPoolData, hasSpendingData, hasSurplusReinvested, computeTotalSpending,

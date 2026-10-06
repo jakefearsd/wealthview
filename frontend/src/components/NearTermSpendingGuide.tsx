@@ -1,5 +1,6 @@
 import type { GuardrailYearlySpending } from '../types/projection';
 import { formatDollarTooltip } from '../utils/chartFormatters';
+import { yearOf } from '../utils/format';
 
 interface Props {
     yearlySpending: GuardrailYearlySpending[];
@@ -129,7 +130,7 @@ export default function NearTermSpendingGuide({ yearlySpending, retirementDate }
     if (nearTermYears.length === 0) return null;
 
     const currentYear = new Date().getFullYear();
-    const retirementYear = new Date(retirementDate).getFullYear();
+    const retirementYear = yearOf(retirementDate);
     const isPreRetirement = currentYear < retirementYear;
     const yearsUntilRetirement = retirementYear - currentYear;
 
