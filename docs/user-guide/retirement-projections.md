@@ -99,9 +99,9 @@ To change a scenario later, open it and click **Edit**. The save button there is
 | **Name** | A descriptive label, e.g. "Retire at 62, moderate spending". |
 | **Retirement Date** | The date you stop working. |
 | **Birth Year** | Used to calculate your age at each projection year. |
-| **Birth Month** | Optional. Makes early-access dates exact: the calendar year you reach 59½ is treated as penalty-free for traditional withdrawals (time withdrawals after the date). Without it, penalty-free access starts the year you turn 60. |
+| **Birth Month** | Optional (**Not set** by default). Makes the 59½ penalty-free year exact: the calendar year you reach 59½ is penalty-free for traditional withdrawals — if you were born January–June, that is the year you turn 59. Leave it blank and penalty-free access starts the year you turn 60. Needs a Birth Year. |
 | **End Age** | Age at which the projection ends. Plan beyond your expected lifespan for safety. |
-| **Inflation Rate (%)** | Annual rate of price increases. `3` = 3%, the historical U.S. average. |
+| **Inflation Rate (%)** | Annual rate of price increases. `3` = 3%, the historical U.S. average. Must be between −5% and 20%. |
 | **Withdrawal Rate (%)** | Percentage of portfolio to withdraw annually in retirement. `4` = 4%. Used when no spending plan is linked. |
 | **Dividend Yield (%)** / **Bond Interest Yield (%)** / **Investment Fees (%)** | See "Drags on Returns" above. |
 | **Include 1928–1971 market history** | Checkbox. See above. |
@@ -156,10 +156,9 @@ Two strategies:
 
 **Fill Tax Bracket** — Automatically convert enough to fill income up to the top of a **Target Tax Bracket** you pick (10%, 12%, 22%, 24%, 32%, or 35%) each year.
 
-Once conversions are active, two more fields appear (the filing status your conversions are taxed at is set under **Tax Configuration** below):
+Once conversions are active (Fill Tax Bracket, or Fixed Amount above $0), a **Conversion Start Year** field appears: the calendar year when conversions begin. Leave it blank to start immediately.
 
-- **Conversion Start Year** — Calendar year when conversions begin. Leave blank to start immediately.
-- **Other Income** — Non-retirement income (salary, rental income) that affects which bracket your conversions land in.
+The filing status and **Other Income** your conversions are taxed with are set under **Tax Configuration** below.
 
 For a fully optimized conversion schedule computed against thousands of market paths, use **Optimize Spending** instead — the optimizer can search for conversions jointly with the spending plan.
 
@@ -171,8 +170,11 @@ follows the household: Married Filing Jointly when a **Spouse Birth Year** is en
 Single. Saved scenarios that never stored a filing status follow the same rule. After a modelled
 first death the survivor files Single.
 
-**Heir Tax Rate** — The income-tax rate your heirs are assumed to pay on inherited traditional
-(pre-tax) money, which they must withdraw within 10 years. Default 24%. Used only for the
+**Other Income** — Annual non-portfolio income (salary, rental income) taxed alongside your
+withdrawals and Roth conversions, which can push them into higher brackets.
+
+**Heir Tax Rate (%)** — The income-tax rate your heirs are assumed to pay on inherited traditional
+(pre-tax) money, which they must withdraw within 10 years. 0–50%, default 24%. Used only for the
 **After-tax Legacy** card.
 
 **State** — Adds state income tax to the projection and unlocks SALT deduction and itemized-vs-standard comparison. The modeled options are:
@@ -244,6 +246,10 @@ Manual (unlinked) accounts let you model future accounts, an employer 401(k) you
 2. Click **Run Projection**.
 3. Results are computed on demand and shown immediately. They are not stored — re-run any time with updated inputs.
 
+Before results appear, the scenario page shows a row of summary cards (**Retirement Date**, **End Age**, **Inflation Rate**, **Strategy**, **Accounts**, and the active **Spending Plan** if any), followed by tables of the scenario's **Income Sources** (with base, override, and effective amounts — net cash flow for rentals) and **Accounts**.
+
+Deleting a scenario from the Projections list also deletes its spending optimizer (guardrail) profile.
+
 ---
 
 ## Reading the Results
@@ -293,7 +299,7 @@ Which tabs appear depends on what your scenario contains.
 | **Data Table** | The full year-by-year table. Includes a **Download CSV** button. |
 | **Spending Analysis** | Stacked area of Essential Expenses and Discretionary (After Cuts), with Withdrawal and Income Streams lines over the top. Only when a spending plan is linked. |
 | **Income & Tax** | Per-year tax detail — see below. Only when income sources or state tax produce data. |
-| **Tax Space** | For each retirement year: your marginal bracket and the room left in it, room left in the 0% and 15% capital-gains bands, where you sit in the Social Security taxation zone, distance to the 3.8% NIIT threshold, your IRMAA tier and the room to the next one (for the premium year two years later), and your *effective* marginal rate on the next $1,000 of ordinary income or capital gains — counting federal and state tax, extra Social Security taxation and bracket stacking. Planning estimates, not tax advice. |
+| **Tax Space** | How much tax "room" each retirement year has — see below. |
 | **Income Streams** | Each linked income source charted over time. |
 | **Tax Shield** | Depreciation-driven tax savings from rental properties. Only when there is depreciation to show. |
 
@@ -304,6 +310,24 @@ The default columns are: Year, Age, Start, Contributions, Growth, Withdrawals, I
 Click **Show Pool Details** to reveal a much wider view: Essential / Discretionary / Net Need, per-pool growth, tax paid out of each pool, **RMD**, **Cap-Gains Tax**, withdrawals from each pool, Surplus/Deficit, Surplus Reinvested, and a Working/Retired status flag.
 
 Retirement years are shaded, with a thick line marking the transition year. A ⚠ next to a year means income exceeded the 22% bracket — hover it for the tooltip: *"Income exceeds 22% bracket — review IRMAA implications for Medicare (2-year lookback)."*
+
+### The Tax Space Tab
+
+A **Tax Space by Year** table, one row per retirement year, for spotting cheap years to realize income — a Roth conversion, a traditional withdrawal, or a capital gain:
+
+| Column | What it shows |
+|--------|---------------|
+| **Year** / **Age** | The calendar year and your age. |
+| **MAGI** | Modified adjusted gross income — the figure IRMAA and the NIIT key off. |
+| **Bracket** | Your marginal federal ordinary-income bracket. Below the standard deduction it shows 0%. |
+| **Room to Top** | How much more ordinary income fits before the top of the current bracket (the bracket is named under the amount). |
+| **0% Cap-Gains Room** | Long-term gains or qualified dividends you could still realize at a 0% federal rate. |
+| **SS Zone** | How much extra Social Security becomes taxable for each extra $1 of ordinary income, e.g. "85¢ per $1". |
+| **NIIT Headroom** | Distance to the 3.8% net investment income tax threshold. Shown in red when negative (you are over it). |
+| **IRMAA** | The Medicare surcharge tier this year's income sets, the room to the next tier, and what crossing it would add per year. Because Medicare looks back two years, the premium year named is two years later. |
+| **Eff. Marginal (Ord.)** / **Eff. Marginal (LTCG)** | Total tax on the next $1,000 of ordinary income or of long-term capital gains, counting federal and state tax, extra Social Security taxation, and bracket stacking. |
+
+A short explanation of each term sits under the table. Like every tax figure here, these are planning estimates, not tax advice.
 
 ### The Income & Tax Tab
 

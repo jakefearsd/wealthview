@@ -82,6 +82,24 @@ wv update
 That is the whole procedure. There is no `git pull` and no build step: the
 image referenced by the new tag already exists in the registry.
 
+### When the release changes the compose file or `.env.example`
+
+`wv update` recreates **only the `app` container** from the compose file
+already on the host. It does not fetch a new `docker-compose.prod.yml`, and it
+does not touch `db` or `backup`. Most releases change only the image, but if
+the release notes (or a diff of the tagged repo) show changes to
+`docker-compose.prod.yml`, `infra/backup/`, or `.env.example`:
+
+1. Add any new required variables to the env file first (the diff command
+   under [App Won't Start After Upgrade](#app-wont-start-after-upgrade) lists
+   them).
+2. Replace the compose file (and `infra/`) with the release's copies —
+   re-applying any local edits such as a loopback `ports:` binding or the
+   `APP_RATE_LIMIT_TRUSTED_PROXIES` line, or better, keeping those in an
+   override file so this step can't drop them.
+3. Run `wv update` as usual, then `wv up --no-build` (or `wv up` if
+   `infra/backup/` changed) so `db` and `backup` pick up their changes too.
+
 > **Never pin `WEALTHVIEW_VERSION=latest`.** CI publishes a `:latest` tag as a
 > convenience pointer, but deploying it defeats `./wv rollback`, which recovers
 > by re-pinning the tag that was running before the update — and a moving tag
@@ -165,7 +183,7 @@ Check that the upgrade succeeded:
 
 Flyway prints `Successfully applied N migrations to schema "public"` (or
 `Schema "public" is up to date` when there was nothing new), and Spring Boot
-prints `Started WealthviewApplication in <seconds>`.
+prints `Started WealthViewApplication in <seconds>`.
 
 ### Upgrading a host with no source tree
 
@@ -206,7 +224,7 @@ manual SQL step.
 ### Versioned Migrations
 
 Files named `V<NNN>__<description>.sql` run exactly once, in version order.
-The current range is `V001__create_tenants_table.sql` through
+The current range is `V001__baseline_tenants_and_users.sql` through
 `V081__guardrail_profile_conversion_settings.sql`. Flyway records which versions have been
 applied in the `flyway_schema_history` table.
 
@@ -441,8 +459,15 @@ Disk space is worth ruling out too; a pull needs room to unpack layers:
 ```bash
 docker system df
 df -h
-docker image prune -a -f       # removes all unused images
+./wv prune --dry-run           # dangling WealthView images only
 ```
+
+Old *tagged* release images (one per version you have deployed) are not
+dangling, so `wv prune` leaves them alone. Remove the ones you no longer need
+as rollback targets by name, e.g.
+`docker image rm ghcr.io/jakefearsd/wealthview:1.2.6`. Avoid
+`docker image prune -a` on a shared host: it removes every unused image from
+every project on the daemon.
 
 ### Health Check Fails After a Successful Start
 
@@ -451,10 +476,12 @@ times out.
 
 **Fix:** Give it 30–60 seconds; the container HEALTHCHECK has a 60-second start
 period and Flyway may still be applying migrations. If it persists, check the
-logs for database connection errors. Note that `./wv status` probes
-`http://localhost:${APP_PORT}/actuator/health` — if your app is bound to
-loopback on a non-default port behind a proxy, set `WV_APP_PORT` or
-`WV_HEALTH_URL` in `wv.conf` so the probe targets the right URL.
+logs for database connection errors. `./wv update`'s own wait uses
+`WV_HEALTH_URL` when set, otherwise `http://localhost:<APP_PORT>/actuator/health`
+(with `APP_PORT` read from the env file, falling back to `WV_APP_PORT`). `./wv
+status` is cruder: it always probes `http://localhost:<APP_PORT or 80>` and
+ignores `WV_HEALTH_URL`, so a "not reachable" from `status` alone, with the
+container showing `(healthy)` in `docker compose ps`, is not a failure.
 
 ### Rollback Also Failed (exit code 2)
 

@@ -24,7 +24,7 @@ WealthView's frontend is a React 19 SPA built with TypeScript and Vite. The rout
 | `/income-sources`        | `IncomeSourcesPage`     | Protected | Create and manage reusable income sources with tax treatments  |
 | `/properties`            | `PropertiesListPage`    | Protected | Rental properties overview                                     |
 | `/properties/:id`        | `PropertyDetailPage`    | Protected | Income/expenses, monthly cash flow chart, valuations, investment analytics, hold-vs-sell ROI analysis |
-| `/admin`                 | `AdminAreaPage`         | Protected (admin nav link) | Sectioned admin area — see [Admin Sections](#admin-sections) |
+| `/admin`                 | `AdminAreaPage`         | Protected; `admin` / `super_admin` | Sectioned admin area — see [Admin Sections](#admin-sections). Any other role reaching the URL directly gets an in-page "Not authorised" alert |
 | `/export`                | `DataExportPage`        | Protected | Full JSON export and per-entity CSV downloads                  |
 | `*`                      | `NotFoundPage`          | Protected | 404 page rendered inside the app shell                         |
 
@@ -44,6 +44,8 @@ Three former top-level routes now `<Navigate replace>` into the consolidated adm
 - **Lazy loading.** All authenticated pages are code-split with `React.lazy(() => import(...))` and rendered inside a single `<Suspense fallback={<LoadingState />}>`. `LoginPage` and `RegisterPage` are imported eagerly so the initial download stays small; heavy dependencies such as recharts fall into the chart-bearing pages' chunks rather than the entry bundle.
 - **Providers.** `<AuthProvider>` wraps `<ProjectionCacheProvider>`, which wraps `<BrowserRouter>`. A `react-hot-toast` `<Toaster position="top-right" />` sits inside the router.
 - **Contexts and hooks.** Contexts: `AuthContext`, `ProjectionCacheContext`. Shared data hooks: `useApiQuery`, `useApiMutation`, `useCrudForm`.
+- **Loading placeholders.** The route-level `<Suspense>` fallback is `<LoadingState message="Loading…" />`; `ProtectedRoute`'s own auth-check placeholder is a plain "Loading..." div.
+- **No account-security screens.** The SPA has no route or section for MFA enrollment, the MFA login challenge, per-device session management, or notification preferences. Those endpoints (`/api/v1/auth/mfa/*`, `/api/v1/auth/sessions`, `/api/v1/notifications/preferences`) exist in the API but are not wired into any web page; `frontend/src/api/notifications.ts` is defined but unused.
 - **API access.** `frontend/src/api/*` modules call the backend at the relative base path `/api/v1` through a shared axios client; auth travels in HttpOnly cookies with double-submit CSRF.
 
 ## Navigation

@@ -133,6 +133,18 @@ It reports:
 It exits non-zero if any required check fails, so it is safe to run from a pre-deploy
 script.
 
+**Health-check URL.** `up`, `restart`, `update`, `rollback`, `restore`, and
+`rotate-secret` poll `http://localhost:<port>/actuator/health`. The port is taken from
+`APP_PORT` in the env file, falling back to `WV_APP_PORT` (default 80). With `--host`, the
+remote hostname replaces `localhost`. `WV_HEALTH_URL` in `wv.conf` overrides all of that.
+`./wv status` is the exception: it always probes `localhost:${APP_PORT:-80}` and ignores
+`WV_HEALTH_URL`, `WV_APP_PORT`, and `--host`. A failure from `status` behind a proxy or
+on a remote host doesn't, on its own, mean the app is down.
+
+`./wv up` (and therefore `restart`) passes `--build` to compose unless you give it
+`--no-build`. On the prod stack that rebuilds only the `backup` image, because the app
+service has no `build:` key.
+
 ---
 
 ## Rotating Secrets
@@ -148,17 +160,24 @@ script.
 |---|---|---|
 | `JWT_SECRET` | 48-char base64 | Written to the env file, app recreated. **All existing JWTs become invalid** — everyone logs in again |
 | `DB_PASSWORD` | 24-char base64 | Written to the env file **and** applied with `ALTER USER wv_app` against the live database, then the app restarts |
-| `SUPER_ADMIN_PASSWORD` | 24-char base64 | Written to the env file; the `users` row is updated directly when `python3` has the `bcrypt` module available |
+| `SUPER_ADMIN_PASSWORD` | 24-char base64 | Written to the env file. When `python3` has the `bcrypt` module, the `users` row for `admin@wealthview.local` is also updated directly. Then the app restarts |
 
 Only those three names are accepted; anything else is rejected. In particular
 `MFA_ENCRYPTION_KEY` is **not** rotatable through this command — rotating it would strand
 every stored TOTP secret.
 
 **Caveat on `SUPER_ADMIN_PASSWORD`:** the database row is only updated when `python3 -c
-"import bcrypt"` works. Without it, the command warns and restarts the app, but
-`SuperAdminInitializer` only creates the account when it is missing — it does not reset an
-existing password. Verify you can still log in, and if not, install `python3-bcrypt` and
-re-run, or set the password from the admin UI.
+"import bcrypt"` works. Without it, the command warns
+`python3 bcrypt not available; restarting app — SuperAdminInitializer will sync the new
+value at boot`. That message is wrong. `SuperAdminInitializer` only creates the account
+when it is missing and never resets an existing password. In that case the env file
+holds the new value and the database still holds the old one. Log in with the **old**
+password, then either install `python3-bcrypt` and re-run, or set the password from the
+admin UI.
+
+For `JWT_SECRET`, `DB_PASSWORD`, and `SUPER_ADMIN_PASSWORD` alike, the restart waits up
+to 90 seconds for the health check. If it doesn't pass, you get a warning but the
+rotation is not reverted.
 
 Take a fresh backup after any rotation so it reflects the new state:
 
@@ -171,6 +190,17 @@ Take a fresh backup after any rotation so it reflects the new state:
 ## Scheduled Jobs
 
 Scheduling is enabled application-wide (`SchedulingConfig` with `@EnableScheduling`).
+Exactly three methods carry `@Scheduled`: price sync, stock split sync, and Zillow
+valuation sync. They are described below.
+
+There is **no** scheduled exchange-rate job. Exchange rates are entered by hand per tenant
+(see [Tenant & User Management](tenant-and-user-management.md#exchange-rates)). There are
+also no cleanup jobs; see [Tables That Only Grow](#tables-that-only-grow).
+
+Scheduling has no distributed lock (no ShedLock or similar). Every app instance runs every
+job, so run a single app container. The compose files already do.
+
+Each job logs one `Starting ...` line and one `... complete` line at INFO.
 
 ### Price Sync
 
@@ -208,7 +238,17 @@ arguments — use it when you want to poke around rather than run a single query
    `POST /api/v1/admin/prices/sync`.
 
 **Notes:**
-- The job does not run on weekends or market holidays. Missing weekend prices is expected.
+- The job does not run on weekends, so missing weekend prices are expected. It does still
+  fire on market holidays, and stores whatever price Finnhub reports under that date.
+- A run counts as successful in the metrics
+  (`wealthview.scheduled.runs{job="priceSync",status="success"}` and the `last_success`
+  gauge) even when every symbol failed. Only an exception that escapes the whole loop
+  counts as a failure. Check `wealthview.pricefeed.symbols{status="failure"}` or the
+  `Daily price sync complete: N succeeded, M failed` log line.
+- **Yahoo Finance** is a second, manual-only price source. It needs no API key and is
+  always available. From `/admin` → Prices → **Yahoo Finance** (or
+  `POST /api/v1/admin/prices/yahoo/sync`) it pulls the last 5 days for every tracked
+  symbol. Nothing schedules it.
 - Requests are throttled by `app.finnhub.rate-limit-ms` (default 1100ms) to stay inside
   Finnhub's free-tier limit of 60 requests/minute. With many symbols the sync takes
   several minutes.
@@ -221,8 +261,11 @@ arguments — use it when you want to poke around rather than run a single query
 | **What it does** | Fetches splits from Finnhub for every distinct symbol in transactions, and applies any split not already recorded — adjusting transactions, holdings, and historical prices |
 | **Requirement** | `FINNHUB_API_KEY` (same conditional wiring as price sync) |
 
-Manual entry and un-apply live under `/api/v1/admin/stock-splits` and the `/admin` →
-Stock Splits tab. See [Stock Splits](../operations/stock-splits.md).
+A run fetches from 7 days before the last recorded sync
+(`system_config` key `stock_splits.last_sync_at`) up to today. `POST
+/api/v1/admin/stock-splits/sync` runs the same sweep on demand. Manual entry and un-apply
+live under `/api/v1/admin/stock-splits` and the `/admin` → Stock Splits tab. See
+[Stock Splits](../operations/stock-splits.md).
 
 ### Zillow Valuation Sync
 
@@ -253,6 +296,27 @@ docker compose exec db psql -U wv_app wealthview -c "
 2. Check logs for Zillow errors: `./wv logs app --tail 500 --no-follow | grep -i zillow`
 3. Zillow may block or rate-limit scraping. Failures are logged and the property's value
    remains unchanged — no data is lost.
+
+There is no admin endpoint to trigger the whole sweep on demand. Use the per-property
+refresh instead.
+
+### Startup and Event-Driven Tasks
+
+These are not `@Scheduled`, but they also run without anyone asking:
+
+| Task | When | What it does |
+|---|---|---|
+| `SuperAdminInitializer` | Every start (`dev`, `docker`, `prod`) | Creates the `System` tenant and `admin@wealthview.local` if that email does not exist. Never changes an existing account |
+| `SystemConfigInitializer` | Every start | Inserts the default `system_config` rows if they are missing. Never overwrites existing rows |
+| `StockSplitBackfillRunner` | Once, on a background thread after the first start with a Finnhub key | Applies historical splits for every symbol back to its earliest transaction, then sets `stock_splits.backfill_completed = true` so it never runs again. Turn it off with `app.stock-splits.backfill-auto-run=false` |
+| Historical price backfill | After a transaction creates a holding in a symbol that has no `prices` rows | Requests 2 years of daily candles from Finnhub for that symbol (log `operation` = `priceBackfill`). Needs `FINNHUB_API_KEY`. If Finnhub returns nothing, it logs `No candle data returned for symbol ...` and moves on |
+| `SampleDataInitializer` / `DevDataInitializer` | Start on `dev`/`docker` (sample) or `dev` (dev data) | Seed the demo tenant and `demo@wealthview.local`. Never active on `prod` |
+
+To make the split backfill run again (for example, after you add a Finnhub key to a
+deployment whose backfill already ran with gaps), set
+`stock_splits.backfill_completed` to `false` in `/admin` → **System Config** (or
+`PUT /api/v1/admin/config/stock_splits.backfill_completed` with `{"value":"false"}`).
+Then restart the app. Splits that are already recorded are skipped.
 
 ---
 
@@ -375,6 +439,30 @@ docker system prune -f
 docker image prune -a -f
 ```
 
+### Tables That Only Grow
+
+No job prunes any application table. On a household deployment they stay small, but they
+grow without bound:
+
+| Table | Grows with |
+|---|---|
+| `prices` | One row per symbol per weekday, plus backfills |
+| `audit_log` | Every audited action. Append-only by design |
+| `login_activity` | Every login attempt, successful or not |
+| `refresh_tokens`, `user_sessions` | Every login and refresh. Revoked or expired rows are kept |
+| `mfa_challenges` | Every login by an MFA-enabled user |
+| `invite_codes` | Codes are only removed by **Delete used codes**, which removes consumed codes. Expired and revoked codes stay |
+
+Check which tables are largest with the size query under
+[Database Maintenance](#checking-database-size). `login_activity` has no foreign keys, so
+trimming it by hand is safe, for example:
+
+```sql
+DELETE FROM login_activity WHERE created_at < now() - interval '180 days';
+```
+
+Take a backup first. Don't trim `audit_log`.
+
 ### Log Rotation
 
 See [monitoring-and-logging.md](monitoring-and-logging.md#log-rotation) for Docker log
@@ -487,7 +575,7 @@ took effect. Monitor with `docker stats`.
 
 | Data | Growth Rate |
 |------|-------------|
-| Prices table | ~252 rows/year per tracked symbol (one row per weekday per symbol; the two daily runs upsert the same row) |
+| Prices table | ~260 rows/year per tracked symbol (one row per weekday, holidays included; manual re-syncs upsert the same row) |
 | Transactions | Depends on import frequency — a typical household adds ~200-500/year |
 | Property valuations | ~52 rows/year per property (weekly Zillow sync) |
 | Backups | ~1-5 MB per daily backup for a small/medium dataset |

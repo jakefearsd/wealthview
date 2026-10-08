@@ -68,7 +68,7 @@ the `TransactionHashUtil` static helper, because they are part of the same workf
 | Service | Responsibility |
 |---|---|
 | `PropertyService` | Property CRUD; income and expense line items |
-| `PropertyAnalyticsService` | Cap rate, cash-on-cash return, equity growth, mortgage amortisation |
+| `PropertyAnalyticsService` | Cap rate, cash-on-cash return, equity growth, mortgage amortisation (via the `AmortizationCalculator` / `PropertyFinance` helpers, which also supply the per-year debt-service schedule projections use) |
 | `PropertyCashFlowService` | Period cash-flow rollups and detail breakdown |
 | `PropertyDepreciationService` | Straight-line and cost-segregation depreciation schedules, bonus depreciation, 481(a) catch-up |
 | `PropertyRoiService` | Hold-vs-sell ROI comparison including depreciation recapture and capital gains |
@@ -93,7 +93,7 @@ the `TransactionHashUtil` static helper, because they are part of the same workf
 
 | Service | Responsibility |
 |---|---|
-| `AuthService` | Login, registration, bcrypt comparison; returns a sealed `LoginOutcome` (`Tokens` or `MfaRequired`) |
+| `AuthService` | Login, registration (the first user registered into an empty tenant becomes its admin; later registrants are members), bcrypt comparison; returns a sealed `LoginOutcome` (`Tokens` or `MfaRequired`) |
 | `TokenService` | JWT issue/refresh; refresh-token rotation |
 | `SessionService` / `SessionStateValidator` | Per-device session listing and revocation |
 | `MfaService` / `MfaChallengeService` | TOTP enrolment, verification, recovery codes, challenge lifecycle |
@@ -122,7 +122,7 @@ All request, response, and internal transfer objects are Java records. No MapStr
 ModelMapper — each record has a static `from(Entity entity)` factory method where mapping
 is needed.
 
-**Counts:** ~51 `*Response` records, ~31 `*Request` records, 6 `*Dto` records; roughly 138
+**Counts:** ~51 `*Response` records, ~31 `*Request` records, 6 `*Dto` records; roughly 143
 files across all `dto` sub-packages.
 
 **Patterns:**
@@ -153,7 +153,8 @@ remain `com.fasterxml.jackson.annotation.*`. Field names are `snake_case` global
 
 ```java
 // Implementations live in wealthview-projection
-public interface ProjectionEngine  { ProjectionResultResponse run(ProjectionInput input); }
+public interface ProjectionEngine  { ProjectionResultResponse run(ProjectionInput input);
+                                     default ProjectionRunDetail runDetailed(ProjectionInput input) { ... } }
 public interface SpendingOptimizer { GuardrailProfileResponse optimize(GuardrailOptimizationInput in); }
 
 // Implementations live in wealthview-import
@@ -206,12 +207,13 @@ The full federal and state tax model lives in `com.wealthview.core.projection.ta
 
 | Class | Role |
 |---|---|
-| `FederalTaxCalculator` | Marginal bracket computation; reads brackets and standard deductions from the DB; projects future years with inflation indexing |
+| `FederalTaxCalculator` | Marginal bracket computation; reads brackets and standard deductions (with the per-person age-65 adder) from the DB; projection callers use seeded values flat-real, and inflation indexing applies only as a fallback for unseeded years |
 | `CapitalGainsTaxCalculator` | Long-term capital gains brackets plus NIIT on taxable-account realizations |
 | `IrmaaSurchargeCalculator` | Medicare IRMAA tiers, applied from age 65 |
 | `SocialSecurityTaxCalculator` | Provisional-income inclusion rules |
 | `SelfEmploymentTaxCalculator` | SE tax on self-employment / part-time income |
 | `RentalLossCalculator` | Passive loss computation; MAGI phase-out for the $25k rental allowance |
+| `TaxSpaceCalculator` | Re-prices a retired year's `YearTaxPicture` to report bracket / LTCG-band room, SS inclusion zone, NIIT headroom, IRMAA tier distance and effective marginal rates |
 | `StateTaxCalculatorFactory` | Returns the correct `StateTaxCalculator` by state code |
 | `BracketBasedStateTaxCalculator` | Generic bracket calculator for most states |
 | `CaliforniaStateTaxCalculator` | California-specific logic |
@@ -223,8 +225,8 @@ The full federal and state tax model lives in `com.wealthview.core.projection.ta
 
 ## Household & Mortality
 
-`com.wealthview.core.projection.household` holds `HouseholdContext`, `PersonId`, and
-`LifeExpectancy` — the value types that make both engines owner-aware (per-owner RMD streams,
+`com.wealthview.core.projection.household` holds `HouseholdContext`, `PersonId`,
+`LifeExpectancy`, and `AgeMilestones` (the 59½ early-withdrawal milestone) — the value types that make both engines owner-aware (per-owner RMD streams,
 owner-age income windows, per-person thresholds, and the first-death transition).
 
 `com.wealthview.core.projection.mortality` holds `MortalityTable` and its `@Service`

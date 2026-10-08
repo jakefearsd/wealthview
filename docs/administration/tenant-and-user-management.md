@@ -3,7 +3,8 @@
 # Tenant & User Management
 
 This guide covers the administrative operations for managing tenants, users, roles, invite
-codes, audit logging, data exports, and scheduled jobs in WealthView.
+codes, prices, exchange rates, system configuration, mobile app versions, audit logging,
+data exports, and scheduled jobs in WealthView.
 
 All of it is reachable from the consolidated admin area at `/admin`. The old `/settings`
 and `/audit-log` routes now redirect there, as does `/admin/prices`.
@@ -52,8 +53,10 @@ Everything under `/api/v1/admin/**` requires the `SUPER_ADMIN` role, with one ex
 | Reset a user's password | `PUT /api/v1/admin/users/{userId}/password` | Body: `{ "new_password": "..." }`, 12--64 chars, rejected if it is a known common password. `204 No Content` |
 | Activate/deactivate a user | `PUT /api/v1/admin/users/{userId}/active` | Body: `{ "active": false }`. `204 No Content` |
 | System statistics | `GET /api/v1/admin/system-stats` | User/tenant/account/holding/transaction counts, database size, symbols tracked, stale symbols |
-| Recent login activity | `GET /api/v1/admin/login-activity` | Email, tenant, IP address, timestamp |
-| Read/modify system config | `GET /api/v1/admin/config`, `PUT /api/v1/admin/config/{key}` | Runtime settings such as `finnhub.rate-limit-ms`, `yahoo.rate-limit-ms`, `zillow.scraper.enabled` |
+| Recent login activity | `GET /api/v1/admin/login-activity?limit=50` | Successful **and failed** attempts: email, tenant, success flag, IP address, timestamp. `limit` defaults to 50 |
+| Read/modify system config | `GET /api/v1/admin/config`, `PUT /api/v1/admin/config/{key}` | Body `{ "value": "..." }`, `204`. See [System Config](#system-config) — most of the seeded keys are not read by the running app |
+| Stock splits | `POST`/`DELETE /api/v1/admin/stock-splits[/{id}]`, `POST /api/v1/admin/stock-splits/sync` | Manual split entry, un-apply, on-demand Finnhub sync. See [Stock Splits](../operations/stock-splits.md) |
+| Mobile app version policy | `GET /api/v1/admin/mobile-versions`, `PUT /api/v1/admin/mobile-versions/{platform}` | API only, with no UI. See [Mobile App Versions](#mobile-app-versions) |
 
 **Expected error responses:** a missing tenant or user is `404 Not Found`; a non-super-admin
 caller gets `403 Forbidden`; an unauthenticated caller gets `401 Unauthorized`. All of them
@@ -73,11 +76,11 @@ Tenants, Stock Splits, System Config) only when the logged-in role is `super_adm
 | Dashboard | super-admin only | System stats and recent login activity |
 | Users | everyone who reaches `/admin` | Manage users (see [Managing Users](#managing-users)) |
 | Tenants | super-admin only | Create tenants, enable/disable them, create an invite code for a tenant |
-| Prices | everyone who reaches `/admin` | Price browser, manual entry, Finnhub/Yahoo sync |
-| Stock Splits | super-admin only | Review, add, and un-apply splits |
-| Exchange Rates | everyone who reaches `/admin` | Per-currency manual rates |
+| Prices | everyone who reaches `/admin` | Tabs: **Finnhub Sync**, **Yahoo Finance**, **CSV Upload**, **Browse**. See [Price Administration](#price-administration) |
+| Stock Splits | super-admin only | Review, add, and un-apply splits; "sync now" |
+| Exchange Rates | everyone who reaches `/admin` | The tenant's manual currency → USD rates. See [Exchange Rates](#exchange-rates) |
 | Invite Codes | everyone who reaches `/admin` | Generate, revoke, and clean up invite codes |
-| System Config | super-admin only | Runtime configuration keys |
+| System Config | super-admin only | View and edit `system_config` rows |
 | Audit Log | everyone who reaches `/admin` (API requires admin or super-admin) | Paginated audit trail with entity-type filtering |
 
 The default section is **Dashboard** for a super-admin and **Users** for everyone else.
@@ -117,7 +120,9 @@ Everything a Viewer can do, plus write access:
 - Import data (CSV, OFX)
 
 Members cannot manage invite codes or other users, and cannot write price data
-(`POST`/`PUT`/`DELETE` on `/api/v1/prices/**` requires `ADMIN` or `SUPER_ADMIN`).
+(`POST`/`PUT`/`DELETE` on `/api/v1/prices/**` requires `ADMIN` or `SUPER_ADMIN`). They
+**can** create, change, and delete their tenant's exchange rates: `/api/v1/exchange-rates`
+has no admin-specific matcher, so it falls under the general Member write rule.
 
 **Use case:** the primary user role. Most users should be Members.
 
@@ -181,12 +186,20 @@ valid code.
 3. **Sharing:** the admin shares the code out of band (email, chat). Codes are never
    emailed automatically. The UI offers a copy-to-clipboard button.
 4. **Consumption:** the invitee registers at `/register` with their email, a password, and
-   the code. On success the code records `consumed_by` / `consumed_at`, and the new user
+   the code. Passwords must be 8–64 characters and not on the common-password list. Note
+   that admin password resets require 12–64. On success the code records
+   `consumed_by` / `consumed_at`, and the new user
    joins **the code's tenant**. The role is `member`, except that the first user to
    register into a tenant that has no users becomes that tenant's `admin` (see
    [Bootstrapping a New Tenant](#bootstrapping-a-new-tenant)).
 5. **Terminal states:** a code that is consumed, revoked, or expired cannot be used or
-   reactivated. Registration attempts against one fail with `InvalidInviteCodeException`.
+   reactivated. Registration attempts against one fail with `400` and the message
+   `Invalid or expired invite code`. That is the same response as for a code that never
+   existed. An email that is already registered gets `409 Email already registered`, but
+   only after the code has been validated.
+
+`expiry_days` is not range-checked. `0` or a negative number produces a code that is
+already expired.
 
 ### Bootstrapping a New Tenant
 
@@ -212,7 +225,7 @@ user has been removed.
 | Generate code | `POST /api/v1/tenant/invite-codes` | Optional body `{ "expiry_days": 7 }`. Returns `201 Created` with `code`, `expires_at`, `consumed`, `is_revoked`, `used_by_email`, `created_by_email`, `created_at` |
 | List codes | `GET /api/v1/tenant/invite-codes` | All codes for the tenant — active, expired, revoked, and consumed |
 | Revoke a code | `PUT /api/v1/tenant/invite-codes/{id}/revoke` | `204 No Content`. The code can no longer be redeemed |
-| Delete used codes | `DELETE /api/v1/tenant/invite-codes/used` | Bulk cleanup. Returns `{ "deleted": N }` |
+| Delete used codes | `DELETE /api/v1/tenant/invite-codes/used` | Bulk cleanup of **consumed** codes only. Expired and revoked codes are kept. Returns `{ "deleted": N }` |
 
 All four require `ADMIN` or `SUPER_ADMIN`.
 
@@ -233,13 +246,26 @@ Tenant Admins manage users within their own tenant:
 Behaviour worth knowing:
 
 - **The super-admin cannot be demoted.** `updateUserRole` rejects any attempt to change the
-  role of a user with `is_super_admin = true`.
+  role of a user with `is_super_admin = true` (`409 Cannot modify super admin role`).
+  There is **no** equivalent guard on delete or deactivate. A super-admin can remove or
+  deactivate their own account through `DELETE /api/v1/tenant/users/{id}` or
+  `PUT /api/v1/admin/users/{id}/active` and lock everyone out of the admin area. If that
+  happens, re-enable the row with `./wv psql`
+  (`UPDATE users SET is_active = true WHERE email = 'admin@wealthview.local';`). If the
+  row was deleted, restart the app. `SuperAdminInitializer` recreates the account, inside a
+  new `System` tenant, using the current `SUPER_ADMIN_PASSWORD`.
 - **Role changes and password resets invalidate existing sessions.** Both bump the user's
   `token_generation`, so already-issued JWTs stop validating and the user must log in
   again.
 - **Deactivating is safer than deleting.** A super-admin can flip `is_active` with
   `PUT /api/v1/admin/users/{userId}/active`, which blocks login while leaving every
-  reference intact.
+  reference intact. It takes effect immediately: every authenticated request re-checks
+  the user and tenant `is_active` flags (`SessionStateValidator`). A deactivated user's
+  existing sessions stop working on their next request, and the app logs
+  `Session rejected: user ... is disabled`. Disabling a tenant does the same to every user
+  in it.
+- **Password reset rules.** 12–64 characters and not a known common password
+  (`400 Password is too common — choose a stronger one`).
 
 **Data impact of removing a user:**
 
@@ -251,7 +277,8 @@ Behaviour worth knowing:
 - `audit_log.user_id` and `invite_codes.created_by` / `consumed_by` reference `users(id)`
   with **no** `ON DELETE` rule. A user who has logged in, created an invite code, or
   registered through one still has rows pointing at them, so the delete can fail with a
-  foreign-key violation. Clearing consumed codes (`DELETE /api/v1/tenant/invite-codes/used`)
+  foreign-key violation. The API reports that as `400 BAD_REQUEST`,
+  `Request violates a database constraint: ...`. Clearing consumed codes (`DELETE /api/v1/tenant/invite-codes/used`)
   removes one class of reference; audit rows are immutable by design. When in doubt,
   deactivate instead of deleting.
 
@@ -274,8 +301,13 @@ deleted by the application.
 | `UPDATE` | `holding`, `transaction` | Holding/transaction services |
 | `CREATE` | `holding`, `tenant` | Holding service, tenant creation |
 | `SET_ACTIVE` | `tenant` | Super-admin tenant enable/disable |
-| `LOGIN`, `REGISTER` | `user` | Authentication service |
+| `LOGIN` (successful logins only), `REGISTER` | `user` | Authentication service |
 | `USER_ROLE_UPDATE`, `USER_DELETE`, `USER_PASSWORD_RESET`, `USER_SET_ACTIVE` | `user` | User management service |
+
+**Not audited:** failed logins (see `login_activity`), invite-code generation and
+revocation, price writes, stock-split apply/un-apply, system-config changes,
+exchange-rate changes, and mobile-version changes. Those leave an INFO line in the
+application log and nothing in `audit_log`.
 
 ### Audit Record Fields
 
@@ -290,8 +322,9 @@ deleted by the application.
 | `details` | JSONB object with additional context (e.g. `old_role`/`new_role`, `email`) |
 | `created_at` | Timestamp of the event |
 
-The table also stores `ip_address`, but the API response does not include it. Query the
-`audit_log` table directly (`./wv psql`) if you need it.
+The table has an `ip_address` column, but nothing writes to it, so it is always `NULL`.
+Client IPs for authentication are recorded in `login_activity` instead. Read them with
+`GET /api/v1/admin/login-activity` or `./wv psql`.
 
 ### Querying the Audit Log
 
@@ -307,14 +340,108 @@ GET /api/v1/audit-log?page=0&size=20&entity_type=account
 
 ### What to Look For
 
-- **Unauthorized access attempts:** `LOGIN` events at unusual times or from unexpected IPs
-  (cross-check `GET /api/v1/admin/login-activity`, which includes the IP address)
+- **Unauthorized access attempts:** `LOGIN` events at unusual times. For IPs and failed
+  attempts, use `GET /api/v1/admin/login-activity`; failures never reach `audit_log`
 - **Unexpected modifications:** `UPDATE`/`DELETE` during off-hours
 - **Privilege changes:** `USER_ROLE_UPDATE`, `USER_SET_ACTIVE`, `USER_PASSWORD_RESET`
 - **Tenant lockouts:** `SET_ACTIVE` on a tenant
 
 **Frontend:** `/admin` → **Audit Log**, with pagination and an entity-type filter. The old
 `/audit-log` route redirects here.
+
+---
+
+## Price Administration
+
+Prices are shared across all tenants. Every tenant's holdings read the same `prices`
+table. `/api/v1/admin/prices/**` is open to `ADMIN` and `SUPER_ADMIN`. That means a tenant
+admin can change prices that every other tenant sees.
+
+| Operation | Endpoint | UI tab | Notes |
+|---|---|---|---|
+| Sync status | `GET /api/v1/admin/prices/status` | Finnhub Sync | Per symbol: latest date, source, and `stale`. A price is stale when it is older than 2 weekdays |
+| Finnhub sync now | `POST /api/v1/admin/prices/sync` | Finnhub Sync | Same code as the 6 PM ET job. Returns `503`, `Finnhub API key is not configured. Set app.finnhub.api-key in your environment.`, when there is no key |
+| Yahoo sync all | `POST /api/v1/admin/prices/yahoo/sync` | Yahoo Finance | Last 5 days for every symbol in the status list. No key needed. Source `yahoo` |
+| Yahoo fetch (preview) | `POST /api/v1/admin/prices/yahoo/fetch` | Yahoo Finance | Body `{ "symbols": [...], "from_date": "YYYY-MM-DD", "to_date": "YYYY-MM-DD" }`. Returns prices without saving them |
+| Yahoo save | `POST /api/v1/admin/prices/yahoo/save` | Yahoo Finance | Saves the previewed rows (`204`) |
+| CSV upload | `POST /api/v1/admin/prices/csv` (multipart `file`) | CSV Upload | First line is a header and is skipped. Then `symbol,date,close_price` with ISO dates. Future dates are rejected. Saved with source `manual`. Returns the imported count and per-line errors |
+| Browse history | `GET /api/v1/admin/prices/{symbol}/history?from=&to=` | Browse | |
+| Delete one price | `DELETE /api/v1/admin/prices/{symbol}/{date}` | Browse | `404 Price not found for symbol X on D` |
+
+Every write evicts the cached balances and latest prices, so dashboards pick up the change
+right away.
+
+---
+
+## Exchange Rates
+
+Exchange rates are **per tenant** and entirely manual. No job fetches them. Each row is
+`currency_code` (three uppercase letters) → `rate_to_usd` (must be greater than 0). USD
+is implicit and is always 1.0.
+
+| Operation | Endpoint | Notes |
+|---|---|---|
+| List | `GET /api/v1/exchange-rates` | Any authenticated user |
+| Create | `POST /api/v1/exchange-rates` | `{ "currency_code": "EUR", "rate_to_usd": 1.08 }`, `201`. `400` for USD, `409` if the currency already exists |
+| Update | `PUT /api/v1/exchange-rates/{currencyCode}` | Same body. Only the rate is used |
+| Delete | `DELETE /api/v1/exchange-rates/{currencyCode}` | `204`. `409 Cannot delete EUR rate: N account(s) use this currency` while any account is still in that currency |
+
+Writes require `ADMIN`, `MEMBER`, or `SUPER_ADMIN` (see the Member note above).
+**Frontend:** `/admin` → **Exchange Rates**.
+
+---
+
+## System Config
+
+`/admin` → **System Config** edits the `system_config` key/value table. On every start,
+`SystemConfigInitializer` inserts these keys if they are missing (it never overwrites):
+
+| Key | Seeded from | Read by the running app? |
+|---|---|---|
+| `finnhub.api-key` | `FINNHUB_API_KEY`, only when it is set | **No.** The app uses the environment variable. Shown masked (`abcd****wxyz`) |
+| `finnhub.rate-limit-ms` | `app.finnhub.rate-limit-ms` (1100) | **No.** |
+| `yahoo.rate-limit-ms` | `app.yahoo.rate-limit-ms` (500) | **No.** |
+| `zillow.scraper.enabled` | always `false` | **No.** Zillow is controlled by `ZILLOW_ENABLED` |
+
+Editing those four rows changes nothing at runtime. To change Finnhub, Yahoo, or Zillow
+behaviour, set the environment or Spring property and restart. Rotating
+`FINNHUB_API_KEY` also does not update the stored copy. That copy is plaintext in the
+database (and in every backup); it is only masked in the API response.
+
+The stock-split jobs write and read two keys that **are** live:
+
+| Key | Meaning |
+|---|---|
+| `stock_splits.last_sync_at` | High-water mark of the nightly split sync (ISO instant). The next run starts 7 days before it |
+| `stock_splits.backfill_completed` | `true` once the one-time split backfill has run. Set it to `false` and restart to run the backfill again |
+
+`PUT /api/v1/admin/config/{key}` creates the key if it does not exist, and accepts any
+value.
+
+---
+
+## Mobile App Versions
+
+The mobile app calls the anonymous `GET /api/v1/app/version-check?platform=&version=` on
+launch. The response tells the app whether an update is required (below the minimum),
+recommended (below the latest), or not needed. A super-admin manages the policy over the
+API. There is no web UI for it.
+
+```bash
+GET /api/v1/admin/mobile-versions
+PUT /api/v1/admin/mobile-versions/ios
+{ "minimum_supported_version": "1.2.0", "latest_version": "1.4.1",
+  "store_url": "https://apps.apple.com/...", "message": "optional banner text" }
+```
+
+- `platform` must be `android` or `ios`. Anything else gets
+  `400 Unknown platform: X (supported: android, ios)`.
+- Both versions must be valid semver, and `store_url` must be non-blank. `message` is
+  optional.
+- Migrations seed both rows with `0.0.1` and **placeholder store URLs**. Set real values
+  before you ship a mobile build.
+- Results are cached per platform, and an update evicts that platform's cache entry.
+- Outcomes are counted in `wealthview.app.version_check_total{platform,outcome}`.
 
 ---
 
@@ -357,7 +484,9 @@ profiles, and income sources.
 ## Scheduled Jobs
 
 Three background jobs run on a schedule. Full detail, verification queries, and failure
-handling live in [maintenance.md](maintenance.md#scheduled-jobs); the summary:
+handling live in [maintenance.md](maintenance.md#scheduled-jobs), along with the startup
+tasks (super-admin creation, one-time stock-split backfill, and the historical price
+backfill for new symbols). There is no exchange-rate job and no cleanup job. The summary:
 
 | Job | Schedule | Requirement |
 |---|---|---|
@@ -374,7 +503,9 @@ handling live in [maintenance.md](maintenance.md#scheduled-jobs); the summary:
 - **Zillow sync:** Zillow may block or rate-limit scraping. Failures are logged and the
   property's stored value is left unchanged — no data is lost.
 - There is no retry mechanism. Each job simply runs again at its next scheduled time.
-  Price sync can also be triggered on demand from `/admin` → **Prices**.
+  Price sync can be triggered on demand from `/admin` → **Prices**, and split sync from
+  `/admin` → **Stock Splits**. Zillow has no whole-sweep trigger, only the per-property
+  refresh.
 
 ---
 

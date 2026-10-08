@@ -172,6 +172,14 @@ sudo ufw enable
 `cloudflared` connects *outbound* to Cloudflare, so you don't need any
 inbound rule for HTTP/HTTPS at all.
 
+> **ufw does not filter Docker-published ports.** Docker inserts its own
+> iptables rules for every `ports:` mapping, and they are evaluated before
+> ufw's chains. With the default `"${APP_PORT:-80}:8080"` mapping the app is
+> reachable on every interface no matter what `ufw status` says. Bind the
+> published port to loopback (see
+> [No unnecessary port publishing](#no-unnecessary-port-publishing)) rather
+> than relying on the firewall.
+
 ### SSH
 
 Disable password authentication (keys only):
@@ -227,7 +235,7 @@ Verify after a rebuild:
 
 ```bash
 docker compose -f docker-compose.prod.yml exec app id
-# uid=101(wv) gid=101(wv) groups=101(wv)
+# uid=<n>(wv) gid=<n>(wv) groups=<n>(wv)   — a system uid, never 0
 ```
 
 ### Container-level HEALTHCHECK
@@ -258,9 +266,10 @@ independent of the container's own HEALTHCHECK.
 ### Image pinning and restart policy
 
 `docker-compose.prod.yml` pins the app to
-`wealthview:${WEALTHVIEW_VERSION:?...}` — the `:?` form means Compose refuses
-to start without an explicit version, so `:latest` can never be deployed by
-accident. The `db` service is pinned by digest (`postgres:16@sha256:...`), as
+`${WEALTHVIEW_IMAGE:-ghcr.io/jakefearsd/wealthview}:${WEALTHVIEW_VERSION:?...}`
+— the `:?` form means Compose refuses to start without an explicit version, so
+nothing is deployed by accident. (`latest` *is* published and would be accepted
+if you typed it; don't — it defeats `wv rollback`.) The `db` service is pinned by digest (`postgres:16@sha256:...`), as
 are all three Dockerfile base images. All three prod services carry
 `restart: unless-stopped`.
 
@@ -273,9 +282,11 @@ other containers on the Compose-managed internal network. (The dev
 `docker-compose.yml` *does* publish Postgres on `5433` — that file is for local
 development, not for a server.)
 
-If your server has a public IP, either keep the firewall rule on port
-`${APP_PORT}` closed (so only nginx or cloudflared can reach it) or bind
-the app's published port to loopback only by editing the Compose file:
+If your server has a public IP, bind the app's published port to loopback so
+only nginx or cloudflared on the same host can reach it. A closed ufw rule is
+**not** enough — Docker's published-port rules bypass ufw (see
+[Firewall](#firewall-ufw)). Edit the Compose file (or use an override file with
+`ports: !override`, as shown in [tls-and-nginx.md](tls-and-nginx.md)):
 
 ```yaml
 services:
@@ -310,14 +321,15 @@ services:
 sudo apt-get update && sudo apt-get upgrade -y docker-ce docker-ce-cli containerd.io
 ```
 
-Rebuild periodically so you pull the latest base-image security updates:
-
-```bash
-docker compose -f docker-compose.prod.yml up --build --pull always -d
-```
-
-`--pull always` forces Docker to check for newer versions of the parent
-images (Temurin JRE, Alpine, PostgreSQL, etc.) before building.
+The app image is built by CI, not on the server, and its base images (Temurin
+JRE, Node, Maven) are pinned by digest in the `Dockerfile`; so are
+`postgres:16` in the compose files and `alpine:3.20` in
+`infra/backup/Dockerfile`. Rebuilding or `--pull always` on the host therefore
+changes nothing. Base-image security patches reach you when a release bumps
+those digests — so the way to stay patched is to keep upgrading
+(`WEALTHVIEW_VERSION` + `wv update`, see [upgrading.md](upgrading.md)), and,
+when a release changes the `db` digest in `docker-compose.prod.yml`, to
+replace your compose file and run `wv up --no-build`.
 
 ---
 
@@ -428,6 +440,7 @@ no server-side HTTP session. The path rules, in order:
 | `/api/v1/admin/prices/**` | `ADMIN` or `SUPER_ADMIN` |
 | `/api/v1/admin/**` | `SUPER_ADMIN` |
 | `POST`/`PUT`/`DELETE` on `/api/v1/prices/**` | `ADMIN` or `SUPER_ADMIN` |
+| `/api/v1/audit-log`, `/api/v1/audit-log/**` | `ADMIN` or `SUPER_ADMIN` |
 | `/api/v1/tenant/invite-codes*`, `/api/v1/tenant/users*` | `ADMIN` or `SUPER_ADMIN` |
 | `GET /api/v1/**` | authenticated |
 | `POST`/`PUT`/`DELETE` on `/api/v1/**` | `ADMIN`, `MEMBER`, or `SUPER_ADMIN` |
@@ -435,15 +448,19 @@ no server-side HTTP session. The path rules, in order:
 
 Two things to be aware of:
 
-- Only `/actuator/health` is anonymous; Prometheus scraping of
-  `/actuator/prometheus` and `/actuator/metrics` requires `SUPER_ADMIN`
-  credentials. The single exception is the `loadtest` profile, which permits
-  those two endpoints anonymously — that profile is for a throwaway local
-  synthetic-data stack and must never be activated on a server.
+- By default only `/actuator/health` is anonymous; `/actuator/prometheus` and
+  `/actuator/metrics` require `SUPER_ADMIN`. Setting
+  `app.observability.anonymous-metrics=true` (env
+  `APP_OBSERVABILITY_ANONYMOUS_METRICS`) opens those two endpoints with **no
+  authentication**. The `docker-compose.observability.yml` overlay sets it,
+  because a scraper has no way to present a JWT, and so does the `loadtest`
+  profile. Use the overlay only where the app port is not internet-reachable,
+  and block `/actuator` at the proxy.
 - `GET /api/v1/**` is gated on *authentication only*, not on role. Any
-  logged-in member of a tenant can read anything readable in their own tenant,
-  including the audit log. Role separation applies to mutations and to the
-  admin surface.
+  logged-in member of a tenant can read anything readable in their own tenant.
+  The exception is the audit log (`/api/v1/audit-log`), which requires `ADMIN`
+  or `SUPER_ADMIN`. Role separation applies to mutations and to the admin
+  surface.
 
 ### Cookies and CSRF (web client)
 
@@ -508,11 +525,17 @@ amplify one request into gigabytes of audit storage.
 
 ### HTTP security headers
 
-Every response from the Spring Boot layer carries:
+Every response from the Spring Boot layer carries the headers below — except
+HSTS, which Spring Security writes **only on requests it sees as HTTPS**. The
+app does not act on `X-Forwarded-Proto` (no `server.forward-headers-strategy`
+is configured), so behind nginx or Cloudflare Tunnel, where it receives plain
+HTTP, it never sends HSTS. Set HSTS at the edge: the nginx vhost in
+[tls-and-nginx.md](tls-and-nginx.md) does, and Cloudflare offers it under
+**SSL/TLS → Edge Certificates**.
 
 | Header | Value |
 |--------|-------|
-| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains; preload` |
+| `Strict-Transport-Security` | `max-age=31536000 ; includeSubDomains ; preload` (HTTPS requests only — see above) |
 | `X-Content-Type-Options` | `nosniff` |
 | `X-Frame-Options` | `DENY` |
 | `Content-Security-Policy` | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'` |
@@ -659,9 +682,10 @@ If you front the app with `nginx.conf` as-is on anything public, you get no
 TLS and no headers from the proxy layer. Use `nginx-prod.conf` (or certbot's
 generated vhost) for a real deployment.
 
-**HSTS preload:** the app and `nginx-prod.conf` both send the `preload`
-directive, but preloading is not active until you actually submit the domain
-at <https://hstspreload.org>. That step can only be done by you, and is easy to
+**HSTS preload:** the app (on direct-HTTPS requests only) and
+`nginx-prod.conf` both send the `preload` directive (the vhost in
+[tls-and-nginx.md](tls-and-nginx.md) does not include it), but preloading is
+not active until you actually submit the domain at <https://hstspreload.org>. That step can only be done by you, and is easy to
 mistake for "done" because the header is present.
 
 For Cloudflare-specific hardening options (Access, WAF, rate limiting at the
@@ -743,17 +767,23 @@ Use this to verify your deployment:
       `.env` alone does not reach the container
 - [ ] App starts cleanly on the `prod` profile (no `ProductionConfigValidator` errors)
 - [ ] `/actuator/prometheus` returns 401/403 to an unauthenticated caller
+      (expected to return 200 on the compose network if you run the
+      observability overlay — then make sure `/actuator` is blocked at the
+      proxy and the app port is loopback-only)
 - [ ] Firewall allows only the ports you need (22, optionally 80 + 443)
 - [ ] SSH password auth is disabled; root login disabled
 - [ ] Automatic host-OS security updates enabled (`unattended-upgrades`)
 - [ ] `db` container has no published ports in production
-- [ ] `app` container published port is bound to loopback or firewalled
+- [ ] `app` container published port is bound to loopback (ufw alone does not
+      filter Docker-published ports)
 - [ ] Container runs as `wv` (non-root) — verified via `docker exec ... id`
 - [ ] App answers `./wv status`; `docker compose ps` should also show `(healthy)`
       now that the image's own `wget` HEALTHCHECK is the only definition
 - [ ] `WEALTHVIEW_VERSION` pinned to a real version, never `latest`
 - [ ] TLS end-to-end: `curl -s https://your-domain/actuator/health` returns `{"status":"UP"}`
 - [ ] Security headers present: `curl -sI https://your-domain | grep -Ei 'strict-transport|permissions-policy|x-frame-options|x-content-type'`
+      — HSTS must come from your proxy or Cloudflare (the app omits it behind a
+      TLS-terminating proxy)
 - [ ] `Referrer-Policy` present — the app does not send it; your proxy must
 - [ ] Backups running: `./wv backups` shows recent dumps (encrypted if `--encrypt`)
 - [ ] You have tested a restore at least once in a non-prod environment

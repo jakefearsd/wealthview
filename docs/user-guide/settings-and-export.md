@@ -58,14 +58,14 @@ Lists everyone you can manage. What you see depends on your role.
 
 **As an admin**, you see the users in your own tenant: **Email**, **Role**, join date, and a **Remove** action. The role dropdown offers **Admin**, **Member**, and **Viewer**.
 
-**As a super-admin**, you see every user across every tenant, with extra **Tenant** and **Status** columns (**Active** / **Disabled**) and three actions per row: **Reset PW**, **Deactivate** / **Activate**, and **Delete**. The role dropdown adds **Super Admin**.
+**As a super-admin**, you see every user across every tenant, with extra **Tenant** and **Status** columns (**Active** / **Disabled**) and up to three actions per row: **Reset PW**, **Deactivate** / **Activate**, and — for users in your own tenant only — **Delete**. The role dropdown (Admin, Member, Viewer) is only offered for users in your own tenant; other tenants' users, and any super-admin, show their role as plain text. Super Admin is never assignable from this screen.
 
 ### Roles
 
 | Role | Permissions |
 |------|------------|
 | **Viewer** | Read-only access to the tenant's data. |
-| **Member** | Can create and edit accounts, transactions, properties, projections, and exchange rates. |
+| **Member** | Can create and edit accounts, transactions, properties, and projections. |
 | **Admin** | All member permissions, plus user management, invite codes, and price administration. |
 | **Super Admin** | Everything, across all tenants. |
 
@@ -87,7 +87,10 @@ Removing a user revokes their access but does **not** delete the tenant's data. 
 
 Create and manage tenants — the isolation boundary for all data in WealthView.
 
-**Create Tenant** takes a tenant name. The list below shows **Name**, **Users**, **Accounts**, **Status** (**Active** / **Disabled**), and **Created**, with a **Disable** / **Enable** toggle per row.
+**Create Tenant** takes a tenant name. The list below shows **Name**, **Users**, **Accounts**, **Status** (**Active** / **Disabled**), and **Created**, with two actions per row:
+
+- **Create invite code** — mints an invite code for that tenant and shows it in an **Invite code for {tenant}** panel with its expiry and a **Copy** link. This is how you get the first person into a brand-new tenant: the first user to register into a tenant with no users becomes that tenant's **Admin**, and can then invite and manage everyone else from their own Admin area. The action is disabled for a disabled tenant (*"Enable the tenant to create invite codes"*).
+- **Disable** / **Enable** — toggles whether the tenant is active.
 
 ---
 
@@ -232,7 +235,7 @@ Two security features exist in the WealthView backend but have **no screens in t
 - **Multi-factor authentication (TOTP)** — setup, verification, recovery codes, status, and disable all exist as API endpoints under `/api/v1/auth/mfa`, and the login flow supports an MFA challenge. There is no setup wizard or QR code screen in the web UI.
 - **Session management** — you can list your active sessions, revoke one, or revoke all sessions except your current one via `/api/v1/auth/sessions`. There is no session list screen in the web UI.
 
-Similarly, **notification preferences** (for large transactions, completed imports, and failed imports) exist as an API but have no settings screen. Preferences default to enabled.
+Similarly, **notification preferences** (for large transactions, completed imports, and failed imports) exist as an API under `/api/v1/notifications/preferences` but have no settings screen. Preferences default to enabled. Note that WealthView does not currently send any of these notifications — the preferences are only stored.
 
 If you need any of these today, you'll need to call the API directly.
 
@@ -244,7 +247,7 @@ Navigate to **Export** in the sidebar.
 
 ### Full Export (JSON)
 
-> *Download all your data (accounts, transactions, holdings, properties) as a single JSON file.*
+> *Download your accounts, transactions, holdings and properties as a single JSON file. Only those four tables are included. Not included: prices, exchange rates, income sources, property expenses, rental income and valuations, projection scenarios, spending profiles and optimizer profiles.*
 
 Click **Download JSON**. You get `wealthview-export.json` containing four top-level sections:
 
@@ -257,7 +260,7 @@ Click **Download JSON**. You get `wealthview-export.json` containing four top-le
 
 ### CSV Export
 
-> *Download individual data tables as CSV files.*
+> *Download the accounts, transactions, holdings or properties table as a CSV file.*
 
 Four buttons, one per table:
 

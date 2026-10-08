@@ -31,8 +31,8 @@ households (tenants), each with fully isolated data.
 | JSON | Jackson 3 (`tools.jackson.*`; annotations stay `com.fasterxml.jackson.annotation`) |
 | Database | PostgreSQL 16, Flyway 13 (81 versioned + 9 repeatable migrations), Hibernate 7 |
 | Auth | JWT bearer tokens + CSRF-protected cookies, bcrypt (strength 12), TOTP MFA, invite-code registration |
-| Import | Apache Commons CSV 1.14.1, OFX4J 1.39, jsoup 1.23.1 |
-| Caching | Caffeine 3.2.4 — five named caches, Micrometer-instrumented |
+| Import | Apache Commons CSV 1.14.1, OFX4J 1.39, jsoup 1.23.2 |
+| Caching | Caffeine 3.3.0 — five named caches, Micrometer-instrumented |
 | Scheduling | Spring `@Scheduled` — weekday price sync, nightly stock-split sync, weekly Zillow valuation |
 | Observability | Micrometer + Prometheus, OpenTelemetry tracing bridge, JSON logging via logstash-logback-encoder |
 | Testing | JUnit 5, Mockito (`@MockitoBean`), AssertJ, Testcontainers 2.0.5 (PostgreSQL 16) |

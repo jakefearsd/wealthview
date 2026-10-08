@@ -40,7 +40,10 @@ Three Compose files live at the repo root:
 | `docker-compose.observability.yml` | `prometheus`, `grafana` | — | Optional overlay for the prod file. Needs `GRAFANA_ADMIN_PASSWORD`. |
 
 All secrets come from a `.env` file next to the compose file. `.env.example` is
-the template; `.env` is gitignored.
+the template; `.env` is gitignored. Compose reads that file from the compose
+file's own directory (`wv` does not pass `--env-file`), so on a source-less
+install keep `WV_ENV_FILE` pointing at the `.env` that sits beside
+`WV_COMPOSE_FILE`.
 
 ---
 
@@ -80,7 +83,7 @@ up  down  restart  status  logs  psql
 backup  backups (list-backups)  restore  verify
 update  rollback
 migrate-out  migrate-in
-rotate-secret  config-check  help
+rotate-secret  config-check  prune  help
 ```
 
 Global flags: `--config FILE`, `--host USER@HOST`. `wv help` is the full
@@ -105,6 +108,11 @@ literally `CHANGE_ME`.
 Production adds two more: `WEALTHVIEW_VERSION` (the release to pull — **never**
 `latest`, which defeats `wv rollback`) and `CORS_ORIGIN` (must be a non-empty
 `https://` value).
+
+The `prod` profile marks the auth and CSRF cookies `Secure`
+(`app.cookie.secure` defaults to `true`), so a browser will not log in over
+plain `http://` (browsers make an exception only for `http://localhost`) — put TLS in front of the app (nginx or Cloudflare Tunnel)
+before the first login.
 
 Optional: `WEALTHVIEW_IMAGE` (registry/repository holding the app image;
 defaults to the upstream GHCR package — set it only for a fork, a private

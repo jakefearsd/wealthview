@@ -104,7 +104,7 @@ npm dependencies); later builds reuse Docker's layer cache and are much faster.
 Useful flags: `--no-build` (skip the rebuild), `--no-detach` (run in the
 foreground), `--no-wait` (skip the health poll).
 
-To watch the startup logs until you see `Started WealthviewApplication`:
+To watch the startup logs until you see `Started WealthViewApplication`:
 
 ```bash
 ./wv logs app

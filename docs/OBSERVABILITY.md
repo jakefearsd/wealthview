@@ -66,8 +66,12 @@ reason about rather than two).
 Because the endpoints are unauthenticated wherever the flag is on:
 
 - Only enable it where the app's port is **not** reachable from the internet.
-  In the bundled stack the app is scraped over the compose network and its port
-  is not published.
+  Prometheus does scrape the app over the compose network, but the app's port
+  **is** still published. `docker-compose.prod.yml` maps `${APP_PORT:-80}:8080`
+  and the overlay doesn't remove that mapping. So
+  `http://<host>:${APP_PORT}/actuator/prometheus` answers anonymously on any
+  host running the overlay. Firewall `APP_PORT`, or block the two metrics paths
+  at the reverse proxy.
 - Keep `/actuator` blocked at the reverse proxy regardless — see
   `docs/deployment/security-hardening.md`.
 - Metrics carry no `tenantId`/`userId` (see "Common tags"), but they do expose
@@ -107,7 +111,7 @@ would explode Prometheus' index and leak PII through scrape output.
 | `wealthview.app.version_check_total` | Counter | `platform`, `outcome` (up_to_date/update_recommended/update_required/invalid_request) | `MobileAppVersionService` |
 | `wealthview.scenarios`        | Counter   | `action` (create/update/delete) | `ScenarioCrudService`           |
 | `wealthview.scheduled.runs`   | Counter   | `job`, `status` (success/failure) | `PriceSyncService`, `PropertyValuationSyncService` |
-| `wealthview.scheduled.last_success_seconds` | Gauge | `job` (priceSync, propertyValuationSync) | same two services |
+| `wealthview.scheduled.last_success_seconds` | Gauge | `job` (priceSync, propertyValuationSync) — exposed by Prometheus as `exported_job`, see "Alerting rules" | same two services |
 | `wealthview.import.process`   | Timer     | (auto from `@Timed`)       | `ImportService.processImport`        |
 | `wealthview.import.rows`      | Counter   | `outcome` (imported/duplicate/error) | `ImportService.processImport` |
 | `wealthview.imports`          | Counter   | `format`, `status`         | `ImportService.processImport`        |
@@ -204,7 +208,10 @@ Spring Boot also ships rich built-ins: `http_server_requests_seconds_*`,
   class's own `@ExceptionHandler` declarations so it cannot drift).
 - For scheduled jobs, emit both a per-run counter (`wealthview.scheduled.runs{job, status}`)
   and a "last success" gauge (`wealthview.scheduled.last_success_seconds{job}`).
-  Alert with `time() - wealthview_scheduled_last_success_seconds{job=...} > <threshold>`.
+  Alert with `time() - wealthview_scheduled_last_success_seconds{exported_job=...} > <threshold>`.
+  In the scraped series the tag is `exported_job`, because it collides with Prometheus'
+  own `job` target label. These gauges are in-memory and read `0` after every restart
+  until the job runs again.
 
 ---
 
@@ -215,20 +222,28 @@ you need to investigate a slow request.
 
 ### Turning it on
 
-Set these env vars (e.g. in your `.env` next to `docker-compose.prod.yml`):
+Set these env vars on the **app container**. A line in `.env` alone is not enough:
+`docker-compose.prod.yml` passes only a fixed list of variables to the app, and these are
+not on it. Put them in a compose override file. In a source checkout, `./wv`
+automatically adds `docker-compose.prod.override.yml` from the repo root when it exists.
+With `wv` installed to `/usr/local/bin`, point `WV_COMPOSE_OVERRIDE_FILE` in `wv.conf` at
+the file:
 
-```bash
-MANAGEMENT_TRACING_ENABLED=true
-OTEL_EXPORTER_OTLP_ENDPOINT=http://my-collector:4318/v1/traces
-# Optional, default 0.1. Set to 1.0 during an incident.
-MANAGEMENT_TRACING_SAMPLING_PROBABILITY=1.0
+```yaml
+services:
+  app:
+    environment:
+      MANAGEMENT_TRACING_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://my-collector:4318/v1/traces
+      # Optional, default 0.1. Set to 1.0 during an incident.
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "1.0"
 ```
 
 `OTEL_EXPORTER_OTLP_ENDPOINT` is consumed through
 `management.otlp.tracing.endpoint`, which defaults to
 `http://localhost:4318/v1/traces` when the env var is absent.
 
-Restart the app. Spring Boot picks up the env vars and wires:
+Recreate the app (`./wv restart --no-build`). Spring Boot picks up the env vars and wires:
 
 - `micrometer-tracing-bridge-otel` — converts Micrometer Observations to
   OpenTelemetry spans.
@@ -340,9 +355,11 @@ Under `docker`/`prod` each line is a complete JSON object from
 `requestId`, `tenantId`, `userId`, `operation`, `traceId` and `spanId` are
 promoted from the MDC to top-level keys rather than nested under `mdc`, and
 `{"application":"wealthview"}` is added as a custom field. The JSON appender
-sits behind an `AsyncAppender` (`queueSize` 2048, `discardingThreshold` 0) so
-application threads never block on encoding; with `discardingThreshold` at 0
-nothing is dropped preferentially — the queue simply applies backpressure.
+sits behind an `AsyncAppender` (`queueSize` 2048, `discardingThreshold` 0), so
+encoding happens off the application thread. Because `discardingThreshold` is 0,
+no level is dropped when the queue fills. Logging threads block until space
+frees up. (The comment in `logback-spring.xml` says INFO and below are dropped
+first; that describes the default threshold, not this configuration.)
 
 `prod`/`docker` also pin `org.springframework` and `org.hibernate` to `WARN`;
 `application-dev.yml` sets `com.wealthview` to `DEBUG`. Slow queries surface
@@ -396,7 +413,7 @@ Grafana runs with `GF_USERS_ALLOW_SIGN_UP=false` and
 - Grafana auto-provisioned with the Prometheus datasource
   (`infra/observability/grafana/provisioning/`) and one dashboard,
   **"WealthView Overview"** (`uid: wealthview-overview`, from
-  `infra/observability/grafana/dashboards/wealthview.json`), containing 14
+  `infra/observability/grafana/dashboards/wealthview.json`), containing 13
   panels: HTTP request rate; HTTP latency p50/p95/p99; JVM heap used vs max;
   GC pause rate; Hikari connection pool (active/idle/pending/max);
   projection + MC p95 latency; Finnhub quote/candle p95 latency; login
@@ -459,6 +476,29 @@ mount-and-include incantation.
 
 `WealthViewHttpP99Latency` depends on `http_server_requests_seconds_bucket`,
 which `application.yml` now publishes on every profile — see the note in §1.
+
+> **The two `wealthview-scheduled` alerts never fire as shipped, and the
+> dashboard's "time since last success" panel can't tell the jobs apart.** The
+> app tags `wealthview.scheduled.last_success_seconds` with `job=priceSync|propertyValuationSync`.
+> Prometheus attaches its own `job="wealthview-app"` target label, and with the
+> default `honor_labels: false` it renames the app's tag to `exported_job`. The
+> rules select `{job="priceSync"}` and `{job="propertyValuationSync"}`, which
+> match nothing, so `time() - max(...)` is empty and never crosses the
+> threshold. The panel's `max by (job)` collapses both jobs into one
+> `wealthview-app` series. Until those queries change, rewrite them with
+> `exported_job` when you load the file:
+>
+> ```promql
+> time() - max by (exported_job) (wealthview_scheduled_last_success_seconds{exported_job="priceSync"}) > 96 * 3600
+> ```
+>
+> The `WealthViewPriceSyncStale` comment saying "runs MON–FRI at 16:30 ET" is
+> also stale. The job runs at 18:00 ET (see `docs/administration/maintenance.md`).
+
+No rule covers the stock-split sync. If you want one, alert on
+`time() - wealthview_splits_last_success_seconds > 36 * 3600` (no `job` tag, so
+no renaming issue). Remember that the gauge reads `0` after a restart until the
+next 02:00 ET run.
 
 ### Production deployment notes
 

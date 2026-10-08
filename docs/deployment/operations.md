@@ -97,6 +97,15 @@ Recognised `wv.conf` keys — all optional, defaults in brackets:
   `/etc/wealthview/backups` — **not** the `WV_BACKUPS_DIR` from `wv.conf`.
   Point `WV_BACKUPS_DIR` at the same directory, or symlink one to the other,
   so `wv backups` sees the cron'd dumps too.
+- Compose interpolates `${WEALTHVIEW_VERSION}`, `${DB_PASSWORD}` and friends
+  from the `.env` in the compose file's directory — `wv` never passes
+  `--env-file`. `WV_ENV_FILE` is what `wv` itself reads (mode detection,
+  `.env` validation, backup settings). Keep it pointing at the `.env` beside
+  `WV_COMPOSE_FILE`, as the layout above does.
+
+Once `/etc/wealthview/wv.conf` exists, it also wins when you run `./wv` from a
+checkout on the same host: the source-tree fallback only applies when no config
+file is found.
 
 The GHCR package is public — it inherits the repository's visibility — so this
 host pulls the image with no credentials and no registry setup. Only a private
@@ -125,6 +134,7 @@ fork or mirror needs `docker login ghcr.io` with a `read:packages` token before
 | `migrate-in <bundle>` | Restore from a bundle on a fresh host |
 | `rotate-secret <NAME>` | Regenerate a secret. `--dry-run` |
 | `config-check` | Validate config, env file, compose file, tools |
+| `prune` | Remove dangling (untagged) WealthView images left by rebuilds. Filters on the `org.opencontainers.image.title=WealthView` label, so it never touches other projects, tagged images, containers, networks or volumes. `--dry-run` |
 | `help` (`-h`, `--help`) | Operator man page |
 
 Global flags, consumed **before** the subcommand: `--config FILE` (or
@@ -175,7 +185,7 @@ chmod 600 .env
 
 # 3. (Production only) pin the release to pull and set the CORS origin.
 #    Setting WEALTHVIEW_VERSION is what flips wv into prod mode.
-echo 'WEALTHVIEW_VERSION=1.2.5' >> .env
+echo 'WEALTHVIEW_VERSION=1.2.8' >> .env
 echo 'CORS_ORIGIN=https://wealthview.example.com' >> .env
 
 # 4. Validate everything.
@@ -210,7 +220,7 @@ the env file (falling back to `WV_APP_PORT`, default 80) and the host is
 ## Update an existing deployment
 
 ```bash
-nano .env            # WEALTHVIEW_VERSION=1.2.5
+nano .env            # WEALTHVIEW_VERSION=1.2.8
 ./wv update
 ```
 
@@ -263,9 +273,13 @@ at that point.
 ## Manual rollback
 
 `./wv rollback` reverts the app to the image recorded in `.wv-previous-image`
-by the last successful `./wv update` (path overridable with
-`WV_PREVIOUS_IMAGE_FILE`). It fails with a clear error if no previous image was
-ever recorded. In prod mode it splits the recorded reference and re-ups the app
+(path overridable with `WV_PREVIOUS_IMAGE_FILE`). That file is written at
+Step 2/5 of **every** `./wv update` — before the new image is fetched, and
+whether or not the update then succeeds — so it always holds whatever was
+running when the most recent update started. Running `wv update` a second time
+on the version you are already on therefore overwrites the rollback target with
+that same version. It fails with a clear error if no previous image was ever
+recorded. In prod mode it splits the recorded reference and re-ups the app
 with **both** `WEALTHVIEW_IMAGE` and `WEALTHVIEW_VERSION` set, then waits up to
 120s for health. Restoring both halves matters: the reference is now
 registry-qualified, so re-pinning only the tag would move a mirrored or forked
@@ -403,10 +417,15 @@ pass `--no-encrypt`.
 The bundle contains:
 
 - An age-encrypted database backup (`*.dump.age`)
-- `.env.example` skeleton
-- The `infra/` directory (backup container source)
+- `.env.example` skeleton and the `infra/` directory (backup container
+  source) — copied from `$WV_ROOT`, the parent of the directory holding `wv`.
+  From a checkout that is the repo; from a `/usr/local/bin/wv` install it is
+  `/usr/local`, where neither exists, so the bundle omits them.
 - `VERSION.pin` recording the WEALTHVIEW_VERSION currently in use
 - A `README.txt` with restore steps
+
+The bundle does **not** contain your `.env`. Copy the secrets you need to keep
+(`JWT_SECRET`, `MFA_ENCRYPTION_KEY` above all) across separately and securely.
 
 Move the bundle to the new host (`scp`, USB, whatever).
 
@@ -436,9 +455,11 @@ chmod 600 .env
 ./wv migrate-in /path/to/wealthview-bundle-<ts>.tar.gz
 ```
 
-`migrate-in` extracts the bundle, locates the `.dump`/`.dump.age`,
-decrypts it if needed, and runs `./wv restore` automatically. The app
-restarts and is health-checked at the end.
+`migrate-in` extracts the bundle, prints the `VERSION.pin` it recorded,
+locates the `.dump`/`.dump.age`, and hands it to `./wv restore` (so it asks
+for confirmation unless `WV_ASSUME_YES=1`, and decrypts `.age` files with
+`BACKUP_ENCRYPTION_KEY_FILE`). The app restarts and is health-checked at the
+end. It does not write or modify `.env` — that is step 2 above.
 
 ---
 
@@ -467,8 +488,17 @@ Each rotation:
      users must log in again.
    - `SUPER_ADMIN_PASSWORD` — updates the `users` row for
      `admin@wealthview.local` directly when python3's `bcrypt` module is
-     available; otherwise it warns and restarts the app so
-     `SuperAdminInitializer` syncs the new value at boot.
+     available, then restarts the app. **Install `python3-bcrypt` first**
+     (`apt-get install python3-bcrypt`). Without it the command warns that
+     `SuperAdminInitializer` will sync the value at boot, but that initializer
+     only *creates* the account when it is missing — it never updates an
+     existing password. The new value lands in `.env` while the database keeps
+     the old hash, so the old password keeps working and the new one does not.
+     If that happens, set the password through the API
+     (`PUT /api/v1/admin/users/{id}/password`, super admin only) or install
+     `python3-bcrypt` and rotate again. The same applies to editing
+     `SUPER_ADMIN_PASSWORD` in `.env` by hand: after the first boot it has no
+     effect on the existing account.
    - `DB_PASSWORD` — runs `ALTER USER wv_app WITH PASSWORD …` against the live
      database first, then restarts the app. (The `pgdata` volume is initialised
      once with the original password; this is what keeps `.env` and the role in
@@ -533,7 +563,8 @@ the remote host itself, run `wv` from a shell on that host.
 | `wv` exits: "No wv.conf found ... and \<dir\> is not a source tree" | Running the system-wide `wv` with no config file | Create `/etc/wealthview/wv.conf` or pass `--config /path/to/wv.conf` |
 | `wv` exits: "Refusing to source ...: unexpected line" | `wv.conf` contains something other than `KEY=VALUE` / comments | Strip the logic; `wv.conf` is declarative only |
 | `./wv up` fails building the `backup` image on a source-less host | `build: ./infra/backup` has no `infra/` directory beside the compose file | Copy `infra/` next to the compose file (see the install above), or `./wv up --no-build` |
-| `./wv status` says health endpoint not reachable, but the app is fine | Probe targets `http://localhost:$APP_PORT`, which is wrong behind a proxy or on a remote host | Set `WV_APP_PORT` or `WV_HEALTH_URL` in `wv.conf` |
+| `./wv status` says health endpoint not reachable, but the app is fine | `status` always probes `http://localhost:<APP_PORT from the env file, else 80>/actuator/health`. Unlike `up`/`update`/`restore`, it ignores `WV_HEALTH_URL`, `WV_APP_PORT` and `WV_HOST` | Harmless if `docker compose ps` shows the app `(healthy)`. Set `APP_PORT` in the env file to the real host port; when driving a remote host, check health with `curl` against the remote URL |
+| `./wv rotate-secret SUPER_ADMIN_PASSWORD` finished but the new password is rejected | `python3` `bcrypt` module missing, so the DB row was never updated (see [Rotate a secret](#rotate-a-secret)) | Log in with the old password and set a new one via `PUT /api/v1/admin/users/{id}/password`, or install `python3-bcrypt` and rotate again |
 
 ---
 
@@ -559,8 +590,10 @@ list the cron'd dumps.
 You can trigger the container's script manually:
 
 ```bash
-docker compose -f docker-compose.prod.yml exec backup /backup.sh
+docker compose -p wealthview -f docker-compose.prod.yml exec backup /backup.sh
 ```
+
+(`-p wealthview` matches the project name `wv` uses, `WV_COMPOSE_PROJECT`.)
 
 If you want to encrypt the cron'd backups too, that lives in
 `infra/backup/` and is intentionally out of scope for this script —
@@ -583,9 +616,10 @@ discussion.
   auto-rollback that `deploy.sh` has none of. Two things to watch: it copies
   `docker-compose.prod.yml` to the remote **as `docker-compose.yml`** (point
   `WV_COMPOSE_FILE` at that path afterwards), and it builds and loads the image
-  as `wealthview:<version>`, so the remote `.env` must also set
-  `WEALTHVIEW_IMAGE=wealthview` or compose will look for the GHCR reference
-  instead.
+  as `wealthview:<version>`. The script exports `WEALTHVIEW_IMAGE=wealthview`
+  and the version for its own `docker compose` calls, but those exports do not
+  persist — for `wv` to keep running the shipped image, the remote `.env` must
+  also set `WEALTHVIEW_IMAGE=wealthview` and `WEALTHVIEW_VERSION=<version>`.
 - `infra/backup/restore.sh` is the backup container's own restore helper. It
   hardcodes `docker compose -f docker-compose.prod.yml` and does no
   decryption; prefer `./wv restore`, which also stops the app, terminates

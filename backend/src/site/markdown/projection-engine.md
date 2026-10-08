@@ -16,6 +16,7 @@ ProjectionEngine   (@FunctionalInterface, wealthview-core)
 
 SpendingOptimizer  (@FunctionalInterface, wealthview-core)
   └── MonteCarloSpendingOptimizer    (@Component)
+        ├── PreRetirementAccumulation   (rolls accounts forward to the retirement year)
         ├── OptimizationContextBuilder  (pools, paths, income, tax tables)
         ├── JointConversionSearch       (Roth conversion arm search)
         │     └── RothConversionOptimizer -> ConversionSimulator + FractionSearch
@@ -79,7 +80,8 @@ optional `allocation` (jsonb weights over `us_stock`, `intl_stock`, `bond`, `cas
   means. Either way the scenario's annual all-in fee rate is then subtracted at that single choke
   point.
 * Pool-level returns are the balance-weighted average of their accounts' returns, computed once from
-  initial balances (no allocation-drift tracking over the horizon).
+  initial balances — or from contributions when every opening balance is zero — with no
+  allocation-drift tracking over the horizon.
 * Where an allocation is not supplied, `SecurityClassificationService` derives one from the linked
   account's holdings. Classification precedence is **tenant override → global `security_asset_class`
   seed → `US_STOCK` default**; the override is upserted through
@@ -244,6 +246,18 @@ any traditional dollars that are drawn early attract the 10% IRC 72(t) additiona
 The optimizer finds the highest sustainable constant-real spending plan the portfolio supports at the
 requested **target success probability**. `GuardrailProfileService` resolves that target from the
 scenario's risk tolerance (see below) unless an explicit confidence level is supplied.
+
+### Stage 0 — Roll forward to retirement (`PreRetirementAccumulation`)
+
+Trials begin in the retirement year, so both optimizer entry points (the optimization and the
+stochastic-mortality pass) first seed the input with each account's **expected** balance at
+retirement: from `baseYear` to the retirement year, add the annual contribution, then grow at the
+account's real, fee-adjusted return (`PoolStrategy.realReturnFor`). Taxable contributions enter at
+cost and accumulation growth stays unrealized (audit C8), so basis rises by contributions only. A
+no-op when retirement is in (or before) the base year. Market dispersion is still simulated only from
+retirement on, each account grows at its own return (the deterministic engine uses one blended rate
+per pool, so mixed-allocation pools can differ), and pre-retirement conversions and RMDs are not
+replayed.
 
 ### Stage 1 — Context preparation (`OptimizationContextBuilder`)
 
@@ -516,6 +530,11 @@ Processes the full set of income sources for a projection year:
 * **Part-time employment** — subject to self-employment tax via `SelfEmploymentTaxCalculator`.
 * **Rental income** — passive; `RentalLossCalculator` computes passive losses (depreciation,
   expenses) and applies the $25k allowance's MAGI phase-out, carrying forward suspended losses.
+  For a rental linked to a property with loan details, `ProjectionInputBuilder` supplies the
+  amortization schedule as nominal per-calendar-year interest and principal (no entries after
+  payoff). Each year's interest is a deductible expense and principal reduces cash flow only; both
+  are deflated to real terms as fixed-nominal outflows. A property with a mortgage balance but no
+  loan details gets no debt service and the projection carries a warning.
 
 ---
 

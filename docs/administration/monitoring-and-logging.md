@@ -53,12 +53,21 @@ The admin command wraps the same probe with container state:
 ```
 
 It prints the detected mode (dev/prod), the compose file in use, `docker compose ps`, and
-then a one-shot health probe against `http://localhost:${APP_PORT}/actuator/health`.
+then a one-shot health probe against `http://localhost:${APP_PORT:-80}/actuator/health`.
+`APP_PORT` is read from the env file. `status` ignores `WV_HEALTH_URL`, `WV_APP_PORT`,
+and `--host`.
 
-`./wv up`, `./wv restart`, `./wv update`, `./wv rollback`, and `./wv restore` all poll the
-same URL before declaring success (120s, 180s, and 90s budgets respectively). Set
-`WV_HEALTH_URL` in `wv.conf` when the app sits behind a reverse proxy and `localhost:80`
-is not the right address.
+The commands that wait for health poll every 3 seconds with these budgets:
+
+| Command | Budget |
+|---|---|
+| `./wv up`, `./wv restart` | 120s |
+| `./wv update` | 180s (then 120s for an automatic rollback) |
+| `./wv rollback` | 120s |
+| `./wv restore`, `./wv rotate-secret` | 90s |
+
+Those commands do honour `WV_HEALTH_URL`. Set it in `wv.conf` when the app sits behind a
+reverse proxy and `localhost:<APP_PORT>` is not the right address.
 
 ### Docker Health Check
 
@@ -99,12 +108,18 @@ on every profile. There is no `/actuator/info`, no `/actuator/env`, no
 | Endpoint | Access |
 |---|---|
 | `/actuator/health` | Public. Details only for authenticated callers |
-| `/actuator/prometheus` | Requires the `SUPER_ADMIN` role |
-| `/actuator/metrics` | Requires the `SUPER_ADMIN` role |
+| `/actuator/prometheus` | Requires the `SUPER_ADMIN` role, unless `app.observability.anonymous-metrics=true` |
+| `/actuator/metrics` | Requires the `SUPER_ADMIN` role, unless `app.observability.anonymous-metrics=true` |
 
 Authentication is the app's own JWT — a `Bearer` token or the auth cookie, per
-`JwtAuthenticationFilter`. Anonymous requests get 401 and non-super-admins get 403, both in
-the standard `{"error":...,"message":...,"status":...}` envelope.
+`JwtAuthenticationFilter`. There is no HTTP Basic auth. Anonymous requests get 401 and
+non-super-admins get 403, both in the standard `{"error":...,"message":...,"status":...}`
+envelope.
+
+`APP_OBSERVABILITY_ANONYMOUS_METRICS=true` (set by `docker-compose.observability.yml`)
+serves the two metrics endpoints with **no authentication**. See
+[Optional Prometheus + Grafana stack](#optional-prometheus--grafana-stack) for what that
+exposes.
 
 ---
 
@@ -124,8 +139,11 @@ keyed on the active Spring profile.
 ### `docker` and `prod` profiles
 
 - **Format:** single-line JSON via Logstash's `LogstashEncoder`, wrapped in an
-  `AsyncAppender` (queue size 2048) so application threads never block on the encoder
-- **Root level:** INFO, with `org.springframework` and `org.hibernate` pinned to WARN
+  `AsyncAppender` (queue size 2048, `discardingThreshold` 0). Threads hand events to the
+  queue instead of encoding them inline. No level is discarded when the queue fills;
+  callers wait for space instead.
+- **Root level:** INFO, with `org.springframework` and `org.hibernate` pinned to WARN.
+  `com.wealthview` is INFO on both profiles.
 - **SQL output:** not logged unless slow (see [Slow Query Detection](#slow-query-detection))
 - **CORS:** `docker` allows `http://localhost`; `prod` requires `CORS_ORIGIN` to be set to
   your https origin (startup aborts otherwise)
@@ -157,7 +175,7 @@ nested under an `mdc` object):
 | `application` | Constant `wealthview` (a custom field on every line) |
 | `requestId` | Per-request id set by `JwtAuthenticationFilter`; echoes an inbound `X-Request-ID` header (truncated to 32 chars) or generates a 12-char id |
 | `tenantId`, `userId` | Set once a request is authenticated |
-| `operation` | Set by scheduled jobs (`priceSync`, `propertyValuationSync`, ...) |
+| `operation` | Set by jobs and long-running work: `priceSync`, `priceBackfill`, `propertyValuationSync`, `import`, `projection`, `mc-optimize`, `guardrail-optimize`. The stock-split sync sets none |
 | `traceId`, `spanId` | Present when tracing is enabled |
 
 ### Parsing with jq
@@ -303,14 +321,23 @@ meters, WealthView registers its own — for example:
 
 | Meter | Type | Meaning |
 |---|---|---|
-| `wealthview.scheduled.last_success_seconds{job=...}` | gauge | Unix epoch seconds of the last successful run of `priceSync` / `propertyValuationSync`; `0` if never |
+| `wealthview.scheduled.last_success_seconds{job=...}` | gauge | Unix epoch seconds of the last successful run of `priceSync` / `propertyValuationSync`; `0` if never. "Successful" means the loop finished. It is set even when every symbol or property failed |
 | `wealthview.scheduled.runs{job,status}` | counter | Scheduled-job runs by outcome |
 | `wealthview.splits.last_success_seconds` | gauge | Last successful stock-split sync |
 | `wealthview.pricefeed.symbols{status}` | counter | Symbols priced successfully vs failed |
 | `wealthview.ratelimit.tracked_keys` | gauge | Live rate-limit windows in memory |
 
-Every meter carries the common `application=wealthview` tag. The full inventory lives in
-[OBSERVABILITY.md](../OBSERVABILITY.md#custom-wealthview-meters).
+Every meter carries the common `application=wealthview` and `env=<profile>` tags. The full
+inventory lives in [OBSERVABILITY.md](../OBSERVABILITY.md#custom-wealthview-meters).
+
+The gauges reset to `0` on every app restart; they live in memory. A freshly restarted
+app reports "never succeeded" until each job has run once.
+
+**Label gotcha:** the scheduled-job meters carry a tag named `job`. Prometheus also attaches
+its own target label `job` (`wealthview-app`), and with the default `honor_labels: false`
+it renames the app's tag to `exported_job`. In PromQL, query
+`wealthview_scheduled_last_success_seconds{exported_job="priceSync"}`, not
+`{job="priceSync"}`. See the note in [OBSERVABILITY.md](../OBSERVABILITY.md#alerting-rules).
 
 ### Optional Prometheus + Grafana stack
 
@@ -326,21 +353,32 @@ docker compose -f docker-compose.prod.yml -f docker-compose.observability.yml up
   `infra/observability/prometheus-rules.yml`
 - Grafana on `${GRAFANA_PORT:-3000}` with a provisioned datasource and the dashboard at
   `infra/observability/grafana/dashboards/wealthview.json`
-- Requires `GRAFANA_ADMIN_PASSWORD` (Grafana refuses to start without it) and
-  `SUPER_ADMIN_PASSWORD` (Prometheus uses it for the scrape credential)
+- Requires `GRAFANA_ADMIN_PASSWORD` (Grafana refuses to start without it). Prometheus
+  needs no credential.
 
-Because `/actuator/prometheus` is super-admin-only, confirm the scrape is actually
-succeeding after you bring the stack up — check Prometheus' **Status → Targets** page or
-`docker compose ... logs prometheus`. See [OBSERVABILITY.md](../OBSERVABILITY.md) for the
-authoritative setup.
+The overlay sets `APP_OBSERVABILITY_ANONYMOUS_METRICS=true` on the app, which makes
+`/actuator/prometheus` and `/actuator/metrics` **unauthenticated**. The scrape config
+sends no credentials, and the app has no HTTP Basic auth that could accept any. The
+prod compose file still publishes the app on `${APP_PORT:-80}`, and the overlay doesn't
+change that. With the overlay on, anyone who can reach that port can read the metrics.
+Block `/actuator/prometheus` and `/actuator/metrics` at your reverse proxy, and keep
+`APP_PORT` firewalled from the internet.
+
+After you bring the stack up, check that the target is `UP` on Prometheus'
+**Status → Targets** page. A `401`/`403` there means the anonymous-metrics flag did not
+reach the app. Check that you passed both `-f` files. See
+[OBSERVABILITY.md](../OBSERVABILITY.md) for the authoritative setup.
 
 ### Tracing
 
 OpenTelemetry tracing is **off** by default (`management.tracing.enabled: false`). Turn it
 on with `MANAGEMENT_TRACING_ENABLED=true` plus an OTLP endpoint
 (`OTEL_EXPORTER_OTLP_ENDPOINT`); sampling defaults to 10% and is raised with
-`MANAGEMENT_TRACING_SAMPLING_PROBABILITY=1.0` during an incident. When enabled, `traceId`
-and `spanId` appear in the JSON logs, which lets you pivot from a log line to a trace.
+`MANAGEMENT_TRACING_SAMPLING_PROBABILITY=1.0` during an incident. These must reach the app
+container through a compose override file. The compose files don't pass them through from
+`.env`; see [OBSERVABILITY.md](../OBSERVABILITY.md#turning-it-on). When tracing is on,
+`traceId` and `spanId` appear in the JSON logs, which lets you pivot from a log line to a
+trace.
 
 ---
 
@@ -408,7 +446,8 @@ docker compose exec db psql -U wv_app wealthview -c "SELECT pg_size_pretty(pg_da
 | Backup recency | `./wv backups \| head -5` | No backup in last 24 hours |
 | Backup integrity | `./wv verify <newest dump>` | Any non-zero exit |
 | Slow query frequency | WARN lines from `org.hibernate.SQL_SLOW` | Increasing trend over days |
-| Scheduled job freshness | `wealthview.scheduled.last_success_seconds` | Older than the job's interval, or `0` |
+| Scheduled job freshness | `wealthview.scheduled.last_success_seconds` (PromQL label `exported_job`) and `wealthview.splits.last_success_seconds` | Older than the job's interval, or `0` |
+| Scheduled job *effectiveness* | `wealthview.pricefeed.symbols{status="failure"}`, `wealthview.property.valuations{status="skipped"}`, `wealthview.splits.sync_failed` | A run that "succeeds" with every symbol failing |
 | Disk space | `df -h` | Any mount > 80% full |
 | Active DB connections | `docker compose exec db psql -U wv_app wealthview -c "SELECT count(*) FROM pg_stat_activity WHERE datname = 'wealthview';"` | > 50 (Hikari caps the app at 20) |
 

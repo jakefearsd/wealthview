@@ -47,7 +47,7 @@ and mapped under `/api/v1/`. The path column is each class's `@RequestMapping` p
 | `MfaController` | `/api/v1/auth/mfa` | TOTP setup, verify, disable, recovery-code regeneration, status |
 | `SessionController` | `/api/v1/auth/sessions` | List and revoke per-device sessions |
 | `TenantManagementController` | `/api/v1/tenant` | Invite codes, users, roles (tenant admin) |
-| `AdminTenantController` | `/api/v1/admin` | Tenant creation, listing, activation (super-admin) |
+| `AdminTenantController` | `/api/v1/admin` | Tenant creation, listing, activation, and invite codes for any tenant (super-admin) |
 | `AdminUserController` | `/api/v1/admin` | User listing, password reset, activation |
 | `AdminSystemController` | `/api/v1/admin` | System stats, login activity, runtime config |
 | `AdminPriceController` | `/api/v1/admin` | Price sync, Yahoo fetch/save, CSV upload, history admin |
@@ -94,7 +94,9 @@ Route rules (evaluated in order):
   GET /api/v1/app/version-check       → permitAll
   /api/v1/admin/prices/**             → ADMIN or SUPER_ADMIN
   /api/v1/admin/**                    → SUPER_ADMIN
-  price + tenant admin mutations      → ADMIN or SUPER_ADMIN
+  /api/v1/audit-log, /audit-log/**    → ADMIN or SUPER_ADMIN
+  price mutations, tenant invite-code
+    and user endpoints (incl. reads)  → ADMIN or SUPER_ADMIN
   GET    /api/v1/**                   → authenticated
   POST/PUT/DELETE /api/v1/**          → ADMIN, MEMBER, or SUPER_ADMIN
   GET /**                             → permitAll (SPA static assets)
@@ -112,7 +114,7 @@ CORS is configured for `/api/**` from `app.cors.allowed-origins`, with credentia
 Reads the `Authorization: Bearer <token>` header and falls back to the auth cookie when absent,
 so the web SPA and the mobile app share one filter. Validates the signature, extracts the
 claims, and places a `TenantUserPrincipal` in the `SecurityContextHolder` for the duration of
-the request. It also seeds the SLF4J MDC (`tenantId`, request id from `X-Request-ID`) for
+the request. It also seeds the SLF4J MDC (`requestId` from `X-Request-ID`, `userId`, `tenantId`) for
 structured logging.
 
 Expired or missing tokens on protected endpoints return `401`; insufficient role returns `403`.
@@ -141,10 +143,12 @@ and returns the `ErrorResponse` record `{ error, message, status }`.
 | `InvalidSessionException`, `BadCredentialsException` | 401 | `UNAUTHORIZED` |
 | `AccessDeniedException`, `TenantAccessDeniedException` | 403 | `FORBIDDEN` |
 | `DuplicateEntityException`, `IllegalStateException` | 409 | `CONFLICT` |
-| `InvalidInviteCodeException`, `IllegalArgumentException`, `MethodArgumentNotValidException`, `MethodArgumentTypeMismatchException`, `HttpMessageNotReadableException`, `DateTimeParseException`, `UncheckedIOException`, `DataIntegrityViolationException` | 400 | `BAD_REQUEST` |
+| `InvalidInviteCodeException`, `IllegalArgumentException`, `MethodArgumentNotValidException`, `MethodArgumentTypeMismatchException`, `MissingServletRequestParameterException`, `HttpMessageNotReadableException`, `DateTimeParseException`, `UncheckedIOException`, `DataIntegrityViolationException` | 400 | `BAD_REQUEST` |
+| `HttpRequestMethodNotSupportedException` | 405 | `METHOD_NOT_ALLOWED` (with an `Allow` header) |
 | `MaxUploadSizeExceededException` | 413 | `PAYLOAD_TOO_LARGE` |
+| `HttpMediaTypeNotSupportedException` | 415 | `UNSUPPORTED_MEDIA_TYPE` |
 | `ServiceUnavailableException` | 503 | `SERVICE_UNAVAILABLE` |
-| anything else | 500 | `INTERNAL_ERROR` |
+| anything else | 500 | `INTERNAL_SERVER_ERROR` (fixed generic message) |
 
 Jakarta Bean Validation failures are summarised into the `message` field; the raw exception is
 never leaked to the client. Every handler records an error metric before responding.

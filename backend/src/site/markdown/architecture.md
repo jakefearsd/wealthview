@@ -60,7 +60,9 @@ The heart of the application. Owns:
 * **Projection interfaces** — `ProjectionEngine`, `SpendingOptimizer`, the `SpendingPlan`
   sealed interface, and `CapitalMarketAssumptionsProvider`
 * **Tax model** — `FederalTaxCalculator`, `StateTaxCalculatorFactory`,
-  `CapitalGainsTaxCalculator`, `IrmaaSurchargeCalculator`, withdrawal strategies
+  `CapitalGainsTaxCalculator`, `IrmaaSurchargeCalculator`, `TaxSpaceCalculator`, withdrawal strategies
+* **Household & mortality** — `HouseholdContext`, `PersonId`, `LifeExpectancy`, `AgeMilestones`,
+  and `MortalityTableProvider` (reads `mortality_rates` for opt-in stochastic mortality)
 * **Cross-cutting config** — `CacheConfig` (five named Caffeine caches), the
   `TenantFilterAspect` / `TenantContext` / `CrossTenantAspect` tenant machinery
 
@@ -97,7 +99,7 @@ Owns external data ingestion:
 
 ### wealthview-projection
 
-The most computation-intensive module — 71 classes, of which exactly two are Spring beans:
+The most computation-intensive module — 73 source files, of which exactly two are Spring beans:
 
 * **`DeterministicProjectionEngine`** — `@Component`; implements `ProjectionEngine`;
   year-by-year simulation
@@ -107,7 +109,8 @@ The most computation-intensive module — 71 classes, of which exactly two are S
 * Everything else is a package-private collaborator: `PoolStrategy`,
   `WithdrawalOrderStrategy`, `RmdCalculator`/`RmdStreamCalculator`, `TaxableLots`,
   `HouseholdTransition`, `MortalitySampler`, `SustainabilitySearch`, `FractionSearch`,
-  `JointConversionSearch`, and friends
+  `JointConversionSearch`, `PreRetirementAccumulation` (rolls accounts forward to retirement
+  before the Monte Carlo trials start), and friends
 
 See the [Projection Engine](projection-engine.html) page for full algorithmic detail.
 
@@ -189,6 +192,8 @@ specific HTTP status codes:
 | `InvalidSessionException`, `BadCredentialsException` | 401 Unauthorized |
 | `DuplicateEntityException`, `IllegalStateException` | 409 Conflict |
 | `InvalidInviteCodeException`, `IllegalArgumentException`, Jakarta validation failures | 400 Bad Request |
+| `HttpRequestMethodNotSupportedException` | 405 Method Not Allowed |
+| `HttpMediaTypeNotSupportedException` | 415 Unsupported Media Type |
 | `MaxUploadSizeExceededException` | 413 Payload Too Large |
 | `ServiceUnavailableException` | 503 Service Unavailable |
 

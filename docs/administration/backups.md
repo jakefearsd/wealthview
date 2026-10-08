@@ -67,7 +67,9 @@ listing globs in `bin/wv-lib/backups.sh` and `infra/backup/restore.sh` still fin
 
 `./wv` resolves the backups directory in this order:
 
-1. `WV_BACKUPS_DIR` from the config file (`/etc/wealthview/wv.conf` or `--config FILE`)
+1. `WV_BACKUPS_DIR` from the config file. The first config file found wins: `--config FILE`
+   (or `WV_CONFIG_FILE`), then `/etc/wealthview/wv.conf`, then
+   `$XDG_CONFIG_HOME/wealthview/wv.conf`, then `~/.config/wealthview/wv.conf`.
 2. Source-tree fallback: `<repo>/backups/`
 
 The `backup` container is independent of that: it always writes to `./backups` next to
@@ -190,6 +192,8 @@ Behaviour worth knowing:
 - `--remote` is best effort: a failed upload logs a warning but does not fail the backup.
   `s3://` needs the `aws` CLI; `user@host:/path` and `rsync://` need `rsync`.
 - `--label` accepts letters, digits, dash, and underscore only.
+- If `pg_dump` fails, the partial file is deleted and the command exits with
+  `ERROR: pg_dump failed`.
 
 `dev-backup.sh` still works — it is now a thin shim that execs `./wv backup`. New
 automation should call `./wv backup` directly.
@@ -266,6 +270,13 @@ migration.
 Running `./wv restore` with no file argument prints the usage line and then lists the
 available backups.
 
+`--dry-run` still asks for confirmation before it prints the plan, because the prompt
+comes first. Answer `y`, or set `WV_ASSUME_YES=1`. Nothing is changed either way.
+
+A failed `pg_restore` does **not** abort the restore. It prints `WARN: pg_restore reported
+errors; this is often harmless for --clean ...`, then restarts the app and runs the
+health check anyway. Read the output above that warning before you trust the result.
+
 `dev-restore.sh` still works: with a file argument it execs `./wv restore`, and with no
 arguments it execs `./wv backups`.
 
@@ -319,7 +330,13 @@ The bundle contains:
 - `VERSION.pin` — the `WEALTHVIEW_VERSION` the dump was taken against
 - `README.txt` — restore instructions
 
-Encryption is the default and requires `BACKUP_ENCRYPTION_RECIPIENT`.
+Encryption is the default and requires `BACKUP_ENCRYPTION_RECIPIENT`. Without it the
+command stops with `BACKUP_ENCRYPTION_RECIPIENT must be set (an age public key) or use
+--no-encrypt.`
+
+The migration dump is also left in the backups directory as
+`wealthview_<ts>_migration.dump.age`. Like every `./wv backup` file, nothing prunes it
+automatically.
 
 **On the destination host** (stack already up, `.env` populated, and
 `BACKUP_ENCRYPTION_KEY_FILE` pointing at the matching age identity):
@@ -459,7 +476,12 @@ from your last manual `./wv backup`.
 ./wv logs backup --tail 20 --no-follow
 ```
 
-Look for `ERROR: pg_dump failed` lines.
+A failed run shows `pg_dump`'s own error (`pg_dump: error: ...`) and no matching
+`Backup complete` line. Don't search for `ERROR: pg_dump failed`. `infra/backup/backup.sh`
+runs under `set -eu`, so the script exits as soon as `pg_dump` fails and never reaches
+its own error branch. `pg_dump -f` may also have left a partial or zero-byte
+`wealthview_auto_*.dump` behind. Check the sizes in `./wv backups` and delete anything
+suspicious.
 
 **Disk usage**
 

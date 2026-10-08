@@ -62,7 +62,7 @@ docker compose up -d db
 PostgreSQL is published on **`localhost:5433`** (not 5432, so it does not collide with a native
 install). That is exactly the URL baked into `application.yml`, so no extra configuration is needed.
 
-**2. Backend (Spring Boot DevTools hot-swap):**
+**2. Backend (Spring Boot):**
 
 ```bash
 cd backend
@@ -78,7 +78,7 @@ The `dev` profile is **required** for a local run: the default profile declares 
 
 | Initializer | Profiles | What it seeds |
 |---|---|---|
-| `SuperAdminInitializer` | `dev`, `docker`, `prod` | `admin@wealthview.local` / `admin123` |
+| `SuperAdminInitializer` | `dev`, `docker`, `prod` | `admin@wealthview.local` in a `System` tenant; password from `SUPER_ADMIN_PASSWORD` (the `dev` profile falls back to a `LOCAL_DEV_*` sentinel) |
 | `SampleDataInitializer` | `dev`, `docker` | demo tenant + `demo@wealthview.local` / `demo123` |
 | `DevDataInitializer` | `dev` | `demo-admin@wealthview.local` / `demo123` and dev fixtures |
 
@@ -109,7 +109,7 @@ test exists.**
 cd backend
 mvn -pl wealthview-core test
 mvn test -Dtest=AccountServiceTest
-mvn test -Dtest="HoldingsComputationServiceTest#recomputeHoldings_withBuyAndSell_calculatesNetQuantity"
+mvn test -Dtest="HoldingsComputationServiceTest#recomputeHoldings_buyThenSell_calculatesNetQuantity"
 ```
 
 Test class naming: `<ClassUnderTest>Test`.
@@ -207,7 +207,7 @@ mvn verify -pl wealthview-app   # runs *IT.java via maven-failsafe-plugin
 ```
 
 Failsafe is configured with `<include>**/*IT.java</include>` and forces
-`spring.profiles.active=it`. The 50 IT classes use HttpClient5 against a fully started Spring Boot
+`spring.profiles.active=it`. The ~50 IT classes use HttpClient5 against a fully started Spring Boot
 container (`@SpringBootTest(webEnvironment = RANDOM_PORT)`) backed by a Testcontainers PostgreSQL
 instance; `AbstractApiIntegrationTest` is the shared base and `DatabaseCleaner` truncates tenant
 tables between tests.

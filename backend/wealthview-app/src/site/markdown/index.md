@@ -47,7 +47,8 @@ variable fails loudly at startup. `ProductionConfigValidator` additionally refus
 ### SuperAdminInitializer (`dev`, `docker`, `prod`)
 
 Checks whether the super-admin user (email from `app.super-admin.email`) exists. If not,
-creates the super-admin tenant and user with `app.super-admin.password`. This guarantees a
+creates a `System` tenant and an `admin`-role user flagged `is_super_admin`, with the password from
+`app.super-admin.password` (`SUPER_ADMIN_PASSWORD`). This guarantees a
 usable entry point on first deployment without any manual setup.
 
 ### SystemConfigInitializer (all profiles)
@@ -93,7 +94,8 @@ Bulk synthetic data generation for the isolated load-test stack.
 
 ## Scheduling
 
-`SchedulingConfig` enables Spring's `@Scheduled` task execution with a configurable thread pool.
+`SchedulingConfig` is a bare `@EnableScheduling` configuration — no custom task scheduler is
+declared, so jobs run on Spring Boot's auto-configured scheduler.
 
 | Job | Schedule | Owner |
 |---|---|---|

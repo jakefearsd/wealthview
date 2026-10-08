@@ -1,8 +1,8 @@
 # Data Model
 
 WealthView's schema spans **42 JPA entities** across 8 business domains, managed by **90 Flyway
-migrations** (V001–V081 versioned + 9 repeatable seed scripts) and served by 43 Spring Data
-repositories.
+migrations** (V001–V081 versioned + 9 repeatable seed scripts) and served by 42 Spring Data
+repositories (plus the `@NoRepositoryBean` `TenantScopedRepository<T>` base).
 
 This page is the **entity / ORM view**: the mapped classes, their base types, associations and fetch
 strategies. For the SQL-schema view — columns, types, constraints and indexes as they exist in
@@ -164,7 +164,7 @@ mapping itself. `entity/package-info.java` declares a package-level Hibernate fi
 package com.wealthview.persistence.entity;
 ```
 
-22 entity classes (plus `AbstractPropertyCashFlowEntity`) then carry
+21 entity classes (plus `AbstractPropertyCashFlowEntity`) then carry
 
 ```java
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
@@ -180,8 +180,10 @@ The filter is deliberately left **disabled** in three cases:
 * **No SecurityContext** — pre-auth requests (login, register, refresh) and `@Scheduled` background
   jobs, which legitimately read across tenants.
 * **`SUPER_ADMIN` principals** — platform administration spans every tenant.
-* **Entities without the annotation** — `TenantEntity` itself, `PriceEntity`, all shared tax and
-  market reference tables, and child rows reached only through an already-filtered parent
+* **Entities without the annotation** — `TenantEntity` itself, `PriceEntity`, the global
+  `StockSplitEntity` and `MobileAppVersionEntity` (the anonymous version-check endpoint must read it),
+  all shared tax and market reference tables, `SecurityClassOverrideEntity` (tenant-scoped by its
+  finders only), `NotificationPreferenceEntity` (user-scoped), and child rows reached only through an already-filtered parent
   (`ProjectionAccountEntity`, `ScenarioIncomeSourceEntity`). `PropertyIncomeEntity` and
   `PropertyExpenseEntity` inherit the annotation from `AbstractPropertyCashFlowEntity`.
 
@@ -221,8 +223,9 @@ that map to a Java collection directly, because their shapes are stable primitiv
 
 **`TenantEntity`** — the isolation boundary; every tenant-owned entity holds a lazy `@ManyToOne` to it.
 
-**`UserEntity`** — email unique within a tenant, bcrypt password hash, role string
-(`viewer` / `member` / `admin`, plus the platform-level `super_admin`).
+**`UserEntity`** — globally unique email, bcrypt password hash, role string
+(`viewer` / `member` / `admin`), plus the platform-level `is_super_admin` flag, `is_active`,
+`token_generation`, an `@Version` optimistic-lock column and the TOTP MFA fields.
 
 **`InviteCodeEntity`** — three lazy user/tenant associations (tenant, `createdBy`, `consumedBy`).
 Consumed codes are retained, not deleted — they are the audit trail of who invited whom.
@@ -314,7 +317,7 @@ These tables are tenant-independent and populated by repeatable Flyway migration
 |---|---|
 | `TaxBracketEntity` | Federal marginal brackets by filing status and year |
 | `StandardDeductionEntity` | Federal standard deduction, plus `additional_age65` (V074) |
-| `StateTaxBracketEntity`, `StateStandardDeductionEntity`, `StateTaxSurchargeEntity` | State brackets, deductions and flat surcharges (e.g. California SDI) |
+| `StateTaxBracketEntity`, `StateStandardDeductionEntity`, `StateTaxSurchargeEntity` | State brackets, deductions and flat surcharges (e.g. California's Mental Health Services Tax) |
 | `LtcgBracketEntity` | 0/15/20% long-term capital gains brackets (V071) |
 | `IrmaaTierEntity` | Medicare IRMAA MAGI tiers with monthly Part B/Part D surcharges (V075) |
 | `AssetClassReturnEntity` | Real historical annual returns per asset class, 1928–2025 (V066) |

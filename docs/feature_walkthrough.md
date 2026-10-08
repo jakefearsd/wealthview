@@ -32,19 +32,19 @@ Open the frontend in a browser (typically http://localhost:5173).
 
 ### 1. Login
 
-1. Navigate to http://localhost:5173/login.
-2. Enter `admin@wealthview.local` / `admin123`.
-3. Click **Login**.
+1. Navigate to http://localhost:5173/login. The page is titled **Login to WealthView**.
+2. Enter `admin@wealthview.local` and the super-admin password. That is the value of `SUPER_ADMIN_PASSWORD` in your environment (for example from `.env` loaded by direnv); when the variable is unset, the `dev` profile falls back to the obviously fake sentinel `LOCAL_DEV_NOT_A_REAL_PASSWORD_OVERRIDE_VIA_ENV`. There is no `admin123` default.
+3. Click **Sign In**.
 4. **Verify:** You are redirected to the Dashboard page.
 
-The `dev` profile also seeds `demo@wealthview.local` / `demo123` and `demo-admin@wealthview.local` / `demo123`.
+The `dev` profile also seeds `demo@wealthview.local` / `demo123` (an admin of a "Demo Family" tenant with sample accounts and rentals), plus `demo-admin@wealthview.local` (admin) and `demo-member@wealthview.local` (member), both with password `demo123`, in a second "Demo Family" tenant whose invite code is `DEMO1234`. For the steps below, `demo@wealthview.local` is the easiest login for tenant features; switch to the super-admin for the super-admin-only Admin sections.
 
 ---
 
 ### 2. Dashboard
 
 1. After login, you land on the Dashboard (`/`).
-2. **Verify:** The page shows a Net Worth summary card, an asset allocation pie chart, and account balance cards.
+2. **Verify:** The page shows four summary cards (Net Worth, Investments, Cash, Property Equity), the **Combined Portfolio History** and **Snapshot Forward Projection** charts, an **Accounts** table, and an **Allocation** pie chart.
 3. **Verify:** A **Recent stock splits** panel is present. On a fresh database it reads "No stock splits affect your portfolio yet. New splits are detected automatically each night."
 4. If this is a fresh database, values will be zero until you add accounts and holdings.
 
@@ -66,28 +66,31 @@ The `dev` profile also seeds `demo@wealthview.local` / `demo123` and `demo-admin
 
 ### 3a. Multi-Currency Account
 
+A non-USD account can only be created once its currency has an exchange rate. Before this step, add a EUR rate as described in step 24a (Admin → Exchange Rates), or first try the step without one:
+
 1. From **Accounts**, click **New Account** again.
 2. Fill in **Name:** `Euro Savings`, **Type:** `Bank`, **Institution:** `N26`, and type `EUR` in the **Currency (e.g. USD, EUR)** field (it accepts three characters and auto-uppercases).
 3. Click **Create**.
-4. **Verify:** The account card shows a pink `EUR` badge and its balance is formatted in euros.
-5. **Verify:** The Dashboard net worth only converts this account once an exchange rate exists — see step 24a.
+4. **Verify (no EUR rate yet):** The create is rejected with an error toast, because creating an account in a currency with no exchange rate returns 400. Add the rate in step 24a and retry.
+5. **Verify (EUR rate exists):** The account card shows a pink `EUR` badge and its balance is formatted in euros, and the Dashboard includes it in net worth converted at that rate.
 
 ---
 
 ### 4. Add Transactions
 
 1. Click on **Fidelity Brokerage** to open the account detail page.
-2. In the **Add Transaction** form:
+2. Click **Add Transaction** in the Transactions panel and fill in the one-row form:
    - **Date:** `2025-01-15`
-   - **Type:** `buy`
+   - **Type:** `Buy`
    - **Symbol:** `VOO`
    - **Quantity:** `10`
    - **Amount:** `5000`
-3. Click **Add Transaction**.
+3. Click **Save**.
 4. **Verify:** The transaction appears in the history table and a **VOO** holding is auto-created with quantity 10 and cost basis $5,000.
 5. Add a second transaction:
-   - **Date:** `2025-02-01`, **Type:** `buy`, **Symbol:** `AAPL`, **Quantity:** `25`, **Amount:** `5500`
-6. **Verify:** Two holdings now appear (VOO and AAPL) in the Holdings table, which has Quantity and **Cost Basis** columns that can be edited inline.
+   - **Date:** `2025-02-01`, **Type:** `Buy`, **Symbol:** `AAPL`, **Quantity:** `25`, **Amount:** `5500`
+6. **Verify:** Two holdings now appear (AAPL and VOO, sorted by symbol) in the Holdings table. Each row's **Edit** button makes **Qty** and **Cost Basis** editable inline (which sets the holding's manual-override flag).
+7. **Verify:** Typing a buy with a quantity of `0` shows "Quantity must be above zero for a buy or sell." and disables **Save**. Deleting a transaction asks for confirmation first.
 
 ---
 
@@ -109,7 +112,7 @@ The `dev` profile also seeds `demo@wealthview.local` / `demo123` and `demo-admin
 ### 5a. Holding Detail and Cost Basis
 
 1. From the account detail page, click a holding (e.g. **VOO**) to open `/holdings/:id`.
-2. **Verify:** The **Holding Summary** card shows a **Cost Basis** value that can be edited inline.
+2. **Verify:** The **Holding Summary** card shows Quantity, Cost Basis, Manual Override and As Of Date, and its **Edit Override** button turns Quantity and Cost Basis into editable fields.
 3. **Verify:** A **Splits affecting VOO** panel is present, listing any stock splits applied to that symbol (or the empty-state message).
 
 ---
@@ -118,16 +121,16 @@ The `dev` profile also seeds `demo@wealthview.local` / `demo123` and `demo-admin
 
 1. Navigate to the **Fidelity Brokerage** account detail page.
 2. Click **Import** (or navigate to `/accounts/{id}/import`).
-3. Select **Format:** `fidelity`.
-4. Upload a Fidelity CSV export file (or any CSV with columns matching the Fidelity format).
-5. Click **Import**.
-6. **Verify:** Imported transactions appear in the account's transaction list. Holdings are recomputed. Duplicate transactions (if re-importing the same file) are skipped via content-hash deduplication.
+3. On the **Transaction History** tab, choose `Fidelity` in the format dropdown.
+4. Choose a Fidelity CSV export file (or any CSV with columns matching the Fidelity format).
+5. Click **Upload**.
+6. **Verify:** A toast reads "Imported: N successful, M failed". Imported transactions appear in the account's transaction list and holdings are recomputed. Re-importing the same file skips every row via content-hash deduplication (the history row shows Success 0, Failed 0).
 
 ---
 
 ### 7. Import from OFX/QFX
 
-1. From the import page, switch to **OFX** format.
+1. From the import page, switch the format dropdown to **OFX / QFX**.
 2. Upload an OFX or QFX file downloaded from your brokerage.
 3. **Verify:** Transactions are parsed and imported. The import job appears in the import history.
 
@@ -136,8 +139,8 @@ The `dev` profile also seeds `demo@wealthview.local` / `demo123` and `demo-admin
 ### 8. Portfolio History Chart
 
 1. Navigate to an account with holdings and historical price data (seed data covers VOO, VTI, AAPL, etc.).
-2. Scroll to the **Portfolio History** chart section.
-3. **Verify:** A line chart shows the theoretical historical portfolio value based on holdings multiplied by historical daily prices. Symbols without price data (e.g., money market funds like SPAXX) are skipped gracefully.
+2. Scroll to the **Theoretical Portfolio History** chart.
+3. **Verify:** A shaded area chart shows today's holdings valued at historical prices, sampled weekly, over the window chosen in the dropdown (default 2 Years), with **Total Growth** and **Avg. Annual Return** below. Symbols without price data are left out; known money market funds (e.g. SPAXX) are held at $1.00 per share with a note saying so.
 
 ---
 
@@ -151,23 +154,24 @@ The `dev` profile also seeds `demo@wealthview.local` / `demo123` and `demo-admin
    - **Purchase Date:** `2020-06-01`
    - **Current Value:** `400000`
    - **Mortgage Balance:** `280000`
+   - **Property Type:** `Investment` (Investment Metrics and Hold vs. Sell only appear for Investment properties)
 4. Leave the **Loan Details** section collapsed (do not provide loan fields).
 5. Click **Create**.
-6. **Verify:** The property appears in the properties list with equity displayed ($400,000 - $280,000 = $120,000). No "Computed Balance" badge.
+6. **Verify:** The property appears in the properties list with equity displayed ($400,000 - $280,000 = $120,000).
 
 ---
 
-### 10. Add Rental Income and Expenses
+### 10. Add Property Expenses
+
+Rental income is **not** entered on the property page — it comes from an income source of type Rental Property linked to the property (step 18).
 
 1. Click on **123 Oak Street** to open the property detail page.
-2. **Verify:** The mortgage shows a **Manual** badge.
-3. Add income:
-   - **Date:** `2025-01-01`, **Amount:** `2200`, **Category:** `rent`
-4. Add an expense:
-   - **Date:** `2025-01-15`, **Amount:** `1500`, **Category:** `mortgage`
-5. Add another expense:
-   - **Date:** `2025-01-20`, **Amount:** `150`, **Category:** `insurance`
-6. **Verify:** The cash flow chart shows January with $2,200 income and $1,650 expenses, yielding $550 net cash flow. The Dashboard net worth now includes property equity.
+2. **Verify:** The mortgage shows a **Manual** badge, and the **Linked Income Sources** card reads "No income source linked" with a link to Income Sources.
+3. In the **Monthly Expenses** card's **Add Expense** form, add:
+   - **Date:** a date in the last 12 months, **Amount:** `1500`, **Category:** `Mortgage`, **Frequency:** `Monthly`
+4. Add another expense:
+   - **Date:** a date in the last 12 months, **Amount:** `1800`, **Category:** `Insurance`, **Frequency:** `Annual`
+5. **Verify:** Both rows appear in the **Recorded Expenses** table, and the **Monthly Expenses** bar chart shows the mortgage in its month and the annual insurance spread as $150 across twelve months. The Dashboard net worth includes property equity.
 
 ---
 
@@ -184,14 +188,13 @@ The `dev` profile also seeds `demo@wealthview.local` / `demo123` and `demo-admin
 4. Click **Show Loan Details** to expand the loan section.
 5. Fill in:
    - **Loan Amount:** `280000`
-   - **Annual Interest Rate:** `6.5`
+   - **Annual Interest Rate (%):** `6.5`
    - **Loan Term (months):** `360`
    - **Loan Start Date:** `2020-01-01`
    - Check **Use computed mortgage balance (amortization)**
 6. Click **Create**.
 7. **Verify:**
-   - The property appears with a **Computed Balance** badge in the list.
-   - The mortgage balance is NOT $250,000 (the manual value); it is the amortization-computed remaining balance.
+   - The mortgage balance shown on the property card is NOT $250,000 (the manual value); it is the amortization-computed remaining balance.
    - Equity = Current Value minus the computed balance.
 
 ---
@@ -208,14 +211,18 @@ The `dev` profile also seeds `demo@wealthview.local` / `demo123` and `demo-admin
 
 ### 10c. Toggle Between Computed and Manual Balance
 
-1. Using the API, update the property to set `use_computed_balance: false`:
+1. Using the API, update the property to set `use_computed_balance: false`. The API takes rates as decimals (`0.065` for 6.5%; values outside 0–1 are rejected). Get a bearer token first — bearer-authenticated requests need no CSRF header:
    ```bash
+   TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/token/login \
+     -H 'Content-Type: application/json' \
+     -d '{"email":"demo@wealthview.local","password":"demo123"}' | jq -r .access_token)
+
    curl -X PUT http://localhost:8080/api/v1/properties/{id} \
      -H "Authorization: Bearer $TOKEN" \
      -H 'Content-Type: application/json' \
      -d '{"address":"456 Elm Avenue","purchase_price":300000,"purchase_date":"2020-01-01",
           "current_value":350000,"mortgage_balance":250000,
-          "loan_amount":280000,"annual_interest_rate":6.5,"loan_term_months":360,
+          "loan_amount":280000,"annual_interest_rate":0.065,"loan_term_months":360,
           "loan_start_date":"2020-01-01","use_computed_balance":false}'
    ```
 2. **Verify:** The mortgage balance reverts to $250,000 (manual) and equity becomes $100,000.
@@ -246,7 +253,7 @@ The `dev` profile also seeds `demo@wealthview.local` / `demo123` and `demo-admin
      -H 'Content-Type: application/json' \
      -d '{"address":"700 Paid Off Circle","purchase_price":150000,"purchase_date":"1990-01-01",
           "current_value":400000,"mortgage_balance":0,
-          "loan_amount":120000,"annual_interest_rate":8.0,"loan_term_months":360,
+          "loan_amount":120000,"annual_interest_rate":0.08,"loan_term_months":360,
           "loan_start_date":"1990-01-01","use_computed_balance":true}'
    ```
 2. **Verify:** Mortgage balance is $0 and equity equals the full current value ($400,000). The amortization calculator returns zero for loans past their term.
@@ -280,20 +287,17 @@ Zillow scraping is controlled by `app.zillow.enabled`. Note the profile differen
    - Properties with `use_computed_balance: true` show equity computed from amortization (not the manual mortgage balance).
    - Properties with `use_computed_balance: false` show equity from the manual mortgage balance.
    - Net worth correctly sums all property equity, investment holdings, and cash.
-   - The allocation pie chart includes a "property" slice.
+   - The allocation pie chart includes a **Property** slice.
 
 ---
 
 ### 10i. Property Analytics
 
-1. Open the detail page for a property that has income, expenses, and loan details configured.
-2. **Verify:** The **Investment Analytics** panel displays:
-   - **Cap Rate** -- annual net operating income as a percentage of property value.
-   - **Cash-on-Cash Return** -- annual cash flow relative to total cash invested.
-   - **Equity Growth** -- change in equity over the selected period.
-   - **Mortgage Progress** -- principal paid, remaining balance, and payoff percentage.
-3. Each metric has an explanatory help icon or info section describing how it is calculated.
-4. **Verify:** Properties without loan details show analytics where applicable and omit mortgage progress gracefully.
+1. Open the detail page for an **Investment** property that has a linked rental income source (step 18), expenses, and loan details configured.
+2. **Verify:** The **Property Overview** card (with a Trailing 12 Months / per-year selector) shows Total Appreciation, Appreciation %, **Mortgage Payoff Progress** (Principal Paid, Balance, Payoff Date) and an **Equity Growth** chart.
+3. **Verify:** The **Investment Metrics** card shows **Cap Rate**, **Cash-on-Cash Return**, **Annual NOI**, **Net Cash Flow** and **Cash Invested**, each with its help text. Net Cash Flow counts only the mortgage payments due over the next 12 months, so a paid-off loan (step 10e) does not reduce it.
+4. **Verify:** A **Hold vs. Sell Analysis** card appears per linked income source.
+5. **Verify:** Properties without loan details omit mortgage progress gracefully.
 
 ---
 
@@ -303,8 +307,8 @@ Zillow scraping is controlled by `app.zillow.enabled`. Note the profile differen
 2. Edit the property and add depreciation details:
    - **In-Service Date:** `2020-06-01`
    - **Land Value:** `70000` (non-depreciable portion)
-   - **Depreciation Method:** `straight_line`
-   - **Useful Life Years:** `27.5` (standard residential rental)
+   - **Depreciation Method:** `Straight-Line`
+   - **Useful Life (years):** `27.5` (standard residential rental)
 3. **Save** the property.
 4. **Verify:** The property now shows depreciation configuration. For straight-line method, annual depreciation = (purchase_price - land_value) / useful_life_years = ($350,000 - $70,000) / 27.5 = ~$10,182/year.
 5. This depreciation amount is used by the projection engine when computing taxes on rental income sources linked to this property.
@@ -327,7 +331,7 @@ Zillow scraping is controlled by `app.zillow.enabled`. Note the profile differen
    - **Withdrawal Rate (%):** `4`
    - **Spending Plan:** `None (use withdrawal rate)`
    - **Withdrawal Strategy:** `Fixed Percentage` (the default)
-   - **Account 1:** Initial Balance `500000`, Annual Contribution `20000`, Expected Return `7`
+   - **Account 1:** Initial Balance `500000`, Annual Contribution `20000`, Override Return (%) `7`
 3. Click **Create Scenario**.
 4. **Verify:** The scenario card appears in the grid.
 5. Click the scenario name to open the detail page.
@@ -336,7 +340,8 @@ Zillow scraping is controlled by `app.zillow.enabled`. Note the profile differen
    - The **Balance Over Time** chart shows growth during working years, then gradual drawdown in retirement.
    - The **Annual Flows** chart shows green contribution bars pre-retirement and red withdrawal bars post-retirement.
    - The **Data Table** shows year-by-year numbers with the retirement transition row highlighted.
-   - Summary cards show Final Balance, Years in Retirement, Peak Balance, and Depletion Year (if the portfolio runs out).
+   - Summary cards show Final Balance, **After-tax Legacy**, Net Worth, Years in Retirement, Peak Balance, and **Depletion** (the year the portfolio runs out, or "Funds last through plan"), followed by Lifetime Tax and Avg Effective Rate.
+   - A **Tax Space** tab is present (it appears whenever the projection has retirement years).
 
 The scenario form also exposes **Dividend Yield (%)**, **Bond Interest Yield (%)**, **Investment Fees (%)** and an **Include 1928–1971 market history** toggle; leave these at their defaults for the basic run.
 
@@ -361,16 +366,28 @@ The scenario form also exposes **Dividend Yield (%)**, **Bond Interest Yield (%)
 2. Enter a **Spouse Birth Year** (this is a year, not a date). Leaving it blank models a single-person household.
 3. **Verify:** Additional fields appear once a spouse birth year is set:
    - **Primary Death Age** and **Spouse Death Age**
+   - **Spouse Birth Month** (optional; stored for future Medicare timing)
    - **Survivor Spending Factor (%)** (defaults to 75)
    - **Community Property State** checkbox
    - **Model Uncertain Lifespans** checkbox
 4. **Verify:** In the accounts section, each account card now also shows an **Owner** select (Primary / Spouse / Joint — Joint is disabled unless the account type is Taxable).
 5. Tick **Model Uncertain Lifespans**.
 6. **Verify:** **Primary Sex**, **Spouse Sex** (Blended (unset) / Male / Female) and **Longevity Age** appear, and the help text notes this affects the guardrail optimizer's Monte Carlo only, not the deterministic projection.
-7. Save and re-run.
-8. **Verify:** After the modeled first death, the data table shows survivor spending scaled by the survivor factor and the filing status flipping from married-filing-jointly to single.
+7. **Verify:** In **Tax Configuration**, **Filing Status** now defaults to **Married Filing Jointly**.
+8. Save and re-run.
+9. **Verify:** After the modeled first death, the data table shows survivor spending scaled by the survivor factor and the filing status flipping from married-filing-jointly to single.
 
 Spouse Social Security is **not** on this form — model it as an Income Source with **Owner: Spouse** (see step 18).
+
+---
+
+### 11c. Tax Space, After-tax Legacy and Birth Month
+
+1. Open the **Basic 4% Rule** scenario and click the **Tax Space** tab.
+2. **Verify:** A **Tax Space by Year** table with Year, Age, MAGI, Bracket, Room to Top, 0% Cap-Gains Room, SS Zone, NIIT Headroom, IRMAA, Eff. Marginal (Ord.) and Eff. Marginal (LTCG) columns, one row per retirement year, followed by a short glossary and the planning-estimates disclaimer.
+3. Click **Edit**. In **Tax Configuration**, set **Heir Tax Rate (%)** to `40` and click **Save & Re-run**.
+4. **Verify:** The **After-tax Legacy** card drops relative to the default 24% for any scenario with a traditional balance at the end. Values above 50 are rejected.
+5. Edit again and set **Birth Month** (next to Birth Year). **Verify:** it is optional (**Not set** by default), and the help text explains that it makes the 59½ penalty-free year exact.
 
 ---
 
@@ -404,20 +421,19 @@ Spouse Social Security is **not** on this form — model it as an Income Source 
    - **Retirement Date:** 10 years from now
    - **End Age:** `85`
    - **Inflation Rate (%):** `2`
-   - **Filing Status:** `Single`
-   - **Annual Roth Conversion:** `50000`
-   - **Other Income:** `0`
-   - **Account 1:** Initial Balance `500000`, Contribution `20000`, Return `7`, **Account Type:** `Traditional`
-   - **Account 2:** Initial Balance `100000`, Contribution `7000`, Return `7`, **Account Type:** `Roth`
+   - **Roth Conversion:** choose the **Fixed Amount** card and set **Annual Roth Conversion** to `50000`
+   - **Tax Configuration:** **Filing Status** `Single`, **Other Income** `0`
+   - **Account 1:** Initial Balance `500000`, Contribution `20000`, Override Return (%) `7`, **Account Type:** `Traditional (Pre-tax)`
+   - **Account 2:** Initial Balance `100000`, Contribution `7000`, Override Return (%) `7`, **Account Type:** `Roth`
 2. Click **Create Scenario**, then open and run the projection.
 3. **Verify:**
    - The **Balance Over Time** chart shows stacked colored areas: orange (traditional), green (roth), blue (taxable).
-   - The **Data Table** includes columns for Traditional Balance, Roth Balance, Roth Conversion Amount, and Tax Liability.
-   - Each year with a conversion shows a non-null Tax Liability computed from federal tax brackets.
+   - The **Data Table** includes **Traditional**, **Roth**, **Taxable**, **Conversion** and **Tax** columns.
+   - Each year with a conversion shows a non-zero Tax computed from federal tax brackets.
    - Traditional balance decreases as funds convert to Roth.
    - Once the traditional balance is fully converted, no further conversions or conversion tax appear.
    - In retirement, withdrawals are drawn tax-free from the Roth pool.
-   - Once the owner reaches RMD age, the data table shows a required-minimum-distribution amount for the traditional pool.
+   - Once the owner reaches RMD age, the data table (with **Show Pool Details**) shows an **RMD** column for the traditional pool.
 
 ---
 
@@ -425,10 +441,10 @@ Spouse Social Security is **not** on this form — model it as an Income Source 
 
 1. Create a scenario:
    - **Name:** `All Roth`
-   - **Filing Status:** `Single`
-   - **Account 1:** Initial Balance `500000`, Contribution `7000`, Return `7`, **Account Type:** `Roth`
+   - **Filing Status** (Tax Configuration): `Single`
+   - **Account 1:** Initial Balance `500000`, Contribution `7000`, Override Return (%) `7`, **Account Type:** `Roth`
 2. Run the projection.
-3. **Verify:** Tax Liability is zero (or null) for every year. Roth withdrawals in retirement are entirely tax-free.
+3. **Verify:** Tax is zero for every year. Roth withdrawals in retirement are entirely tax-free.
 
 ---
 
@@ -440,7 +456,7 @@ Spouse Social Security is **not** on this form — model it as an Income Source 
 4. **Verify:**
    - An overlay area chart displays all selected scenarios with distinct colors (blue, green, purple).
    - A summary table below shows each scenario's Final Balance, Peak Balance, Depletion Year, and Years in Retirement.
-   - Selecting fewer than 2 or more than 3 scenarios is prevented by the UI.
+   - There are only three dropdowns, so more than 3 cannot be picked; clicking **Compare** with fewer than 2 shows "Select at least 2 scenarios to compare".
 
 ---
 
@@ -455,7 +471,7 @@ Spouse Social Security is **not** on this form — model it as an Income Source 
 4. Optionally add **Spending Tiers** for age-based phases. Each tier has **Phase Name**, **Start Age**, **End Age (blank = forever)**, **Essential (annual)** and **Discretionary (annual)**:
    - **Tier 1:** Phase Name `Active Retirement`, Start Age `65`, Essential `45000`, Discretionary `25000`
    - **Tier 2:** Phase Name `Quiet Years`, Start Age `80`, Essential `30000`, Discretionary `10000`
-5. Click **Create**.
+5. Click **Create Profile**.
 6. **Verify:** The profile card appears with Essential, Discretionary, Monthly Equivalent and Spending Tiers tiles.
 7. **Verify:** Below the profile list, a **Monte Carlo Guardrail Profiles** section lists any optimizer-generated profiles with Essential Floor, Failure Rate, Median Final Balance, Trials, Cash Buffer and Balance Range (P10-P50) tiles.
 
@@ -476,7 +492,7 @@ Guardrail profiles are spending profiles — a scenario has **at most one** acti
    - **Start Age:** `67`
    - **End Age (blank = forever):** leave blank
    - **Inflation Rate (%):** `2` (entered as a percentage — the help text notes SS COLA is typically ~2%)
-4. Click **Create**.
+4. Click **Create Income Source**.
 5. Create a rental income source:
    - **Name:** `Oak Street Rental`
    - **Income Type:** `Rental Property`
@@ -485,10 +501,11 @@ Guardrail profiles are spending profiles — a scenario has **at most one** acti
    - **Annual Rent Amount:** `26400` ($2,200/month)
    - **Start Age:** `55` (current age)
    - **Inflation Rate (%):** `2`
-6. Click **Create**.
+6. Click **Create Income Source**.
 7. **Verify:** Both income sources appear in the list with Tax Treatment, Annual Adjustment and Monthly Equivalent tiles.
-8. **Optional (household):** create a third source with **Owner:** `Spouse`, tick **Survivor Benefit** and set **Survivor % (%)** to model what the surviving spouse keeps.
+8. **Optional (household):** create a third source (e.g. a Pension) with **Owner:** `Spouse` and set **Survivor Benefit (%)** to model what the surviving spouse keeps. For Social Security the field is replaced by a read-only note that the statutory survivor rule applies.
 9. **Optional (one-time):** tick **One-time payment (e.g., deferred compensation, inheritance)** and note that the form collapses to **Payment Amount** + **Payment Age**.
+10. **Verify:** Deleting an income source asks for confirmation and warns that it will be removed from any scenarios that use it.
 
 ---
 
@@ -504,10 +521,10 @@ Guardrail profiles are spending profiles — a scenario has **at most one** acti
    - Income sources are listed with their tax treatments.
    - The results tab bar now includes **Spending Analysis**, **Income & Tax** and **Income Streams** alongside **Balance Over Time**, **Annual Flows** and **Data Table** (a **Tax Shield** tab appears when rental deductions are in play).
    - Click **Spending Analysis** to see the stacked area chart with essential expenses (red), discretionary after cuts (amber), withdrawal line, and income streams line.
-   - The **Data Table** now includes additional columns: Essential, Discretionary, Income, Net Need, Surplus/Deficit, and Discretionary After Cuts.
+   - The **Data Table** shows Income and Total Spending, and **Show Pool Details** adds Essential, Discretionary, Net Need and Surplus/Deficit columns.
    - Tax liability reflects the tax treatment of each income source (Social Security via the IRS provisional-income formula, rental income with passive loss deductions including depreciation).
    - In early retirement years before Social Security starts, the net spending need is higher because there's no SS income offset. After Social Security kicks in at age 67, the net need drops and surplus increases.
-   - **Rental income is reported NET** of property expenses (tax, insurance, maintenance) and mortgage principal and interest, not gross. In the projection years, the mortgage follows the loan's amortization schedule and stops after payoff.
+   - **Rental income is reported NET** of property expenses (tax, insurance, maintenance) and mortgage principal and interest, not gross. In the projection years, the mortgage follows the loan's amortization schedule and stops after payoff. If the linked property has a mortgage balance but no loan details (like `123 Oak Street`), a warning banner says the payments can't be modelled.
 
 ---
 
@@ -538,13 +555,14 @@ This banner is the only place in the UI that sets a security's asset class; ther
 
 1. Create a scenario with low initial balance and high spending:
    - **Name:** `Shortfall Test`
-   - **Account 1:** Initial Balance `200000`, Contribution `5000`, Return `5`
+   - **Account 1:** Initial Balance `200000`, Contribution `5000`, Override Return (%) `5`
    - **Spending Plan:** `Moderate Retirement`
    - **Retirement Date:** 5 years from now
 2. Run the projection.
 3. **Verify:**
    - In the **Data Table**, some retirement years show a negative Surplus/Deficit value, meaning withdrawals don't cover spending.
-   - The **Discretionary After Cuts** column shows reduced discretionary spending (below the original $20,000 inflated amount) in deficit years.
+   - The **Discretionary** column (with **Show Pool Details**) shows reduced discretionary spending (below the planned $20,000) in deficit years.
+   - The **Plan Outcome** card reads **Underfunded at age N** or **Depleted at age N**, and a **Spending Shortfall Detected** banner appears.
    - Essential expenses are always fully covered -- shortfalls come entirely from discretionary.
    - The **Spending Analysis** chart visually shows the gap between withdrawals and spending needs.
 
@@ -553,16 +571,19 @@ This banner is the only place in the UI that sets a security's asset class; ther
 ### 21a. Optimize Spending (Monte Carlo Guardrails)
 
 1. From a scenario detail page, click **Optimize Spending** (route `/projections/:id/optimize`).
-2. Run the optimization.
+2. Click **Run Optimization**.
 3. **Verify:** A guardrail profile is produced with a per-year spending schedule, and the scenario's **Spending Plan** now points at it (the previously selected spending profile is cleared — the two are mutually exclusive).
 4. **Verify:** Risk tolerance maps to a target success probability: conservative 0.95, moderate 0.90, aggressive 0.80.
+5. **Verify:** Under **Advanced Settings**, **Cash Rate** defaults to 1.5%. With **Roth Conversion Strategy** ticked, the results' conversion schedule fills the **Bracket** column (e.g. "12%").
+6. Back on **Spending Profiles**, click **Re-optimize** on the guardrail profile. **Verify:** it reruns with the same settings, including the Roth-conversion toggle and dynamic-sequencing bracket rate.
+7. Edit the scenario and change its **Filing Status** or **State**, then save. **Verify:** the guardrail profile now shows a **Stale** badge.
 
 ---
 
 ### 22. Delete a Scenario
 
-1. From the **Projections** list, click the delete button on one of the test scenarios.
-2. **Verify:** The scenario is removed from the list.
+1. From the **Projections** list, click **Delete** on one of the test scenarios.
+2. **Verify:** A confirmation warns that the scenario's spending optimizer profile will be deleted with it. After confirming, the scenario is removed from the list.
 
 ---
 
@@ -588,8 +609,8 @@ This banner is the only place in the UI that sets a security's asset class; ther
 
 1. Log in as an admin user.
 2. Navigate to **Admin** (`/admin`) and click **Audit Log** in the left sub-navigation.
-3. **Verify:** The section shows a paginated list of actions performed -- account creates, property updates, projection runs, login events, etc., with Time / Action / Entity Type / Details columns.
-4. Use the filter dropdown (default **All**) to narrow by entity type.
+3. **Verify:** The section shows a paginated list (50 per page) of actions performed in the tenant -- account, transaction, holding, property, user and tenant changes -- with Time / Action / Entity Type / Details columns.
+4. Use the **Filter by type:** dropdown (default **All**) to narrow by entity type.
 5. **Verify:** An empty result set renders "No audit log entries" rather than a blank table.
 
 ---
@@ -628,14 +649,15 @@ Splits are also detected automatically: a daily Finnhub sync plus a one-time bac
 ### 24c. Users, Tenants and System Config (Admin)
 
 1. Navigate to **Admin** → **Users**.
-2. **Verify:** A table of Email / Role / Tenant / Joined / Status / Actions with an inline role select. A super admin sees Super Admin / Admin / Member / Viewer; a tenant admin sees the same list without Super Admin.
-3. **Verify:** Row actions are **Reset PW** (opens a **Reset Password** modal), **Deactivate** / **Activate**, and **Delete** (super admin) or **Remove** (tenant admin). There is no "create user" button — new users arrive via invite codes.
+2. **Verify:** A tenant admin sees Email / Role / Joined / Actions, with an inline role select offering **Admin**, **Member** and **Viewer**. A super admin additionally sees every tenant's users with Tenant and Status columns; the role select appears only for users in the super admin's own tenant (other tenants' users and any super admin show the role as text), and Super Admin is never offered.
+3. **Verify:** Super-admin row actions are **Reset PW** (opens a **Reset Password** modal), **Deactivate** / **Activate**, and **Delete** (own tenant only); a tenant admin gets **Remove**. There is no "create user" button — new users arrive via invite codes.
 4. As a super admin, navigate to **Admin** → **Dashboard**.
 5. **Verify:** Stat cards for Total Users, Active Users (30d), Tenants, Accounts, Holdings, Transactions, Database Size, Symbols Tracked and Stale Symbols, plus a **Recent Login Activity** table (Email / Time / IP Address / Status).
 6. Navigate to **Admin** → **Tenants** (super admin only).
-7. **Verify:** A **Create Tenant** form and a table of Name / Users / Accounts / Status / Created.
-8. Navigate to **Admin** → **System Config** (super admin only).
-9. **Verify:** Grouped cards — **API Keys**, **Application Settings**, **Price Sync** and **Other** — with per-row **Edit** → **Save** / **Cancel**, **Show** / **Hide** for secret values, and a toggle for boolean keys.
+7. **Verify:** A **Create Tenant** form and a table of Name / Users / Accounts / Status / Created, with **Create invite code** and **Disable** / **Enable** per row.
+8. Create a tenant, then click **Create invite code** on it. **Verify:** an "Invite code for {tenant}" panel shows the code, its expiry and **Copy**. Register with that code (step 23): the first user into the empty tenant becomes its **Admin**.
+9. Navigate to **Admin** → **System Config** (super admin only).
+10. **Verify:** Grouped cards — **API Keys**, **Application Settings**, **Price Sync** and **Other** — with per-row **Edit** → **Save** / **Cancel**, **Show** / **Hide** for secret values, and a toggle for boolean keys.
 
 MFA (TOTP), active-session management, notification preferences and mobile app version pinning are **backend-only** at present — the REST endpoints exist but there is no web UI for them, so they cannot be exercised from this walkthrough.
 
@@ -645,9 +667,9 @@ MFA (TOTP), active-session management, notification preferences and mobile app v
 
 1. Navigate to **Export** (`/export`).
 2. In the **Full Export (JSON)** card, click **Download JSON**.
-3. **Verify:** A "JSON export downloaded" toast appears and the file contains all tenant data (accounts, transactions, holdings, properties, projections, etc.).
+3. **Verify:** A "JSON export downloaded" toast appears and the file contains exactly four sections: `accounts`, `transactions`, `holdings` and `properties`. Projections, spending profiles, income sources, prices and exchange rates are not included (the card says so).
 4. In the **CSV Export** card, click each of the four buttons: **Accounts**, **Transactions**, **Holdings**, **Properties**.
-5. **Verify:** Each CSV file downloads with the expected data and column headers, and a "{type} export downloaded" toast appears.
+5. **Verify:** Each CSV file downloads with the expected data and column headers (the accounts CSV ends with a `currency` column), and a "{type} export downloaded" toast appears.
 
 ---
 
@@ -682,16 +704,16 @@ MFA (TOTP), active-session management, notification preferences and mobile app v
 | 1 | Login | Redirects to dashboard |
 | 2 | Dashboard | Net worth, pie chart, account cards, recent-splits panel |
 | 3 | Create account | Appears in list; type select, currency field |
-| 3a | Multi-currency account | Non-USD badge, currency-formatted balance |
+| 3a | Multi-currency account | Rejected without a rate; non-USD badge once a rate exists |
 | 4 | Add transactions | Holdings auto-computed |
 | 5 | Add manual price | Valuation updates on dashboard |
-| 5a | Holding detail | Editable cost basis, per-symbol splits panel |
+| 5a | Holding detail | Edit Override, per-symbol splits panel |
 | 6 | CSV import | Transactions imported, dedup works |
 | 7 | OFX import | Transactions parsed correctly |
 | 8 | Portfolio history | Chart renders with historical prices |
 | 9 | Create property (manual) | Equity = current value - manual mortgage balance |
-| 10 | Rental income/expenses | Cash flow chart and net calculation |
-| 10a | Property with loan details | Computed balance via amortization, "Computed Balance" badge |
+| 10 | Property expenses | Expense table, monthly expenses chart; income comes from a linked income source |
+| 10a | Property with loan details | Computed balance via amortization |
 | 10b | Loan details display | Loan panel on detail page, Computed badge on mortgage |
 | 10c | Toggle computed/manual | Balance switches between amortization and manual on toggle |
 | 10d | Partial loan validation | 400 error envelope when only some loan fields provided |
@@ -699,11 +721,12 @@ MFA (TOTP), active-session management, notification preferences and mobile app v
 | 10f | Valuation history empty | "No valuation history yet" placeholder with refresh button |
 | 10g | Valuation refresh | Enabled on `dev`; 503 when `app.zillow.enabled=false` |
 | 10h | Dashboard computed balances | Net worth uses computed balance for flagged properties |
-| 10i | Property analytics | Cap rate, cash-on-cash, equity growth, mortgage progress |
+| 10i | Property analytics | Property Overview, Investment Metrics, Hold vs. Sell |
 | 10j | Property depreciation | Straight-line config; cost-seg class breakdown |
 | 11 | Fixed % projection | Balance chart, flows, data table, summary cards |
 | 11a | Allocation editor + cost basis | Four-way allocation must sum to 100%; cost basis field |
 | 11b | Household / spouse | Spouse fields, per-account owner, survivor factor, mortality toggle |
+| 11c | Tax Space / legacy / birth month | Tax Space table, Heir Tax Rate moves After-tax Legacy |
 | 12 | Dynamic % projection | Withdrawals track current balance, never depletes |
 | 13 | Vanguard dynamic | Withdrawal changes capped at ceiling/floor |
 | 14 | Roth conversion | Pool tracking, tax computed, stacked chart, RMDs |
@@ -715,13 +738,13 @@ MFA (TOTP), active-session management, notification preferences and mobile app v
 | 19a | Reclassify unclassified symbols | Orange notice, asset-class select, Apply & re-run |
 | 20 | Edit scenario | Save & Re-run updates scenario and reruns projection |
 | 21 | Spending shortfall | Discretionary absorbs deficit, essential fully covered |
-| 21a | Optimize spending | Guardrail profile created, clears spending profile |
+| 21a | Optimize spending | Guardrail profile created, clears spending profile; re-optimize; stale flag |
 | 22 | Delete scenario | Removed from list |
 | 23 | Invite + register (Admin) | `/settings` redirects to `/admin` → Invite Codes |
 | 24 | Audit log (Admin) | `/audit-log` redirects to `/admin` → Audit Log |
 | 24a | Exchange rates (Admin) | Add/edit/delete rate; dashboard converts |
 | 24b | Prices + stock splits (Admin) | Four price tabs; apply/un-apply split |
-| 24c | Users/tenants/config (Admin) | Role select, stat cards, grouped config |
+| 24c | Users/tenants/config (Admin) | Role select, stat cards, tenant invite codes, grouped config |
 | 25 | Data export | JSON + four CSV downloads |
 | 26 | Backward compat | Old scenarios run without errors, spending fields null |
 | 27 | Dashboard with data | All assets reflected in net worth |

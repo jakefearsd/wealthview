@@ -189,7 +189,9 @@ so a nominal override is converted to real using the scenario's inflation rate.
 `RmdStreamCalculator` compute per-owner required distributions inside the deterministic run;
 `TaxableLots` tracks per-lot FIFO cost basis so `CapitalGainsTaxCalculator` can apply LTCG
 brackets and NIIT to taxable-account withdrawals. `IrmaaSurchargeCalculator` annotates years
-from the Medicare age of 65.
+from the Medicare age of 65. `TaxSpaceCalculator` (core) re-prices each retired year's
+`YearTaxPicture` from `runDetailed()` to report bracket / LTCG-band room, NIIT headroom, IRMAA
+tier distance and effective marginal rates.
 
 **Pools.** `PoolStrategy` is a sealed interface permitting a single implementation,
 `PoolStrategy.MultiPool`, which tracks taxable / traditional / Roth sub-pools separately.
@@ -197,7 +199,7 @@ from the Medicare age of 65.
 `OrderedWithdrawalOrder`) allocates each withdrawal across them.
 
 **Household and survivor modeling.** `com.wealthview.core.projection.household` supplies
-`HouseholdContext`, `PersonId`, and `LifeExpectancy`. Accounts and income sources carry an
+`HouseholdContext`, `PersonId`, `LifeExpectancy`, and `AgeMilestones` (the 59½ penalty-free year). Accounts and income sources carry an
 `owner` (`primary`, `spouse`, or `joint`). `HouseholdTransition`, `OwnerPool`,
 `SurvivorIncomeAdjuster`, and `HouseholdMcResolver` implement the first-death transition —
 keep-larger Social Security, rollover, basis step-up, a survivor spending factor (default
@@ -212,8 +214,10 @@ longevity-conditional metrics.
 **Monte Carlo.** `MonteCarloSpendingOptimizer` delegates its searches to focused
 collaborators: `SustainabilitySearch` (30-iteration spending binary search),
 `FractionSearch` (50-point grid + 20 refinement iterations for a single conversion
-fraction), and `JointConversionSearch` (20×20 spending × conversion grid, 500 trials per
-cell, 10 refinement iterations). Return paths come from `BlockBootstrapReturnGenerator`
+fraction), and `JointConversionSearch` (a 21-point conversion-fraction grid, `i/20`, each arm
+scored by its sustainable spending on `min(500, trialCount)` trials, then 10 refinement
+iterations). Trials start in the retirement year, so `PreRetirementAccumulation` first rolls
+every account forward from the base year along the expected (contribute-then-grow) path. Return paths come from `BlockBootstrapReturnGenerator`
 (block bootstrap over the multi-asset real-return matrix, preserving autocorrelation) via
 `PortfolioPathGenerator`, which reuses one index sequence per trial across all accounts so
 cross-asset correlation survives. Risk tolerance maps directly to a target success
@@ -249,8 +253,8 @@ wealthview/
 │   ├── wealthview-core/                   (services, business logic, DTOs)
 │   │   └── projection/
 │   │       ├── strategy/                  (WithdrawalStrategy sealed interface + 3 implementations)
-│   │       ├── tax/                       (federal/state/LTCG/IRMAA/SS/SE calculators)
-│   │       ├── household/                 (HouseholdContext, PersonId, LifeExpectancy)
+│   │       ├── tax/                       (federal/state/LTCG/IRMAA/SS/SE calculators, TaxSpaceCalculator)
+│   │       ├── household/                 (HouseholdContext, PersonId, LifeExpectancy, AgeMilestones)
 │   │       ├── mortality/                 (MortalityTable, MortalityTableProvider)
 │   │       └── dto/                       (SpendingPlan, ProjectionInput, ProjectionYearDto, ...)
 │   ├── wealthview-persistence/            (entities, repos, migrations)

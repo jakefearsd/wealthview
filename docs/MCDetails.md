@@ -17,6 +17,14 @@ The *same* year sequence drives every account in a trial, so cross-asset correla
 Your accounts' returns come from their asset allocations blended against that sequence (or a fixed
 expected-return override, which shows no variability at all), minus your fee rate.
 
+**Trials start at retirement, from the balances you will have then.** Before the trials begin, each
+account is rolled forward from today to the retirement year (`PreRetirementAccumulation`): every year
+its contribution is added, then it grows at that account's own real, fee-adjusted return. Market
+variation is simulated from retirement onward only. Because the deterministic projection grows each
+pool at one blended return instead, the two engines' balances at retirement can differ for a pool
+that mixes allocations. For a household, the simulated plan ends at the second death, matching the
+projection.
+
 **What is NOT random:** everything else. Income sources, Social Security, tax brackets, the
 conversion schedule, spending phases, inflation, and life expectancy are all held fixed across trials.
 (Life expectancy is the one exception — see *Stochastic Mortality* below, which is opt-in.)
@@ -183,7 +191,11 @@ table, so a draw that crosses a bracket is priced correctly. On top of that:
 - **RMDs** run one stream per owner from that owner's own SECURE 2.0 start age (73 if born before
   1960, otherwise 75), on the IRS Uniform Lifetime Table.
 - Tax bills that the year's income cannot cover are drawn from the pools, and that funding draw is
-  itself grossed up when it touches traditional.
+  itself grossed up when it touches traditional. When the draw sells taxable lots (to pay
+  conversion tax, or to seed and refill the cash reserve) the sale realizes a taxable gain in that
+  year, and losses offset the year's gains.
+- **Cash reserve.** The reserve (`cash_reserve_years` x first-year spending) is capped at the
+  portfolio's size, and earns the cash return rate (default **1.5% real**).
 
 **Not modeled in the Monte Carlo engine:** IRMAA Medicare surcharges (deterministic engine only),
 state income tax, itemized deductions and credits, and any state-specific surtax.

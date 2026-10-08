@@ -29,6 +29,16 @@ Three optional panels sit below, each behind a **Show / Hide** toggle: **Loan De
 
 Only users with the **admin**, **member**, or **super-admin** role can create or edit properties. Viewers see the data but not the Edit button.
 
+### What the Form Accepts
+
+The save is rejected with an error if a value is clearly impossible:
+
+- Purchase price, current value, mortgage balance, loan amount, property tax, insurance, maintenance, and land value cannot be negative.
+- **Annual Interest Rate** must be between 0% and 100%; **Loan Term** must be at least 1 month (and at most 1,200).
+- **Annual Appreciation Rate** must be between −100% and +100%.
+- **Useful Life** must be more than 0 years; **Bonus Depreciation Rate** must be between 0% and 100%.
+- **Land Value** cannot be more than the purchase price.
+
 ---
 
 ## Loan Details and Mortgage Tracking
@@ -248,7 +258,7 @@ A year selector at the top lets you look at **Trailing 12 Months** or any specif
 - **Appreciation %** — that, as a percentage of purchase price.
 - **Months Remaining** — on the mortgage, when loan details exist.
 - **Mortgage Payoff Progress** — a progress bar with **Principal Paid**, **Balance**, **Payoff Date**, and remaining months.
-- **Equity Growth** — a chart with three lines: **Equity**, **Property Value**, and **Mortgage**, from your purchase month to today.
+- **Equity Growth** — a chart with three lines: **Equity**, **Property Value**, and **Mortgage**, from your purchase month to today. Before your first recorded valuation, the property value is drawn on a straight line from the purchase price to today's value.
 
 ### Investment Metrics
 
@@ -312,7 +322,7 @@ This card does not carry a disclaimer of its own, so here's one: those are simpl
 Your properties contribute to your overall financial picture:
 
 - **Net Worth** includes property equity (current value minus the effective mortgage balance).
-- The **Asset Allocation** view shows property equity alongside your investment accounts.
+- The **Allocation** pie chart shows property equity as its own **Property** slice alongside your investment account types.
 
 ---
 
@@ -321,6 +331,7 @@ Your properties contribute to your overall financial picture:
 Properties reach your retirement projections through **income sources**. Create an income source of type Rental Property, link it to the property, and the projection engine will:
 
 - Treat the rental income as a retirement income stream.
+- Charge each projected year that year's scheduled mortgage principal and interest from your **Loan Details**, stop at payoff, and deduct only that year's interest from taxable rental income. The payment is fixed in dollars, so in the projection's today's-dollars view it shrinks a little each year. If the property has a mortgage balance but no loan details, the projection can't model the payments and says so in its warnings.
 - Apply the property's depreciation as a deduction against that rental income, following the passive-loss rules for the tax treatment you chose.
 - Include property equity in the projection's final **Net Worth**.
 - Surface the depreciation benefit on the projection's **Tax Shield** tab.

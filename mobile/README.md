@@ -8,13 +8,13 @@ This pass ships the daily-driver Portfolio screen on top of the auth MVP: net-wo
 
 | Package | Version |
 |---|---|
-| `react-native` | 0.87.0 (new architecture + Hermes both enabled) |
+| `react-native` | 0.87.1 (new architecture + Hermes both enabled) |
 | `react` | 19.2.8 (pinned by the root `overrides` block) |
 | `@react-navigation/native` / `native-stack` / `bottom-tabs` | 7.x |
 | `react-native-keychain` | 10.x |
 | `react-native-screens` | 4.x |
 | `react-native-safe-area-context` | 5.x |
-| `axios` | 1.19.x (also the transport inside `@wealthview/shared`) |
+| `axios` | 1.20.x (also the transport inside `@wealthview/shared`) |
 | Jest | 29.x with `@react-native/jest-preset` + `@testing-library/react-native` 14 |
 | TypeScript | 5.9.x |
 | ESLint | 8.x with `@react-native/eslint-config` |

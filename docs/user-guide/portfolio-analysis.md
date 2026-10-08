@@ -16,7 +16,7 @@ When you sign in, the **Dashboard** is the first thing you see. Reading top to b
 4. Side by side: the **Accounts** table and the **Allocation** pie chart
 5. **Recent stock splits**
 
-Everything on the dashboard is expressed in USD. Balances held in other currencies are converted using the rates configured under Admin → Exchange Rates.
+Everything on the dashboard is expressed in USD. Balances held in other currencies are converted using the rates configured under Admin → Exchange Rates. An account whose currency has no rate on record is left out of the totals, the forward projection, and the accounts table rather than breaking the page — so if a non-USD account seems to be missing, ask an admin to check its exchange rate.
 
 ---
 
@@ -70,15 +70,15 @@ This is a straight-line extrapolation of past growth, not a retirement plan. It 
 
 A plain list of everything you own, with three columns: **Name**, **Type**, and **Balance**.
 
-Properties appear in this table too, listed by street address with the type `property` and their equity as the balance — so the table is a complete inventory rather than investment accounts only. To open an account, use the **Accounts** page in the sidebar; the rows here are not links.
+Properties appear in this table too, listed by street address with the type **Property** and their equity as the balance — so the table is a complete inventory rather than investment accounts only. To open an account, use the **Accounts** page in the sidebar; the rows here are not links.
 
 ---
 
 ## Allocation Chart
 
-A pie chart breaking your net worth down by category. Each slice is one account **type** — brokerage, ira, 401k, roth, bank — plus one slice for **property**. Labels show the category name and its share of net worth as a percentage.
+A pie chart breaking your net worth down by category. Each slice is one account **type** — Brokerage, IRA, 401(k), Roth IRA, Bank — plus one slice for **Property**. Labels show the category name and its share of net worth as a percentage.
 
-This is the quickest way to spot tax-diversification problems. If 60% of the pie is `401k`, nearly all of your wealth is in pre-tax dollars, which constrains your options in retirement in ways a Roth-heavy or taxable-heavy portfolio would not.
+This is the quickest way to spot tax-diversification problems. If 60% of the pie is **401(k)**, nearly all of your wealth is in pre-tax dollars, which constrains your options in retirement in ways a Roth-heavy or taxable-heavy portfolio would not.
 
 Note that it groups by account type, not by asset class — two brokerage accounts holding wildly different things merge into one slice. For an asset-class view (US stock, international, bonds, cash), look at a projection scenario's allocation instead.
 

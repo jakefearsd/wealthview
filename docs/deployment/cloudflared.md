@@ -143,8 +143,16 @@ cloudflared tunnel login
 
 **Option B (Docker):**
 
+The `cloudflare/cloudflared` image runs as the distroless `nonroot` user
+(UID 65532), whose home is `/home/nonroot`. Mount your host directory there —
+mounting it at `/root/.cloudflared` does not work, because cloudflared neither
+looks in nor can write to `/root` — and give that user ownership of it so it
+can write the certificate and, later, read it back:
+
 ```bash
-docker run --rm -it -v ~/.cloudflared:/root/.cloudflared \
+mkdir -p ~/.cloudflared
+sudo chown 65532:65532 ~/.cloudflared
+docker run --rm -it -v ~/.cloudflared:/home/nonroot/.cloudflared \
   cloudflare/cloudflared:latest tunnel login
 ```
 
@@ -152,9 +160,9 @@ Both commands print a URL. Open it in a browser on any computer and log in to
 Cloudflare; you'll be asked which of your domains to authorize. Pick the one
 you'll use for WealthView.
 
-The command finishes by writing a certificate to `~/.cloudflared/cert.pem`
-(native) or `~/.cloudflared/cert.pem` inside the named volume (Docker). Do
-not commit this file — it is an account credential.
+The command finishes by writing a certificate to `~/.cloudflared/cert.pem` —
+directly (native) or through the bind mount (Docker). Do not commit this file
+— it is an account credential.
 
 ---
 
@@ -172,11 +180,12 @@ cloudflared tunnel create wealthview
 **Option B (Docker):**
 
 ```bash
-docker run --rm -it -v ~/.cloudflared:/root/.cloudflared \
+docker run --rm -it -v ~/.cloudflared:/home/nonroot/.cloudflared \
   cloudflare/cloudflared:latest tunnel create wealthview
 ```
 
-Output looks like:
+Output looks like (the path is `/home/nonroot/.cloudflared/...` when run in
+Docker — the same file on the host side of the mount):
 
 ```
 Tunnel credentials written to /home/you/.cloudflared/<UUID>.json.
@@ -245,9 +254,27 @@ services:
 
 `network_mode: "service:app"` puts the cloudflared container in the same
 network namespace as the `app` container, so `http://localhost:8080` inside
-cloudflared reaches the Spring Boot listener directly.
+cloudflared reaches the Spring Boot listener directly. `~` here is expanded by
+Compose for the user running it — under `sudo wv ...` that is `/root`, so use
+an absolute path if you run the stack as root.
 
-Create `~/.cloudflared/config.yml`:
+Two consequences of that shared namespace to plan for:
+
+- **Let `wv` manage this file.** Make it the compose override: in source-tree
+  prod mode, name it `docker-compose.prod.override.yml` (picked up
+  automatically); on a `wv.conf` install, point `WV_COMPOSE_OVERRIDE_FILE` at
+  it. Otherwise `wv down` removes the cloudflared container as an orphan (it
+  passes `--remove-orphans`) and `wv up` won't recreate it.
+- **Recreate cloudflared after the app container is replaced.** `wv update`,
+  `wv rollback` and `wv rotate-secret` recreate only `app`
+  (`up -d --no-deps app`), and a container attached with
+  `network_mode: service:app` stays bound to the old app's namespace, so the
+  tunnel goes dark. Afterwards run
+  `docker compose -p wealthview -f docker-compose.prod.yml -f docker-compose.cloudflared.yml up -d --force-recreate cloudflared`
+  (or `wv restart --no-build`, if the file is your override).
+
+Create `~/.cloudflared/config.yml` (with `sudo tee`, since the directory now
+belongs to UID 65532):
 
 ```yaml
 tunnel: <UUID>
@@ -278,7 +305,7 @@ cloudflared tunnel route dns wealthview wealthview.example.com
 **Option B (Docker):**
 
 ```bash
-docker run --rm -it -v ~/.cloudflared:/root/.cloudflared \
+docker run --rm -it -v ~/.cloudflared:/home/nonroot/.cloudflared \
   cloudflare/cloudflared:latest tunnel route dns wealthview wealthview.example.com
 ```
 
@@ -291,7 +318,7 @@ Cloudflare is usually immediate.
 ## Step 7: Update WealthView's `.env`
 
 The app enforces CORS and rate-limit rules based on which public URL is in
-use. Edit `.env` at the repo root:
+use. Edit the env file (`.env` beside the compose file):
 
 ```dotenv
 # Your public Cloudflare Tunnel hostname. Must be https:// and non-empty on
@@ -360,8 +387,11 @@ user.
 **Option B (Docker):**
 
 ```bash
-docker compose -f docker-compose.prod.yml -f docker-compose.cloudflared.yml up -d
+docker compose -p wealthview -f docker-compose.prod.yml -f docker-compose.cloudflared.yml up -d
 ```
+
+(If you made the file your `wv` override as suggested in Step 5b, `./wv up
+--no-build` does the same.)
 
 Check the logs in either case:
 
@@ -370,7 +400,7 @@ Check the logs in either case:
 sudo journalctl -u cloudflared -f
 
 # Docker
-docker compose -f docker-compose.prod.yml -f docker-compose.cloudflared.yml logs -f cloudflared
+docker compose -p wealthview -f docker-compose.prod.yml -f docker-compose.cloudflared.yml logs -f cloudflared
 ```
 
 You want to see `Connection registered` lines with increasing `connIndex`
@@ -392,18 +422,23 @@ dig +short wealthview.example.com
 curl -s https://wealthview.example.com/actuator/health
 # {"status":"UP"}
 
-# 3. Security headers are in place (all emitted by the app itself,
-#    from SecurityConfig — Cloudflare adds nothing here)
+# 3. Security headers are in place (emitted by the app, from SecurityConfig)
 curl -sI https://wealthview.example.com/ | grep -Ei "strict-transport|permissions-policy|x-frame-options|x-content-type-options|content-security-policy"
 # Expected:
-#   strict-transport-security: max-age=31536000 ; includeSubDomains ; preload
 #   permissions-policy: geolocation=(), microphone=(), camera=(), payment=()
 #   x-frame-options: DENY
 #   x-content-type-options: nosniff
 #   content-security-policy: default-src 'self'; script-src 'self'; ...
+#   strict-transport-security: ...   (only once you enable HSTS in Cloudflare)
 ```
 
-Note the app does **not** set `Referrer-Policy`; with Cloudflare Tunnel there
+**HSTS does not come from the app here.** Spring Security writes
+`Strict-Transport-Security` only on requests it sees as HTTPS, and cloudflared
+hands the app plain HTTP (the app does not act on `X-Forwarded-Proto`). Turn
+HSTS on in the Cloudflare dashboard under **SSL/TLS → Edge Certificates →
+HTTP Strict Transport Security (HSTS)**.
+
+The app does **not** set `Referrer-Policy` either; with Cloudflare Tunnel there
 is no nginx layer to add one. Add it as a Cloudflare Transform Rule if you
 want it.
 
@@ -425,16 +460,18 @@ a Cloudflare-issued cert; click through to `/login` and sign in with
   ```
 - **Lock the container port to loopback.** With the default
   `ports: "${APP_PORT:-80}:8080"` and a public IP, the container is still
-  reachable directly on that port, bypassing Cloudflare. Either:
-  - Keep the inbound port closed at the firewall (easiest), OR
-  - Bind to loopback only by editing the `ports:` line in
-    `docker-compose.prod.yml`:
-    ```yaml
-    ports:
-      - "127.0.0.1:${APP_PORT:-80}:8080"
-    ```
-    If you also change `APP_PORT`, remember `wv`'s health probe follows it —
-    set `WV_APP_PORT` or `WV_HEALTH_URL` in `wv.conf` if the two diverge.
+  reachable directly on that port, bypassing Cloudflare. **Closing the port in
+  ufw does not help** — Docker's iptables rules for published ports are
+  evaluated before ufw's. Bind to loopback instead by editing the `ports:` line
+  in `docker-compose.prod.yml` (or with `ports: !override` in an override file,
+  see [tls-and-nginx.md](tls-and-nginx.md#step-1-change-the-apps-port-to-not-conflict-with-nginx)):
+  ```yaml
+  ports:
+    - "127.0.0.1:${APP_PORT:-80}:8080"
+  ```
+  With Option B (shared network namespace) the tunnel doesn't use the
+  published port at all. `wv`'s health probe reads `APP_PORT` from the env
+  file, so it keeps working after the change.
 - **Cloudflare Access (optional).** You can require a Cloudflare Access login
   (email OTP, Google SSO, etc.) in addition to WealthView's own authentication.
   In the Cloudflare dashboard: **Zero Trust → Access → Applications → Add**,
@@ -496,8 +533,8 @@ the new path, and `sudo systemctl restart cloudflared`.
 ### The app is reachable publicly without HTTPS
 
 This means the host port published by the `app` service (`${APP_PORT:-80}`) is
-open to the internet. Close it at the firewall (`sudo ufw deny 80/tcp`) or bind
-the container port to loopback only (see the
+open to the internet. A ufw rule will not close it (Docker bypasses ufw for
+published ports); bind the container port to loopback only (see the
 [security notes](#security-notes-specific-to-cloudflare-tunnel) above).
 
 ---
@@ -510,7 +547,7 @@ To undo everything:
 # Stop the tunnel
 sudo systemctl stop cloudflared            # native
 # OR
-docker compose -f docker-compose.cloudflared.yml down   # Docker
+docker compose -p wealthview -f docker-compose.prod.yml -f docker-compose.cloudflared.yml rm -sf cloudflared   # Docker
 
 # Remove the DNS CNAME in the Cloudflare dashboard (DNS → Records)
 

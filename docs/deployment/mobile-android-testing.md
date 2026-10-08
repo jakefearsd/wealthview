@@ -8,7 +8,7 @@ iOS deployment is deferred until first release; that section is a placeholder at
 
 | Tool | Version | Notes |
 |---|---|---|
-| React Native | 0.87.0 | Pinned in `mobile/package.json` (`react-native`, `@react-native/*` tooling, and `@react-native/new-app-screen` all on 0.87.0). React 19.2.x. |
+| React Native | 0.87.1 | Pinned in `mobile/package.json` (`react-native`, `@react-native/*` tooling, and `@react-native/new-app-screen` all on 0.87.1). React 19.2.x. |
 | Android Studio | Recent enough to install SDK Platform 37 | Installed at `~/android-studio/`. Launchable from the apps menu (entry created at `~/.local/share/applications/android-studio.desktop`) or via `studio.sh` once `~/android-studio/bin` is on PATH. |
 | JDK | 17.0.19-tem via SDKMAN | Declared in `mobile/.sdkmanrc`. The backend uses JDK 25 (`backend/.sdkmanrc`); SDKMAN auto-switches per directory. |
 | Node | ≥ 22.13.0 | `engines` in `mobile/package.json`. |
@@ -137,6 +137,8 @@ The first launch shows the Server URL screen. To talk to your local backend:
 
    These are seeded by `SampleDataInitializer`, which runs on the `dev` and `docker` profiles only — so they exist against a local `./wv up` stack, not against a `prod` deployment.
 
+   The auth endpoints are rate limited to 60 requests per minute per client IP (`RateLimitFilter`); 5 failed logins for one email within a rolling 15-minute window also block further attempts for that email. If logins start failing with `429` or a lockout during testing, wait it out or restart the backend (both counters are in memory).
+
 ### What you should see
 
 After login you'll land on the **Portfolio** tab showing your net worth and accounts grouped by category (Investment Accounts / Cash / Other). Pull down to refresh. Tap any account card to see its details. The **Settings** tab lets you change the server URL or log out.
@@ -213,7 +215,7 @@ Place the keystore **outside** the repo (e.g. `~/.android/wealthview-release.key
 | `SDK location not found` | Set `ANDROID_HOME` to your SDK path (e.g. `~/Android/Sdk` on Linux, `~/Library/Android/sdk` on macOS) and add `$ANDROID_HOME/platform-tools` to `PATH`. |
 | Gradle picks the wrong JDK | `mobile/.sdkmanrc` pins `17.0.19-tem`. Confirm with `java -version` inside `mobile/`; the backend's JDK 25 will not build the Android project. |
 | Login succeeds but Dashboard shows blank | The `/auth/me` round-trip on focus is failing silently. Check `adb logcat` for axios errors and confirm rate limits aren't tripping (`X-RateLimit-Remaining`). |
-| Tokens "stick" after backend restart | The backend bumps `token_generation` on restart only if you've also rotated `JWT_SECRET`. Otherwise pull-to-refresh / re-login should clear it. If it doesn't, `Settings → Log out` wipes the keychain. |
+| Tokens "stick" after backend restart | A restart alone invalidates nothing: tokens stay valid until they expire, the session is revoked, or the user's `token_generation` is bumped (logout, password reset). Rotating `JWT_SECRET` invalidates every token at once, since their signatures no longer verify. If the app holds a token the backend now rejects, re-login; failing that, `Settings → Log out` wipes the keychain. |
 
 ## 7. iOS (placeholder)
 

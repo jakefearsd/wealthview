@@ -22,12 +22,14 @@ If you deployed WealthView using Docker Compose, a demo account is created autom
 - **Email:** `demo@wealthview.local`
 - **Password:** `demo123`
 
-A super-admin account is also available in all deployment modes:
+The demo user is the **Admin** of its own demo tenant, which comes pre-loaded with sample accounts and rental properties.
+
+A super-admin account is also created in every deployment mode:
 
 - **Email:** `admin@wealthview.local`
-- **Password:** `admin123`
+- **Password:** whatever your operator set as `SUPER_ADMIN_PASSWORD` in the `.env` file. There is no built-in default; the app will not start without one, and a production install refuses well-known values such as `admin123`.
 
-Change these before exposing WealthView to anything but your own machine.
+Change the demo password before exposing WealthView to anything but your own machine.
 
 ### Registering a New Account
 
@@ -36,7 +38,7 @@ New users register with an **invite code**. An admin generates invite codes from
 1. On the login page, click **Register** at the bottom.
 2. Fill in the three fields on the **Register for WealthView** form:
    - **Email**
-   - **Password** — must be at least 8 characters, and cannot be a well-known/common password.
+   - **Password** — 8 to 64 characters, and it cannot be a well-known/common password.
    - **Invite Code** — paste the code your admin gave you.
 3. Click **Register**. You are signed in immediately and dropped on the Dashboard.
 
@@ -69,7 +71,7 @@ Each user has one of four roles within their tenant:
 | **Admin** | Everything a Member can do, plus the **Admin** area: manage users, generate invite codes, set exchange rates, and run price syncs. |
 | **Super-Admin** | Full system access across all tenants, plus the super-admin-only Admin sections (system dashboard, tenants, stock splits, system config). Used for initial setup and system administration. |
 
-Admins can switch a user between **member** and **admin** from Admin → Users. Super-admin is granted at the system level, not from the UI.
+Admins can set a user's role to **Viewer**, **Member**, or **Admin** from Admin → Users. Super-admin is granted at the system level, not from the UI.
 
 ---
 
@@ -84,7 +86,7 @@ The dark sidebar on the left is always visible once you are signed in:
 - **Income Sources** — Model Social Security, pensions, rental income, and other retirement income streams.
 - **Properties** — Rental and personal real estate with mortgage tracking, income, expenses, and analytics.
 - **Prices** — See the latest price on record for every symbol, and add prices by hand.
-- **Export** — Download your data as JSON or CSV for backups or analysis.
+- **Export** — Download your accounts, transactions, holdings, and properties as JSON or CSV for analysis. (This is not a full backup — projections, spending profiles, and income sources are not included.)
 - **Admin** — Only shown to admins and super-admins. See below.
 
 At the bottom of the sidebar you will find your email address, your role, and a **Logout** button.
@@ -97,7 +99,7 @@ Everything that used to live under "Settings" and "Audit Log" now lives on a sin
 |---------|----------------|--------------|
 | **Dashboard** | Super-admin | System-wide stats and login activity |
 | **Users** | Admin | List the users in your tenant, change their role, remove them. Super-admins additionally see every tenant's users and can reset passwords or deactivate accounts. |
-| **Tenants** | Super-admin | Create and manage tenants |
+| **Tenants** | Super-admin | Create tenants, activate or deactivate them, and create an invite code for any active tenant so its first user can register |
 | **Prices** | Admin | Finnhub sync, Yahoo Finance fetch, price CSV upload, price browser |
 | **Stock Splits** | Super-admin | Review, add, and un-apply stock splits |
 | **Exchange Rates** | Admin | Set the to-USD rate for each non-USD currency you use |

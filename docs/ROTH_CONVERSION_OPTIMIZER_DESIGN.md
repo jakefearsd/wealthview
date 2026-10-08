@@ -308,10 +308,15 @@ record ConversionYearRecommendation(int year, int age, BigDecimal conversionAmou
 >
 > `recommendedAnnualConversion`, `conversionEndAge`, `projectedRmdAtAge73` and `rmdExceedsTarget`
 > were **not** built — the per-year `years` list supersedes them, `exhaustionTargetMet` covers the
-> warning case, and `bracketUsed` is currently always null on the write path.
+> warning case, and `bracketUsed` (wire name `bracket_used`) is filled in by
+> `GuardrailResponseBuilder` with the federal bracket the year's income including the conversion
+> lands in (for example `"12%"`).
 >
 > Persistence: `guardrail_spending_profiles.conversion_schedule` is a `jsonb` column mapped with
-> `@JdbcTypeCode(SqlTypes.JSON)`, alongside `conversion_bracket_rate` and the other knobs.
+> `@JdbcTypeCode(SqlTypes.JSON)`, alongside `conversion_bracket_rate` and the other knobs. V081 added
+> `optimize_conversions` (backfilled from whether a schedule exists) and
+> `dynamic_sequencing_bracket_rate`, so `reoptimize` re-runs a profile with the conversion settings it
+> was saved with. Before V081, reoptimizing a profile created without conversions turned them on.
 
 ### Frontend UX
 

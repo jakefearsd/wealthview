@@ -32,8 +32,9 @@ Request-body validation (Jakarta Bean Validation, enforced with `@Valid`):
 
 - `email` — not blank, must parse as an email address.
 - `password` — not blank on login; 8–64 characters on register.
-- `invite_code` — not blank on register. Register does **not** accept
-  `device_label`.
+- `invite_code` — not blank on register. Register does **not** read
+  `device_label`; like any unknown field it is silently ignored rather than
+  rejected (the server deserializes leniently).
 - `device_label` — optional on login, max 64 characters.
 - `mfa_token` — not blank. `totp_code` 6–8 chars, `recovery_code` exactly 8.
 
@@ -182,8 +183,10 @@ access token, refresh token, and cached identity under three separate
 
 `POST /api/v1/auth/token/logout` with the current Bearer access token
 returns 204 and increments the user's `token_generation` server-side,
-invalidating all outstanding access and refresh tokens for that user
-across both cookie and Bearer transports. After logout, the client MUST
+revokes every stored refresh token and every `user_sessions` row for the
+user, invalidating all outstanding access and refresh tokens for that user
+across both cookie and Bearer transports (the transport only tags the
+logout metric). Calling it without a valid Bearer token is a 401. After logout, the client MUST
 delete the stored refresh token.
 
 ## Error envelope
@@ -207,10 +210,11 @@ The `error` codes below are the exact strings emitted by
 | Status | `error`                | When |
 |--------|------------------------|------|
 | 400    | `BAD_REQUEST`          | Request body fails Bean Validation (e.g. missing `email`), an unparseable body, a bad query-param type, or a rejected argument (`IllegalArgumentException`). |
-| 401    | `UNAUTHORIZED`         | Invalid credentials, missing/expired Bearer token, revoked or reused refresh token, failed MFA code. |
+| 401    | `UNAUTHORIZED`         | Invalid credentials, missing/expired Bearer token, revoked or reused refresh token, failed MFA code, or a login against an email locked out after 5 failed attempts in a 15-minute window (also 401, not 429). |
 | 403    | `FORBIDDEN`            | Authenticated but role lacks permission for this endpoint, or a cross-tenant access attempt. |
 | 404    | `NOT_FOUND`            | Entity does not exist, or exists but isn't the caller's (see per-device sessions below). |
 | 409    | `CONFLICT`             | Duplicate entity (e.g. email already registered) or an illegal-state conflict. |
+| 405 / 415 | `METHOD_NOT_ALLOWED` / `UNSUPPORTED_MEDIA_TYPE` | Wrong HTTP method for the path, or a request body that is not `application/json`. |
 | 429    | `RATE_LIMITED`         | Too many requests for this principal/IP. |
 | 5xx    | `INTERNAL_SERVER_ERROR`| Server fault. Retry with exponential backoff. |
 

@@ -14,7 +14,8 @@ Runs on Hibernate 7 via the Spring Boot 4.1 BOM, against PostgreSQL 16 with Flyw
 
 ## JPA Entities (42)
 
-All entities use UUID primary keys (except `prices`, which has a composite key), `timestamptz`
+All entities use UUID primary keys (except `prices`, which has a composite key, and the text-keyed
+`system_config` and `mobile_app_versions`), `timestamptz`
 timestamps, and `numeric(19,4)` for money. Tenant-owned entities carry a `tenant` association
 for row-level isolation; the shared reference tables (prices, tax and IRMAA/LTCG brackets,
 asset-class returns, mortality rates, system config) deliberately do not.
@@ -27,7 +28,7 @@ Common bases in the same package: `@MappedSuperclass` `Auditable`, `UuidAuditabl
 | Entity | Table | Notes |
 |---|---|---|
 | `TenantEntity` | `tenants` | Top-level isolation boundary |
-| `UserEntity` | `users` | bcrypt password hash, role enum |
+| `UserEntity` | `users` | Globally unique email, bcrypt password hash, role string (`admin`/`member`/`viewer`), `is_super_admin`, MFA fields, `@Version` lock |
 | `InviteCodeEntity` | `invite_codes` | Single-use; consumption preserved for audit |
 | `RefreshTokenEntity` | `refresh_tokens` | Rotating refresh tokens |
 | `UserSessionEntity` | `user_sessions` | Per-device session listing and revocation |
@@ -39,7 +40,7 @@ Common bases in the same package: `@MappedSuperclass` `Auditable`, `UuidAuditabl
 | Entity | Table | Notes |
 |---|---|---|
 | `AccountEntity` | `accounts` | 5 account types (`brokerage`, `ira`, `401k`, `roth`, `bank`); per-account `currency` since V053 |
-| `TransactionEntity` | `transactions` | `import_hash` SHA-256 unique constraint for deduplication; `TransactionType` enum via `TransactionTypeConverter` |
+| `TransactionEntity` | `transactions` | `import_hash` SHA-256 for deduplication (indexed on `(tenant_id, account_id, import_hash)`, not unique — matching is done in the service); `TransactionType` enum via `TransactionTypeConverter` |
 | `HoldingEntity` | `holdings` | `(account_id, symbol)` unique; `is_manual_override` flag |
 | `PriceEntity` | `prices` | Composite PK `(symbol, date)` via `PriceId`; no tenant FK — shared. `source` allows `manual`, `finnhub`, `yahoo` |
 | `ImportJobEntity` | `import_jobs` | Import run status and row counts |
@@ -56,7 +57,7 @@ Common bases in the same package: `@MappedSuperclass` `Auditable`, `UuidAuditabl
 | `PropertyIncomeEntity` | `property_income` | Extends `AbstractPropertyCashFlowEntity` |
 | `PropertyExpenseEntity` | `property_expenses` | Extends `AbstractPropertyCashFlowEntity` |
 | `PropertyValuationEntity` | `property_valuations` | Historical snapshots |
-| `PropertyDepreciationScheduleEntity` | `property_depreciation_schedule` | Straight-line and cost-segregation params |
+| `PropertyDepreciationScheduleEntity` | `property_depreciation_schedule` | Year-by-year depreciation amounts for cost-segregation studies |
 
 ### Retirement Projections
 | Entity | Table | Notes |
@@ -64,19 +65,19 @@ Common bases in the same package: `@MappedSuperclass` `Auditable`, `UuidAuditabl
 | `ProjectionScenarioEntity` | `projection_scenarios` | `spending_profile_id` and `guardrail_profile_id` are mutually exclusive — the entity's `activateSpendingProfile()` / `activateGuardrailProfile()` mutators clear the other side. `params_json` is `jsonb` (`@JdbcTypeCode(SqlTypes.JSON)`) |
 | `ProjectionAccountEntity` | `projection_accounts` | Linked or hypothetical accounts; `account_type` constrained to `traditional` / `roth` / `taxable`; carries allocation, cost basis, and `owner` |
 | `SpendingProfileEntity` | `spending_profiles` | Age-banded `spending_tiers` stored as `jsonb` |
-| `GuardrailSpendingProfileEntity` | `guardrail_spending_profiles` | MC-optimized output; `gate_on_adaptive_rules` flag |
+| `GuardrailSpendingProfileEntity` | `guardrail_spending_profiles` | MC-optimized output; `gate_on_adaptive_rules` flag; `optimize_conversions` and `dynamic_sequencing_bracket_rate` re-used by reoptimize (V081) |
 | `IncomeSourceEntity` | `income_sources` | SS, pension, part-time templates; `owner` and `survivor_percent` |
-| `ScenarioIncomeSourceEntity` | `scenario_income_sources` | Join with overrides (start/end age, amount) |
+| `ScenarioIncomeSourceEntity` | `scenario_income_sources` | Join with an optional per-scenario `override_annual_amount` |
 | `MortalityRateEntity` | `mortality_rates` | SSA `qx` by age and sex — lives in `com.wealthview.persistence.projection`, not the `entity` package |
 
 ### Reference Data (no tenant)
 | Entity | Table | Notes |
 |---|---|---|
-| `TaxBracketEntity` | `tax_brackets` | Federal marginal brackets; inflation-projected beyond the seeded years |
+| `TaxBracketEntity` | `tax_brackets` | Federal marginal brackets; calculators fall back to the latest seeded year |
 | `StandardDeductionEntity` | `standard_deductions` | Federal standard deduction plus the age-65 addition (V074) |
 | `StateTaxBracketEntity` | `state_tax_brackets` | State brackets |
 | `StateStandardDeductionEntity` | `state_standard_deductions` | |
-| `StateTaxSurchargeEntity` | `state_tax_surcharges` | CA SDI and similar flat surcharges |
+| `StateTaxSurchargeEntity` | `state_tax_surcharges` | Flat surcharges above a threshold (e.g. CA Mental Health Services Tax) |
 | `LtcgBracketEntity` | `ltcg_brackets` | Long-term capital-gains brackets (V071) |
 | `IrmaaTierEntity` | `irmaa_tiers` | Medicare IRMAA tiers (V075) |
 | `AssetClassReturnEntity` | `asset_class_returns` | Annual real returns per asset class, the Monte Carlo bootstrap source |
@@ -108,11 +109,11 @@ public interface TenantScopedRepository<T> extends JpaRepository<T, UUID> {
 }
 ```
 
-Everything else still takes `tenantId` explicitly:
+Most other finders take `tenantId` explicitly:
 
 ```java
-Optional<AccountEntity> findByTenantIdAndId(UUID tenantId, UUID id);
-List<HoldingEntity> findByTenantIdAndAccountId(UUID tenantId, UUID accountId);
+Optional<HoldingEntity> findByIdAndTenant_Id(UUID id, UUID tenantId);
+List<HoldingEntity> findByAccount_IdAndTenant_Id(UUID accountId, UUID tenantId);
 ```
 
 Repositories that need non-trivial queries (e.g. aggregation for dashboard net worth, or the
@@ -123,7 +124,7 @@ explicit result projections.
 
 A Hibernate `tenantFilter` is declared by `@FilterDef` in the `entity` package's
 `package-info.java` and applied with `@Filter(name = "tenantFilter", condition =
-"tenant_id = :tenantId")` on 24 tenant-owned entities. `TenantFilterAspect` in
+"tenant_id = :tenantId")` on 21 tenant-owned entities plus `AbstractPropertyCashFlowEntity`. `TenantFilterAspect` in
 `wealthview-core` switches it on per transaction. It applies to queries, not to
 `EntityManager#find` primary-key loads, so it is a backstop rather than the primary defense;
 SUPER_ADMIN sessions and unauthenticated contexts (login, scheduled jobs) leave it disabled.
@@ -134,7 +135,7 @@ SUPER_ADMIN sessions and unauthenticated contexts (login, scheduled jobs) leave 
 
 **Location:** `src/main/resources/db/migration/`
 
-**Versioned migrations (V001–V080, 80 files):** Immutable once merged to `main`. Each migration
+**Versioned migrations (V001–V081, 81 files):** Immutable once merged to `main`. Each migration
 is idempotent where possible (`IF NOT EXISTS`), and carries a comment at the top describing what
 changed and why.
 
@@ -148,6 +149,7 @@ Recent milestones worth knowing:
 | V073–V077 | Age-65 standard deduction, IRMAA tiers, gate-on-adaptive-rules |
 | V078–V079 | Household modeling: `projection_accounts.owner`, income-source `owner` + `survivor_percent` |
 | V080 | `mortality_rates` |
+| V081 | `guardrail_spending_profiles.optimize_conversions` + `dynamic_sequencing_bracket_rate` |
 
 **Repeatable migrations (9 × `R__seed_*.sql`):**
 `R__seed_stock_prices`, `R__seed_tax_brackets`, `R__seed_standard_deductions`,
@@ -167,9 +169,9 @@ instance across test classes in the same JVM, avoiding repeated startup overhead
 against the container, so every test also exercises migration correctness.
 
 ```java
-@DataJpaTest
-@Testcontainers
-@AutoConfigureTestDatabase(replace = NONE)
+// AbstractIntegrationTest carries @DataJpaTest, @ImportAutoConfiguration(FlywayAutoConfiguration.class),
+// @AutoConfigureTestDatabase(replace = NONE) and @ActiveProfiles("test"), and wires the shared
+// container via @DynamicPropertySource.
 class HoldingRepositoryIntegrationTest extends AbstractIntegrationTest { ... }
 ```
 

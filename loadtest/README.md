@@ -102,6 +102,10 @@ Flags and env vars overlap: `--vus-max 80` and `VUS_MAX=80` are equivalent
    (`GET /api/v1/projections/{id}/run`), Monte Carlo guardrail optimize
    (`POST /api/v1/projections/{id}/optimize` with an empty body), and
    Roth-conversion optimize (same endpoint with `optimizeConversions: true`).
+   Caveat: the API binds JSON as snake_case (`optimize_conversions`), so the
+   camelCase key in `hotpaths.ts` is ignored and the `roth_optimize` request
+   currently runs a plain guardrail optimization, without the conversion
+   search.
 
 `soak.js` instead holds a constant `max(5, 15% of VUS_MAX)` VUs on the hot paths
 for `SOAK_DURATION` (default `15m`).

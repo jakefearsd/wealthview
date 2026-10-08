@@ -41,7 +41,9 @@ To change any of those fields later, click **Edit** on the account card, adjust,
 
 ### A Note on Non-USD Accounts
 
-Before you can use a currency other than USD, an admin must add a to-USD rate under **Admin → Exchange Rates**. Without a rate, anything that adds accounts together (the dashboard, net worth, the combined chart) will fail for that account with a *"No exchange rate found"* message. The account's own card and detail page always show its native currency; conversion only happens where totals are combined.
+Before you can use a currency other than USD, an admin must add a to-USD rate under **Admin → Exchange Rates**. Creating an account in a currency with no rate — or switching an existing account to one — is refused with an error, so add the rate first.
+
+If a rate is later removed, the dashboard totals (net worth, investments, cash) and the dashboard's forward projection simply leave that account out rather than failing. The account's own card and detail page always show its native currency; conversion only happens where totals are combined.
 
 ---
 
@@ -68,8 +70,10 @@ There is a sixth type, **opening balance**, which behaves exactly like a buy whe
 - **Date** — When the transaction occurred. Use the actual trade date, not the settlement date. Required.
 - **Type** — One of the five types above.
 - **Symbol** — The ticker symbol of the security (e.g., "AAPL", "VOO"). Leave blank for cash deposits and withdrawals. A buy or sell with no symbol is accepted, but it will not produce a holding.
-- **Quantity** — The number of shares bought or sold. Can be fractional (e.g., 2.5 shares). Must not be negative.
-- **Amount** — The dollar value of the transaction, always entered as a positive number. For buys this is the total cost, for sells the total proceeds, for dividends the payment received. Required.
+- **Quantity** — The number of shares bought or sold. Can be fractional (e.g., 2.5 shares). For a buy or sell, a quantity you enter must be above zero; leaving it blank is accepted, but such a transaction leaves the holding unchanged.
+- **Amount** — The dollar value of the transaction. Enter it as a positive number: for buys the total cost, for sells the total proceeds, for dividends the payment received. Required. (Negative amounts are accepted because some brokerage imports carry signed amounts, so those imported rows stay editable.)
+
+Symbols are trimmed and converted to upper case when saved, so `aapl ` and `AAPL` are the same holding.
 
 Click **Save** to record it, or **Cancel** to discard.
 
@@ -164,7 +168,7 @@ If you hold a money market fund whose ticker is not on that list, it will simply
 
 ## Editing and Deleting Transactions
 
-Every transaction row has **Edit** and **Delete** buttons (members, admins, and super-admins only). **Edit** expands the row into the same five-field form; **Delete** removes it immediately, with no confirmation prompt — so aim carefully.
+Every transaction row has **Edit** and **Delete** buttons (members, admins, and super-admins only). **Edit** expands the row into the same five-field form; **Delete** asks you to confirm, then removes the transaction.
 
 **Important:** editing or deleting a transaction triggers an automatic recomputation of holdings for the affected symbol. If you delete a buy transaction, the quantity and cost basis of the corresponding holding decrease accordingly.
 
@@ -209,7 +213,9 @@ The word *theoretical* is doing real work here. The chart takes the shares you h
 
 ### Transactions List
 
-The 50 most recent transactions in the account, showing **Date**, **Type**, **Symbol**, **Qty**, and **Amount**, plus Edit/Delete for members, admins, and super-admins. There is no filtering or search on this list; to see everything for one symbol, click the symbol in the Holdings table instead.
+The account's transactions, newest first, 50 at a time — click **Load more** at the bottom to fetch the next 50. Each row shows **Date**, **Type**, **Symbol**, **Qty**, and **Amount**, plus Edit/Delete for members, admins, and super-admins. There is no filtering or search on this list; to see everything for one symbol, click the symbol in the Holdings table instead.
+
+Holdings are listed alphabetically by symbol.
 
 ---
 

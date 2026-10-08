@@ -272,7 +272,7 @@ Individual financial event within an account.
 
 **Indexes:** `idx_transactions_account_id`, `idx_transactions_tenant_id`, `idx_transactions_account_id_symbol`, `idx_transactions_import_hash (tenant_id, account_id, import_hash)`, `idx_transactions_tenant_id_symbol` (V065, added for the stock-split recompute path).
 
-**Lifecycle:** Created manually, via CSV/OFX import, or as opening balances. Duplicate imports are rejected by `import_hash` matching. On create/update/delete, the `HoldingsService` recomputes holdings for the affected account + symbol. Stock split application rewrites `quantity` (and records the before/after in `stock_split_adjustments`).
+**Lifecycle:** Created manually, via CSV/OFX import, or as opening balances. Duplicate imports are rejected by `import_hash` matching. On create/update/delete, `HoldingsComputationService` recomputes holdings for the affected account + symbol (old and new symbol when an edit changes it). Stock split application rewrites `quantity` (and records the before/after in `stock_split_adjustments`).
 
 ### HoldingEntity (`holdings`)
 

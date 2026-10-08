@@ -3,7 +3,7 @@
 The computation-intensive module implementing retirement projection algorithms.
 Depends on `wealthview-core` for interfaces, DTOs, and the tax model.
 
-The module holds 71 classes in a single flat package, `com.wealthview.projection`, of which
+The module holds 73 source files in a single flat package, `com.wealthview.projection`, of which
 exactly **two are Spring beans**: `DeterministicProjectionEngine` and
 `MonteCarloSpendingOptimizer`. Everything else is a package-private collaborator, deliberately
 not exposed — the rest of the application talks to this module only through the
@@ -30,6 +30,7 @@ not exposed — the rest of the application talks to this module only through th
 | `BlockBootstrapReturnGenerator` | Plain class | Block-bootstraps index sequences into the multi-asset return matrix for MC simulation |
 | `PortfolioPathGenerator`, `PortfolioReturnResolver`, `PoolReturnModel` | Plain classes | Draw per-trial return trajectories, blended per account by allocation |
 | `SustainabilitySearch`, `FractionSearch`, `JointConversionSearch` | Plain classes | The three search routines the MC optimizer delegates to |
+| `PreRetirementAccumulation` | Plain class | Rolls each account forward (contribute, then grow at its real fee-adjusted return) from the base year to retirement before the MC trials start |
 | `SpendingCorridorCalculator`, `SpendingSmoother`, `SpendingFeasibilityAnalyzer` | Plain classes | Guardrail corridor, smoothing, feasibility reporting |
 
 See the [Projection Engine](../projection-engine.html) page for full algorithmic detail.
@@ -50,7 +51,9 @@ real geometric means served by `CapitalMarketAssumptionsProvider`. A user-suppli
 so all cash flows share one real-dollar frame (falling back to 2.5% when the scenario has no
 rate).
 
-**Pre-retirement years:** applies contributions, grows each account, no withdrawals.
+**Pre-retirement years:** applies contributions, grows each account, no withdrawals. (The Monte
+Carlo optimizer replays this accumulation along the expected path via
+`PreRetirementAccumulation`, since its trials start at retirement.)
 
 **Retirement years:** resolves spending from the active `SpendingPlan`, nets it against income
 sources, computes the after-tax withdrawal need, draws from the pools in the configured
@@ -59,8 +62,11 @@ sources, computes the after-tax withdrawal need, draws from the pools in the con
 
 **Tax calculation:** composed from `FederalTaxCalculator` plus a state calculator when
 configured, with `SocialSecurityTaxCalculator`, `SelfEmploymentTaxCalculator`, and
-`RentalLossCalculator` feeding the income picture. Federal brackets are inflation-indexed for
-future years.
+`RentalLossCalculator` feeding the income picture. Brackets and standard deductions are used at
+their seeded dollar values with no annual indexing (the projection is real-terms); only statutorily
+nominal thresholds (Social Security provisional income, NIIT) are deflated year by year. A rental
+linked to a financed property charges each calendar year's amortized mortgage interest (deductible)
+and principal (cash flow only), deflated as fixed-nominal outflows.
 
 **Capital gains on taxable accounts:** `TaxableLots` maintains per-lot FIFO cost basis seeded
 from each account's `costBasis`, and `CapitalGainsTaxCalculator` applies LTCG brackets and NIIT
@@ -71,8 +77,10 @@ qualified-dividend / ordinary-interest split.
 one stream per owner via `getTraditionalByOwner()`. RMDs always come from the traditional pool;
 surplus beyond the withdrawal need is deposited to taxable.
 
-**Roth conversion:** applied each retirement year from the schedule carried on the
-`SpendingPlan` (`conversionSchedule()`), or left at zero when no schedule is present.
+**Roth conversion:** taken from the schedule carried on the `SpendingPlan`
+(`conversionSchedule()`, guardrail plans only) when present; otherwise from `params_json`
+(a fixed `annual_roth_conversion`, or the `fill_bracket` strategy up to `target_bracket_rate`
+inside `MultiPool`); zero when neither is configured.
 
 **IRMAA:** `IrmaaSurchargeCalculator` is optional (`@Nullable`) — when absent the surcharge
 stays zero every year. When present it applies from `MEDICARE_AGE = 65`.
@@ -140,8 +148,8 @@ page for the full algorithm description.
 | `PHASE_BINARY_SEARCH_ITERATIONS` | 40 | `SustainabilitySearch` |
 | `MAX_SPENDING_CEILING` | 500 000 | `SustainabilitySearch` |
 | `GRID_SIZE` / `REFINE_ITERATIONS` | 50 / 20 | `FractionSearch` |
-| `JOINT_GRID_SIZE` | 20 (20×20 spending × conversion grid) | `JointConversionSearch` |
-| `JOINT_SEARCH_TRIALS` | 500 MC trials per grid cell | `JointConversionSearch` |
+| `JOINT_GRID_SIZE` | 20 (21 conversion fractions `i/20`, each scored by sustainable spending) | `JointConversionSearch` |
+| `JOINT_SEARCH_TRIALS` | `min(500, trialCount)` MC trials per candidate fraction | `JointConversionSearch` |
 | `JOINT_REFINE_ITERATIONS` | 10 ternary refinement iterations | `JointConversionSearch` |
 
 The optimizer returns a `GuardrailProfileResponse` (assembled by `GuardrailResponseBuilder`)
@@ -160,14 +168,15 @@ in `wealthview-core` loads SSA `qx` rows from `mortality_rates` (seeded by
 `R__seed_mortality_rates`, migration V080) into a `MortalityTable`. `MortalitySampler` and
 `MortalityDrawGenerator` draw per-trial deaths on a **separate RNG stream** so enabling the
 mode does not perturb the return paths, and `StochasticMortalityEvaluator` splices the
-three regimes (both alive / survivor / neither) and reports longevity-conditional metrics
+three regimes (`JOINT` both-alive, `PRIMARY_SURVIVES`, `SPOUSE_SURVIVES`) and reports longevity-conditional metrics
 through `StochasticMortalitySummary` and the core `StochasticMortalityResponse` DTO.
 
 ---
 
 ## RothConversionOptimizer
 
-Package-private. Not a Spring bean. Instantiated by the service layer.
+Package-private. Not a Spring bean. Instantiated by `JointConversionSearch` on the Monte Carlo
+path; the deterministic engine does not use it.
 
 It derives a `RothConversionConfig`, computes the target traditional balance at RMD age, and
 delegates the year-by-year simulation to `ConversionSimulator` and the conversion-fraction

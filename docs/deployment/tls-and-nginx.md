@@ -67,7 +67,25 @@ services:
 
 The `127.0.0.1:` prefix is important — it ensures the app is only reachable
 from the host itself, never directly from the internet. nginx (running on the
-host) can still proxy to it.
+host) can still proxy to it. Don't rely on `ufw` instead: Docker programs its
+own iptables rules for published ports, and they take effect ahead of ufw's, so
+a port published on `0.0.0.0` stays reachable even when ufw denies it.
+
+`wv update` never rewrites the compose file, so this edit survives upgrades —
+but you must re-apply it whenever you replace `docker-compose.prod.yml` with a
+newer release's copy. To keep it out of the canonical file, put it in an
+override file instead (`docker-compose.prod.override.yml` beside the compose
+file is picked up automatically in source-tree prod mode; otherwise set
+`WV_COMPOSE_OVERRIDE_FILE` in `wv.conf`). Compose *merges* `ports:` lists
+across files, so the override needs the `!override` tag (Docker Compose
+v2.24.4+) to replace the public binding rather than add to it:
+
+```yaml
+services:
+  app:
+    ports: !override
+      - "127.0.0.1:${APP_PORT:-80}:8080"
+```
 
 Restart the app:
 
@@ -75,10 +93,12 @@ Restart the app:
 docker compose -f docker-compose.prod.yml up -d app
 ```
 
-Tell `wv` where to probe for health, so `./wv up`, `./wv status`, and
-`./wv update` don't look on port 80. Either set `APP_PORT` (which `wv` reads
-from the env file) — already done above — or, if nginx is terminating in front,
-pin the full URL in `wv.conf`:
+`wv` reads `APP_PORT` from the env file, so setting it above is enough for
+`./wv up`, `./wv update`, `./wv restore` and `./wv status` to probe
+`http://localhost:8080/actuator/health`. If you would rather probe through the
+proxy, pin the full URL in `wv.conf` — `up`, `update`, `restore` and
+`rotate-secret` honour it, while `status` always probes
+`http://localhost:<APP_PORT>`:
 
 ```
 WV_HEALTH_URL=https://wealthview.example.com/actuator/health
@@ -286,16 +306,20 @@ Inside the `server { listen 443 ssl; ... }` block, add:
 ```
 
 Note: WealthView's Spring Boot layer (`SecurityConfig`) already emits
-`Strict-Transport-Security` (`max-age=31536000; includeSubDomains; preload`),
 `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
 `Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()`, and
 a `Content-Security-Policy` of
 `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`.
+It is also configured for `Strict-Transport-Security`
+(`max-age=31536000 ; includeSubDomains ; preload`), but Spring Security writes
+that header only on requests it sees as HTTPS — and behind nginx the app
+receives plain HTTP and does not act on `X-Forwarded-Proto` (no
+`server.forward-headers-strategy` is set). **So in this setup nginx is the only
+source of HSTS**, as well as of `Referrer-Policy`, which the app never sets.
 
-Four of the headers above are therefore **duplicates at the nginx layer**, and
-act as belt-and-suspenders for any request path that bypasses Spring (e.g.
-nginx-served error pages). It is safe to have both. `Referrer-Policy` is the
-one the app does **not** set, so nginx is its only source.
+`X-Content-Type-Options` and `X-Frame-Options` are duplicates at the nginx
+layer: belt-and-suspenders for any response that bypasses Spring (e.g.
+nginx-served error pages). Browsers tolerate the repeated headers.
 
 Reload:
 
@@ -513,11 +537,13 @@ sudo tail -50 /var/log/nginx/error.log
 Common cause: `proxy_pass` in the nginx config points at a different port
 than the one in the `app` service's `ports:` mapping. They must match.
 
-### Login audit rows show `127.0.0.1` instead of the real user IP
+### Login audit rows all show one internal IP instead of the real user IP
 
-Set `APP_RATE_LIMIT_TRUSTED_PROXIES=127.0.0.1` in `.env` **and** add it to the
-`app` service's `environment:` block in `docker-compose.prod.yml`, then restart
-the app. Setting it in `.env` alone has no effect. See
+That address (often the Docker bridge gateway, `172.x.x.x`, rather than
+`127.0.0.1`) is the peer the app sees. Set `APP_RATE_LIMIT_TRUSTED_PROXIES` to
+exactly that value in `.env` **and** add the variable to the `app` service's
+`environment:` block, then restart the app. Setting it in `.env` alone has no
+effect, and the match is exact (no CIDR ranges). See
 [Step 8](#step-8-update-wealthviews-env).
 
 ### Certificate renewal fails

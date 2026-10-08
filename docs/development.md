@@ -6,9 +6,10 @@ Instructions for setting up a local development environment, building, and runni
 
 ## Prerequisites
 
-- Java 25 (the backend targets `<java.version>25</java.version>`; `backend/.sdkmanrc` pins `25.0.3-tem`)
+- Java 25 (the backend targets `<java.version>25</java.version>`; `backend/.sdkmanrc` pins `25.0.4-tem`)
 - Maven 3.9+
-- Node.js 20.19+ (CI runs Node 22; the production Docker image builds on Node 24)
+- Node.js 22.13+ (the `mobile` workspace's `engines` floor, and the root `npm install` installs every
+  workspace; Vite 8 alone would accept 20.19+). CI runs Node 22; the production Docker image builds on Node 24
 - Docker & Docker Compose (for PostgreSQL and integration tests via Testcontainers)
 - `gitleaks` — required by the pre-commit hook (see [Pre-Commit Secret Scanning](#pre-commit-secret-scanning))
 
@@ -66,8 +67,11 @@ seed-data initializers described below.
 
 Dev/demo logins:
 
-- `admin@wealthview.local` / `admin123` — super admin, every profile
-- `demo@wealthview.local` / `demo123` — demo tenant, `dev` + `docker`
+- `admin@wealthview.local` / the value of `SUPER_ADMIN_PASSWORD` — super admin, every profile. There is
+  no built-in password: under `dev` with the variable unset it falls back to the sentinel
+  `LOCAL_DEV_NOT_A_REAL_PASSWORD_OVERRIDE_VIA_ENV`, and `ProductionConfigValidator` (active for `docker`
+  and `prod`) refuses to boot with a blank value, `admin123`, `demo123`, or any `LOCAL_DEV_*` value
+- `demo@wealthview.local` / `demo123` — demo tenant admin, `dev` + `docker`
 - `demo-admin@wealthview.local` / `demo123` — `dev` only
 
 ## Frontend
@@ -125,7 +129,8 @@ cd backend
 # (so Docker is required). Does NOT include the wealthview-app *IT.java suite.
 mvn test
 
-# Unit tests only (no Docker required)
+# Unit tests only (no Docker required). -pl without -am resolves wealthview-persistence from
+# your local repository, so run `mvn install -DskipTests` once first.
 mvn test -pl wealthview-core,wealthview-api,wealthview-import,wealthview-projection
 
 # API-level integration tests (wealthview-app, Failsafe + Testcontainers, `it` profile)
@@ -149,7 +154,7 @@ mvn test -Dtest="AccountServiceTest#methodName"
 - Unit tests use JUnit 5 + Mockito with AssertJ assertions
 - Integration tests use Testcontainers with PostgreSQL 16 (never H2)
 - Failsafe in `wealthview-app` matches `**/*IT.java` and forces `spring.profiles.active=it`
-- The `wealthview-app` module holds **50 `*IT.java` classes** covering the HTTP API, auth/transport
+- The `wealthview-app` module holds **52 `*IT.java` classes** covering the HTTP API, auth/transport
   boundaries, tenant isolation, fuzzing, stock splits and metrics
 - The `wealthview-persistence` module covers Flyway migrations, repository queries and entity mapping
   with `@DataJpaTest` + Testcontainers; its shared container lives in `AbstractIntegrationTest`
@@ -167,10 +172,54 @@ npm run lint                              # ESLint check
 npm run typecheck                         # tsc --noEmit
 ```
 
-Frontend coverage is measured and ratcheted in `frontend/vite.config.ts`: statements 83, branches 75,
-functions 74, lines 86. `coverage.include` is set to `src/**/*.{ts,tsx}` so an entirely untested file
+Frontend coverage is measured and ratcheted in `frontend/vite.config.ts`: statements 87, branches 79,
+functions 80, lines 89. `coverage.include` is set to `src/**/*.{ts,tsx}` so an entirely untested file
 counts as zero rather than disappearing from the denominator. Raise a floor when you raise coverage;
 never lower one.
+
+### End-to-end (Playwright)
+
+`frontend/e2e/` holds Playwright specs (flows, accessibility via `@axe-core/playwright`, visual
+regression). They are not wired to an npm script or to CI and run against a live stack at
+`http://localhost` (`frontend/playwright.config.ts`):
+
+```bash
+./wv up                                   # from the repo root
+cd frontend
+npx playwright install chromium           # one-time browser download
+npx playwright test                       # all specs
+npx playwright test e2e/auth.spec.ts      # one spec
+```
+
+Known staleness: `e2e/helpers.ts` hard-codes the super-admin password `admin123`, which the `docker`
+profile refuses at startup, and its `loginViaApi` helper writes tokens to `localStorage` from before the
+move to HttpOnly cookies. Specs that use the super admin or `loginViaApi` (`admin`, `deep-validation`,
+`features`, `multi-currency`) need updating before they can pass.
+
+### `wv` operations tool
+
+```bash
+./scripts/test-wv.sh                      # shellcheck + the bats suite in scripts/test/wv.bats
+./scripts/test-wv.sh shellcheck           # just shellcheck
+./scripts/test-wv.sh bats                 # just bats
+```
+
+This is what the `scripts.yml` CI workflow runs.
+
+### Repo-root scripts
+
+| Script | What it does |
+|---|---|
+| `fulltestsuite.sh` | `mvn verify` in `backend/` (gates + Testcontainers ITs), then `npm run test` in `frontend/`. Needs Docker. Does not run the `shared` or `mobile` tests |
+| `deploy.sh` | Build-here-ship-there deploy over SSH (`DEPLOY_HOST=user@host ./deploy.sh`). See [Production Setup, Appendix B](deployment/production-setup.md) |
+| `manual-test.sh` | Ad-hoc curl walkthrough of the guardrail optimizer against `http://localhost`, as the demo user |
+| `e2e-audit.py` | Ad-hoc Python (`requests`) audit that creates users and checks projection-math invariants |
+| `dev-backup.sh` / `dev-restore.sh` | Deprecated shims for `./wv backup` / `./wv restore` |
+
+`manual-test.sh` and `e2e-audit.py` are stale: both read an `access_token` from the body of
+`POST /api/v1/auth/login`, but the web login now returns tokens only as HttpOnly cookies (the
+`/api/v1/auth/token/login` mobile endpoint returns them in the body). `e2e-audit.py` also logs in as the
+super admin with `admin123`. Treat them as reference material until they are updated.
 
 ---
 

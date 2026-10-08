@@ -10,7 +10,7 @@ endpoint-by-endpoint reference, see `docs/reference/api-reference.md` in the rep
 
 ## Controller Inventory
 
-28 controllers live in `com.wealthview.api.controller`, carrying 128 method-level request mappings
+28 controllers live in `com.wealthview.api.controller`, carrying 129 method-level request mappings
 under their class-level `@RequestMapping` base paths.
 
 | Controller | Base path |
@@ -79,7 +79,8 @@ managed separately under `/api/v1/auth/mfa`.
 
 ## Tenant Isolation
 
-The JWT carries `user_id`, `tenant_id`, `role` and `session_id`. `JwtAuthenticationFilter`
+The access JWT carries the user id as its `sub`, plus `tenant_id`, `role`, `email`, `generation` (the
+user's `token_generation`, for bulk revocation) and `sid` (the `user_sessions` row). `JwtAuthenticationFilter`
 deserialises them into a `TenantUserPrincipal`, which controllers receive via
 `@AuthenticationPrincipal`:
 
@@ -116,19 +117,21 @@ The matcher order that matters (first match wins):
 |---|---|
 | `/actuator/health` | permit all |
 | `/actuator/**` | `SUPER_ADMIN` |
+| `/api/v1/auth/me` | authenticated |
 | `POST /api/v1/auth/logout`, `/api/v1/auth/token/logout` | authenticated |
 | `/api/v1/auth/sessions`, `/api/v1/auth/sessions/**` | authenticated |
 | `/api/v1/auth/mfa/**` (enumerated) | authenticated |
 | `/api/v1/auth/**` (everything else) | permit all |
 | `GET /api/v1/app/version-check` | permit all |
 | `/api/v1/admin/prices/**` | `ADMIN` or `SUPER_ADMIN` |
-| `/api/v1/admin/**` | `SUPER_ADMIN` |
+| `/api/v1/admin/**` | `SUPER_ADMIN` (includes `POST /api/v1/admin/tenants/{id}/invite-codes`) |
+| `/api/v1/audit-log`, `/api/v1/audit-log/**` | `ADMIN` or `SUPER_ADMIN` |
 | `POST`/`PUT`/`DELETE` on `/api/v1/prices/**` | `ADMIN` or `SUPER_ADMIN` |
-| `/api/v1/tenant/invite-codes*`, `/api/v1/tenant/users*` writes | `ADMIN` or `SUPER_ADMIN` |
+| `/api/v1/tenant/invite-codes*`, `/api/v1/tenant/users*` (reads and writes) | `ADMIN` or `SUPER_ADMIN` |
 | `GET /api/v1/**` | authenticated |
 | `POST`/`PUT`/`DELETE` `/api/v1/**` | `ADMIN`, `MEMBER` or `SUPER_ADMIN` |
 
-The practical rule: **any authenticated role can read; writes need MEMBER or better; anything under
+The practical rule: **any authenticated role can read (except the audit log and the tenant user / invite-code listings, which are ADMIN+); writes need MEMBER or better; anything under
 `/api/v1/admin/**` is SUPER_ADMIN** (with the price-admin carve-out). A `VIEWER` is read-only by
 virtue of the last three rows.
 
@@ -179,12 +182,14 @@ Controllers do not catch. Every error serialises as `ErrorResponse`:
 
 | HTTP | `error` | Triggering exception |
 |---|---|---|
-| 400 | `BAD_REQUEST` | `MethodArgumentNotValidException` (bean validation), `IllegalArgumentException`, `InvalidInviteCodeException`, `MethodArgumentTypeMismatchException`, `HttpMessageNotReadableException`, `DateTimeParseException`, `UncheckedIOException`, `DataIntegrityViolationException` |
+| 400 | `BAD_REQUEST` | `MethodArgumentNotValidException` (bean validation), `IllegalArgumentException`, `InvalidInviteCodeException`, `MethodArgumentTypeMismatchException`, `MissingServletRequestParameterException`, `HttpMessageNotReadableException`, `DateTimeParseException`, `UncheckedIOException`, `DataIntegrityViolationException` |
 | 401 | `UNAUTHORIZED` | `BadCredentialsException`, `InvalidSessionException` |
 | 403 | `FORBIDDEN` | `AccessDeniedException`, `TenantAccessDeniedException` |
 | 404 | `NOT_FOUND` | `EntityNotFoundException`, `NoResourceFoundException` |
+| 405 | `METHOD_NOT_ALLOWED` | `HttpRequestMethodNotSupportedException` (also sets the `Allow` header) |
 | 409 | `CONFLICT` | `DuplicateEntityException`, `IllegalStateException` |
 | 413 | `PAYLOAD_TOO_LARGE` | `MaxUploadSizeExceededException` |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | `HttpMediaTypeNotSupportedException` |
 | 429 | `RATE_LIMITED` | `RateLimitFilter` (written directly, see below) |
 | 503 | `SERVICE_UNAVAILABLE` | `ServiceUnavailableException` |
 | 500 | `INTERNAL_SERVER_ERROR` | anything else — the message is a fixed generic string, never the exception text |

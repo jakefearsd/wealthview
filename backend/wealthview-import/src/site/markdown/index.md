@@ -48,8 +48,9 @@ global handler maps to 400.
 
 `TransactionHashUtil` (in `wealthview-core`) hashes every parsed transaction with SHA-256 over
 `date | type | symbol | quantity | amount`, pipe-delimited, with `NULL` standing in for absent
-optional components. The hex digest is stored in the `import_hash` column under a unique
-constraint. Duplicate rows are skipped and counted on the import job record.
+optional components. The hex digest is stored in the `import_hash` column, backed by a plain (non-unique)
+`(tenant_id, account_id, import_hash)` index; `ImportService` checks for an existing hash before
+inserting. Duplicate rows are skipped and counted on the import job record.
 
 ---
 
@@ -119,7 +120,7 @@ stored with `source = yahoo` (added by migration V047).
 ## Zillow Property Valuation
 
 `ZillowScraperClient` implements the core `PropertyValuationClient` interface and uses
-**jsoup** (1.23.1) to fetch a Zillow property detail page and extract the current Zestimate.
+**jsoup** (1.23.2) to fetch a Zillow property detail page and extract the current Zestimate.
 
 ### Why a Scraper?
 
@@ -152,7 +153,7 @@ of both integrations through Actuator.
 |---|---|---|
 | Apache Commons CSV | 1.14.1 | CSV parsing; `CSVFormat` per brokerage |
 | OFX4J (`com.webcohesion.ofx4j`) | 1.39 | OFX/QFX file parsing |
-| jsoup | 1.23.1 | Zillow HTML scraping |
+| jsoup | 1.23.2 | Zillow HTML scraping |
 
 ---
 

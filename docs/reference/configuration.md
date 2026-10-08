@@ -21,7 +21,7 @@ Backend defaults live in `backend/wealthview-app/src/main/resources/application.
 | `ZILLOW_ENABLED` | `app.zillow.enabled` (compose passes `APP_ZILLOW_ENABLED`) | No | `false` (`dev` profile sets `true`) | Enables Zillow valuation scraping and the weekly sync job |
 | `WEALTHVIEW_VERSION` | *(compose only)* | Yes for prod | none | The release tag `docker-compose.prod.yml` **pulls** from the registry (production has no `build:` for `app`). Setting it also flips `./wv` into prod mode. Never `latest` — CI publishes that tag, but deploying it defeats `wv rollback`, which recovers by re-pinning the tag that was running before the update. |
 | `WEALTHVIEW_IMAGE` | *(compose only)* | No | `ghcr.io/jakefearsd/wealthview` | Registry/repository half of the app image reference in `docker-compose.prod.yml`. Set it only to use a fork, a private mirror, or an air-gapped registry. `wv rollback` re-pins this alongside `WEALTHVIEW_VERSION`, so a mirrored deployment rolls back to the mirror. |
-| `APP_PORT` | *(compose only)* | No | `80` | Host port bound to the container's 8080 in `docker-compose.prod.yml` |
+| `APP_PORT` | *(compose only)* | No | `80` | Host port bound to the container's 8080 in `docker-compose.prod.yml` (the dev `docker-compose.yml` hardcodes `80:8080`) |
 | `BACKUP_RETENTION_DAYS` | *(compose only)* | No | `14` | Retention for the `backup` sidecar in `docker-compose.prod.yml` |
 
 Standard Spring relaxed binding applies, so any property below can be overridden by its upper-snake-case env name. The compose files use this for `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `SPRING_PROFILES_ACTIVE` and `APP_ZILLOW_ENABLED`.
@@ -42,12 +42,13 @@ Set in `application.yml`; usually overridden only by the compose `SPRING_DATASOU
 | `spring.jpa.hibernate.ddl-auto` | `validate` | Schema is owned by Flyway; Hibernate only validates it |
 | `spring.jpa.open-in-view` | `false` | No session-in-view; services own their transactions |
 | `spring.flyway.locations` | `classpath:db/migration` | Migrations ship in `wealthview-persistence` |
+| `spring.jpa.properties.hibernate.session.events.log.LOG_QUERIES_SLOWER_THAN_MS` | `500` (`dev`: `100`) | Hibernate logs any query slower than this many milliseconds |
 
 ## Server & Requests
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `server.port` | `8080` | Container port (published as 80 by both compose files) |
+| `server.port` | `8080` | Container port (published as `80` by `docker-compose.yml`, and as `${APP_PORT:-80}` by `docker-compose.prod.yml`) |
 | `server.shutdown` | `graceful` | In-flight requests drain before exit; send SIGTERM, not SIGKILL |
 | `spring.lifecycle.timeout-per-shutdown-phase` | `25s` | Cap on the graceful-shutdown drain |
 | `spring.servlet.multipart.max-file-size` | `10MB` | Upload limit for CSV/OFX imports |
@@ -61,6 +62,7 @@ Set in `application.yml`; usually overridden only by the compose `SPRING_DATASOU
 | `app.jwt.refresh-token-expiration` | `86400000` (24 hours) | Refresh token lifetime in milliseconds |
 | `app.jwt.issuer` | `wealthview-api` | `iss` claim, validated on every token |
 | `app.jwt.audience` | `wealthview-web` | `aud` claim, validated on every token |
+| `app.super-admin.email` | `admin@wealthview.local` | Email of the super-admin `SuperAdminInitializer` creates. Set in the `dev`, `docker` and `prod` profile files, not from an env var. |
 | `app.cookie.secure` | `true` | Adds the `Secure` flag to the auth and CSRF cookies. The `dev`, `docker` and `it` profiles set `false` so plain-HTTP local development works. |
 
 ## Rate Limiting
@@ -110,7 +112,7 @@ Used by the admin price-backfill endpoints under `/api/v1/admin/prices/yahoo/*`.
 |---------|---------|-------------|
 | `app.zillow.enabled` | `false` (`dev`: `true`) | Enable/disable Zillow valuation scraping |
 | `app.zillow.timeout-ms` | `10000` | HTTP timeout for Zillow requests |
-| `app.zillow.rate-limit-ms` | `5000` | Delay between scrape requests |
+| `app.zillow.rate-limit-ms` | `5000` | Declared in `application.yml` but **not currently read by any code** — changing it has no effect |
 | `app.zillow.sync-cron` | `0 0 6 * * SUN` | Cron schedule for automatic valuation sync (Sunday 6 AM, server timezone) |
 
 ## Observability
@@ -208,7 +210,9 @@ No profile is active by default — `dev` must be requested explicitly (`-Dsprin
 
 ## Runtime Settings (`system_config` table)
 
-`SystemConfigInitializer` seeds these into the database on first start; super-admins then view and edit them at **Admin → System Config** (`GET /api/v1/admin/config`, `PUT /api/v1/admin/config/{key}`). Values already present in the table are never overwritten by the seeder, and API-key changes take effect after the next restart.
+`SystemConfigInitializer` seeds these into the database on every start (keys already present are never overwritten); super-admins view and edit them at **Admin → System Config** (`GET /api/v1/admin/config`, `PUT /api/v1/admin/config/{key}`). `finnhub.api-key` is masked in the GET response.
+
+**These seeded keys are informational only.** No running code reads them back: the Finnhub client, the rate limiters and the Zillow scraper are all wired from the `app.*` properties above at startup. Editing a value here — even followed by a restart — does not change behavior; change the environment variable / property instead.
 
 | Key | Seeded from | Default |
 |-----|-------------|---------|
@@ -216,6 +220,8 @@ No profile is active by default — `dev` must be requested explicitly (`-Dsprin
 | `finnhub.rate-limit-ms` | `app.finnhub.rate-limit-ms` | `1100` |
 | `yahoo.rate-limit-ms` | `app.yahoo.rate-limit-ms` | `500` |
 | `zillow.scraper.enabled` | *(literal)* | `false` |
+
+Two further keys are written and read by the stock-split machinery itself and are not meant to be edited by hand: `stock_splits.backfill_completed` (set to `true` once `StockSplitBackfillRunner` finishes, so it never re-runs) and `stock_splits.last_sync_at` (timestamp of the last `StockSplitSyncService` run).
 
 ## Frontend
 

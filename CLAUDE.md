@@ -392,6 +392,7 @@ Cross-platform code that mobile also consumes lives in the `shared/` workspace
 ./wv migrate-out / migrate-in                      # Encrypted bundle for moving to another host
 ./wv rotate-secret JWT_SECRET                      # In-place secret rotation
 ./wv config-check                                  # Validate .env, compose files, tools
+./wv prune                                         # Remove dangling WealthView images (label-scoped)
 ```
 
 The `dev-backup.sh` and `dev-restore.sh` scripts are now thin shims that delegate to `./wv backup` / `./wv restore`; new automation should call `./wv` directly.

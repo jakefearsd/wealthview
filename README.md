@@ -7,13 +7,13 @@ A self-hosted, multi-tenant personal finance application for tracking investment
 - **Investment Portfolio Tracking** -- Accounts, holdings, transactions with automatic cost basis computation, portfolio history charts, live price and market value columns, multi-currency support with tenant-managed exchange rates, and money market fund support
 - **Automatic Stock Split Handling** -- Daily Finnhub split sync plus a one-time backfill keep transactions, holdings, and historical prices split-adjusted; manual entry and un-apply live under `/api/v1/admin/stock-splits` (see [Stock Splits](docs/operations/stock-splits.md))
 - **Rental Property Management** -- Income/expense tracking, cash flow reports, loan amortization, Zillow valuation scraping, cap rate / cash-on-cash analytics, hold-vs-sell ROI analysis, and cost-segregation depreciation with schedule transparency
-- **Retirement Projections** -- Deterministic year-by-year projection engine plus a Monte Carlo guardrail spending optimizer with block-bootstrap returns. Models allocation-driven real-terms returns, an investment fee/expense-ratio drag, RMDs, capital gains on taxable accounts (per-lot FIFO, LTCG + NIIT, dividend drag), an essential-spending-floor success metric, Roth conversion optimization, dynamic withdrawal sequencing, per-pool withdrawal transparency, rental property integration, and scenario comparison
+- **Retirement Projections** -- Deterministic year-by-year projection engine plus a Monte Carlo guardrail spending optimizer with block-bootstrap returns. Models allocation-driven real-terms returns, an investment fee/expense-ratio drag, RMDs, capital gains on taxable accounts (per-lot FIFO, LTCG + NIIT, dividend drag), an essential-spending-floor success metric, a per-year tax-space view (bracket room, capital-gains bands, IRMAA headroom), an after-tax legacy figure, Roth conversion optimization, dynamic withdrawal sequencing, per-pool withdrawal transparency, rental property integration, and scenario comparison
 - **Household & Survivor Modeling** -- Spouse-aware pools and income windows in both engines, per-owner RMD streams, an atomic first-death transition (keep-larger Social Security, spousal rollover, basis step-up, reduced survivor spending, MFJ→single filing flip), plus an opt-in stochastic-mortality Monte Carlo mode driven by SSA mortality tables
 - **Multi-Format Import** -- Fidelity, Vanguard, and Schwab CSV parsers plus OFX/QFX import with content-hash deduplication
 - **Live Price Feeds** -- Finnhub API integration with historical backfill, scheduled daily sync, and on-demand admin sync
 - **Dashboard** -- Net worth summary combining investments, cash, and property equity with asset allocation breakdown
 - **Multi-Tenant** -- JWT-based auth with tenant isolation, invite code registration, and role-based access (admin/member/viewer)
-- **Account Security** -- TOTP multi-factor auth with recovery codes, refresh tokens, active-session management, and login activity history
+- **Account Security** -- TOTP multi-factor auth with recovery codes, refresh tokens, active-session management, and login activity history. MFA enrollment and session management are API only (`/api/v1/auth/mfa/*`, `/api/v1/auth/sessions`); neither the web nor the mobile client has a screen for them yet, and the web login form has no TOTP step
 - **Administrative Tooling** -- A consolidated `/admin` area (settings, prices, audit log, system stats), super-admin tenant management, data export (JSON + per-entity CSV with formula-injection neutralization), and notification-preference storage (API only — no web UI yet)
 - **Mobile Companion App** -- A React Native client (`mobile/`) sharing API and formatting code with the web SPA through the `shared/` workspace
 - **Self-Hosted** -- Single Docker Compose command to deploy; no third-party SaaS dependencies
@@ -37,8 +37,10 @@ package is public, so the host pulls it with no login and no registry setup.
 See [Upgrading](docs/deployment/upgrading.md).
 
 - **URL:** http://localhost
-- **Super admin:** `admin@wealthview.local` / `admin123`
-- **Demo user:** `demo@wealthview.local` / `demo123` (pre-loaded with sample data)
+- **Super admin:** `admin@wealthview.local` / the `SUPER_ADMIN_PASSWORD` you set in `.env` (there is no
+  default; the app refuses to start with a blank value or a known dev default such as `admin123`)
+- **Demo user:** `demo@wealthview.local` / `demo123` (pre-loaded with sample data; dev stack only, never
+  seeded in prod mode)
 
 ```bash
 ./wv down                                 # Stop (preserve data)
@@ -121,6 +123,8 @@ run `./wv update`, which pulls the published image.
 
 ## Documentation
 
+The full index, grouped by audience, is [docs/README.md](docs/README.md).
+
 ### For Users
 
 | Guide | Description |
@@ -146,6 +150,7 @@ run `./wv update`, which pulls the published image.
 | [TLS & Nginx](docs/deployment/tls-and-nginx.md) | Host-managed TLS with nginx + Let's Encrypt |
 | [Security Hardening](docs/deployment/security-hardening.md) | Firewall, SSH, secrets, app-level security |
 | [Upgrading](docs/deployment/upgrading.md) | Upgrades, rollback, Flyway migrations |
+| [Deployment Guide](docs/DeploymentGuide.md) | Orientation page linking the deployment docs above |
 
 ### System Administration
 
@@ -176,6 +181,8 @@ run `./wv update`, which pulls the published image.
 | [Development Guide](docs/development.md) | Local setup, build commands, testing |
 | [Feature Walkthrough](docs/feature_walkthrough.md) | Step-by-step manual test script |
 | [Mobile App](mobile/README.md) | React Native client setup and native builds |
+| [Android Device Testing](docs/deployment/mobile-android-testing.md) | Running the mobile app on a physical Android phone |
+| [Shared Package](shared/README.md) | `@wealthview/shared` cross-platform API client and utilities |
 | [Mobile API](docs/MOBILE_API.md) | Token-auth endpoints used by the mobile client |
 | [Load Test Harness](loadtest/README.md) | k6 scenarios, profiling, and result reports |
 | [CHANGELOG.md](CHANGELOG.md) | Release history |

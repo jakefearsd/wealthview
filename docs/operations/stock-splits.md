@@ -148,6 +148,23 @@ In the UI this is the **Admin → Stock Splits** tab (`StockSplitsSection`,
 SUPER_ADMIN only), which also hosts the manual-entry form and a "sync now"
 button. Un-apply is behind a confirm dialog.
 
+**Caveat: the tab's "Applied splits" table is tenant-scoped.** It is filled from
+the same `GET /api/v1/stock-splits` that users call, so it only lists splits for
+symbols the *super-admin's own tenant* has transactions in. The super-admin
+normally lives in the otherwise empty `System` tenant, so the table is usually
+empty. There is no cross-tenant list endpoint. To un-apply a split that isn't
+listed, get its id from the database and call the API directly:
+
+```sql
+SELECT id, symbol, effective_date, numerator, denominator, source
+FROM stock_splits ORDER BY applied_at DESC LIMIT 20;
+```
+
+```bash
+# Authenticated as the super-admin (Bearer token or the browser session's cookies + XSRF header)
+DELETE /api/v1/admin/stock-splits/<id>
+```
+
 ## Manual-override holdings
 
 If a holding row has `is_manual_override = true`, the auto-recompute
@@ -167,7 +184,7 @@ All exported via `/actuator/prometheus` (SUPER_ADMIN-only — see
 | `wealthview.splits.unapplied{symbol}` | Manual reverts. Should be near-zero. |
 | `wealthview.splits.synced_total{result="success"\|"partial"}` | One increment per completed sync run. `partial` means at least one symbol failed. |
 | `wealthview.splits.sync_failed{symbol}` | Per-symbol failure during sync (Finnhub unavailable, etc.). |
-| `wealthview.splits.last_success_seconds` | Unix epoch of the last **completed** sync run; `0` if never. Alert if `(now - this) > 36h`. |
+| `wealthview.splits.last_success_seconds` | Unix epoch of the last **completed** sync run; `0` if never. The value is in memory only, so it reads `0` after every app restart until the next run. Alert if `(now - this) > 36h`; no shipped rule does this (see `docs/OBSERVABILITY.md`). |
 | `wealthview.splits.backfill_completed_total` | Increments exactly once, on the run that flips the backfill flag. |
 | `wealthview.splits.sync` | Timer + histogram around the whole `syncAll()` run. |
 | `wealthview.finnhub.splits` | Timer + histogram for the Finnhub `/stock/split` call. |
@@ -185,6 +202,10 @@ Two gotchas when you turn these into queries:
   "the job ran to completion," not "every symbol succeeded." Pair it with
   `wealthview.splits.synced_total{result="partial"}` and
   `wealthview.splits.sync_failed`.
+
+The sync sets no `operation` MDC key, so it can't be filtered that way in the JSON
+logs. Grep for the `Starting stock split sync:` and `Split sync complete:` INFO lines,
+and for `Split sync failed for <symbol>` WARNs.
 
 ## "Splits aren't being detected"
 
@@ -255,6 +276,29 @@ Work from the audit trail rather than guessing — every rewrite is recorded.
   (Useful if you import prices from a feed that already returns
   split-adjusted values.)
 - Override `app.stock-splits.sync-cron` to reschedule the nightly job.
+  It is a six-field Spring cron (`second minute hour day month weekday`),
+  evaluated in `America/New_York`.
+
+None of these properties is passed through by the compose files. Set them as
+environment variables (`APP_STOCK_SPLITS_SYNC_CRON`, etc.) on the app service in
+a compose override file.
+
+## Re-running the backfill
+
+Set the `system_config` key `stock_splits.backfill_completed` to `false`, either
+in **Admin → System Config** or with
+`PUT /api/v1/admin/config/stock_splits.backfill_completed` and body
+`{"value":"false"}`. Then restart the app. The backfill runs again on its
+background thread. Splits already in `stock_splits` are skipped, so only gaps are
+filled. This is useful after enabling Finnhub on a deployment whose first
+backfill hit errors (each failed symbol only logs `Backfill failed for <symbol>`,
+and the flag is set to `true` regardless).
+
+To widen the nightly sync window instead, set `stock_splits.last_sync_at` to an
+earlier ISO-8601 instant the same way (for example `2024-01-01T00:00:00Z`). The
+next run fetches from 7 days before that. Use the API or UI rather than `psql`.
+`SystemConfigService` caches values in memory, so a direct SQL edit isn't seen
+until the app restarts.
 
 Manual entry and un-apply remain available in all of these cases — they don't
 depend on Finnhub.

@@ -8,7 +8,7 @@ Cross-platform utilities and types shared between the WealthView web frontend (V
 
 | Module | Exports |
 |---|---|
-| `src/format.ts` | `formatCurrency`, `formatWholeCurrency`, `formatCompactCurrency`, `formatPercent`, `toPercent`, `parseCurrencyInput`, `formatCurrencyInput` |
+| `src/format.ts` | `formatCurrency`, `formatWholeCurrency`, `formatCompactCurrency`, `formatPercent`, `toPercent`, `parseCurrencyInput`, `formatCurrencyInput`, `formatDate`, `todayIso`, `yearOf` |
 | `src/errorMessage.ts` | `extractErrorMessage` — pulls a human-readable message out of an Axios error, the API's `{error, message, status}` envelope, or a plain exception |
 | `src/api/client.ts` | `createApiClient` + `ApiClientConfig`. Builds a configured axios instance: bearer or cookie transport, refresh-on-401 with a single retry and coalesced concurrent refreshes, and `onTokensRefreshed` / `onAuthFailed` callbacks so token storage stays platform-specific |
 | `src/api/auth.ts` | `createAuthApi` + `AuthApi` — `login`, `register`, `refresh`, `logout`, `getCurrentUser`, routed to `/auth/token/*` or `/auth/*` depending on transport |

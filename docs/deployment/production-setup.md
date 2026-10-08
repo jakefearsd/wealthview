@@ -199,7 +199,7 @@ file and the docs on the host in step with the image you are deploying:
 
 ```bash
 git tag -l | sort -V | tail -5
-git checkout v1.2.5
+git checkout v1.2.8
 ```
 
 If you would rather not keep a checkout at all, download
@@ -221,7 +221,7 @@ cp .env.example .env
 
 ### Required — the stack will not start without these
 
-`docker-compose.yml` uses `${VAR:?message}` syntax for all four, and
+Both compose files use `${VAR:?message}` syntax for all four, and
 `./wv` re-checks them (including refusing any value still set to `CHANGE_ME`)
 before it will bring the stack up.
 
@@ -248,7 +248,7 @@ MFA_ENCRYPTION_KEY=<generate with: openssl rand -base64 32>
 # NEVER use `latest` — CI publishes that tag as a convenience pointer, but
 # deploying it defeats `wv rollback`, which recovers by re-pinning the tag that
 # was running before the update.
-WEALTHVIEW_VERSION=1.2.5
+WEALTHVIEW_VERSION=1.2.8
 
 # Allowed origin for /api/* requests. REQUIRED on the prod profile — the app
 # refuses to start with an empty or non-https:// value. Set to your public URL.
@@ -409,6 +409,11 @@ The config file is resolved in this order, first match wins: `--config FILE` →
 `$XDG_CONFIG_HOME/wealthview/wv.conf` → `~/.config/wealthview/wv.conf` →
 source-tree fallback.
 
+Once `/etc/wealthview/wv.conf` exists it wins even when you run `./wv` from the
+checkout — the source-tree fallback is only used when no config file is found.
+From then on `/etc/wealthview/.env` is the live env file, and the copy in the
+checkout is ignored. Edit the one in `/etc/wealthview`.
+
 > **Two things to know when `/etc/wealthview` is the compose directory.**
 >
 > 1. The `app` service is image-only — it has no `build:` key, so nothing about
@@ -420,6 +425,13 @@ source-tree fallback.
 >    `/etc/wealthview/backups`, **not** the `WV_BACKUPS_DIR` you set in
 >    `wv.conf`. Either point `WV_BACKUPS_DIR` at `/etc/wealthview/backups` so
 >    on-demand and cron'd dumps share a directory, or symlink one to the other.
+> 3. Compose reads `${WEALTHVIEW_VERSION}`, `${DB_PASSWORD}` and the rest from
+>    the `.env` **in the compose file's directory**; `wv` does not pass
+>    `--env-file`. `WV_ENV_FILE` only tells `wv` where to look for its own
+>    checks (mode detection, `wv_env_check`, backup settings). Keep the two the
+>    same file — `/etc/wealthview/.env` beside
+>    `/etc/wealthview/docker-compose.prod.yml` — or compose and `wv` will
+>    disagree about which version and secrets are in force.
 
 ---
 
@@ -430,10 +442,12 @@ source-tree fallback.
 ```
 
 `./wv up` validates `.env`, runs `docker compose -f docker-compose.prod.yml up
---build -d`, then polls `http://localhost:${APP_PORT}/actuator/health` for up
-to 120 seconds. The first build takes 2–5 minutes (it downloads Maven and npm
-dependencies); subsequent builds reuse Docker's layer cache and take under a
-minute.
+--build -d`, then polls `http://localhost:${APP_PORT}/actuator/health` (or
+`WV_HEALTH_URL`) for up to 120 seconds. Nothing heavy is compiled: compose
+pulls the `app` image for your `WEALTHVIEW_VERSION` from GHCR (a few hundred MB
+on the first run) and builds only the small Alpine `backup` sidecar. The first
+boot then runs every Flyway migration against the empty database, which takes
+longer than later restarts.
 
 Watch the logs until the app finishes starting up:
 
@@ -444,9 +458,13 @@ Watch the logs until the app finishes starting up:
 You should see:
 
 - `Successfully applied N migrations to schema "public"` (Flyway)
-- `Started WealthviewApplication in <seconds>` (Spring Boot is up)
-- `Production security configuration validated successfully`
-- `SuperAdminInitializer` creating the `admin@wealthview.local` account
+- `Started WealthViewApplication in <seconds>` (Spring Boot is up)
+- `Super-admin account created: admin@wealthview.local` (from
+  `SuperAdminInitializer`, first boot only — later boots log
+  `Super-admin account already exists`)
+- `Production security configuration validated successfully` (this check runs
+  after startup completes; if it fails, the process exits with a
+  `SECURITY: ...` message and the container restart-loops)
 
 Press `Ctrl-C` to stop tailing (the containers keep running).
 
@@ -465,6 +483,10 @@ container-level HEALTHCHECK passes, which can take 30–60 seconds after startup
 
 Load the UI in a browser at `http://<server-ip>:${APP_PORT}/` — you should see
 the WealthView login page. Don't log in yet; first put TLS in front of the app.
+Logging in over plain HTTP will not work anyway: the `prod` profile sets the
+`Secure` flag on the auth and `XSRF-TOKEN` cookies (`app.cookie.secure`
+defaults to `true`), so the browser drops them on an `http://` origin (only
+`http://localhost`, e.g. through an SSH tunnel, is exempt).
 
 ---
 
@@ -477,7 +499,7 @@ off, so the sweep can never reach an operator's `./wv backup` dump. Trigger one 
 works, then take an on-demand `wv` backup and verify it restores:
 
 ```bash
-docker compose -f docker-compose.prod.yml exec backup /backup.sh
+docker compose -p wealthview -f docker-compose.prod.yml exec backup /backup.sh
 ./wv backups                                    # list with size + age
 ./wv backup --label first-run                   # on-demand pg_dump
 ./wv verify backups/wealthview_<ts>_first-run.dump
@@ -490,7 +512,7 @@ live database. Schedule it weekly.
 To encrypt backups (strongly recommended for anything leaving the host):
 
 ```bash
-age-keygen -o /etc/wealthview/backup.key
+sudo age-keygen -o /etc/wealthview/backup.key
 sudo chmod 600 /etc/wealthview/backup.key
 grep '# public key:' /etc/wealthview/backup.key   # copy the age1... value
 ```
@@ -546,11 +568,17 @@ curl -sI https://wealthview.example.com/ | grep -Ei \
   "strict-transport|permissions-policy|x-frame-options|content-security-policy"
 ```
 
-The app emits these itself from `SecurityConfig`:
+The app emits these itself from `SecurityConfig` — with one exception:
+**`Strict-Transport-Security` is only written on requests the app itself sees
+as HTTPS.** Spring Security's HSTS writer skips plain-HTTP requests, and the app
+does not trust `X-Forwarded-Proto` (no `server.forward-headers-strategy` is
+configured), so behind a TLS-terminating proxy or Cloudflare Tunnel the app
+never sends HSTS. Add it at the edge: the nginx guide does, and Cloudflare has
+an HSTS setting under **SSL/TLS → Edge Certificates**.
 
 | Header | Value |
 |---|---|
-| `Strict-Transport-Security` | `max-age=31536000 ; includeSubDomains ; preload` |
+| `Strict-Transport-Security` | `max-age=31536000 ; includeSubDomains ; preload` — only on requests that reach Spring as HTTPS (see above) |
 | `X-Frame-Options` | `DENY` |
 | `X-Content-Type-Options` | `nosniff` |
 | `Permissions-Policy` | `geolocation=(), microphone=(), camera=(), payment=()` |
@@ -606,16 +634,29 @@ services:
       APP_RATE_LIMIT_TRUSTED_PROXIES: ${APP_RATE_LIMIT_TRUSTED_PROXIES:-}
 ```
 
-…or add the same block in a Compose override file and point
-`WV_COMPOSE_OVERRIDE_FILE` at it. Then set the value in `.env`:
+…or add the same block in a Compose override file. `wv` picks up
+`docker-compose.prod.override.yml` next to the compose file automatically in
+source-tree prod mode; on a `wv.conf` install, point `WV_COMPOSE_OVERRIDE_FILE`
+at it. (Raw `docker compose -f docker-compose.prod.yml …` commands do not see
+the override unless you add a second `-f`.) An override survives replacing
+`docker-compose.prod.yml` with a newer release's copy; an in-place edit does
+not. Then set the value in `.env`:
 
 ```dotenv
-# If nginx runs on the same host:
-APP_RATE_LIMIT_TRUSTED_PROXIES=127.0.0.1
+# The peer address the app actually observes for your proxy (see below).
+APP_RATE_LIMIT_TRUSTED_PROXIES=<peer-ip>
 ```
 
+The list is comma-separated and matched **exactly** against the TCP peer
+address — there is no CIDR support. Don't assume `127.0.0.1` for a proxy on the
+same host: it connects to a *published* container port, so the container
+usually sees the Docker bridge gateway (something in `172.x.x.x`). Log in once,
+read the IP recorded in **Admin → Login Activity**, put that value here,
+restart, and confirm the next login records your real client address.
+
 Leave it unset if nothing is in front of the app. If all your login-activity
-rows show the same internal IP, this is why.
+rows show the same internal IP, this is why — and every client then also shares
+one 60-requests-per-minute bucket on `/api/v1/auth/**`.
 
 ---
 
@@ -628,10 +669,12 @@ rows show the same internal IP, this is why.
    ```dotenv
    FINNHUB_API_KEY=your_api_key_here
    ```
-3. Restart the app so Spring picks up the new env var:
+3. Recreate the app so Spring picks up the new env var:
    ```bash
-   docker compose -f docker-compose.prod.yml up -d app
+   ./wv up --no-build
    ```
+   (`docker compose up -d` recreates only containers whose configuration
+   changed, so this restarts `app` and leaves `db` alone.)
 
 The price sync runs once per weekday in `America/New_York`, on
 `PriceSyncService`'s own schedule (`app.finnhub.sync-cron`, default
@@ -648,10 +691,7 @@ also requires a Finnhub key. See
 
 1. Set `ZILLOW_ENABLED=true` in `.env` (both compose files map this to
    `APP_ZILLOW_ENABLED`, which Spring binds to `app.zillow.enabled`).
-2. Restart the app:
-   ```bash
-   docker compose -f docker-compose.prod.yml up -d app
-   ```
+2. Recreate the app: `./wv up --no-build`.
 3. In the UI, configure a Zillow ZPID for each property.
 
 The sync runs on `app.zillow.sync-cron`, default `0 0 6 * * SUN` — 06:00 on
@@ -665,8 +705,14 @@ Sundays in the container's timezone (UTC unless you change it).
 on top of the production stack:
 
 ```bash
-docker compose -f docker-compose.prod.yml -f docker-compose.observability.yml up -d
+docker compose -p wealthview -f docker-compose.prod.yml -f docker-compose.observability.yml up -d
 ```
+
+`wv` does not know about this file unless you make it the override
+(`WV_COMPOSE_OVERRIDE_FILE`, or copy it to `docker-compose.prod.override.yml`
+in source-tree mode). If you don't, a later `wv down` removes the Prometheus
+and Grafana containers as orphans (`wv down` passes `--remove-orphans`) and
+`wv up` won't bring them back.
 
 It needs one extra variable, which has no fallback:
 
@@ -778,11 +824,16 @@ registry flow** and is not the recommended path: for any host you can SSH into,
 `wv update` is better in every way (pre-deploy backup, health check,
 auto-rollback).
 
-> **It needs one extra variable now.** `deploy.sh` builds and loads the image as
+> **Image naming.** `deploy.sh` builds and loads the image as
 > `wealthview:<version>`, while `docker-compose.prod.yml` resolves
 > `${WEALTHVIEW_IMAGE:-ghcr.io/jakefearsd/wealthview}:${WEALTHVIEW_VERSION}`.
-> Unless the remote `.env` also sets `WEALTHVIEW_IMAGE=wealthview`, compose
-> will not find the loaded image and will try to pull from GHCR instead.
+> The script handles its own run by exporting `WEALTHVIEW_IMAGE=wealthview`
+> and `WEALTHVIEW_VERSION=<version>` on the remote for the `docker compose`
+> calls it makes. Those exports do not persist: for `wv` (or a plain
+> `docker compose up`) to keep running the shipped image afterwards, the remote
+> `.env` must also say `WEALTHVIEW_IMAGE=wealthview` and
+> `WEALTHVIEW_VERSION=<the version deploy.sh printed>`. Otherwise compose falls
+> back to the GHCR reference and tries to pull it.
 
 ```bash
 DEPLOY_HOST=you@192.168.1.50 ./deploy.sh
@@ -798,10 +849,16 @@ What it does:
 3. Creates `$DEPLOY_DIR` on the remote, `scp`s `docker-compose.prod.yml` there
    **as `docker-compose.yml`**, and copies `infra/` alongside it.
 4. If the remote has no `.env`, copies `.env.example` across and stops with
-   instructions. Fill in `DB_PASSWORD`, `JWT_SECRET`, `SUPER_ADMIN_PASSWORD`,
-   `MFA_ENCRYPTION_KEY`, `CORS_ORIGIN`, and `WEALTHVIEW_VERSION`, then re-run.
+   instructions. Its message names only `DB_PASSWORD`, `JWT_SECRET` and
+   `SUPER_ADMIN_PASSWORD`, but the prod stack also needs `MFA_ENCRYPTION_KEY`
+   and `CORS_ORIGIN` — fill in all five (plus `WEALTHVIEW_IMAGE` /
+   `WEALTHVIEW_VERSION` as above), then re-run.
 5. `scp`s the tarball, `docker load`s it, and runs `docker compose down` then
-   `up -d` on the remote with `WEALTHVIEW_VERSION` set.
+   `up -d` on the remote with `WEALTHVIEW_IMAGE` and `WEALTHVIEW_VERSION`
+   exported. There is no health wait — it sleeps five seconds and prints
+   `docker compose ps`.
+6. Prunes old `wealthview:*` tags on both machines, keeping the two most
+   recent, so the previous build stays available as a manual rollback target.
 
 Because the file lands as `docker-compose.yml`, subsequent `wv` invocations on
 that host should point `WV_COMPOSE_FILE` at `$DEPLOY_DIR/docker-compose.yml`.

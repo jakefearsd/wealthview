@@ -23,15 +23,15 @@ mvn verify                    # gates + Testcontainers integration tests
 | Tool | Enforcing goal (phase) | Purpose | Config | Site Report |
 |---|---|---|---|---|
 | **JaCoCo 0.8.15** | `jacoco:check` (`verify`) | Line and branch coverage floors | Per-module `jacoco.*.minimum` properties | `jacoco/index.html` per module |
-| **SpotBugs (plugin 4.10.3.0)** | `spotbugs:check` (`verify`) | Static bug detection | `backend/spotbugs-exclude.xml` | `spotbugs.html` |
+| **SpotBugs (plugin 4.10.4.1)** | `spotbugs:check` (`verify`) | Static bug detection | `backend/spotbugs-exclude.xml` | `spotbugs.html` |
 | **Checkstyle (plugin 3.6.0)** | `checkstyle:check` (`verify`) | Code style | `backend/wealthview_checks.xml` | `checkstyle.html` |
 | **PMD (plugin 3.28.0)** | `pmd:check` (`verify`) | Code quality rules | `backend/pmd-ruleset.xml` | `pmd.html` |
 | **CPD (same plugin)** | `pmd:cpd-check` (`verify`) | Copy-paste detection | maven-pmd-plugin defaults | `cpd.html` |
-| **PIT 1.25.9** | *(advisory — run manually)* | Mutation testing | Parent POM `<configuration>` | Separate run; not in site |
+| **PIT 1.30.0** | *(advisory — run manually)* | Mutation testing | Parent POM `<configuration>` | Separate run; not in site |
 
 Two analysis engines are pinned independently of their plugin version so they can parse Java 25:
 
-* **Checkstyle core `13.10.0`** — pinned via a `<dependencies>` block on `maven-checkstyle-plugin`.
+* **Checkstyle core `14.3.0`** — pinned via a `<dependencies>` block on `maven-checkstyle-plugin`.
 * **PMD core** stays at the `7.17.0` bundled with maven-pmd-plugin 3.28.0. Forcing a newer PMD core
   was tried and reverted: 7.26.0 surfaced four additional rule violations unrelated to the tooling
   bump. 7.17.0 is already at or above the JDK-25-capable floor.
@@ -210,7 +210,7 @@ sentinels. If a sentinel trips the scanner, allowlist it in `.gitleaks.toml`.
 
 ## Dependency Version Reporting
 
-The **Versions Maven Plugin** (versions-maven-plugin 2.21.0) generates three site reports:
+The **Versions Maven Plugin** (versions-maven-plugin 2.22.0) generates three site reports:
 
 * **Dependency Updates** — which declared dependencies have newer versions available
 * **Plugin Updates** — which build/report plugins have newer versions
@@ -226,7 +226,8 @@ Beyond tool-based checks, the project's use of modern Java provides structural g
 
 * **Sealed interfaces** — `SpendingPlan`, `ProjectionAccountInput`, `WithdrawalStrategy`,
   `QuoteResult` and `LoginOutcome` in `wealthview-core`; `PoolStrategy`, `WithdrawalOrderStrategy`,
-  `IncomeSourceProcessor` and `ConversionSimulator` in `wealthview-projection`. Exhaustive switch
+  and the private nested `IncomeSourceProcessor.IncomeTypeResult` and
+  `ConversionSimulator.SpendingWithdrawalStrategy` in `wealthview-projection`. Exhaustive switch
   expressions are compiler-checked, so adding a subtype forces every switch to be updated.
 
 * **Records** for all DTOs — immutability, with `equals`/`hashCode`/`toString` generated correctly;

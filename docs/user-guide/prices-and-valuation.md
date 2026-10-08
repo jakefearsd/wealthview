@@ -104,7 +104,9 @@ Each series runs from as far back as the security has history (AAPL starts in De
 
 If your holdings include symbols outside this list, historical chart data only exists from whenever a feed first collected it — or from whatever you entered manually.
 
-> **On upgrades:** when a WealthView release ships refreshed seed data, the price table is rebuilt from the seed file. Prices you entered by hand for other symbols are replaced along with it, so keep your own price CSVs if they are hard to reconstruct.
+Seed prices are labelled `finnhub` in the Source column.
+
+> **On upgrades:** when a WealthView release ships refreshed seed data, the whole price table is cleared and rebuilt from the seed file. That removes every other stored price too — synced, Yahoo, uploaded, and manual — until the next sync or backfill fetches them again. Prices you entered by hand or uploaded do not come back on their own, so keep your own price CSVs if they are hard to reconstruct.
 
 ---
 

@@ -5,7 +5,8 @@
 WealthView is a self-hosted, multi-tenant personal finance application focused on investment portfolio monitoring, rental property income/expense tracking, and retirement projection modeling. It is designed for financially literate users who want full ownership of their data and the flexibility to share the platform with family or trusted peers.
 
 **Current state:** Phases 1–8 in the [Feature Breakdown](#feature-breakdown) have
-shipped; the latest release is **v1.2.8** (2026-10-04). This document describes
+shipped; the latest release is **v1.2.8** (2026-10-04). Phase 9 (tactical retirement
+planning) has started on `main` and is not yet in a release. This document describes
 what the code actually does — anything not yet built is confined to the
 [Roadmap](#roadmap--not-yet-built) subsection. For the release history see
 [CHANGELOG.md](CHANGELOG.md); for contributor conventions see `CLAUDE.md`.
@@ -153,10 +154,10 @@ All entity IDs are **UUID** (`uuid` type in PostgreSQL, `UUID` in JPA). This pre
 
 Registration is **invite-code gated**. There is no open public registration.
 
-1. An **admin** creates a tenant and generates one or more single-use invite codes.
+1. The **super-admin** creates a tenant and mints an invite code for it (`POST /api/v1/admin/tenants/{id}/invite-codes`, or **Create invite code** in the admin Tenants section). Tenant admins generate further single-use codes for their own tenant.
 2. A new user visits `/register`, enters their email, password, and invite code.
 3. The system validates the code, creates the user within the associated tenant, and marks the code as consumed.
-4. The first user in a tenant automatically receives the `admin` role.
+4. The first user to register into a tenant that has no users receives the `admin` role; later users join as `member` (an admin can change roles afterwards).
 
 A **super-admin** role (your own account, seeded at first startup) can create new tenants and generate invite codes for any tenant.
 
@@ -203,7 +204,7 @@ deductions, LTCG brackets, IRMAA tiers, asset class returns, mortality rates,
 security asset classes, stock splits) are global rather than tenant-scoped.
 
 The tables below are the load-bearing ones. The authoritative schema is the
-Flyway migration set — **89 files** (`V001`..`V080` plus 9 `R__seed_*`
+Flyway migration set — **90 files** (`V001`..`V081` plus 9 `R__seed_*`
 repeatables) in `backend/wealthview-persistence/src/main/resources/db/migration/`
 — and the JPA entities in `wealthview-persistence`. See
 [Data Model reference](docs/reference/data-model.md) for the full listing.
@@ -360,19 +361,28 @@ The UI presents a single unified "Spending Plan" dropdown.
 ### Phase 8 — Platform & Operations Maturity
 
 - [x] **Automatic stock split handling** — Daily Finnhub split sync plus a one-time backfill keep transactions, holdings, and historical prices split-adjusted; every adjustment is recorded so a split can be un-applied. Manual entry under `/api/v1/admin/stock-splits`.
-- [x] **Account security** — TOTP MFA with encrypted secrets and single-use recovery codes, refresh tokens, active-session listing and revocation, and login activity history.
+- [x] **Account security** — TOTP MFA with encrypted secrets and single-use recovery codes, refresh tokens, active-session listing and revocation, and login activity history. MFA enrollment, the TOTP login step, and session management are exposed by the API only; the web and mobile clients have no screens for them yet (see Roadmap).
 - [x] **Consolidated admin area** — A single `/admin` page absorbing tenant settings, prices, audit log, and system stats; `/settings`, `/audit-log`, and `/admin/prices` redirect there.
 - [x] **Mobile companion app** — React Native client (login, portfolio, account detail, settings, server config) against a token-auth endpoint family, with a version-check / force-upgrade gate. Shares API and formatting code via the `shared/` workspace.
-- [x] **`wv` operations tool** — A single admin command surface (`up`, `down`, `restart`, `status`, `logs`, `psql`, `backup`, `backups`, `restore`, `verify`, `update`, `rollback`, `migrate-out`, `migrate-in`, `rotate-secret`, `config-check`, `help`) installable system-wide and able to drive a remote Docker host over SSH.
+- [x] **`wv` operations tool** — A single admin command surface (`up`, `down`, `restart`, `status`, `logs`, `psql`, `backup`, `backups`, `restore`, `verify`, `update`, `rollback`, `migrate-out`, `migrate-in`, `rotate-secret`, `config-check`, `prune`, `help`) installable system-wide and able to drive a remote Docker host over SSH.
 - [x] **Enforced quality gates** — PMD, CPD, SpotBugs, Checkstyle, and JaCoCo all fail `mvn verify`, with per-module line and branch floors. PIT mutation testing available as an advisory tool.
 - [x] **Load test harness & observability** — k6 scenarios with profiling and report generation under `loadtest/`, a Micrometer/Actuator Prometheus endpoint, and an optional observability compose stack.
 - [x] **Scaling work** — Batch balance computation replacing N+1 queries, Caffeine caching across five named caches, and a tuned HikariCP pool.
 
+### Phase 9 — Tactical Retirement Planning (on `main`, unreleased)
+
+- [x] **Tax Space view** — A per-retirement-year tab showing the marginal bracket and room left in it, the 0% / 15% capital-gains bands, the Social Security taxation zone, NIIT headroom, IRMAA tier and room to the next one, and the effective marginal rate on the next $1,000; the run response carries it as `tax_space`.
+- [x] **After-tax legacy** — An after-tax terminal value card driven by a scenario `heir_tax_rate` (default 0.24); the run response carries `terminal_value`.
+- [x] **Exact 59½ access** — Optional birth months make the calendar year the primary reaches 59½ penalty-free.
+- [x] **Persisted optimizer conversion settings** — V081 stores `optimize_conversions` and `dynamic_sequencing_bracket_rate` on guardrail profiles so `reoptimize` reuses them.
+
 ### Roadmap — Not Yet Built
 
 - [ ] **Notification delivery** — A real channel (email/SMTP or webhook) behind the existing preference model, for sync failures, large transactions, and projection milestones.
+- [x] **Extended tail-risk return window** — The bootstrap defaults to the 1972–2025 window (stagflation included); a scenario can opt into the full 1928–2025 window (`include_depression_years`) to add the Depression-era tail.
 - [ ] **Stochastic inflation** — Inflation is currently a fixed per-scenario rate; modeling it as a correlated stochastic process was scoped during the realism work but never selected.
-- [ ] **Extended tail-risk return window** — Widening the bootstrap sample to a 1972–2025 historical window to capture stagflation-era sequences.
+- [ ] **MFA and session screens in the clients** — Web enrollment/disable, a TOTP step on the web login form, recovery-code display, and session listing/revocation; the mobile app currently refuses MFA-enabled accounts.
+- [ ] **Remaining tactical-planning work (Phase 9)** — Birth months are stored for Medicare and per-person early-withdrawal timing but only the primary's 59½ year uses them so far.
 - [ ] **Automated bank/brokerage sync** — Still deliberately out of scope; import stays file-based (see Decision Log #4).
 
 ---
@@ -380,7 +390,7 @@ The UI presents a single unified "Spending Plan" dropdown.
 ## API Design Conventions
 
 - **Base path:** `/api/v1/`
-- **Auth:** `Authorization: Bearer <JWT>` on all endpoints except the unauthenticated entry points (`/api/v1/auth/login`, `/register`, `/refresh`, `/mfa/challenge` and their `/api/v1/auth/token/*` mobile equivalents).
+- **Auth:** The web SPA authenticates with HttpOnly JWT cookies (access + refresh) and double-submit CSRF (`XSRF-TOKEN` cookie echoed as `X-XSRF-TOKEN`). Native clients use `/api/v1/auth/token/*`, which returns tokens in the body, and send `Authorization: Bearer <JWT>`. Unauthenticated entry points: `/api/v1/auth/login`, `/register`, `/refresh`, `/mfa/challenge` and their `/api/v1/auth/token/*` equivalents, `GET /api/v1/app/version-check`, and `/actuator/health`.
 - **Tenant scoping:** The JWT contains `tenant_id`; a Spring Security filter enforces row-level access on every query.
 - **Pagination:** `?page=0&size=25` with response envelope `{ data: [], page: 0, size: 25, total: 142 }`.
 - **Errors:** Standard JSON error body `{ error: "NOT_FOUND", message: "Account not found", status: 404 }`.
@@ -388,7 +398,7 @@ The UI presents a single unified "Spending Plan" dropdown.
 
 ### Example Endpoints
 
-A representative slice. The API is 28 controllers and roughly 136 mappings —
+A representative slice. The API is 28 controllers and 129 endpoint mappings —
 see the [API Reference](docs/reference/api-reference.md) for the full surface.
 
 ```
@@ -415,6 +425,7 @@ DELETE /api/v1/tenant/users/{id}
 # Super-admin
 POST   /api/v1/admin/tenants             (create tenant)
 GET    /api/v1/admin/tenants
+POST   /api/v1/admin/tenants/{id}/invite-codes   (mint an invite code for any active tenant)
 GET    /api/v1/admin/system-stats
 GET    /api/v1/admin/login-activity
 GET    /api/v1/admin/config              (PUT /config/{key} to update)
@@ -496,7 +507,7 @@ full table.
 
 | Route                          | Page                  | Description                                                              | Roles          |
 | ------------------------------ | --------------------- | ------------------------------------------------------------------------ | -------------- |
-| `/login`                       | Login                 | Email + password form, with the TOTP challenge step when MFA is enabled  | Public         |
+| `/login`                       | Login                 | Email + password form (no TOTP step yet; MFA is API only)                | Public         |
 | `/register`                    | Register              | Email, password, invite code; creates user and logs in                   | Public         |
 | `/`                            | Dashboard             | Net worth summary, portfolio history chart, allocation breakdown         | All            |
 | `/accounts`                    | Accounts List         | Table of all accounts with type, institution, balance                    | All            |
@@ -506,7 +517,7 @@ full table.
 | `/prices`                      | Prices                | Held symbols with latest price; inline edit for manual entry             | Admin, Member  |
 | `/projections`                 | Projections           | Scenario list and creation                                               | All            |
 | `/projections/compare`         | Projection Compare    | Side-by-side scenario comparison                                         | All            |
-| `/projections/:id`             | Projection Detail     | Year-by-year results, per-pool withdrawals, RMDs, capital gains          | All            |
+| `/projections/:id`             | Projection Detail     | Year-by-year results, per-pool withdrawals, RMDs, capital gains, tax space | All          |
 | `/projections/:id/optimize`    | Spending Optimizer    | Monte Carlo guardrail optimization and near-term spending guide          | Admin, Member  |
 | `/spending-profiles`           | Spending Profiles     | Age-banded spending tiers                                                | All (write: admin, member) |
 | `/income-sources`              | Income Sources        | Social Security, pensions, rental and other income, with owner/survivor  | All (write: admin, member) |
@@ -557,14 +568,14 @@ drive a remote Docker host over SSH. It covers lifecycle (`up`, `down`,
 `restart`, `status`, `logs`, `psql`), data safety (`backup`, `backups`,
 `restore`, `verify`, `migrate-out`, `migrate-in`), and change management
 (`update` with pre-update backup and health-check auto-rollback, `rollback`,
-`rotate-secret`, `config-check`). See the
+`rotate-secret`, `config-check`), plus `prune` to reclaim disk from dangling WealthView images. See the
 [Operations Handbook](docs/deployment/operations.md).
 
 ### Database Migrations
 
 Use Flyway, applied automatically on application startup. Migration files live in
-`backend/wealthview-persistence/src/main/resources/db/migration/` — currently 89
-files: versioned `V001`..`V080` plus 9 `R__seed_*` repeatables carrying the tax,
+`backend/wealthview-persistence/src/main/resources/db/migration/` — currently 90
+files: versioned `V001`..`V081` plus 9 `R__seed_*` repeatables carrying the tax,
 LTCG, IRMAA, standard-deduction, asset-class-return, mortality, security-class,
 and price seed data. Versioned migrations are immutable once committed.
 
@@ -620,7 +631,7 @@ docker compose up -d db
 # Backend
 cd backend
 mvn clean install
-mvn -pl wealthview-app spring-boot:run
+mvn -pl wealthview-app spring-boot:run -Dspring-boot.run.profiles=dev   # dev profile is required
 
 # Frontend (separate terminal) — dev server on :5173, backend on :8080
 cd frontend

@@ -32,7 +32,7 @@ The page describes it this way: *"Spending profiles define your retirement cost 
 4. Optionally add spending tiers (below).
 5. Click **Create Profile**.
 
-Only the name is required. Each profile card in the list shows the annual total plus tiles for **Essential**, **Discretionary**, **Monthly Equivalent**, and how many **Spending Tiers** it has.
+Only the name is required (it can't be blank); amounts can't be negative. Each profile card in the list shows the annual total plus tiles for **Essential**, **Discretionary**, **Monthly Equivalent**, and how many **Spending Tiers** it has.
 
 > **All amounts are in today's dollars.** This is important and it's different from how most retirement calculators work. WealthView projects in *real* terms — you enter what your lifestyle costs today and the engine keeps that purchasing power constant. You will not see your spending line climb year after year in the results, and that is correct.
 
@@ -48,7 +48,7 @@ Click **+ Add Spending Tier**. Each tier has exactly five fields:
 |-------|-------------|---------|
 | **Phase Name** | A name for this phase. | "Go-Go Years" |
 | **Start Age** | The age when this tier begins. | 65 |
-| **End Age (blank = forever)** | The age when it ends. Leave blank for an open-ended final phase. | 74 |
+| **End Age (blank = forever)** | The age when it ends. Leave blank for an open-ended final phase. Ages must be between 0 and 120, and the end age can't be before the start age. | 74 |
 | **Essential (annual)** | Annual essential spending for this phase. | $40,000 |
 | **Discretionary (annual)** | Annual discretionary spending for this phase. | $25,000 |
 
@@ -73,7 +73,7 @@ Neither case produces an error or a warning, so it's worth reading your tier age
 
 ### Editing and Deleting
 
-Click a profile to edit it; the button becomes **Update Profile**. Deleting a profile is immediate — **there is no confirmation prompt**. If any scenario was using the profile, its reference is cleared and that scenario falls back to its withdrawal-rate strategy.
+Click a profile to edit it; the button becomes **Update Profile**. Deleting a profile asks you to confirm first: *"Scenarios using it will revert to a withdrawal-rate strategy."* If any scenario was using the profile, its reference is cleared and that scenario falls back to its withdrawal-rate strategy.
 
 ---
 
@@ -109,18 +109,18 @@ Changing the type resets the tax treatment to that type's first valid option, so
 | **Name** | A descriptive label. Required. |
 | **Income Type** | One of the six above. *"Type determines how this income is taxed in projections."* |
 | **Owner** | **Primary** or **Spouse**. *"Whose income this is, for household/survivor modeling."* |
-| **Survivor Benefit / Survivor % (%)** | See below. |
+| **Survivor Benefit (%)** | See below. For Social Security this is a read-only **Survivor Benefit** note instead. |
 | **Tax Treatment** | Pick a card. Options depend on the type — see below. |
 | **Link to Property (optional)** | Rental Property only. See below. |
 | **One-time payment** | Checkbox. See below. |
 | **Annual Amount** | The yearly income in today's dollars. Must be greater than zero. |
-| **Start Age** | When this income begins. |
-| **End Age (blank = forever)** | *"Leave blank if this income continues for life."* |
+| **Start Age** | When this income begins (0–120). |
+| **End Age (blank = forever)** | *"Leave blank if this income continues for life."* If set, it must be 120 or less and not before the start age. |
 | **Inflation Rate (%)** | *"Annual adjustment rate (e.g., 2 = 2%). SS COLA is typically ~2%."* |
 
 4. Click **Create Income Source**.
 
-Deleting an income source is immediate, with no confirmation prompt.
+Deleting an income source asks you to confirm first, then removes it from any scenarios that use it.
 
 ### Owner and Survivor Percent
 
@@ -128,7 +128,7 @@ These two fields exist for household scenarios (see [Retirement Projections](ret
 
 **Owner** is **Primary** or **Spouse** — there is no "joint" option, because income belongs to one person even when the accounts don't.
 
-**Survivor %** controls what happens to this income after its owner dies: *"Share of this income the survivor keeps after the owner's death (0–100%, default 100%)."* A single-life pension that stops at death would be 0%. A joint-and-survivor annuity at 50% would be 50%.
+**Survivor Benefit (%)** controls what happens to this income after its owner dies: *"Share of this income the survivor keeps after the owner's death (0–100%, default 100%)."* A single-life pension that stops at death would be 0%. A joint-and-survivor annuity at 50% would be 50%.
 
 **Social Security is different.** For Social Security, the field is replaced with a read-only note: *"Statutory survivor rule applies automatically (survivor keeps the larger benefit)."* You don't set a percentage because the law already determines the answer — the surviving spouse keeps whichever of the two benefits is larger, and the smaller one stops. WealthView models that rule directly.
 
@@ -368,7 +368,7 @@ The results carry this note, and it's worth reading:
 - **Spending Corridor** — *"The blue line shows recommended spending at your confidence level. The shaded band shows the adjustment range — spend near the top in good markets, cut toward the bottom in downturns. The green area represents income that offsets portfolio withdrawals."*
 - **Year-by-Year Breakdown** — Age, Phase, Recommended, Floor, Discretionary, Income, Portfolio Draw, portfolio balance at p10/p25/p50, and the spending corridor range.
 - **Near-Term Spending Guide** — the tactical view. A hero card for year one with the recommended amount broken into Essential, Discretionary, Income, and Portfolio Draw, then a short run of following years. Each year also shows what you could spend if the portfolio outperforms: a **Recommended (p25)** figure and an **Expected path (p50)** figure.
-- **Roth Conversion Strategy** — when conversions were optimized: lifetime tax with and without conversions, estimated savings, the conversion and RMD bracket settings, a Traditional/Roth balance trajectory chart, and the full year-by-year conversion schedule.
+- **Roth Conversion Strategy** — when conversions were optimized: lifetime tax with and without conversions, estimated savings, the conversion and RMD bracket settings, a Traditional/Roth balance trajectory chart, and the full year-by-year conversion schedule (Age, Year, Conversion, Est. Tax, Traditional, Roth, RMD, Other Income, Taxable Income, and the **Bracket** each year's conversion lands in, e.g. "12%").
 
 ### Living With the Plan
 
@@ -376,6 +376,6 @@ Back on **Spending Profiles**, guardrail profiles get their own section: *"Optim
 
 Each shows a **$min – $max / year** range with tiles for **Essential Floor**, **Failure Rate**, **Median Final Balance**, **Trials**, **Cash Buffer**, and **Balance Range (P10–P50)**, plus **View**, **Re-optimize**, and **Delete** actions.
 
-A **Stale** badge means the scenario changed after the optimization ran — balances moved, you added an account, you changed the retirement date. The numbers are no longer trustworthy; click **Re-optimize** to refresh them using the same confidence level and risk tolerance as before.
+A **Stale** badge means the scenario changed after the optimization ran in a way that affects the result — balances moved, you added an account, you changed the retirement date, or you changed the filing status, state, other income, withdrawal order, or a birth month. The flag is set when you save the scenario; nothing in the saved plan changes on its own. The numbers are no longer trustworthy; click **Re-optimize** to refresh them using the same settings as before — confidence level, risk tolerance, and also whether Roth conversions were optimized and the dynamic-sequencing bracket rate.
 
-Deleting a guardrail profile asks first: *"Delete this guardrail profile? The scenario will revert to its spending profile for projections."*
+Deleting a guardrail profile asks first: *"Delete this guardrail profile? The scenario will revert to its spending profile for projections."* In practice the scenario is left with **no** spending plan — running the optimizer had already detached any spending profile — so the projection falls back to the withdrawal-rate strategy until you pick a spending plan again on the scenario form.

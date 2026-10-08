@@ -28,7 +28,7 @@ secure storage. Authenticated requests then send `Authorization: Bearer <jwt>`.
 | `/api/v1/auth/mfa/challenge`      | POST   | Complete an MFA-gated login                       |
 | `/api/v1/auth/register`           | POST   | Register with an invite code (201)                |
 | `/api/v1/auth/refresh`            | POST   | Rotate tokens; reads the `refresh_token` cookie   |
-| `/api/v1/auth/logout`             | POST   | Revoke sessions and clear both cookies (204)      |
+| `/api/v1/auth/logout`             | POST   | Revoke all of the user's tokens and sessions (both transports) and clear both cookies (204) |
 | `/api/v1/auth/me`                 | GET    | Current user identity                             |
 
 **Login request:**
@@ -74,7 +74,7 @@ Password must be 8-64 characters. Returns 201.
 | `/api/v1/auth/token/mfa/challenge`      | POST   | Complete an MFA-gated login              |
 | `/api/v1/auth/token/register`           | POST   | Register with an invite code (201)       |
 | `/api/v1/auth/token/refresh`            | POST   | Rotate tokens; refresh token in body     |
-| `/api/v1/auth/token/logout`             | POST   | Revoke the bearer sessions (204)         |
+| `/api/v1/auth/token/logout`             | POST   | Revoke all of the user's tokens and sessions (204) |
 
 Request and response bodies match the cookie endpoints, except that the success response
 also carries the tokens:
@@ -135,12 +135,16 @@ Roles are stored lowercase and mapped to Spring authorities as `ROLE_<UPPERCASE>
   `/api/v1/auth/token/**` except `logout`
 - `GET /api/v1/app/version-check`
 - `GET /actuator/health`
+- `GET /actuator/prometheus` and `GET /actuator/metrics`, **only** when
+  `app.observability.anonymous-metrics=true` (default `false`; see
+  [Configuration](configuration.md#observability))
 - `GET /**` — the SPA's static assets
 
 **Everything else under `/api/v1/`** requires authentication, with these role rules:
 
 | Path pattern                                    | Required role                    |
 |-------------------------------------------------|----------------------------------|
+| `/api/v1/auth/me`, `POST /api/v1/auth/logout`, `POST /api/v1/auth/token/logout`, `/api/v1/auth/sessions/**`, `/api/v1/auth/mfa/{setup,verify-setup,disable,regenerate-recovery-codes,status}` | any authenticated role |
 | `/api/v1/admin/prices/**`                       | `admin` or `super_admin`         |
 | `/api/v1/admin/**` (all other admin paths)      | `super_admin`                    |
 | `/actuator/**` (other than `/actuator/health`)  | `super_admin`                    |
@@ -150,7 +154,10 @@ Roles are stored lowercase and mapped to Spring authorities as `ROLE_<UPPERCASE>
 | `GET` on any other `/api/v1/**`                 | any authenticated role           |
 | `POST`/`PUT`/`DELETE` on any other `/api/v1/**` | `admin`, `member`, or `super_admin` |
 
-In practice `viewer` is read-only: it can `GET` but is rejected on every write.
+In practice `viewer` is read-only: it can `GET` but is rejected (403) on every write
+outside `/api/v1/auth/**`. Because the auth rules match first, a viewer *can* log out,
+revoke its own sessions and manage its own MFA — but it cannot `PUT` its own
+notification preferences.
 
 ### CSRF
 
@@ -188,8 +195,10 @@ Every error returns the standard envelope:
 | Role mismatch, cross-tenant access                            | 403    | `FORBIDDEN`             |
 | Duplicate entity, illegal state                               | 409    | `CONFLICT`              |
 | Bean-validation failure, invalid invite code, illegal argument | 400    | `BAD_REQUEST`           |
-| Unparseable request body or query-param type mismatch         | 400    | `BAD_REQUEST`           |
+| Unparseable request body, query-param type mismatch, missing required param | 400 | `BAD_REQUEST` |
 | Bad date/time format, CSV/IO parse failure, DB constraint violation | 400 | `BAD_REQUEST`          |
+| HTTP method not supported on the path (sets `Allow`)          | 405    | `METHOD_NOT_ALLOWED`    |
+| Unsupported request `Content-Type`                            | 415    | `UNSUPPORTED_MEDIA_TYPE` |
 | Upload larger than 10MB                                       | 413    | `PAYLOAD_TOO_LARGE`     |
 | Optional integration not configured (Finnhub, Zillow)         | 503    | `SERVICE_UNAVAILABLE`   |
 | Rate limit exceeded                                           | 429    | `RATE_LIMITED`          |
@@ -249,9 +258,11 @@ and — when a price is available — `current_price`, `market_value`, `gain_los
 | `/api/v1/transactions/{id}`                  | PUT    | Update a transaction            |
 | `/api/v1/transactions/{id}`                  | DELETE | Delete a transaction (204)      |
 
-**Transaction request:** `date` and `amount` are required, `type` is a required enum
-(lowercase wire tokens), `symbol` is optional, `quantity` must be >= 0. An unknown `type`
-token fails deserialization and surfaces as 400.
+**Transaction request:** `date` and `amount` are required, `type` is a required enum —
+one of `buy`, `sell`, `dividend`, `deposit`, `withdrawal`, `opening_balance` — `symbol` is
+optional (max 32 chars), and `quantity` must be >= 0 (and > 0 when supplied on a `buy` or
+`sell`). An unknown `type` token fails deserialization and surfaces as 400. Transaction
+list defaults are `page=0`, `size=25`.
 
 ## Properties
 
@@ -295,6 +306,11 @@ configured.
 | `/api/v1/import/positions`     | POST   | Positions CSV (201). Same params; `format` defaults to `fidelityPositions` |
 | `/api/v1/import/ofx`           | POST   | OFX/QFX file (201). Params: `accountId`, `file`       |
 | `/api/v1/import/jobs`          | GET    | Import job history for the tenant                     |
+
+The CSV `format` selects a parser: omitted, blank or `generic` uses the generic parser;
+`fidelity`, `schwab` and `vanguard` select the broker-specific ones (an unknown value is a
+400). Positions resolve `format` through the same parser registry; the only positions parser shipped is `fidelityPositions` (the default). Note `accountId` is a
+form/query parameter, so it stays camelCase.
 
 All three uploads are `multipart/form-data`. Uploads are capped at 10MB, and the content
 type must be one of `text/csv`, `text/plain`, `application/octet-stream`,
@@ -352,18 +368,29 @@ Takes `{ "asset_class": "us_stock" }` (case-insensitive). Valid keys are `us_sto
 | `/api/v1/projections/{id}/run`      | GET    | Run the projection, year-by-year results      |
 | `/api/v1/projections/compare`       | POST   | Compare 2-3 scenarios side by side            |
 
-Create and update take an identical payload. Beyond the basics (`name`,
-`retirement_date`, `end_age`, `inflation_rate`, `birth_year`, `withdrawal_rate`,
-`withdrawal_strategy`, `filing_status`, `state`) it carries the tax and sequencing knobs
-(`annual_roth_conversion`, `withdrawal_order`, `roth_conversion_strategy`,
-`target_bracket_rate`, `dynamic_sequencing_bracket_rate`, `dividend_yield`,
-`interest_yield`, `fee_rate`), the household/survivor fields (`spouse_birth_year`,
+Create and update take an identical payload. Beyond the basics (`name` — the only
+required field — `retirement_date`, `end_age`, `inflation_rate` (-0.05-0.20), `birth_year`,
+`withdrawal_rate`, `withdrawal_strategy` (`fixed_percentage` / `dynamic_percentage` /
+`vanguard_dynamic_spending`), `dynamic_ceiling`, `dynamic_floor`, `filing_status`, `state`,
+`other_income`, `include_depression_years`) it carries the tax and sequencing knobs
+(`annual_roth_conversion`, `withdrawal_order` (`taxable_first` / `traditional_first` /
+`roth_first` / `pro_rata` / `dynamic_sequencing`, or a legacy comma list of
+`taxable`,`traditional`,`roth`), `roth_conversion_strategy` (`fixed_amount` /
+`fill_bracket`), `roth_conversion_start_year`, `target_bracket_rate`,
+`dynamic_sequencing_bracket_rate`, `primary_residence_property_tax`,
+`primary_residence_mortgage_interest`, `dividend_yield`, `interest_yield`, `fee_rate`), the household/survivor fields (`spouse_birth_year`,
 `primary_death_age`, `spouse_death_age`, `survivor_spending_factor`,
 `community_property`, `stochastic_mortality`, `primary_sex`, `spouse_sex`,
 `longevity_conditional_age`), the early-access and legacy fields (`birth_month` and
 `spouse_birth_month`, 1-12, optional — a month requires the matching birth year;
 `heir_tax_rate`, 0-0.50, default 0.24), plus `accounts`, `income_sources`, `spending_profile_id`,
-and `use_guardrail_profile`.
+and `use_guardrail_profile`. Each `accounts` row is `{ linked_account_id, initial_balance,
+annual_contribution, expected_return, cost_basis, allocation, account_type, owner }`; each
+`income_sources` row is `{ income_source_id, override_annual_amount }`.
+
+The scenario response carries `id`, `name`, `retirement_date`, `end_age`,
+`inflation_rate`, `params_json` (the remaining parameters as a JSON string), `accounts`,
+`spending_profile`, `guardrail_profile`, `income_sources`, `created_at`, `updated_at`.
 
 `filing_status` (`single` / `married_filing_jointly`) applies to every scenario, not only ones
 with Roth conversions. When it is absent or blank, the engines, the Monte Carlo optimizer and the
@@ -409,12 +436,15 @@ scenario.
 | `/api/v1/projections/{scenarioId}/guardrail`          | DELETE | Delete the profile (204)       |
 | `/api/v1/projections/{scenarioId}/guardrail/reoptimize` | POST | Re-run with the saved settings |
 
-The optimization request accepts `essential_floor`, `terminal_balance_target`,
-`return_mean`, `trial_count` (100-50000), `confidence_level` (0.5-0.999), `phases`,
+The optimization request accepts `name`, `essential_floor`, `terminal_balance_target`,
+`return_mean`, `trial_count` (100-50000), `confidence_level` (0.5-0.999), `phases` (each
+`{ name, start_age, end_age, priority_weight, target_spending }`),
 `portfolio_floor`, `max_annual_adjustment_rate`, `phase_blend_years`, `risk_tolerance`,
 `cash_reserve_years`, `cash_return_rate`, `optimize_conversions`,
 `conversion_bracket_rate`, `rmd_target_bracket_rate`, `traditional_exhaustion_buffer`,
 `rmd_bracket_headroom`, `dynamic_sequencing_bracket_rate`, and `gate_on_adaptive_rules`.
+`risk_tolerance` is `conservative`, `moderate` or `aggressive`; the scenario id comes from
+the path.
 Every field is optional; the service resolves defaults for anything omitted. When `cash_return_rate` is omitted it
 defaults to 1.5% real.
 `optimize_conversions` and `dynamic_sequencing_bracket_rate` are stored on the profile
@@ -514,7 +544,8 @@ All five set `Content-Disposition: attachment`; the CSV endpoints return `text/c
 GET returns one row per known notification type — `LARGE_TRANSACTION`, `IMPORT_COMPLETE`,
 `IMPORT_FAILED` — defaulting to `enabled: true` where the user has saved no preference.
 
-PUT body:
+PUT returns 200 with an empty body. Like any other `PUT` under `/api/v1/`, it requires
+`admin`, `member` or `super_admin` — a `viewer` gets 403. PUT body:
 ```json
 { "preferences": [ { "notification_type": "IMPORT_FAILED", "enabled": false } ] }
 ```
@@ -527,8 +558,10 @@ Both fields on each item are required; a null `enabled` is a 400.
 | `/api/v1/app/version-check`    | GET    | Anonymous. Required params: `platform`, `version`     |
 
 Returns `platform`, `current_version`, `minimum_supported_version`, `latest_version`,
-`update_required`, `update_recommended`, `store_url`, `message`. A missing `platform` or
-`version` is a 400. The matching admin endpoints are under
+`update_required`, `update_recommended`, `store_url`, `message`. `platform` is `android` or
+`ios` (case-insensitive) and `version` must be `major.minor.patch` with an optional
+`-prerelease` suffix; a missing or malformed value, or an unknown platform, is a 400. See
+[Mobile API](../MOBILE_API.md#version-check) for the comparison rules. The matching admin endpoints are under
 [Super-Admin](#super-admin).
 
 ## Tenant Management
@@ -547,7 +580,10 @@ Admin or super-admin, scoped to the caller's own tenant.
 
 The invite-code POST body is optional; supply `{ "expiry_days": 14 }` to override the
 7-day default. `PUT .../role` takes `{ "role": "admin" }` where role is one of `admin`,
-`member`, `viewer`.
+`member`, `viewer`, and returns the updated user.
+
+Invite codes carry `id`, `code`, `expires_at`, `consumed`, `is_revoked`, `used_by_email`,
+`created_by_email`, `created_at`. Users carry `id`, `email`, `role`, `created_at`.
 
 ## Super-Admin
 
@@ -565,7 +601,8 @@ which also accepts `admin`.
 | `/api/v1/admin/tenants/{id}/active`   | PUT    | Enable or disable a tenant (204)   |
 | `/api/v1/admin/tenants/{id}/invite-codes` | POST | Create an invite code for that tenant (201) |
 
-Create takes `{ "name": "..." }`; the active toggle takes `{ "active": true }`. The invite-code
+Create takes `{ "name": "..." }` and returns `id`, `name`, `created_at`; the detail rows add
+`is_active`, `user_count`, `account_count`. The active toggle takes `{ "active": true }`. The invite-code
 POST body is optional (`{ "expiry_days": 14 }`, default 7) and the response is the same invite-code
 object as `POST /api/v1/tenant/invite-codes`; an unknown tenant is 404 and a disabled tenant is 409.
 The first user to register into a tenant that has no users gets the `admin` role; later registrations
@@ -579,7 +616,9 @@ are `member`.
 | `/api/v1/admin/users/{userId}/password`     | PUT    | Reset a password (204)               |
 | `/api/v1/admin/users/{userId}/active`       | PUT    | Enable or disable a user (204)       |
 
-Password reset takes `{ "new_password": "..." }` — 12 to 64 characters.
+Password reset takes `{ "new_password": "..." }` — 12 to 64 characters. The active toggle
+takes `{ "active": true }`. User rows carry `id`, `email`, `role`, `tenant_id`,
+`tenant_name`, `is_active`, `created_at`.
 
 ### System
 
@@ -590,7 +629,10 @@ Password reset takes `{ "new_password": "..." }` — 12 to 64 characters.
 | `/api/v1/admin/config`            | GET    | All system config key/value pairs             |
 | `/api/v1/admin/config/{key}`      | PUT    | Set one config value (204)                    |
 
-`PUT config/{key}` takes `{ "value": "..." }`.
+`PUT config/{key}` takes `{ "value": "..." }` and upserts the key. `GET config` returns
+`key`, `value`, `updated_at` rows, with `finnhub.api-key` and `jwt.secret` masked. See
+[Configuration](configuration.md#runtime-settings-system_config-table) for what the seeded
+keys do (and don't) control.
 
 ### Prices (admin or super-admin)
 
@@ -607,7 +649,10 @@ Password reset takes `{ "new_password": "..." }` — 12 to 64 characters.
 
 `yahoo/fetch` takes `{ "symbols": [...], "from_date": "...", "to_date": "..." }`;
 `yahoo/save` takes `{ "prices": [ { "symbol": ..., "date": ..., "close_price": ... } ] }`.
-`prices/sync` returns 503 when no Finnhub API key is configured.
+`prices/sync` returns 503 when no Finnhub API key is configured. `yahoo/sync` returns
+`inserted`, `updated`, `failures` (`{symbol, reason}`); `csv` takes a multipart `file` and
+returns `imported` and `errors`; `status` rows are `symbol`, `latest_date`, `source`,
+`stale`.
 
 ### Mobile versions
 
@@ -617,7 +662,8 @@ Password reset takes `{ "new_password": "..." }` — 12 to 64 characters.
 | `/api/v1/admin/mobile-versions/{platform}`     | PUT    | Update one platform's version policy |
 
 PUT requires `minimum_supported_version`, `latest_version`, and `store_url`; `message` is
-optional.
+optional. `{platform}` is `android` or `ios`; both endpoints return the same shape as
+`version-check`.
 
 ---
 

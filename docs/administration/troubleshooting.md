@@ -35,10 +35,11 @@ stack (`docker-compose.prod.yml`) adds `backup`. There is no `nginx` or `certbot
 container — if you terminate TLS with nginx it runs on the host (see
 [TLS & Nginx](../deployment/tls-and-nginx.md)).
 
-**Ports:** the app is published on `${APP_PORT:-80}` → 8080 in the container. The dev
-compose file also publishes PostgreSQL on host port **5433** (→ 5432 in the container) so
-local backends and IDE run configs can connect; the production compose file publishes no
-database port at all.
+**Ports:** the production compose file publishes the app on `${APP_PORT:-80}` → 8080 in the
+container. The dev compose file hard-codes `80:8080` and ignores `APP_PORT`. It also
+publishes PostgreSQL on host port **5433** (→ 5432 in the container) so local backends and
+IDE run configs can connect. The production compose file publishes no database port at
+all.
 
 ---
 
@@ -136,9 +137,12 @@ ss -tlnp | grep :80
 ss -tlnp | grep :5433
 ```
 
-Stop the conflicting service, or set `APP_PORT` in the env file to a free port (the prod
-compose file publishes `${APP_PORT:-80}:8080`). If you change it, update `WV_APP_PORT` (or
-`WV_HEALTH_URL`) in `wv.conf` so health checks still point at the right place.
+Stop the conflicting service, or set `APP_PORT` in the env file to a free port. Only the
+prod compose file honours it; on the dev stack, edit the `80:8080` mapping in
+`docker-compose.yml`, or put the change in a `docker-compose.override.yml`, which `./wv`
+picks up automatically. `./wv` reads `APP_PORT` from the env file for its health checks,
+so nothing else needs changing. `WV_APP_PORT` is only a fallback for when `APP_PORT` is
+absent, and `WV_HEALTH_URL` overrides both.
 
 ### Out of Memory
 
@@ -206,13 +210,30 @@ It reports missing and placeholder (`CHANGE_ME`) values for all four required va
 
 Passwords are case-sensitive. Check for trailing whitespace in the env file.
 
+### Login Error Messages
+
+Every login failure is a `401` with `"error": "UNAUTHORIZED"`. The `message` field tells
+you which case you hit:
+
+| `message` | Meaning |
+|---|---|
+| `Invalid email or password` | Unknown email or wrong password. The two are deliberately indistinguishable |
+| `Account temporarily locked due to too many failed attempts` | Lockout (below). Checked *before* the password, so even the right password fails |
+| `Account is disabled` | `users.is_active = false`. Shown only after a correct password |
+| `Account disabled — contact your administrator` | The user's **tenant** is disabled. Shown only after a correct password |
+
+Every attempt, including failures, is recorded in `login_activity`
+(`GET /api/v1/admin/login-activity`). The app log gets a matching WARN such as
+`Login failed: wrong password for user <id>`.
+
 ### Account Temporarily Locked
 
-**Symptom:** correct credentials still return 401, right after several failed attempts.
+**Symptom:** login returns `401` with
+`Account temporarily locked due to too many failed attempts`.
 
 **Cause:** `LoginAttemptService` blocks an email address after **5 failed attempts within
-15 minutes**. Every failure mode returns the same generic error, so the response does not
-say "locked".
+15 minutes**. The window starts at the first failure. A successful login (before the
+limit is reached) clears the counter.
 
 **Fix:** wait for the 15-minute window to roll off, or restart the app (the counter is
 in-memory):
@@ -223,7 +244,10 @@ in-memory):
 
 ### User or Tenant Deactivated
 
-**Symptom:** one user — or every user in a tenant — gets 401 with correct credentials.
+**Symptom:** one user — or every user in a tenant — gets 401 with correct credentials
+(`Account is disabled` or `Account disabled — contact your administrator`). Users who
+were already logged in are kicked out on their next request, and the app logs
+`Session rejected: user <id> is disabled` or `Session rejected: tenant <id> is disabled`.
 
 **Cause:** `users.is_active` or `tenants.is_active` is `false`.
 
@@ -253,7 +277,12 @@ a super-admin can clear MFA for that account directly:
 # then:
 # UPDATE users SET mfa_enabled = false, mfa_secret_encrypted = NULL, mfa_setup_at = NULL
 #  WHERE email = 'user@example.com';
+# DELETE FROM mfa_recovery_codes
+#  WHERE user_id = (SELECT id FROM users WHERE email = 'user@example.com');
 ```
+
+This is what the app's own MFA disable does: it clears the three columns and deletes the
+recovery codes.
 
 Have the user re-enrol afterwards from their account settings.
 
@@ -269,6 +298,11 @@ Have the user re-enrol afterwards from their account settings.
   this deliberately to invalidate existing sessions.
 - The session was revoked from `/api/v1/auth/sessions`.
 
+The app log names the reason for each rejected request:
+`Session rejected: stale generation for user ...`,
+`Session rejected: sid ... not found for user ...`, or
+`Session rejected: user ... is disabled`.
+
 **Fix:** this is expected behaviour. Users log in again; old tokens cannot be refreshed or
 repaired.
 
@@ -277,8 +311,20 @@ repaired.
 **Symptom:** repeated login attempts or a busy client start returning HTTP 429.
 
 **Cause:** `RateLimitFilter` allows **60 auth requests per minute per IP** and **300 API
-requests per minute per authenticated user**, in 60-second windows. Super-admin requests
-are exempt.
+requests per minute per authenticated user**, in 60-second windows. Only `/api/**` paths
+count, and super-admin requests are exempt. The response body is
+`{"error":"RATE_LIMITED","message":"Too many requests","status":429}`, and each rejection
+increments `wealthview.ratelimit.exceeded{type="ip"|"user"}`.
+
+The per-IP limit uses `ClientIpResolver`. It trusts `X-Forwarded-For` only when the direct
+peer is listed in `app.rate-limit.trusted-proxies` (empty by default). Behind host nginx or cloudflared with that list empty, every request
+seems to come from the proxy's address (often the Docker gateway). All users then share
+one 60-per-minute auth budget, and `login_activity` records the proxy IP for everyone. Add
+the proxy's address, as the app sees it, to that property. The compose files pass only a
+fixed list of variables to the container, so putting it in `.env` is not enough. Set
+`APP_RATE_LIMIT_TRUSTED_PROXIES` under `services.app.environment` in a compose override
+file: `docker-compose.prod.override.yml` in a source checkout (`./wv` loads it
+automatically), or whatever `WV_COMPOSE_OVERRIDE_FILE` names in `wv.conf`.
 
 **Fix:** back off for a minute. The filter can be disabled with
 `app.rate-limit.enabled=false` for diagnostics, but leave it on in production.
@@ -298,6 +344,38 @@ frontend but work with `curl`.
   entry must be `https://`. Update it and `./wv restart`.
 - `dev` profile (running the backend outside Docker) allows `http://localhost:5173`.
 
+### Registration Fails
+
+| Response | Cause |
+|---|---|
+| `400` `Invalid or expired invite code` | The code doesn't exist, or it is consumed, revoked, or expired. All four look the same |
+| `409` `Email already registered` | The email exists (checked only after the code is valid) |
+| `400` `This password is too common and easily guessed. ...` | The password is on the common-password list |
+| `400` `password: Password must be between 8 and 64 characters` | Length check |
+
+The admin can see whether a code is still usable under `/admin` → **Invite Codes**, and
+should generate a new one if not.
+
+---
+
+## Admin Action Errors
+
+| Action | Response | Meaning / fix |
+|---|---|---|
+| Change a role | `409 Cannot modify super admin role` | The super-admin's role is fixed |
+| Change a role | `400 Invalid role: X` | Use `admin`, `member`, or `viewer` |
+| Reset a password | `400 Password is too common — choose a stronger one` | Pick another. 12–64 characters are required |
+| Delete a user | `400 Request violates a database constraint: ...` | The user is still referenced by `audit_log` or `invite_codes`. Deactivate instead (see [Tenant & User Management](tenant-and-user-management.md#managing-users)) |
+| Create an invite code for a tenant | `409 Tenant is inactive; reactivate it before creating invite codes` | Enable the tenant first |
+| "Sync now" (prices) | `503 Finnhub API key is not configured. Set app.finnhub.api-key in your environment.` | Set `FINNHUB_API_KEY` and recreate the app |
+| "Sync now" (stock splits) | `503 Stock split sync is not configured. Set app.finnhub.api-key in your environment.` | Same |
+| Delete an exchange rate | `409 Cannot delete EUR rate: N account(s) use this currency` | Move or delete those accounts first |
+| Update mobile version | `400 Unknown platform: X (supported: android, ios)` / `400 Invalid latest_version: ...` | Platform must be `android`/`ios`; versions must be semver |
+| Edit System Config, nothing changes | (no error) | Most seeded keys are not read by the app. See [System Config](tenant-and-user-management.md#system-config) |
+
+Any unexpected exception becomes `500` with `An unexpected error occurred`. The app log has
+the stack trace under `ERROR ... - Unhandled exception`.
+
 ---
 
 ## Import Failures
@@ -307,8 +385,11 @@ frontend but work with `curl`.
 **Symptom:** import completes but rows fail validation or produce incorrect data.
 
 **Fix:** the format must match the brokerage that produced the file. The available parsers
-are Fidelity, Fidelity positions, Vanguard, and Schwab for CSV, plus OFX/QFX:
+are generic (the default when no format is given), Fidelity, Fidelity positions, Vanguard,
+and Schwab for CSV, plus OFX/QFX. An unrecognised `format` value is rejected with
+`400 Unknown CSV format: <format>`.
 
+- Generic WealthView CSV: leave the format unset (or `generic`)
 - Fidelity transaction CSV: select "Fidelity"
 - Fidelity positions CSV: use the positions import
 - Vanguard CSV: select "Vanguard"
@@ -326,6 +407,13 @@ Each parser expects specific column headers and data formats.
 ```bash
 iconv -f ISO-8859-1 -t UTF-8 original.csv > converted.csv
 ```
+
+### File Too Large
+
+**Symptom:** `413` with `File size exceeds the 10MB limit`.
+
+**Fix:** uploads are capped at 10 MB (`spring.servlet.multipart.max-file-size`). Split the
+file.
 
 ### Missing Required Columns
 
@@ -391,6 +479,21 @@ and can hit provider-side limits.
 2. Upgrade to a paid Finnhub plan
 3. Wait — failed symbols are retried on the next run, and you can trigger one immediately
    from `/admin` → **Prices**
+
+### Per-Symbol Failures
+
+Each failed symbol logs one WARN and the sync carries on. Messages to grep for:
+
+- `No quote returned for symbol X: ...`. Finnhub answered but had no usable quote, which
+  is common for mutual funds and non-US tickers. Use the **Yahoo Finance** tab or a CSV
+  upload for those symbols.
+- `HTTP 429 fetching quote for symbol X`. The provider's rate limit (above).
+- `HTTP 401 fetching quote for symbol X` (or 403). The key is invalid or revoked.
+- `Failed to fetch quote for symbol X`. Network error.
+
+The run ends with `Daily price sync complete: N succeeded, M failed, ...ms`. The admin
+**Prices → Finnhub Sync** status table marks any symbol whose latest price is more than 2
+weekdays old as stale.
 
 ### Weekends and Holidays
 
@@ -736,6 +839,15 @@ the app was running an untagged or digest-only image. Set `WEALTHVIEW_VERSION` (
 The scheduled job runs daily at 3:00 AM UTC and only exists on the production stack. In dev
 there is no `backup` container — take dumps with `./wv backup`.
 
+### Scheduled Backup Failed
+
+If the backup container's log shows `pg_dump: error: ...` with no
+`Backup complete` line after it, the nightly dump failed. The script runs under `set -e`,
+so it never prints its own `ERROR: pg_dump failed`. It may leave a partial or zero-byte
+`wealthview_auto_*.dump` behind. Look for an unusually small newest file in
+`./wv backups`, and delete it after you fix the cause (usually credentials or disk
+space). Details are in [Backups](backups.md#troubleshooting).
+
 ### Restore Procedure
 
 ```bash
@@ -749,6 +861,24 @@ there is no `backup` container — take dumps with `./wv backup`.
 ending in `.age` are decrypted on the fly using `BACKUP_ENCRYPTION_KEY_FILE`.
 
 Deeper backup diagnostics live in [Backups](backups.md#troubleshooting).
+
+---
+
+## Metrics and Alerts
+
+### Prometheus Target Shows 401/403
+
+The scrape is reaching an authenticated `/actuator/prometheus`. The app accepts only a JWT,
+and Prometheus has none. Either run with `docker-compose.observability.yml` (which sets
+`APP_OBSERVABILITY_ANONYMOUS_METRICS=true`; read the exposure warning in
+[OBSERVABILITY.md](../OBSERVABILITY.md) first), or inject a super-admin bearer token in
+front of the scrape.
+
+### Scheduled-Job Alerts Never Fire / Queries Return Nothing
+
+The app's `job` tag on `wealthview_scheduled_*` is renamed `exported_job` by Prometheus.
+Query `{exported_job="priceSync"}`. See
+[OBSERVABILITY.md](../OBSERVABILITY.md#alerting-rules).
 
 ---
 
