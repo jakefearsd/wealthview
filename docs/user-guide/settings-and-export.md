@@ -232,7 +232,7 @@ Columns: **Time**, **Action**, **Entity Type**, and **Details**. Fifty entries p
 
 Two security features exist in the WealthView backend but have **no screens in the web app** yet. They are available through the API only:
 
-- **Multi-factor authentication (TOTP)** — setup, verification, recovery codes, status, and disable all exist as API endpoints under `/api/v1/auth/mfa`, and the login flow supports an MFA challenge. There is no setup wizard or QR code screen in the web UI.
+- **Multi-factor authentication (TOTP)** — setup, verification, recovery codes, status, and disable all exist as API endpoints under `/api/v1/auth/mfa`, and the web login page asks for your authentication code (or a recovery code) when MFA is on. There is no setup wizard or QR code screen in the web UI.
 - **Session management** — you can list your active sessions, revoke one, or revoke all sessions except your current one via `/api/v1/auth/sessions`. There is no session list screen in the web UI.
 
 Similarly, **notification preferences** (for large transactions, completed imports, and failed imports) exist as an API under `/api/v1/notifications/preferences` but have no settings screen. Preferences default to enabled. Note that WealthView does not currently send any of these notifications — the preferences are only stored.

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router';
-import { login } from '../api/auth';
+import { completeMfaChallenge, login } from '../api/auth';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/Button';
 
@@ -10,31 +10,98 @@ export default function LoginPage() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [mfaToken, setMfaToken] = useState<string | null>(null);
+    const [mfaCode, setMfaCode] = useState('');
     const navigate = useNavigate();
     const { loginSuccess } = useAuth();
+
+    function errorMessage(err: unknown, fallback: string) {
+        return (err as { response?: { data?: { message?: string } } })
+            ?.response?.data?.message || fallback;
+    }
 
     async function handleSubmit(e: FormEvent) {
         e.preventDefault();
         setError('');
         setLoading(true);
         try {
-            const response = await login({ email, password });
-            loginSuccess(response);
+            const result = await login({ email, password });
+            if (result.type === 'mfa_required') {
+                setMfaToken(result.mfa_token);
+                setMfaCode('');
+                return;
+            }
+            loginSuccess(result.auth);
             navigate('/');
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })
-                ?.response?.data?.message || 'Login failed';
-            setError(msg);
+            setError(errorMessage(err, 'Login failed'));
         } finally {
             setLoading(false);
         }
     }
 
+    async function handleMfaSubmit(e: FormEvent) {
+        e.preventDefault();
+        if (!mfaToken) {
+            return;
+        }
+        setError('');
+        setLoading(true);
+        try {
+            const auth = await completeMfaChallenge(mfaToken, mfaCode);
+            loginSuccess(auth);
+            navigate('/');
+        } catch (err: unknown) {
+            setError(errorMessage(err, 'Verification failed'));
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    function backToSignIn() {
+        setMfaToken(null);
+        setMfaCode('');
+        setPassword('');
+        setError('');
+    }
+
+    const formStyle = { background: '#fff', padding: '2rem', borderRadius: '8px', width: '380px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' };
+    const errorBox = error && <div role="alert" style={{ color: '#d32f2f', marginBottom: '1rem', padding: '0.5rem', background: '#fde', borderRadius: '4px' }}>{error}</div>;
+
+    if (mfaToken) {
+        return (
+            <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f5f5f5' }}>
+                <form data-testid="mfa-form" onSubmit={handleMfaSubmit} style={formStyle}>
+                    <h1 style={{ fontSize: '1.5em', marginTop: '0.83em', marginBottom: '1.5rem' }}>Two-step verification</h1>
+                    {errorBox}
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <label htmlFor="mfa-code" style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>Authentication code</label>
+                        <input id="mfa-code" type="text" inputMode="text" autoComplete="one-time-code" autoFocus
+                            value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} required
+                            style={{ width: '100%', padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
+                        <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+                            Enter the 6-digit code from your authenticator app, or one of your 8-character recovery codes.
+                        </p>
+                    </div>
+                    <Button type="submit" disabled={loading} style={{ width: '100%', padding: '0.75rem' }}>
+                        {loading ? 'Verifying...' : 'Verify'}
+                    </Button>
+                    <p style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.9rem' }}>
+                        <button type="button" onClick={backToSignIn}
+                            style={{ background: 'none', border: 'none', color: '#1976d2', cursor: 'pointer', textDecoration: 'underline', fontSize: 'inherit' }}>
+                            Back to sign in
+                        </button>
+                    </p>
+                </form>
+            </main>
+        );
+    }
+
     return (
         <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f5f5f5' }}>
-            <form data-testid="login-form" onSubmit={handleSubmit} style={{ background: '#fff', padding: '2rem', borderRadius: '8px', width: '380px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+            <form data-testid="login-form" onSubmit={handleSubmit} style={formStyle}>
                 <h1 style={{ fontSize: '1.5em', marginTop: '0.83em', marginBottom: '1.5rem' }}>Login to WealthView</h1>
-                {error && <div role="alert" style={{ color: '#d32f2f', marginBottom: '1rem', padding: '0.5rem', background: '#fde', borderRadius: '4px' }}>{error}</div>}
+                {errorBox}
                 <div style={{ marginBottom: '1rem' }}>
                     <label htmlFor="email" style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>Email</label>
                     <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required

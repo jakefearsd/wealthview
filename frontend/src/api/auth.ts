@@ -1,6 +1,6 @@
 import axios from 'axios';
 import client from './client';
-import type { AuthResponse, CurrentUserResponse, LoginRequest, RegisterRequest } from '../types/auth';
+import type { AuthResponse, CurrentUserResponse, LoginRequest, LoginResult, RegisterRequest } from '../types/auth';
 
 const authClient = axios.create({
     baseURL: '/api/v1/auth',
@@ -8,8 +8,35 @@ const authClient = axios.create({
     withCredentials: true,
 });
 
-export async function login(request: LoginRequest): Promise<AuthResponse> {
-    const { data } = await authClient.post<AuthResponse>('/login', request);
+const TOTP_CODE = /^\d{6}$/;
+
+interface MfaRequiredBody {
+    mfa_required: true;
+    mfa_token: string;
+}
+
+function isMfaRequired(body: AuthResponse | MfaRequiredBody): body is MfaRequiredBody {
+    return 'mfa_required' in body && body.mfa_required === true;
+}
+
+export async function login(request: LoginRequest): Promise<LoginResult> {
+    const { data } = await authClient.post<AuthResponse | MfaRequiredBody>('/login', request);
+    if (isMfaRequired(data)) {
+        return { type: 'mfa_required', mfa_token: data.mfa_token };
+    }
+    return { type: 'authenticated', auth: data };
+}
+
+/**
+ * Finishes an MFA login. A six-digit code is sent as a TOTP code; anything
+ * else is treated as a one-time recovery code (8 upper-case characters).
+ */
+export async function completeMfaChallenge(mfaToken: string, code: string): Promise<AuthResponse> {
+    const normalized = code.replace(/[\s-]/g, '');
+    const body = TOTP_CODE.test(normalized)
+        ? { mfa_token: mfaToken, totp_code: normalized }
+        : { mfa_token: mfaToken, recovery_code: normalized.toUpperCase() };
+    const { data } = await authClient.post<AuthResponse>('/mfa/challenge', body);
     return data;
 }
 

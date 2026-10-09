@@ -265,11 +265,12 @@ both with body `{ "active": true }`.
 
 ### MFA Blocking Login
 
-**Symptom:** login returns `{"mfa_required": true, "mfa_token": "..."}` instead of a
-session, and the user no longer has their authenticator app.
+**Symptom:** after the password, the web login page asks for an authentication code
+(the API returns `{"mfa_required": true, "mfa_token": "..."}`), and the user no longer has
+their authenticator app.
 
-**Fix:** the user completes login by posting the TOTP code (or one of their recovery codes)
-to `POST /api/v1/auth/mfa/challenge`. If both the device and the recovery codes are lost,
+**Fix:** the user enters one of their 8-character recovery codes in the code field instead
+(API clients post it to `POST /api/v1/auth/mfa/challenge`). If both the device and the recovery codes are lost,
 a super-admin can clear MFA for that account directly:
 
 ```bash

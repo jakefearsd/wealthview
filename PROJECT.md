@@ -361,7 +361,7 @@ The UI presents a single unified "Spending Plan" dropdown.
 ### Phase 8 — Platform & Operations Maturity
 
 - [x] **Automatic stock split handling** — Daily Finnhub split sync plus a one-time backfill keep transactions, holdings, and historical prices split-adjusted; every adjustment is recorded so a split can be un-applied. Manual entry under `/api/v1/admin/stock-splits`.
-- [x] **Account security** — TOTP MFA with encrypted secrets and single-use recovery codes, refresh tokens, active-session listing and revocation, and login activity history. MFA enrollment, the TOTP login step, and session management are exposed by the API only; the web and mobile clients have no screens for them yet (see Roadmap).
+- [x] **Account security** — TOTP MFA with encrypted secrets and single-use recovery codes, refresh tokens, active-session listing and revocation, and login activity history. The web login form asks for a TOTP or recovery code when MFA is on. MFA enrollment and session management are exposed by the API only; the web and mobile clients have no screens for them yet (see Roadmap).
 - [x] **Consolidated admin area** — A single `/admin` page absorbing tenant settings, prices, audit log, and system stats; `/settings`, `/audit-log`, and `/admin/prices` redirect there.
 - [x] **Mobile companion app** — React Native client (login, portfolio, account detail, settings, server config) against a token-auth endpoint family, with a version-check / force-upgrade gate. Shares API and formatting code via the `shared/` workspace.
 - [x] **`wv` operations tool** — A single admin command surface (`up`, `down`, `restart`, `status`, `logs`, `psql`, `backup`, `backups`, `restore`, `verify`, `update`, `rollback`, `migrate-out`, `migrate-in`, `rotate-secret`, `config-check`, `prune`, `help`) installable system-wide and able to drive a remote Docker host over SSH.
@@ -381,7 +381,7 @@ The UI presents a single unified "Spending Plan" dropdown.
 - [ ] **Notification delivery** — A real channel (email/SMTP or webhook) behind the existing preference model, for sync failures, large transactions, and projection milestones.
 - [x] **Extended tail-risk return window** — The bootstrap defaults to the 1972–2025 window (stagflation included); a scenario can opt into the full 1928–2025 window (`include_depression_years`) to add the Depression-era tail.
 - [ ] **Stochastic inflation** — Inflation is currently a fixed per-scenario rate; modeling it as a correlated stochastic process was scoped during the realism work but never selected.
-- [ ] **MFA and session screens in the clients** — Web enrollment/disable, a TOTP step on the web login form, recovery-code display, and session listing/revocation; the mobile app currently refuses MFA-enabled accounts.
+- [ ] **MFA and session screens in the clients** — Web enrollment/disable, recovery-code display, and session listing/revocation; the mobile app currently refuses MFA-enabled accounts.
 - [ ] **Remaining tactical-planning work (Phase 9)** — Birth months are stored for Medicare and per-person early-withdrawal timing but only the primary's 59½ year uses them so far.
 - [ ] **Automated bank/brokerage sync** — Still deliberately out of scope; import stays file-based (see Decision Log #4).
 
@@ -507,7 +507,7 @@ full table.
 
 | Route                          | Page                  | Description                                                              | Roles          |
 | ------------------------------ | --------------------- | ------------------------------------------------------------------------ | -------------- |
-| `/login`                       | Login                 | Email + password form (no TOTP step yet; MFA is API only)                | Public         |
+| `/login`                       | Login                 | Email + password, then a TOTP/recovery-code step when MFA is on         | Public         |
 | `/register`                    | Register              | Email, password, invite code; creates user and logs in                   | Public         |
 | `/`                            | Dashboard             | Net worth summary, portfolio history chart, allocation breakdown         | All            |
 | `/accounts`                    | Accounts List         | Table of all accounts with type, institution, balance                    | All            |

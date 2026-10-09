@@ -13,7 +13,7 @@ A self-hosted, multi-tenant personal finance application for tracking investment
 - **Live Price Feeds** -- Finnhub API integration with historical backfill, scheduled daily sync, and on-demand admin sync
 - **Dashboard** -- Net worth summary combining investments, cash, and property equity with asset allocation breakdown
 - **Multi-Tenant** -- JWT-based auth with tenant isolation, invite code registration, and role-based access (admin/member/viewer)
-- **Account Security** -- TOTP multi-factor auth with recovery codes, refresh tokens, active-session management, and login activity history. MFA enrollment and session management are API only (`/api/v1/auth/mfa/*`, `/api/v1/auth/sessions`); neither the web nor the mobile client has a screen for them yet, and the web login form has no TOTP step
+- **Account Security** -- TOTP multi-factor auth with recovery codes, refresh tokens, active-session management, and login activity history. MFA enrollment and session management are API only (`/api/v1/auth/mfa/*`, `/api/v1/auth/sessions`); neither the web nor the mobile client has a screen for them yet; the web login form does ask for the TOTP or recovery code when an account has MFA on
 - **Administrative Tooling** -- A consolidated `/admin` area (settings, prices, audit log, system stats), super-admin tenant management, data export (JSON + per-entity CSV with formula-injection neutralization), and notification-preference storage (API only — no web UI yet)
 - **Mobile Companion App** -- A React Native client (`mobile/`) sharing API and formatting code with the web SPA through the `shared/` workspace
 - **Self-Hosted** -- Single Docker Compose command to deploy; no third-party SaaS dependencies

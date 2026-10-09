@@ -8,7 +8,7 @@ WealthView's frontend is a React 19 SPA built with TypeScript and Vite. The rout
 
 | Route                    | Page Component          | Access    | Description                                                    |
 |--------------------------|-------------------------|-----------|----------------------------------------------------------------|
-| `/login`                 | `LoginPage`             | Public    | Email/password authentication                                  |
+| `/login`                 | `LoginPage`             | Public    | Email/password, then a TOTP/recovery-code step when MFA is on |
 | `/register`              | `RegisterPage`          | Public    | New user registration with invite code                         |
 | `/`                      | `DashboardPage`         | Protected | Net worth summary cards, allocation pie chart, account balances, combined portfolio history, snapshot projection, recent stock splits |
 | `/accounts`              | `AccountsListPage`      | Protected | All investment accounts with balances                          |
@@ -45,7 +45,7 @@ Three former top-level routes now `<Navigate replace>` into the consolidated adm
 - **Providers.** `<AuthProvider>` wraps `<ProjectionCacheProvider>`, which wraps `<BrowserRouter>`. A `react-hot-toast` `<Toaster position="top-right" />` sits inside the router.
 - **Contexts and hooks.** Contexts: `AuthContext`, `ProjectionCacheContext`. Shared data hooks: `useApiQuery`, `useApiMutation`, `useCrudForm`.
 - **Loading placeholders.** The route-level `<Suspense>` fallback is `<LoadingState message="Loading…" />`; `ProtectedRoute`'s own auth-check placeholder is a plain "Loading..." div.
-- **No account-security screens.** The SPA has no route or section for MFA enrollment, the MFA login challenge, per-device session management, or notification preferences. Those endpoints (`/api/v1/auth/mfa/*`, `/api/v1/auth/sessions`, `/api/v1/notifications/preferences`) exist in the API but are not wired into any web page; `frontend/src/api/notifications.ts` is defined but unused.
+- **No account-security screens.** The SPA has no route or section for MFA enrollment, per-device session management, or notification preferences. Those endpoints (`/api/v1/auth/mfa/*`, `/api/v1/auth/sessions`, `/api/v1/notifications/preferences`) exist in the API but are not wired into any web page; `frontend/src/api/notifications.ts` is defined but unused.
 - **API access.** `frontend/src/api/*` modules call the backend at the relative base path `/api/v1` through a shared axios client; auth travels in HttpOnly cookies with double-submit CSRF.
 
 ## Navigation

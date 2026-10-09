@@ -48,6 +48,11 @@ tax-accuracy fixes in both projection engines. One schema change (V081).
   (for example "12%") instead of blank.
 
 ### Fixed
+- **Web sign-in works for accounts with MFA turned on.** The login page used to
+  treat the server's "MFA required" reply as a successful sign-in and land on a
+  broken session. It now shows a second step that takes the 6-digit
+  authenticator code or an 8-character recovery code and finishes the login
+  through `POST /api/v1/auth/mfa/challenge`.
 - A super admin can now actually get a user into a tenant they create:
   `POST /api/v1/admin/tenants/{id}/invite-codes` (and a **Create invite code**
   action on each tenant in the admin Tenants section) mints a code for any
