@@ -21,6 +21,15 @@ export interface AuthResponse {
     role: string;
 }
 
+/**
+ * Outcome of a password login: either the session cookies were issued, or the
+ * account has MFA enabled and the caller must finish with a code against
+ * {@code mfa_token}.
+ */
+export type LoginResult =
+    | { type: 'authenticated'; auth: AuthResponse }
+    | { type: 'mfa_required'; mfa_token: string };
+
 export interface CurrentUserResponse {
     user_id: string;
     tenant_id: string;

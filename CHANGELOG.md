@@ -14,6 +14,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 - Engine robustness, with no change to projected numbers, except Monte Carlo bond tent results for scenarios whose pre-retirement withdrawals drain an account: a near-empty Monte Carlo tent is treated as empty, and negative pre-retirement contributions no longer distort the tent build-up return. Bad tent sizing inputs and replay data with no overlapping years now give clearer errors.
 
 ### Fixed
+- **Web sign-in works for accounts with MFA turned on.** The login page used to
+  treat the server's "MFA required" reply as a successful sign-in and land on a
+  broken session. It now shows a second step that takes the 6-digit
+  authenticator code or an 8-character recovery code and finishes the login
+  through `POST /api/v1/auth/mfa/challenge`.
 - A scenario whose stored parameters are malformed now opens, with the bond tent off, in both the edit form and the scenario detail page instead of failing the page.
 
 ### Upgrade notes

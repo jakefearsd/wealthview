@@ -46,7 +46,7 @@ Invite codes are single-use and expire after 7 days by default (an admin can cho
 
 Everyone who registers with an invite code joins as a **Member**, and an admin can promote you afterwards. The one exception is a brand-new tenant with no users yet: the first person to register into it becomes its **Admin**.
 
-> **Two-factor authentication:** the web app currently has no MFA setup or challenge screens. If your deployment enables MFA for an account, sign in from the mobile app instead.
+> **Two-factor authentication:** if MFA is turned on for your account, the login page asks for a second step after your password. Enter the 6-digit code from your authenticator app, or one of your 8-character recovery codes (each recovery code works once). The web app has no screen for turning MFA on or off yet, and the mobile app cannot sign in to an MFA-enabled account.
 
 ---
 

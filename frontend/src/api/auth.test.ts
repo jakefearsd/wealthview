@@ -34,7 +34,7 @@ const mocks = {
     clientGet: vi.mocked(client.get),
 };
 
-import { login, register, refresh, logout, getCurrentUser } from './auth';
+import { login, completeMfaChallenge, register, refresh, logout, getCurrentUser } from './auth';
 import type { AuthResponse, CurrentUserResponse } from '../types/auth';
 
 const SAMPLE_AUTH: AuthResponse = {
@@ -62,17 +62,50 @@ describe('api/auth', () => {
 
             const result = await login({ email: 'demo@x', password: 'pw' });
 
-            expect(result).toEqual(SAMPLE_AUTH);
+            expect(result).toEqual({ type: 'authenticated', auth: SAMPLE_AUTH });
             expect(mocks.authPost).toHaveBeenCalledWith('/login', {
                 email: 'demo@x',
                 password: 'pw',
             });
         });
 
+        it('returns an mfa_required result when the server asks for a second factor', async () => {
+            mocks.authPost.mockResolvedValue({ data: { mfa_required: true, mfa_token: 'mfa-jwt' } });
+
+            const result = await login({ email: 'demo@x', password: 'pw' });
+
+            expect(result).toEqual({ type: 'mfa_required', mfa_token: 'mfa-jwt' });
+        });
+
         it('propagates server errors', async () => {
             mocks.authPost.mockRejectedValue(new Error('Bad credentials'));
 
             await expect(login({ email: 'a', password: 'b' })).rejects.toThrow('Bad credentials');
+        });
+    });
+
+    describe('completeMfaChallenge', () => {
+        it('sends a six-digit code as totp_code', async () => {
+            mocks.authPost.mockResolvedValue({ data: SAMPLE_AUTH });
+
+            const result = await completeMfaChallenge('mfa-jwt', ' 123 456 ');
+
+            expect(result).toEqual(SAMPLE_AUTH);
+            expect(mocks.authPost).toHaveBeenCalledWith('/mfa/challenge', {
+                mfa_token: 'mfa-jwt',
+                totp_code: '123456',
+            });
+        });
+
+        it('sends any other code upper-cased as recovery_code', async () => {
+            mocks.authPost.mockResolvedValue({ data: SAMPLE_AUTH });
+
+            await completeMfaChallenge('mfa-jwt', 'abcd-2345');
+
+            expect(mocks.authPost).toHaveBeenCalledWith('/mfa/challenge', {
+                mfa_token: 'mfa-jwt',
+                recovery_code: 'ABCD2345',
+            });
         });
     });
 
