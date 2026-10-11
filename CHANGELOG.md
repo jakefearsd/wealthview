@@ -6,6 +6,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-10-11
+
 Phase 1a of the tactical retirement planning work: a tax-space view of each
 retirement year, an after-tax legacy figure, exact 59½ early access, and a set of
 tax-accuracy fixes in both projection engines. One schema change (V081).
@@ -46,6 +48,12 @@ tax-accuracy fixes in both projection engines. One schema change (V081).
 - The optimizer's default cash return is 1.5% real.
 - The conversion schedule's **Bracket** column (`bracket_used`) is populated
   (for example "12%") instead of blank.
+- **Documentation brought in line with the code.** The user guide,
+  administration, deployment, reference and developer docs were checked against
+  the controllers, migrations, configuration, `wv` scripts and UI, with stale
+  claims corrected (super-admin password, HSTS behind a proxy, Docker ports and
+  ufw, scheduled jobs, `system_config`) and gaps filled. A new `docs/README.md`
+  indexes the docs by audience.
 
 ### Fixed
 - **Web sign-in works for accounts with MFA turned on.** The login page used to
@@ -818,7 +826,8 @@ First tagged release. Consolidates all development prior to the 1.0 cut.
 - Test-first workflow mandated by `CLAUDE.md`; no production code without a
   failing test.
 
-[Unreleased]: https://github.com/jakefearsd/wealthview/compare/v1.2.8...HEAD
+[Unreleased]: https://github.com/jakefearsd/wealthview/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/jakefearsd/wealthview/compare/v1.2.8...v1.3.0
 [1.2.8]: https://github.com/jakefearsd/wealthview/compare/v1.2.7...v1.2.8
 [1.2.7]: https://github.com/jakefearsd/wealthview/compare/v1.2.6...v1.2.7
 [1.2.6]: https://github.com/jakefearsd/wealthview/compare/v1.2.5...v1.2.6
