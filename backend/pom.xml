@@ -76,7 +76,7 @@
         <commons-csv.version>1.14.1</commons-csv.version>
         <ofx4j.version>1.39</ofx4j.version>
         <jsoup.version>1.23.2</jsoup.version>
-        <caffeine.version>3.3.0</caffeine.version>
+        <caffeine.version>3.3.1</caffeine.version>
         <samstevens-totp.version>1.7.1</samstevens-totp.version>
         <guava.version>33.7.2-jre</guava.version>
         <jsonassert.version>1.5.3</jsonassert.version>
@@ -98,9 +98,9 @@
              Deliberately NOT overridden: opentelemetry (micrometer-tracing-bridge-otel is
              compiled against a BOM-pinned OTel API, and a mismatch shows up at prod runtime
              rather than in tests, which is exactly why green tests are not reassurance). -->
-        <flyway.version>13.9.0</flyway.version>
+        <flyway.version>13.10.3</flyway.version>
         <!-- Quality tool versions -->
-        <spotbugs-maven-plugin.version>4.10.4.1</spotbugs-maven-plugin.version>
+        <spotbugs-maven-plugin.version>4.10.5.0</spotbugs-maven-plugin.version>
         <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
         <jacoco-plugin.version>0.8.15</jacoco-plugin.version>
         <pmd-plugin.version>3.28.0</pmd-plugin.version>
@@ -121,7 +121,7 @@
         <project-info-reports-plugin.version>3.9.0</project-info-reports-plugin.version>
         <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
         <maven-surefire-report-plugin.version>3.6.0</maven-surefire-report-plugin.version>
-        <versions-maven-plugin.version>2.22.0</versions-maven-plugin.version>
+        <versions-maven-plugin.version>2.23.0</versions-maven-plugin.version>
         <!-- JaCoCo coverage gate thresholds (jacoco:check on the verify phase).
              Defaults are conservative; each gated module overrides these in its
              own <properties> block. LINE minimums track the CLAUDE.md targets;
@@ -377,7 +377,7 @@
                 <plugin>
                     <groupId>org.pitest</groupId>
                     <artifactId>pitest-maven</artifactId>
-                    <version>1.30.0</version>
+                    <version>1.30.1</version>
                     <dependencies>
                         <dependency>
                             <groupId>org.pitest</groupId>
