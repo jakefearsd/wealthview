@@ -1,9 +1,9 @@
 # Stage 1: Build frontend
-# Pinned by digest (node:24-alpine, NODE_VERSION=24.21.0 at time of pin).
+# Pinned by digest (node:24-alpine, NODE_VERSION=24.22.0 at time of pin).
 # Moved off the node:20 line in 2026-08: Node 20 reached end-of-life in April 2026
 # and stopped receiving security patches. 24.x is the current Active LTS line.
 # To upgrade: `docker pull node:<tag>` then `docker inspect --format='{{index .RepoDigests 0}}' node:<tag>`.
-FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS frontend-build
+FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS frontend-build
 WORKDIR /app
 # Workspace manifests — must all be present for `npm ci` to resolve the
 # workspace topology even though we only build frontend in this stage.
