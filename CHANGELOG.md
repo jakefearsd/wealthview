@@ -6,11 +6,18 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-10-17
+
 Phase 1a of the tactical retirement planning work: a tax-space view of each
 retirement year, an after-tax legacy figure, exact 59½ early access, and a set of
-tax-accuracy fixes in both projection engines. One schema change (V081).
+tax-accuracy fixes in both projection engines. It also carries the fixes from a
+full-application bug hunt and a dependency refresh that moves to React 19.3,
+React Native 0.88 and TypeScript 6. One schema change (V081).
 
 ### Upgrade notes
+- **`wv update` delivers this release.** The changes are in the app image, and
+  Flyway applies V081 when the new container starts. No new environment
+  variables and no `wv` script changes, so the admin scripts need no reinstall.
 - **Existing optimizer profiles are flagged stale the next time their scenario
   is saved**, because the plan signature now also covers filing status, state,
   other income, withdrawal order and birth months. This is a flag only: no saved
@@ -46,6 +53,13 @@ tax-accuracy fixes in both projection engines. One schema change (V081).
 - The optimizer's default cash return is 1.5% real.
 - The conversion schedule's **Bracket** column (`bracket_used`) is populated
   (for example "12%") instead of blank.
+- React 19.3.1 in the web and mobile apps, now that React Native supports it.
+  React Native 0.88.0 (the Android build is unchanged; iOS keeps its existing
+  AppDelegate, since the new SceneDelegate lifecycle is optional), TypeScript
+  6.0.3, Vite 8.3.4, Vitest 4.1.12, plus minor updates across the npm workspaces.
+- Flyway 13.9.0 → 13.10.3; all 90 migrations replay cleanly. caffeine 3.3.1.
+- Observability overlay: Grafana 13.2.4.
+- Build tooling: SpotBugs plugin 4.10.5.0, PIT 1.30.1, versions plugin 2.23.0.
 
 ### Fixed
 - A super admin can now actually get a user into a tenant they create:
@@ -162,6 +176,37 @@ tax-accuracy fixes in both projection engines. One schema change (V081).
     negative live balance or cost basis, and contributions may be negative; strategy fields
     accept blank values, any letter case where the engine ignores case, and the old
     comma-separated withdrawal order; and an optimizer request may have no phases.
+- **Web app fixes from the bug hunt:**
+  - Accessibility: form labels are tied to their controls, strategy cards, tabs
+    and scrollable tables work from the keyboard, the login and register pages
+    have a main landmark and heading, action columns have header labels, and
+    secondary, hint, warning and button text meet WCAG AA contrast.
+  - Errors: pages and admin sections show a load failure (with a retry where
+    one helps) instead of zeros, empty tables or a blank page. Loaded data stays
+    on screen when a refetch fails, and the error boundary resets on navigation.
+    Deleting a scenario, spending profile or income source asks for confirmation.
+  - Forms validate and normalise what they send. A buy or sell quantity, when
+    given, must be positive. The property form no longer sends NaN. Income
+    sources and spending tiers may start at age 0. Currency inputs save what was
+    typed, percentage fields drop float noise, and a per-scenario income
+    override of $0 is allowed. IRA accounts map to traditional.
+  - Display: negative values keep their minus sign on the rental chart axes and
+    in tooltips, the balance chart labels every year, and the retirement year no
+    longer shifts by a day with the browser's time zone. The tax breakdown no
+    longer double-counts self-employment tax when state tax applies. The export
+    page lists everything the export omits, and `/admin` is gated by role.
+
+### Security
+- **shell-quote 1.10.0 → 1.12.0** (critical, GHSA-pqg4-j6r4-53mv: command
+  injection through `quote()`) and **compression 1.8.1 → 1.8.2** (high,
+  GHSA-vc2v-76pw-4v95: denial of service). Both are reached only through React
+  Native's development server and DevTools packages; the web app does not
+  include either.
+- Two advisories remain with no patched release, `braces` (GHSA-vfj7-8cjw-p6xm)
+  and `sprintf-js` (GHSA-hp3w-g68c-fv3c). Both are reached only through mobile
+  build and test tooling, and nothing that reaches users includes them.
+- The frontend build stage moves to Node 24.22.0. The postgres:16 digest pin is
+  refreshed onto a rebuilt Debian base, with the server still at 16.15.
 
 ## [1.2.8] — 2026-10-04
 
@@ -813,7 +858,8 @@ First tagged release. Consolidates all development prior to the 1.0 cut.
 - Test-first workflow mandated by `CLAUDE.md`; no production code without a
   failing test.
 
-[Unreleased]: https://github.com/jakefearsd/wealthview/compare/v1.2.8...HEAD
+[Unreleased]: https://github.com/jakefearsd/wealthview/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/jakefearsd/wealthview/compare/v1.2.8...v1.3.0
 [1.2.8]: https://github.com/jakefearsd/wealthview/compare/v1.2.7...v1.2.8
 [1.2.7]: https://github.com/jakefearsd/wealthview/compare/v1.2.6...v1.2.7
 [1.2.6]: https://github.com/jakefearsd/wealthview/compare/v1.2.5...v1.2.6
