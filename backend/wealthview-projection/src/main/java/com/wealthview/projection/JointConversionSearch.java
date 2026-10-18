@@ -1,6 +1,7 @@
 package com.wealthview.projection;
 
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Random;
 
 import org.slf4j.Logger;
@@ -101,9 +102,12 @@ final class JointConversionSearch {
         // Each fraction is scored by how much the MC optimizer can sustain.
         int searchTrials = Math.min(JOINT_SEARCH_TRIALS, ctx.sim().trialCount());
         Random searchRng = input.seed() != null ? new Random(input.seed() + 1) : new Random();
-        PoolReturnModel searchModel = PoolReturnModel.from(input.accounts(), ctx.sim().inflationRate());
+        // Bond tent plan 1: the search paths run through the same pre-retirement years and today's-accounts
+        // return model as the main run (always set for a non-empty horizon, the only kind that gets here).
+        PoolReturnModel searchModel = Objects.requireNonNull(ctx.sim().returnModel(), "returnModel");
         PortfolioReturnPaths searchPaths = PortfolioPathGenerator.generate(
-                searchTrials, ctx.sim().years(), searchModel, matrix, searchRng, ctx.sim().feeRate());
+                searchTrials, ctx.sim().preRetirementYears(), ctx.sim().years(), searchModel, matrix,
+                searchRng, ctx.sim().feeRate());
 
         double[] searchFloors = SustainabilitySearch.verifyEssentialFloor(
                 searchPaths.portfolioPaths(), ctx.taxIncome().incomeByYear(), ctx.taxIncome().essentialFloor(),

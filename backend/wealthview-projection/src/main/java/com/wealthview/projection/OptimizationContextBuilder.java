@@ -73,7 +73,26 @@ final class OptimizationContextBuilder {
                                 LtcgTaxTable[] ltcgTables, @Nullable double[] dsBracketCeilings,
                                 double[] rentalIncomeByYear) {}
 
-    OptimizationSetup build(GuardrailOptimizationInput input, RealReturnMatrix matrix) {
+    /**
+     * Builds the setup for a request stated AS OF TODAY (the base year): the expected-at-retirement
+     * scalars come from {@link PreRetirementAccumulation#seedAtRetirement}, while every Monte Carlo
+     * trial starts in the base year from {@code request.accounts()}.
+     */
+    OptimizationSetup build(GuardrailOptimizationInput request, RealReturnMatrix matrix) {
+        return build(PreRetirementAccumulation.seedAtRetirement(request, matrix), request.accounts(), matrix);
+    }
+
+    /**
+     * Builds the setup from expected-at-retirement scalars plus the base-year accounts the trials
+     * start from.
+     *
+     * @param input the request with its accounts already advanced to the retirement year along the
+     *              expected path -- the source of every scalar (balances, gating, bases)
+     * @param todayAccounts the accounts as they stand in the base year; the return model and each
+     *              trial's pre-retirement accumulation are built from these
+     */
+    OptimizationSetup build(GuardrailOptimizationInput input, List<? extends ProjectionAccountInput> todayAccounts,
+                            RealReturnMatrix matrix) {
         int retirementYear = input.retirementDate().getYear();
         int retirementAge = retirementYear - input.birthYear();
         int endAge = input.endAge();
@@ -111,10 +130,11 @@ final class OptimizationContextBuilder {
         // per-pool returns are balance-weighted. The projection is REAL terms, so pools grow at
         // these real returns directly (no Fisher conversion), matching the constant-real
         // spending/income model.
-        PoolReturnModel returnModel = PoolReturnModel.from(input.accounts(), inflationRate);
+        PoolReturnModel returnModel = PoolReturnModel.from(todayAccounts, inflationRate);
         double feeRate = resolveFeeRate(input);
+        int preRetirementYears = Math.max(0, retirementYear - input.baseYear());
         PortfolioReturnPaths returnPaths = PortfolioPathGenerator.generate(
-                trialCount, years, returnModel, matrix, rng, feeRate);
+                trialCount, preRetirementYears, years, returnModel, matrix, rng, feeRate);
         double[][] portfolioPaths = returnPaths.portfolioPaths();
 
         // Audit C7 / T7-M3: the MC engine only models years from retirement onward, so its own
@@ -214,7 +234,8 @@ final class OptimizationContextBuilder {
                         returnPaths.taxableReturns(), returnPaths.traditionalReturns(),
                         returnPaths.rothReturns(), rmdStartAge, dividendYield, feeRate, returnMean,
                         interestYield, taxableEquityShare, household.survivorFactor(), household.sim(),
-                        mortalityDraws, stochasticEval, earlyAccessAge),
+                        mortalityDraws, stochasticEval, earlyAccessAge,
+                        returnPaths.startBalances(), preRetirementYears, returnModel),
                 new TaxIncomeContext(filingStatus, essentialFloor,
                         incomeByYear, taxableIncomeByYear, surplusTaxByYear,
                         incomeData, rentalAwareTaxableIncome, adjustedFloors, ordinaryTaxTables,

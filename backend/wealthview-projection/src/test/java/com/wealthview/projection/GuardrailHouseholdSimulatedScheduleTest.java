@@ -97,9 +97,9 @@ class GuardrailHouseholdSimulatedScheduleTest {
 
         double preDisc = yearly.get(0).discretionary().doubleValue();
         double postDisc = yearly.get(TRANSITION_IDX).discretionary().doubleValue();
-        // Pre-transition 22665.6513, post ×0.75. (5685.4123 before API #22: the fixture's base year
+        // Pre-transition 19018.4007 (22665.6513 before trials started in the base year), post ×0.75. (5685.4123 before API #22: the fixture's base year
         // is 2025, so the optimizer now seeds 2030 with five years of growth on these balances.)
-        assertThat(preDisc).isEqualTo(22665.6513, within(0.01));
+        assertThat(preDisc).isEqualTo(19018.4007, within(0.01));
         assertThat(postDisc).isEqualTo(preDisc * SURVIVOR_FACTOR, within(0.01));
 
         // The whole point: the reported success rate reflects the SCALED (displayed) draws. Only
@@ -108,16 +108,16 @@ class GuardrailHouseholdSimulatedScheduleTest {
         // strictly higher rate is the signature of simulated == displayed.
         double success = result.successProbability().doubleValue();
         assertThat(success).isGreaterThan(CONFIDENCE);
-        assertThat(success).isEqualTo(0.9067, within(1e-4));   // pre-HP2: 0.9000
+        assertThat(success).isEqualTo(0.9133, within(1e-4));   // pre-HP2: 0.9000
 
         // Less drawn post-transition => higher ending balances (both median and the 10th percentile
         // move up from their pre-HP2 values).
         assertThat(result.medianFinalBalance().doubleValue())
                 .isGreaterThan(480002.94)                       // pre-HP2 median
-                .isEqualTo(703014.0480, within(0.5));           // 493270.3721 before API #22
+                .isEqualTo(822917.0499, within(0.5));           // 703014.0480 before trials-start-today; 493270.3721 before API #22
         assertThat(result.percentile10Final().doubleValue())
                 .isGreaterThan(0.0)                             // pre-HP2 p10 was 0
-                .isEqualTo(35539.0519, within(0.5));            // 8181.0855 before API #22
+                .isEqualTo(23798.4046, within(0.5));            // 35539.0519 before trials-start-today; 8181.0855 before API #22
     }
 
     /**
@@ -135,8 +135,8 @@ class GuardrailHouseholdSimulatedScheduleTest {
         // Tolerance absorbs the 4-dp rounding of both reported values; still nowhere near a
         // double-scale (0.5625).
         assertThat(postDisc / preDisc).isEqualTo(SURVIVOR_FACTOR, within(1e-5));
-        // Exact single-scale value (double-scale would be 12749.4289; 4264.0592 before API #22).
-        assertThat(postDisc).isEqualTo(16999.2385, within(0.01));
+        // Exact single-scale value (double-scale would be about 10697.85; 16999.2385 before trials started in the base year).
+        assertThat(postDisc).isEqualTo(14263.8006, within(0.01));
 
         // Every post-transition year carries the same single-scaled level (uniform phase, no
         // smoothing); every pre-transition year carries the un-scaled level.

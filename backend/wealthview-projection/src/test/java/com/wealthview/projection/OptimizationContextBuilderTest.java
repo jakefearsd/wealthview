@@ -522,4 +522,66 @@ class OptimizationContextBuilderTest {
         assertThat(setup.sim().earlyAccessAge()).isEqualTo(60);
     }
 
+    private GuardrailOptimizationInput allUsTaxableInput(int baseYear) {
+        return GuardrailOptimizationInputBuilder.builder()
+                .withAccounts(List.of(new HypotheticalAccountInput(
+                        new BigDecimal("500000"), new BigDecimal("10000"), AssetAllocation.ALL_US,
+                        Optional.empty(), "taxable")))
+                .withTrialCount(50)
+                .withSeed(7L)
+                .withBaseYear(baseYear)
+                .build();
+    }
+
+    @Test
+    void build_retirementInBaseYear_hasNoTrialStartBalances() {
+        var input = allUsTaxableInput(2030);
+
+        var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        assertThat(setup.sim().startBalances()).isNull();
+        assertThat(setup.sim().preRetirementYears()).isZero();
+    }
+
+    @Test
+    void build_retirementBeforeBaseYear_hasNoTrialStartBalances() {
+        var input = allUsTaxableInput(2032);
+
+        var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        assertThat(setup.sim().startBalances()).isNull();
+        assertThat(setup.sim().preRetirementYears()).isZero();
+    }
+
+    @Test
+    void build_retirementTenYearsOut_eachTrialStartsFromItsOwnRetirementBalance() {
+        var input = allUsTaxableInput(2020);
+
+        var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        var starts = setup.sim().startBalances();
+        assertThat(setup.sim().preRetirementYears()).isEqualTo(10);
+        assertThat(starts).hasSize(input.trialCount());
+        for (int t = 0; t < starts.length; t++) {
+            assertThat(setup.sim().portfolioPaths()[t][0]).isEqualTo(starts[t].total());
+        }
+        var totals = java.util.Arrays.stream(starts).mapToDouble(TrialStartBalances::total).toArray();
+        assertThat(java.util.Arrays.stream(totals).min().orElseThrow())
+                .isLessThan(java.util.Arrays.stream(totals).max().orElseThrow());
+    }
+
+    @Test
+    void build_requestOverload_expectedScalarsAreSeededAtRetirement() {
+        var input = allUsTaxableInput(2020);
+        var matrix = ProjectionTestFixtures.TEST_CMA_MATRIX;
+
+        var setup = builder.build(input, matrix);
+
+        double expectedTaxable = PreRetirementAccumulation.seedAtRetirement(input, matrix).accounts().stream()
+                .filter(a -> a.poolType() == com.wealthview.core.projection.dto.PoolType.TAXABLE)
+                .mapToDouble(a -> a.initialBalance().doubleValue())
+                .sum();
+        assertThat(setup.portfolio().initTaxable()).isEqualTo(expectedTaxable);
+    }
+
 }

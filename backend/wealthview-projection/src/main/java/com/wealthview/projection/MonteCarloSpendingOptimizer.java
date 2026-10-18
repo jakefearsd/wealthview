@@ -154,10 +154,11 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         }
         try {
             RealReturnMatrix matrix = matrix(request.includeDepressionYears());
-            // API #22: trials start at retirement, so seed them with the accounts as they will stand
-            // then (contributions + growth from the base year), not today's balances.
+            // API #22: the expected-path scalars are the accounts as they will stand at retirement
+            // (contributions + growth from the base year); every trial itself starts today and
+            // accumulates through its own pre-retirement market (bond tent plan 1).
             var input = PreRetirementAccumulation.seedAtRetirement(request, matrix);
-            var ctx = contextBuilder.build(input, matrix);
+            var ctx = contextBuilder.build(input, request.accounts(), matrix);
             if (ctx.sim().years() <= 0) {
                 return new OptimizeResult(emptyResult(input), null);
             }
@@ -267,7 +268,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     StochasticMortalityEvaluation evaluateStochasticMortality(GuardrailOptimizationInput request) {
         RealReturnMatrix matrix = matrix(request.includeDepressionYears());
         var input = PreRetirementAccumulation.seedAtRetirement(request, matrix);
-        var ctx = contextBuilder.build(input, matrix);
+        var ctx = contextBuilder.build(input, request.accounts(), matrix);
         if (ctx.sim().years() <= 0) {
             return null;
         }
@@ -354,7 +355,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         double maxAdjRate = input.maxAnnualAdjustmentRate() != null
                 ? input.maxAnnualAdjustmentRate().doubleValue() : 0.0;
         var returnPaths = new PortfolioReturnPaths(ctx.sim().taxableReturns(), ctx.sim().traditionalReturns(),
-                ctx.sim().rothReturns(), ctx.sim().portfolioPaths());
+                ctx.sim().rothReturns(), ctx.sim().portfolioPaths(), ctx.sim().startBalances());
         return new SustainabilitySearch.SearchContext(
                 ctx, returnPaths, ctx.sim().trialCount(), ctx.taxIncome().taxCtx(),
                 conversionByYear, conversionTaxByYear,

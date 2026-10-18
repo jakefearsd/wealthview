@@ -97,4 +97,23 @@ class PreRetirementAccumulationTest {
         assertThat(result.yearlySpending())
                 .allSatisfy(row -> assertThat(row.essentialFloor()).isEqualByComparingTo(bd("30000")));
     }
+
+    @Test
+    void optimize_retirementYearsAway_firstRetirementYearShowsPreRetirementDispersion() {
+        var accounts = List.<ProjectionAccountInput>of(new HypotheticalAccountInput(
+                bd("200000"), bd("10000"), AssetAllocation.ALL_US, Optional.empty(), bd("200000"),
+                "taxable", "primary"));
+        var matrix = ProjectionTestFixtures.TEST_CMA_MATRIX;
+        var optimizer = new MonteCarloSpendingOptimizer(null, matrix);
+        var today = zeroInflationNoFee(accounts).withBaseYear(2015).withSeed(11L).withTrialCount(200).build();
+        var atRetirement = zeroInflationNoFee(PreRetirementAccumulation.seedAtRetirement(today, matrix).accounts())
+                .withBaseYear(2030).withSeed(11L).withTrialCount(200).build();
+
+        var a = optimizer.optimize(today).yearlySpending().getFirst();
+        var b = optimizer.optimize(atRetirement).yearlySpending().getFirst();
+
+        double spreadA = a.portfolioBalanceP10().doubleValue() / a.portfolioBalanceMedian().doubleValue();
+        double spreadB = b.portfolioBalanceP10().doubleValue() / b.portfolioBalanceMedian().doubleValue();
+        assertThat(spreadA).isLessThan(spreadB);
+    }
 }

@@ -35,10 +35,11 @@ import com.wealthview.core.projection.tax.FilingStatus;
  * window already alone. This deliberately differs from the deterministic engine's wider scope,
  * which models {@code baseYear..endYear} (including pre-retirement accumulation years) and so CAN
  * show the transition firing at its true pre-retirement calendar year -- see
- * {@link HouseholdTransition#resolveYear}. The MC engine never models pre-retirement years at all,
- * so "died five years before retirement" and "died thirty years before retirement" both collapse to
- * the same already-survivor starting state; see {@link HouseholdIndexMath#transitionIndex} (the
- * shared clamp site) for the full rationale and {@code HouseholdMcResolverTest} for the pin.
+ * {@link HouseholdTransition#resolveYear}. MC trials now simulate pre-retirement market growth and
+ * contributions from the base year, but still model NO pre-retirement deaths, so "died five years
+ * before retirement" and "died thirty years before retirement" both collapse to the same
+ * already-survivor starting state; see {@link HouseholdIndexMath#transitionIndex} (the shared clamp
+ * site) for the full rationale and {@code HouseholdMcResolverTest} for the pin.
  */
 final class HouseholdMcResolver {
 

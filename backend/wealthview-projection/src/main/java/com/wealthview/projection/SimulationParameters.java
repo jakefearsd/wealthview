@@ -62,7 +62,14 @@ record SimulationParameters(
         // mortality; the recommendation flow never reads it, so the fixed-death engine is byte-identical.
         @Nullable StochasticEvalArrays stochasticEval,
         // Phase 1a: first penalty-free age, resolved once from the birth month (AgeMilestones).
-        int earlyAccessAge
+        int earlyAccessAge,
+        // Bond tent plan 1: every MC trial starts in the BASE year. Each trial's own balances at
+        // retirement (null exactly when preRetirementYears == 0 -- the byte-identical anchor), the
+        // number of pre-retirement years simulated, and the today's-accounts return model that
+        // produced them (so JointConversionSearch can generate matching search paths).
+        @Nullable TrialStartBalances[] startBalances,
+        int preRetirementYears,
+        @Nullable PoolReturnModel returnModel
 ) {
 
     /**
@@ -75,6 +82,6 @@ record SimulationParameters(
                                              int years, int rmdStartAge) {
         return new SimulationParameters(retirementYear, retirementAge, endAge, years, 0, 0, 0,
                 null, null, null, null, rmdStartAge, 0, 0, 0, 0, 1, 1.0, null, null, null,
-                AgeMilestones.LEGACY_EARLY_ACCESS_AGE);
+                AgeMilestones.LEGACY_EARLY_ACCESS_AGE, null, 0, null);
     }
 }

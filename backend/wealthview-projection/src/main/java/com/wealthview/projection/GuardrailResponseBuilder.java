@@ -221,6 +221,7 @@ final class GuardrailResponseBuilder {
                 .dsBracketCeilingByYear(ctx.taxIncome().dsBracketCeilingByYear())
                 .cashReserve(ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate())
                 .returns(ctx.sim().taxableReturns(), ctx.sim().traditionalReturns(), ctx.sim().rothReturns())
+                .startBalances(ctx.sim().startBalances())
                 .taxableBasis(ctx.portfolio().initTaxableBasis())
                 .ltcgTaxTableByYear(ctx.taxIncome().ltcgTaxTableByYear())
                 .dividendYield(ctx.sim().dividendYield())
@@ -283,6 +284,13 @@ final class GuardrailResponseBuilder {
         return (double) pass.successCount() / trialCount;
     }
 
+    /** Year-0 guardrail baseline: the median of the trials' own retirement-start totals when trials
+     * start in the base year, else the single expected-path pool total. */
+    private static double yearZeroBaseline(OptimizationSetup ctx, PoolSimSetup poolSetup) {
+        var starts = ctx.sim().startBalances();
+        return starts != null ? TrialStartBalances.medianTotal(starts) : poolSetup.initTotal();
+    }
+
     /**
      * Audit C9: the essential-floor success rate with the SIMULATED guardrail adaptation rule
      * active. Re-runs the SAME trials (same per-pool return sequences, same
@@ -320,7 +328,7 @@ final class GuardrailResponseBuilder {
 
         var adaptation = GuardrailRuleInputBuilder.build(ctx.sim().portfolioPaths(), ctx.taxIncome().incomeByYear(),
                 ctx.taxIncome().adjustedFloors(), discretionaryByYear, years, trialCount,
-                poolSetup.initTotal(), medianBalanceByYear, maxAdjRate);
+                yearZeroBaseline(ctx, poolSetup), medianBalanceByYear, maxAdjRate);
 
         var pass = trialPassRunner.run(trialCount, years, configFactory,
                 ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(),

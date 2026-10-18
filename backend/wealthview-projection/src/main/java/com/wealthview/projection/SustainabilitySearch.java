@@ -476,6 +476,7 @@ final class SustainabilitySearch {
     private static TrialConfigFactory buildConfigFactory(SearchContext ctx, PoolSimSetup poolSetup) {
         return TrialConfigFactory.builder(poolSetup)
                 .initialPortfolioPaths(ctx.paths())
+                .startBalances(ctx.returnPaths().startBalances())
                 .taxTables(poolSetup.simPools() ? ctx.taxCtx().ordinaryTaxTableByYear() : null,
                         poolSetup.simPools() ? ctx.taxCtx().ordinaryBaseIncomeByYear() : null)
                 .conversions(ctx.conversionByYear(), ctx.conversionTaxByYear())
@@ -540,8 +541,13 @@ final class SustainabilitySearch {
      * {@link GuardrailResponseBuilder} derives it from its own pool setup: fixed pool balances when
      * pools exist, else the non-pool scalar every trial's path is seeded from
      * ({@code paths[t][0]}, constant across trials by construction — see
-     * {@code PortfolioPathGenerator.generate}). */
+     * {@code PortfolioPathGenerator.generate}). When trials start in the base year the trials no
+     * longer share one balance, so the baseline is the MEDIAN of their retirement-start totals. */
     private static double initialTotalBalance(SearchContext ctx, PoolSimSetup poolSetup) {
+        var starts = ctx.returnPaths().startBalances();
+        if (starts != null) {
+            return TrialStartBalances.medianTotal(starts);
+        }
         return poolSetup.simPools() ? poolSetup.initTotal() : ctx.paths()[0][0];
     }
 }

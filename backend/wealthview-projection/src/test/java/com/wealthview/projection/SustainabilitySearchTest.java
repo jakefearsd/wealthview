@@ -62,8 +62,9 @@ class SustainabilitySearchTest {
 
     /**
      * T24: a fixture shaped like production ({@code paths[t][0]} constant across trials -- the
-     * invariant {@code PortfolioPathGenerator} guarantees, which {@code expectedStartBalance[0]}
-     * relies on) with a minority of "crashing" trials (steep, sustained decline) and a majority of
+     * invariant {@code PortfolioPathGenerator} guarantees when there are no pre-retirement years,
+     * which {@code expectedStartBalance[0]} then relies on; with pre-retirement years the
+     * baseline is the median of the per-trial start totals instead) with a minority of "crashing" trials (steep, sustained decline) and a majority of
      * "flat" trials, so the no-adaptation median trajectory (dominated by the flat majority) reads
      * as healthy while the crashing minority's OWN trajectory falls far below it -- exactly the
      * signal {@link TrialSimulator#adaptYearSpending} cuts on.
@@ -113,7 +114,7 @@ class SustainabilitySearchTest {
         var portfolio = new PortfolioSetup(0.0, 0.0, 0.0, 0.0, null, 0, 0.0, 0.0, 0.0, 0.0);
         var sim = new SimulationParameters(0, retirementAge, 0, years, trialCount, confidenceLevel, 0.0,
                 paths, taxableReturns, traditionalReturns, rothReturns, Integer.MAX_VALUE,
-                0.0, 0.0, 0.0, 0.0, 1.0, 1.0, null, null, null, AgeMilestones.LEGACY_EARLY_ACCESS_AGE);
+                0.0, 0.0, 0.0, 0.0, 1.0, 1.0, null, null, null, AgeMilestones.LEGACY_EARLY_ACCESS_AGE, null, 0, null);
         var taxIncome = new TaxIncomeContext(null, 0.0, income, null, surplusTax, null, null, null,
                 null, null, null, null, null);
         return new OptimizationSetup(portfolio, sim, taxIncome);
