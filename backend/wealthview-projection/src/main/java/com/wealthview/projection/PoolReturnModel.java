@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.wealthview.core.projection.dto.AssetAllocation;
+import com.wealthview.core.projection.dto.LotOwner;
+import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 
 /**
@@ -30,10 +32,12 @@ record PoolReturnModel(
      * real return ({@code overrideReal}, a deterministic escape hatch with no volatility); otherwise
      * its {@code allocation} is blended against the matrix per year. {@code contribution} is the
      * account's annual contribution, the fallback blend weight when every account in a pool opens
-     * at a zero balance -- mirroring the deterministic {@code PoolStrategy} weighting.
+     * at a zero balance -- mirroring the deterministic {@code PoolStrategy} weighting. {@code poolType}
+     * and {@code owner} tag the account for per-trial start-balance slicing ({@link TrialStartBalances}).
      */
     record AccountReturnSource(double balance, double contribution, boolean overrideBased,
-                               double overrideReal, AssetAllocation allocation) {}
+                               double overrideReal, AssetAllocation allocation,
+                               PoolType poolType, LotOwner owner) {}
 
     // ExhaustiveSwitchHasDefault: the switch below is exhaustive over PoolType, but Checkstyle's
     // MissingSwitchDefault rule (also an enforced gate) requires the default anyway on a switch
@@ -84,8 +88,10 @@ record PoolReturnModel(
         if (account.expectedReturnOverride().isPresent()) {
             double nominal = account.expectedReturnOverride().get().doubleValue();
             double real = (1 + nominal) / (1 + inflationRate) - 1;
-            return new AccountReturnSource(balance, contribution, true, real, account.allocation());
+            return new AccountReturnSource(balance, contribution, true, real, account.allocation(),
+                    account.poolType(), account.ownerType());
         }
-        return new AccountReturnSource(balance, contribution, false, 0.0, account.allocation());
+        return new AccountReturnSource(balance, contribution, false, 0.0, account.allocation(),
+                account.poolType(), account.ownerType());
     }
 }
