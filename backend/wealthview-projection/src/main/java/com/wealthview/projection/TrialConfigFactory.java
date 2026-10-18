@@ -25,6 +25,7 @@ final class TrialConfigFactory {
 
     private final PoolSimSetup poolSetup;
     private final double[][] initialPortfolioPaths;
+    private final TrialStartBalances[] startBalances;
     private final OrdinaryTaxTable[] ordinaryTaxTableByYear;
     private final double[] ordinaryBaseIncomeByYear;
     private final double[] conversionByYear;
@@ -51,6 +52,7 @@ final class TrialConfigFactory {
     private TrialConfigFactory(Builder b) {
         this.poolSetup = b.poolSetup;
         this.initialPortfolioPaths = b.initialPortfolioPaths;
+        this.startBalances = b.startBalances;
         this.ordinaryTaxTableByYear = b.ordinaryTaxTableByYear;
         this.ordinaryBaseIncomeByYear = b.ordinaryBaseIncomeByYear;
         this.conversionByYear = b.conversionByYear;
@@ -97,8 +99,24 @@ final class TrialConfigFactory {
                                               @Nullable TrialSimulator.HouseholdSim householdOverride) {
         double initTaxable = poolSetup.simPools() || initialPortfolioPaths == null
                 ? poolSetup.initTaxable() : initialPortfolioPaths[t][0];
+        double initTraditional = poolSetup.initTraditional();
+        double initRoth = poolSetup.initRoth();
+        var trialHousehold = householdOverride != null ? householdOverride : household;
+        if (startBalances != null) {
+            var start = startBalances[t];
+            if (poolSetup.simPools()) {
+                initTaxable = start.taxable();
+                initTraditional = start.traditional();
+                initRoth = start.roth();
+            } else {
+                initTaxable = start.total();
+            }
+            if (trialHousehold != null) {
+                trialHousehold = trialHousehold.withStartBalances(start);
+            }
+        }
         return TrialSimulator.SimulationConfig
-                .builder(initTaxable, poolSetup.initTraditional(), poolSetup.initRoth(), poolSetup.order())
+                .builder(initTaxable, initTraditional, initRoth, poolSetup.order())
                 .taxTables(ordinaryTaxTableByYear, ordinaryBaseIncomeByYear)
                 .conversions(conversionByYear, conversionTaxByYear)
                 .retirementAge(retirementAge)
@@ -115,7 +133,7 @@ final class TrialConfigFactory {
                 .rentalIncomeByYear(rentalIncomeByYear)
                 .interestYield(interestYield)
                 .taxableEquityShare(taxableEquityShare)
-                .household(householdOverride != null ? householdOverride : household)
+                .household(trialHousehold)
                 .survivorRegimes(survivorRegimes, survivorFactor)
                 .build();
     }
@@ -134,6 +152,7 @@ final class TrialConfigFactory {
     static final class Builder {
         private final PoolSimSetup poolSetup;
         private double[][] initialPortfolioPaths;
+        private TrialStartBalances[] startBalances;
         private OrdinaryTaxTable[] ordinaryTaxTableByYear;
         private double[] ordinaryBaseIncomeByYear;
         private double[] conversionByYear;
@@ -172,6 +191,17 @@ final class TrialConfigFactory {
          */
         Builder initialPortfolioPaths(double[][] paths) {
             this.initialPortfolioPaths = paths;
+            return this;
+        }
+
+        /**
+         * Per-trial balances at retirement start. When non-null this takes precedence over {@link
+         * #initialPortfolioPaths}: a pooled run seeds taxable/traditional/Roth from each trial's own
+         * pools, a non-pooled run seeds taxable from the trial's total, and the household (if any)
+         * receives the trial's spouse slices and taxable lot values.
+         */
+        Builder startBalances(@Nullable TrialStartBalances[] startBalances) {
+            this.startBalances = startBalances;
             return this;
         }
 

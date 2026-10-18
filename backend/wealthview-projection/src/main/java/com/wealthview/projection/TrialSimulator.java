@@ -143,6 +143,21 @@ final class TrialSimulator {
             return new HouseholdSim(initTraditionalSpouse, initRothSpouse, spouseAgeOffset, spouseRmdStartAge,
                     transitionYearIndex, survivorIsPrimary, jointStepUpFactor, truncateYearIndex, taxableSeed);
         }
+
+        /**
+         * A copy of this household with the trial's own starting state: the spouse's traditional/Roth
+         * slices and the three taxable lot VALUES come from {@code start}. The taxable lot bases and every
+         * other field are unchanged -- the basis stays the expected scalar in every trial, so a trial whose
+         * taxable pool grew less than its basis seeds a lot with an unrealized loss.
+         */
+        HouseholdSim withStartBalances(TrialStartBalances start) {
+            var seed = new TaxableSeed(taxableSeed.jointBasis(), start.taxableJoint(),
+                    taxableSeed.primaryBasis(), start.taxablePrimary(),
+                    taxableSeed.spouseBasis(), start.taxableSpouse());
+            return new HouseholdSim(start.traditionalSpouse(), start.rothSpouse(), spouseAgeOffset,
+                    spouseRmdStartAge, transitionYearIndex, survivorIsPrimary, jointStepUpFactor,
+                    truncateYearIndex, seed);
+        }
     }
 
     /**
