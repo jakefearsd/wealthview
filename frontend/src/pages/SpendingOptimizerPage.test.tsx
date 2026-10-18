@@ -254,7 +254,7 @@ describe('SpendingOptimizerPage', () => {
         renderPage();
 
         await waitFor(() => {
-            expect(screen.getByText(/stale/i)).toBeInTheDocument();
+            expect(screen.getByText(/profile is out of date/i)).toBeInTheDocument();
         });
         expect(screen.getByRole('button', { name: /re-optimize/i })).toBeInTheDocument();
     });
