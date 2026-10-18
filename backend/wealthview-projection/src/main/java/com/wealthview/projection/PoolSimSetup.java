@@ -50,7 +50,8 @@ record PoolSimSetup(double initTaxable, double initTraditional, double initRoth,
      * varies trial-to-trial and is supplied separately at trial-config time (see {@link
      * TrialConfigFactory.Builder#initialPortfolioPaths}) -- unlike the {@link
      * #resolve(PortfolioSetup, double[])} variant, whose non-pool {@code initTaxable} is already
-     * the single {@link PortfolioSetup#initialPortfolio()} scalar, fixed for every trial.
+     * the single {@link PortfolioSetup#initialPortfolio()} scalar, fixed for every trial unless the trials carry
+     * per-trial {@code startBalances}, which {@link TrialConfigFactory#configFor} applies in its place.
      */
     static PoolSimSetup resolve(TaxContext taxCtx) {
         boolean hasPools = taxCtx != null && (taxCtx.initTraditional() > 0 || taxCtx.initRoth() > 0);

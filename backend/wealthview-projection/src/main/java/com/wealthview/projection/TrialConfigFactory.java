@@ -18,7 +18,8 @@ import com.wealthview.core.projection.household.AgeMilestones;
  * {@code initTaxable}/{@code order} formula applies) stays exactly where and how it already was --
  * at each caller, before it builds this factory -- so {@link #configFor} only ever plugs in
  * ALREADY-resolved values; it introduces no new conditional logic beyond the one Search-only
- * per-trial taxable fallback documented on {@link Builder#initialPortfolioPaths}. See the task-12
+ * per-trial taxable fallback documented on {@link Builder#initialPortfolioPaths} and the
+ * per-trial {@code startBalances} override described on {@link #configFor}. See the task-12
  * report for the full per-field asymmetry table across the three original chains.
  */
 final class TrialConfigFactory {
@@ -88,6 +89,12 @@ final class TrialConfigFactory {
      * varies it (mirroring {@link StochasticMortalityEvaluator}'s original chain, which never
      * called {@code .trackYearBalances(...)} at all) simply always passes {@code false} -- the
      * same value the builder's own default produces, so the built config is identical either way.
+     *
+     * <p>Precedence for the opening balances: when this factory carries {@code startBalances} (trials
+     * that start in the base year), trial {@code t}'s own retirement-start balances override the pool
+     * setup's scalars and the per-trial {@code initialPortfolioPaths} fallback -- by pool when pools
+     * are simulated, else the trial's total as the single taxable balance -- and the household is
+     * given the same balances. Without {@code startBalances} the pool setup / path-start values apply.
      *
      * <p>{@code householdOverride}, when non-null, replaces this factory's baked-in {@code
      * household} for JUST this trial -- the mechanism {@link StochasticMortalityEvaluator} uses to

@@ -170,8 +170,9 @@ final class PortfolioPathGenerator {
      * a prior call to this method), so only the non-fallback branch subtracts it — once per pool,
      * uniformly across override-based and allocation-based accounts alike (audit B1).
      *
-     * <p>Accounts are weighted by their balance at retirement start ({@code balances}, aligned with
-     * {@code accounts}); when the pool's accounts all open at zero they
+     * <p>Accounts are weighted by the {@code balances} passed in, aligned with {@code accounts}: the
+     * opening balances when there are no pre-retirement years, otherwise the trial's own balances at
+     * retirement start. When the pool's accounts all sit at zero they
      * are weighted by annual contribution, else equally (API #23) — so a zero-balance pool grows at
      * its OWN accounts' return, exactly like the deterministic {@code PoolStrategy}, instead of a
      * zero weight.

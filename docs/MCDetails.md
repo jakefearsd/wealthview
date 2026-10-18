@@ -2,9 +2,17 @@
 
 ## What the Simulation Actually Does
 
-The optimizer runs **5,000 trials by default** (`trial_count`, request-overridable). Each trial is one
-possible market history for your whole retirement, and the optimizer searches for the highest constant
-spending plan that still works in enough of them.
+The optimizer runs **5,000 trials by default** (`trial_count`, request-overridable). Every trial starts
+**today**, in the base year, not on retirement day. Each trial is one possible market history for the
+years between now and retirement *and* for your whole retirement, and the optimizer searches for the
+highest constant spending plan that still works in enough of them.
+
+**Years before retirement are simulated too.** For each pre-retirement year, every account takes its
+annual contribution and then grows at its return for that trial's market year, net of the fee rate,
+never dropping below zero. There are no pre-retirement taxes, Roth conversions, RMDs or deaths in this
+stretch. A trial hit by a downturn just before retirement therefore reaches retirement with a smaller
+portfolio than one that was not, so each trial retires with its own balances. If retirement is in the
+base year or earlier, there are no pre-retirement years and trials start from your current balances.
 
 **What is random:** the market. Each trial draws one *block bootstrap* sequence of historical years
 (expected block length **5 years**) out of the real annual returns for four asset classes — US stock,
@@ -36,7 +44,8 @@ scenario therefore reproduces the same numbers exactly; change any of those inpu
 and the cache key move together.
 
 From that one seed, three *separate* random streams are derived so they cannot perturb each other:
-the return paths use `seed`, the Roth-conversion arm search uses `seed + 1`, and stochastic mortality
+the return paths (pre-retirement and retirement years together) use `seed`, the Roth-conversion arm
+search uses `seed + 1`, and stochastic mortality
 uses `seed + 0x4D4F5254`. (An engine-level call with no seed at all falls back to unseeded
 randomness, but nothing in the application takes that path.)
 
