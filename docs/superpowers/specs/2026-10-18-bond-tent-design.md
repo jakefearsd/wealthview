@@ -1,7 +1,7 @@
 # Bond Tent — Design
 
 **Date:** 2026-10-18
-**Status:** Draft. Builder check done; awaiting owner approval.
+**Status:** Approved by the owner 2026-10-18.
 **Roadmap:** Item B5 (Glidepath / bond tent) of `2026-10-04-tactical-retirement-planning-roadmap.md`, Phase 2. This
 design replaces B5's "allocation as a function of age" sketch. It pulls in the parts of B2 (historical replays) and B6
 (bucket upgrade) that a tent needs.
