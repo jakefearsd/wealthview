@@ -16,6 +16,16 @@ final class SpendingCorridorCalculator {
     }
 
     /**
+     * Year-{@code y} growth factor of an unwithdrawn portfolio path ({@code path[y + 1] / path[y]}).
+     * A trial whose path sits at $0 (a per-trial pre-retirement floor can leave a trial with nothing
+     * at retirement) has no growth to apply, so the factor is 1.0 rather than the NaN of 0/0.
+     * Unchanged whenever {@code path[y] > 0}.
+     */
+    static double unwithdrawnGrowthFactor(double[] path, int y) {
+        return path[y] > 0 ? path[y + 1] / path[y] : 1.0;
+    }
+
+    /**
      * Computes the spending corridor (low/high bands) for each retirement year from
      * pre-generated portfolio paths. Returns a {@code [2][years]} array — index 0 is
      * the corridor low, index 1 is the corridor high.
@@ -38,7 +48,7 @@ final class SpendingCorridorCalculator {
             double baseSpending = floors[y] + discretionary[y];
 
             for (int t = 0; t < trialCount; t++) {
-                double gf = paths[t][y + 1] / paths[t][y];
+                double gf = unwithdrawnGrowthFactor(paths[t], y);
                 double availableThisYear = runningBalance[t] * gf + income[y];
                 sustainableAtYear[t] = availableThisYear;
             }
@@ -53,7 +63,7 @@ final class SpendingCorridorCalculator {
             // Advance running balances: apply growth and withdraw spending
             double withdrawal = Math.max(0, baseSpending - income[y]);
             for (int t = 0; t < trialCount; t++) {
-                double gf = paths[t][y + 1] / paths[t][y];
+                double gf = unwithdrawnGrowthFactor(paths[t], y);
                 runningBalance[t] = Math.max(0, runningBalance[t] * gf - withdrawal);
             }
         }

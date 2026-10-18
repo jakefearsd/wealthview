@@ -1,10 +1,13 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
+import com.wealthview.core.projection.dto.AssetAllocation;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 import com.wealthview.core.projection.dto.GuardrailProfileResponse;
@@ -2780,5 +2783,29 @@ class MonteCarloSpendingOptimizerTest {
 
         assertThat(result.floorReduced()).isFalse();
         assertThat(result.originalFloorSuccessProbability()).isNull();
+    }
+
+    @Test
+    void optimize_trialsDrainedToZeroBeforeRetirement_returnsFiniteCorridors() {
+        // $30k with -$6k/yr contributions over 5 pre-retirement years: the per-trial floor at $0
+        // leaves a share of trials at exactly $0 on retirement day, so their unwithdrawn growth
+        // factor is 0/0. It must read as 1.0 (no growth), not NaN, or the p90 corridor goes NaN
+        // and the BigDecimal conversion throws.
+        var drainedAccount = new HypotheticalAccountInput(new BigDecimal("30000"), new BigDecimal("-6000"),
+                AssetAllocation.ALL_US, Optional.empty(), new BigDecimal("30000"), "taxable", "primary");
+        var input = GuardrailOptimizationInputBuilder.builder()
+                .withRetirementDate(LocalDate.of(2030, 1, 1))
+                .withInflationRate(BigDecimal.ZERO).withFeeRate(BigDecimal.ZERO)
+                .withAccounts(List.of(drainedAccount)).withBaseYear(2025)
+                .withEssentialFloor(new BigDecimal("20000")).withTrialCount(500).withSeed(3L).build();
+
+        var result = optimizer.optimize(input);
+
+        assertThat(result.yearlySpending()).isNotEmpty();
+        assertThat(result.yearlySpending()).allSatisfy(year -> {
+            assertThat(year.recommended()).isNotNull();
+            assertThat(year.corridorLow()).isNotNull();
+            assertThat(year.corridorHigh()).isNotNull();
+        });
     }
 }

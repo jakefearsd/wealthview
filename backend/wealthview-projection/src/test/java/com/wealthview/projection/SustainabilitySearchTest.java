@@ -204,6 +204,21 @@ class SustainabilitySearchTest {
     }
 
     @Test
+    void verifyEssentialFloor_zeroStartTrial_returnsFiniteFloors() {
+        int years = 3;
+        int trialCount = 1;
+        double[][] paths = flatPaths(trialCount, years, 0);
+        double[] income = new double[years];
+
+        double[] floors = SustainabilitySearch.verifyEssentialFloor(
+                paths, income, 10_000, 0.90, years, trialCount);
+
+        // A trial that retires with $0 has no growth to apply (0/0 must read as 1.0, not NaN);
+        // with no income the affordable floor clamps to zero.
+        assertThat(floors).containsExactly(0, 0, 0);
+    }
+
+    @Test
     void verifyEssentialFloor_matchesYearByYearReferenceSimulation() {
         int years = 25;
         int trialCount = 20;
@@ -228,6 +243,56 @@ class SustainabilitySearchTest {
         double[] expected = referenceEssentialFloor(
                 paths, income, essentialFloor, confidenceLevel, years, trialCount);
         assertThat(floors).containsExactly(expected);
+    }
+
+    private static TrialStartBalances taxableStart(double taxable) {
+        return new TrialStartBalances(taxable, 0, 0, 0, 0, 0, taxable, 0);
+    }
+
+    private static SustainabilitySearch.SearchContext contextWithStarts(double[][] paths,
+                                                                         TrialStartBalances[] starts) {
+        int years = paths[0].length - 1;
+        int trialCount = paths.length;
+        double[][] returns = new double[trialCount][years];
+        var setup = searchContextSetup(years, trialCount, 65, 0.90, new double[years], new double[years],
+                paths, returns, returns, returns);
+        var returnPaths = new PortfolioReturnPaths(returns, returns, returns, paths, starts);
+        return new SustainabilitySearch.SearchContext(setup, returnPaths, trialCount, null, null, null,
+                false, 0.0);
+    }
+
+    @Test
+    void initialTotalBalance_withStartBalances_isMedianOfTrialStartTotals() {
+        double[][] paths = {{10_000, 10_000}, {50_000, 50_000}, {900_000, 900_000}};
+        var starts = new TrialStartBalances[] {taxableStart(10_000), taxableStart(50_000), taxableStart(900_000)};
+        var ctx = contextWithStarts(paths, starts);
+
+        double baseline = SustainabilitySearch.initialTotalBalance(ctx,
+                new PoolSimSetup(1, 0, 0, "taxable_first", false));
+
+        assertThat(baseline).isEqualTo(TrialStartBalances.medianTotal(starts)).isEqualTo(50_000);
+    }
+
+    @Test
+    void initialTotalBalance_withoutStartBalances_nonPoolUsesScalarPathStart() {
+        double[][] paths = {{250_000, 250_000}, {250_000, 250_000}};
+        var ctx = contextWithStarts(paths, null);
+
+        double baseline = SustainabilitySearch.initialTotalBalance(ctx,
+                new PoolSimSetup(0, 0, 0, "taxable_first", false));
+
+        assertThat(baseline).isEqualTo(250_000);
+    }
+
+    @Test
+    void initialTotalBalance_withoutStartBalances_poolsUseFixedPoolTotal() {
+        double[][] paths = {{250_000, 250_000}};
+        var ctx = contextWithStarts(paths, null);
+
+        double baseline = SustainabilitySearch.initialTotalBalance(ctx,
+                new PoolSimSetup(100_000, 90_000, 60_000, "taxable_first", true));
+
+        assertThat(baseline).isEqualTo(250_000);
     }
 
     private static double[][] flatPaths(int trialCount, int years, double balance) {

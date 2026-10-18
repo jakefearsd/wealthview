@@ -1,6 +1,7 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
+import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -454,6 +455,48 @@ class PortfolioPathGeneratorTest {
                 assertThat(value).isEqualTo(11_000.0 / 210_000.0, within(1e-12));
             }
         }
+    }
+
+    /** Replays scripted bootstrap draws: every block terminates, and {@code nextInt} pops the script. */
+    private static final class ScriptedRandom extends Random {
+        private static final long serialVersionUID = 1L;
+        private final transient ArrayDeque<Integer> script;
+
+        ScriptedRandom(int... draws) {
+            super(0L);
+            script = new ArrayDeque<>();
+            for (int draw : draws) {
+                script.add(draw);
+            }
+        }
+
+        @Override
+        public int nextInt(int bound) {
+            return script.removeFirst();
+        }
+
+        @Override
+        public double nextDouble() {
+            return 0.0;
+        }
+    }
+
+    @Test
+    void generate_preRetirementYears_prefixIndicesDriveAccumulationAndSuffixDriveRetirement() {
+        // Row 0 = +10% and row 1 = -10% for every asset class. The scripted full sequence over
+        // pre(2) + years(2) is [0, 0, 1, 1]: the FIRST two indices must grow the account to
+        // 100000 * 1.1 * 1.1, and the REMAINING two must supply the retirement returns of -10%.
+        var matrix = new RealReturnMatrix(new int[]{1, 2}, ORDER, new double[][]{
+                {0.10, 0.10, 0.10, 0.10},
+                {-0.10, -0.10, -0.10, -0.10},
+        });
+        var model = PoolReturnModel.from(List.of(allocationAccount("100000", AssetAllocation.ALL_US, "taxable")),
+                0.0);
+
+        var paths = PortfolioPathGenerator.generate(1, 2, 2, model, matrix, new ScriptedRandom(0, 0, 1, 1), 0.0);
+
+        assertThat(paths.startBalances()[0].total()).isEqualTo(121_000.0, within(1e-6));
+        assertArraysClose(paths.taxableReturns()[0], new double[]{-0.10, -0.10});
     }
 
     @Test

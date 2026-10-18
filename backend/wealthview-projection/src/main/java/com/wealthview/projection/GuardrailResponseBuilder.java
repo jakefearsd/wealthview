@@ -286,7 +286,7 @@ final class GuardrailResponseBuilder {
 
     /** Year-0 guardrail baseline: the median of the trials' own retirement-start totals when trials
      * start in the base year, else the single expected-path pool total. */
-    private static double yearZeroBaseline(OptimizationSetup ctx, PoolSimSetup poolSetup) {
+    static double yearZeroBaseline(OptimizationSetup ctx, PoolSimSetup poolSetup) {
         var starts = ctx.sim().startBalances();
         return starts != null ? TrialStartBalances.medianTotal(starts) : poolSetup.initTotal();
     }

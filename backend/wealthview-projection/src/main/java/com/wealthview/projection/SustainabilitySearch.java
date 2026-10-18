@@ -211,7 +211,7 @@ final class SustainabilitySearch {
         double[] balancesAtYear = new double[trialCount];
         for (int y = 0; y < years; y++) {
             for (int t = 0; t < trialCount; t++) {
-                double growthFactor = paths[t][y + 1] / paths[t][y];
+                double growthFactor = SpendingCorridorCalculator.unwithdrawnGrowthFactor(paths[t], y);
                 balances[t] = Math.max(0, balances[t] * growthFactor - floorWithdrawals[y]);
                 balancesAtYear[t] = balances[t];
             }
@@ -543,7 +543,7 @@ final class SustainabilitySearch {
      * ({@code paths[t][0]}, constant across trials by construction — see
      * {@code PortfolioPathGenerator.generate}). When trials start in the base year the trials no
      * longer share one balance, so the baseline is the MEDIAN of their retirement-start totals. */
-    private static double initialTotalBalance(SearchContext ctx, PoolSimSetup poolSetup) {
+    static double initialTotalBalance(SearchContext ctx, PoolSimSetup poolSetup) {
         var starts = ctx.returnPaths().startBalances();
         if (starts != null) {
             return TrialStartBalances.medianTotal(starts);
