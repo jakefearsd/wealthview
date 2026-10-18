@@ -1,5 +1,7 @@
 package com.wealthview.projection;
 
+import org.springframework.lang.Nullable;
+
 /**
  * Monte Carlo return trajectories for one optimization run.
  *
@@ -9,9 +11,22 @@ package com.wealthview.projection;
  * sequence per trial. {@code portfolioPaths} is a {@code [trial][year+1]} cumulative
  * total-portfolio balance path (balance-weighted blend of all accounts) retained for the essential-
  * floor verification and spending-corridor calculators, which reason about the whole portfolio.
+ *
+ * <p>{@code startBalances} holds each trial's balances at retirement start after its own
+ * pre-retirement accumulation; it is {@code null} exactly when there are no pre-retirement years.
  */
 record PortfolioReturnPaths(
         double[][] taxableReturns,
         double[][] traditionalReturns,
         double[][] rothReturns,
-        double[][] portfolioPaths) {}
+        double[][] portfolioPaths,
+        @Nullable TrialStartBalances[] startBalances) {
+
+    /** Paths with no pre-retirement prefix: {@code startBalances} is {@code null}. */
+    // UseVarargs: portfolioPaths is a [trial][year] matrix, not a variable argument list.
+    @SuppressWarnings("PMD.UseVarargs")
+    PortfolioReturnPaths(double[][] taxableReturns, double[][] traditionalReturns, double[][] rothReturns,
+                         double[][] portfolioPaths) {
+        this(taxableReturns, traditionalReturns, rothReturns, portfolioPaths, null);
+    }
+}

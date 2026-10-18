@@ -12,8 +12,10 @@ import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealRetur
 import com.wealthview.core.projection.dto.AssetAllocation;
 import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
+import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
 /**
@@ -337,5 +339,129 @@ class PortfolioPathGeneratorTest {
         var paths = PortfolioPathGenerator.generate(1, 3, model, FLAT_US_MATRIX, new Random(1L), 0.0);
 
         assertAllClose(paths.rothReturns()[0], 0.06);
+    }
+
+    private static HypotheticalAccountInput contributingAccount(String balance, String contribution,
+                                                                String type) {
+        return new HypotheticalAccountInput(new BigDecimal(balance), new BigDecimal(contribution),
+                AssetAllocation.ALL_US, Optional.empty(), type);
+    }
+
+    @Test
+    void generate_zeroPreRetirementYears_identicalToSixArgOverload() {
+        var model = PoolReturnModel.from(List.of(
+                contributingAccount("100000", "5000", "taxable"),
+                contributingAccount("50000", "0", "traditional")), 0.02);
+
+        var sixArg = PortfolioPathGenerator.generate(20, 10, model, ProjectionTestFixtures.TEST_CMA_MATRIX,
+                new Random(7L), 0.001);
+        var sevenArg = PortfolioPathGenerator.generate(20, 0, 10, model, ProjectionTestFixtures.TEST_CMA_MATRIX,
+                new Random(7L), 0.001);
+
+        assertThat(sevenArg.taxableReturns()).isDeepEqualTo(sixArg.taxableReturns());
+        assertThat(sevenArg.traditionalReturns()).isDeepEqualTo(sixArg.traditionalReturns());
+        assertThat(sevenArg.rothReturns()).isDeepEqualTo(sixArg.rothReturns());
+        assertThat(sevenArg.portfolioPaths()).isDeepEqualTo(sixArg.portfolioPaths());
+        assertThat(sevenArg.startBalances()).isNull();
+    }
+
+    @Test
+    void generate_preRetirementYears_contributesBeforeGrowthEachYear() {
+        var model = PoolReturnModel.from(List.of(contributingAccount("100000", "10000", "taxable")), 0.0);
+
+        var paths = PortfolioPathGenerator.generate(3, 2, 4, model, FLAT_US_MATRIX, new Random(1L), 0.0);
+
+        for (int t = 0; t < 3; t++) {
+            assertThat(paths.startBalances()[t].taxable()).isEqualTo(144_100.0, within(1e-6));
+            assertThat(paths.portfolioPaths()[t][0]).isEqualTo(144_100.0, within(1e-6));
+        }
+    }
+
+    @Test
+    void generate_preRetirementYears_feeReducesEachYearsGrowth() {
+        var model = PoolReturnModel.from(List.of(contributingAccount("100000", "10000", "taxable")), 0.0);
+
+        var paths = PortfolioPathGenerator.generate(3, 2, 4, model, FLAT_US_MATRIX, new Random(1L), 0.01);
+
+        for (int t = 0; t < 3; t++) {
+            assertThat(paths.startBalances()[t].taxable()).isEqualTo(141_591.0, within(1e-6));
+        }
+    }
+
+    @Test
+    void generate_preRetirementYears_overrideAccount_sameStartInEveryTrial() {
+        var model = PoolReturnModel.from(List.of(overrideAccount("100000", "0.05", "taxable")), 0.0);
+
+        var paths = PortfolioPathGenerator.generate(10, 3, 4, model, ProjectionTestFixtures.TEST_CMA_MATRIX,
+                new Random(3L), 0.0);
+
+        for (int t = 0; t < 10; t++) {
+            assertThat(paths.startBalances()[t].taxable()).isEqualTo(115_762.5, within(1e-6));
+        }
+    }
+
+    @Test
+    void generate_preRetirementYears_dispersedMatrix_startBalancesVaryAcrossTrials() {
+        var model = PoolReturnModel.from(List.of(allocationAccount("100000", AssetAllocation.ALL_US, "taxable")),
+                0.0);
+
+        var paths = PortfolioPathGenerator.generate(200, 10, 5, model, ProjectionTestFixtures.TEST_CMA_MATRIX,
+                new Random(42L), 0.0);
+
+        double min = Double.MAX_VALUE;
+        double max = -Double.MAX_VALUE;
+        for (var start : paths.startBalances()) {
+            min = Math.min(min, start.total());
+            max = Math.max(max, start.total());
+        }
+        assertThat(min).isLessThan(max);
+    }
+
+    @Test
+    void generate_preRetirementYears_zeroOpeningBalanceWithContributions_growsPerTrial() {
+        var model = PoolReturnModel.from(List.of(contributingAccount("0", "5000", "taxable")), 0.0);
+
+        var paths = PortfolioPathGenerator.generate(3, 2, 4, model, FLAT_US_MATRIX, new Random(1L), 0.0);
+
+        for (int t = 0; t < 3; t++) {
+            assertThat(paths.startBalances()[t].taxable()).isEqualTo(11_550.0, within(1e-6));
+            assertAllClose(paths.taxableReturns()[t], 0.10);
+        }
+    }
+
+    @Test
+    void generate_preRetirementYears_negativeContribution_neverBelowZero() {
+        var model = PoolReturnModel.from(List.of(contributingAccount("1000", "-5000", "taxable")), 0.0);
+
+        var paths = PortfolioPathGenerator.generate(3, 3, 4, model, FLAT_US_MATRIX, new Random(1L), 0.0);
+
+        for (int t = 0; t < 3; t++) {
+            assertThat(paths.startBalances()[t].taxable()).isEqualTo(0.0);
+            assertThat(paths.portfolioPaths()[t][0]).isEqualTo(0.0);
+        }
+    }
+
+    @Test
+    void generate_preRetirementYears_poolBlendWeightsUseTrialRetirementBalances() {
+        var model = PoolReturnModel.from(List.of(
+                overrideAccount("100000", "0.0", "taxable"),
+                contributingAccount("0", "100000", "taxable")), 0.0);
+
+        var paths = PortfolioPathGenerator.generate(2, 1, 3, model, FLAT_US_MATRIX, new Random(1L), 0.0);
+
+        for (int t = 0; t < 2; t++) {
+            for (double value : paths.taxableReturns()[t]) {
+                assertThat(value).isEqualTo(11_000.0 / 210_000.0, within(1e-12));
+            }
+        }
+    }
+
+    @Test
+    void generate_negativePreRetirementYears_throwsIllegalArgument() {
+        var model = PoolReturnModel.from(List.of(overrideAccount("100000", "0.05", "taxable")), 0.0);
+
+        assertThatThrownBy(() -> PortfolioPathGenerator.generate(1, -1, 4, model, FLAT_US_MATRIX,
+                new Random(1L), 0.0))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }
