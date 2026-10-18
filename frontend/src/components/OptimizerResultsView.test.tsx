@@ -80,7 +80,7 @@ describe('OptimizerResultsView', () => {
                 retirementDate="2035-01-01"
             />
         );
-        expect(screen.getByText(/profile is stale/i)).toBeInTheDocument();
+        expect(screen.getByText(/profile is out of date/i)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: /Re-optimize/i }));
         expect(onReoptimize).toHaveBeenCalled();
     });

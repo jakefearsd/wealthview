@@ -246,6 +246,8 @@ A guardrail profile is a spending plan just like a spending profile — the two 
 1. Open a projection scenario.
 2. Click **Optimize Spending**.
 
+Each simulated market history starts today: your balances and contributions grow through simulated markets until you retire, so a downturn in the years before retirement is part of the result.
+
 The top of the page shows a read-only summary of the scenario — inflation, retirement year, end age, account balances by type, and income sources — with the note: *"These values come from the projection scenario. Edit the scenario to change them."* To change any of that, go back and edit the scenario.
 
 ### Optimization Parameters
@@ -376,6 +378,6 @@ Back on **Spending Profiles**, guardrail profiles get their own section: *"Optim
 
 Each shows a **$min – $max / year** range with tiles for **Essential Floor**, **Failure Rate**, **Median Final Balance**, **Trials**, **Cash Buffer**, and **Balance Range (P10–P50)**, plus **View**, **Re-optimize**, and **Delete** actions.
 
-A **Stale** badge means the scenario changed after the optimization ran — balances moved, you added an account, you changed the retirement date. The numbers are no longer trustworthy; click **Re-optimize** to refresh them using the same confidence level and risk tolerance as before.
+A **Stale** badge means the scenario changed after the optimization ran — balances moved, you added an account, you changed the retirement date. The numbers are no longer trustworthy; click **Re-optimize** to refresh them using the same confidence level and risk tolerance as before. The badge also appears after WealthView changes how it simulates.
 
 Deleting a guardrail profile asks first: *"Delete this guardrail profile? The scenario will revert to its spending profile for projections."*

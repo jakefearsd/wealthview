@@ -54,7 +54,7 @@ export default function OptimizerResultsView({
                     padding: '1rem', display: 'flex', justifyContent: 'space-between',
                     alignItems: 'center', marginBottom: '1.5rem',
                 }}>
-                    <span style={{ color: '#bf360c' }}>This profile is stale &mdash; the scenario has changed since optimization.</span>
+                    <span style={{ color: '#bf360c' }}>This profile is out of date &mdash; your scenario or WealthView's simulation model has changed since it was optimized.</span>
                     <button onClick={onReoptimize}
                         style={{ padding: '0.35rem 0.75rem', background: '#b45309', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>
                         Re-optimize

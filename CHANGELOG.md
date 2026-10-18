@@ -6,6 +6,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Monte Carlo simulations now start today rather than at retirement, for every scenario.
+- Success rates and recommended spending may move, especially when retirement is years away.
+- Existing optimized profiles are marked out of date. Re-optimize to refresh them.
+- Scenarios retiring this year are unaffected.
+
 ## [1.3.0] — 2026-10-17
 
 Phase 1a of the tactical retirement planning work: a tax-space view of each
