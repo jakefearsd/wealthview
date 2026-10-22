@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.1</version>
+        <version>4.1.2</version>
         <relativePath/>
     </parent>
 
@@ -76,7 +76,7 @@
         <commons-csv.version>1.14.1</commons-csv.version>
         <ofx4j.version>1.39</ofx4j.version>
         <jsoup.version>1.23.2</jsoup.version>
-        <caffeine.version>3.3.0</caffeine.version>
+        <caffeine.version>3.3.1</caffeine.version>
         <samstevens-totp.version>1.7.1</samstevens-totp.version>
         <guava.version>33.7.2-jre</guava.version>
         <jsonassert.version>1.5.3</jsonassert.version>
@@ -100,7 +100,7 @@
              rather than in tests, which is exactly why green tests are not reassurance). -->
         <flyway.version>13.9.0</flyway.version>
         <!-- Quality tool versions -->
-        <spotbugs-maven-plugin.version>4.10.4.1</spotbugs-maven-plugin.version>
+        <spotbugs-maven-plugin.version>4.10.5.0</spotbugs-maven-plugin.version>
         <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
         <jacoco-plugin.version>0.8.15</jacoco-plugin.version>
         <pmd-plugin.version>3.28.0</pmd-plugin.version>
