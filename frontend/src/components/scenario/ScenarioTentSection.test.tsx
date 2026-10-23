@@ -46,7 +46,7 @@ function sizing(overrides: Partial<BondTentSizing> = {}): BondTentSizing {
     };
 }
 
-function renderSection(config: BondTentConfig | null, props: { planAvailable?: boolean; scenarioId?: string | null } = {}) {
+function renderSection(config: BondTentConfig | null, props: { planAvailable?: boolean; scenarioId?: string | null; savedPlanMatches?: boolean } = {}) {
     const onChange = vi.fn();
     render(
         <ScenarioTentSection
@@ -54,6 +54,7 @@ function renderSection(config: BondTentConfig | null, props: { planAvailable?: b
             onChange={onChange}
             planAvailable={props.planAvailable ?? true}
             scenarioId={props.scenarioId === undefined ? null : props.scenarioId}
+            savedPlanMatches={props.savedPlanMatches ?? true}
         />,
     );
     return onChange;
@@ -258,11 +259,42 @@ describe('ScenarioTentSection', () => {
         expect(mockSize).not.toHaveBeenCalled();
     });
 
+    it('asks to save first, without calling the api, when the plan differs from the saved one', async () => {
+        vi.useFakeTimers();
+        renderSection(defaultConfig(), { scenarioId: 'sc-1', savedPlanMatches: false });
+
+        await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+
+        expect(screen.getByText('Save the scenario to see how big the tent needs to be.')).toBeInTheDocument();
+        expect(mockSize).not.toHaveBeenCalled();
+    });
+
+    it('says the sizing is based on the saved scenario', async () => {
+        vi.useFakeTimers();
+        mockSize.mockResolvedValue(sizing());
+        renderSection(defaultConfig(), { scenarioId: 'sc-1' });
+
+        await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+
+        expect(screen.getByText(
+            "Based on your saved scenario. Save to include any changes you've made since.",
+        )).toBeInTheDocument();
+    });
+
+    it('marks a mix that is not selected when its shares are wrong', () => {
+        const config = defaultConfig();
+        config.mixes.push({ name: 'Other', shares: { ultrashort: 0.5, short: 0.4, intermediate: 0, long: 0 } });
+        renderSection(config);
+
+        expect(screen.getByLabelText('Mix 2 name')).toHaveAttribute('aria-invalid', 'true');
+        expect(screen.getByLabelText('Mix 1 name')).not.toHaveAttribute('aria-invalid', 'true');
+    });
+
     it('clears a stale sizing result when the config becomes invalid', async () => {
         vi.useFakeTimers();
         mockSize.mockResolvedValue(sizing());
         const onChange = vi.fn();
-        const props = { onChange, planAvailable: true, scenarioId: 'sc-1' };
+        const props = { onChange, planAvailable: true, scenarioId: 'sc-1', savedPlanMatches: true };
         const { rerender } = render(<ScenarioTentSection config={defaultConfig()} {...props} />);
         await act(async () => { await vi.advanceTimersByTimeAsync(500); });
         expect(screen.getByText(/Tent size needed: \$240,000/)).toBeInTheDocument();

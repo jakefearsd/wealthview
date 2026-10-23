@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../hooks/useApiQuery', () => ({
     useApiQuery: vi.fn(),
@@ -8,6 +8,7 @@ vi.mock('../hooks/useApiQuery', () => ({
 vi.mock('../api/accounts', () => ({ listAccounts: vi.fn() }));
 vi.mock('../api/spendingProfiles', () => ({ listSpendingProfiles: vi.fn() }));
 vi.mock('../api/incomeSources', () => ({ listIncomeSources: vi.fn() }));
+vi.mock('../api/projections', () => ({ sizeBondTent: vi.fn() }));
 
 vi.mock('../utils/format', () => ({
     formatCurrency: (v: number) => `$${v.toLocaleString()}`,
@@ -36,12 +37,14 @@ vi.mock('./CurrencyInput', () => ({
 }));
 
 import { useApiQuery } from '../hooks/useApiQuery';
+import { sizeBondTent } from '../api/projections';
 import ScenarioForm from './ScenarioForm';
 import type { Scenario, ProjectionAccount } from '../types/projection';
 import type { Account } from '../types/account';
 import { makeAccount, makeScenario as buildScenario } from '../testutil/builders';
 
 const mockUseApiQuery = vi.mocked(useApiQuery);
+const mockSizeBondTent = vi.mocked(sizeBondTent);
 
 const spendingProfile = { id: 'sp-1', name: 'Base Plan', essential_expenses: 50000, discretionary_expenses: 20000 };
 
@@ -320,6 +323,114 @@ describe('ScenarioForm', () => {
             render(<ScenarioForm initialValues={tentScenario(bad)} onSubmit={vi.fn()} submitLabel="Save" />);
 
             expect(screen.getByText('Save')).toBeDisabled();
+        });
+    });
+
+    describe('bond tent sizing and plan availability', () => {
+        const tent = {
+            coverage_years: 6.5,
+            build_up_start_years: 8,
+            mixes: [{ name: 'Mine', shares: { ultrashort: 0.5, short: 0.5, intermediate: 0, long: 0 } }],
+            yields: { ultrashort: 0.04, short: 0.045, intermediate: 0.05, long: 0.055 },
+        };
+        const otherProfile = { id: 'sp-2', name: 'Other Plan', essential_expenses: 40000, discretionary_expenses: 10000 };
+        const SAVE_FIRST = 'Save the scenario to see how big the tent needs to be.';
+
+        function scenarioWith(overrides: Record<string, unknown>, bondTent: unknown = tent): Scenario {
+            return buildScenario({
+                params_json: JSON.stringify({ birth_year: 1980, bond_tent: bondTent }),
+                ...overrides,
+            } as Partial<Scenario>);
+        }
+
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        it('sizes the saved scenario when the plan selection is unchanged', async () => {
+            vi.useFakeTimers();
+            setupMocks();
+            mockSizeBondTent.mockResolvedValue({
+                projected_portfolio_at_retirement: 1, coverage_years: 6.5, mixes: [], covered_years: [],
+            });
+            render(<ScenarioForm initialValues={scenarioWith({ spending_profile: spendingProfile })}
+                onSubmit={vi.fn()} submitLabel="Save" />);
+
+            await act(async () => { await vi.advanceTimersByTimeAsync(600); });
+
+            expect(mockSizeBondTent).toHaveBeenCalledWith('sc-1', tent);
+        });
+
+        it('asks to save first, without sizing, when the plan was changed since the save', async () => {
+            vi.useFakeTimers();
+            setupMocks({ profiles: [spendingProfile, otherProfile] });
+            render(<ScenarioForm initialValues={scenarioWith({ spending_profile: spendingProfile })}
+                onSubmit={vi.fn()} submitLabel="Save" />);
+
+            fireEvent.change(labeledInput<HTMLSelectElement>('Spending Plan'), { target: { value: 'sp-2' } });
+            await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+
+            expect(screen.getByText(SAVE_FIRST)).toBeInTheDocument();
+            expect(mockSizeBondTent).not.toHaveBeenCalled();
+        });
+
+        it('asks to save first, without sizing, when the saved scenario has no plan', async () => {
+            vi.useFakeTimers();
+            setupMocks();
+            render(<ScenarioForm initialValues={scenarioWith({ spending_profile: null }, null)}
+                onSubmit={vi.fn()} submitLabel="Save" />);
+
+            fireEvent.change(labeledInput<HTMLSelectElement>('Spending Plan'), { target: { value: 'sp-1' } });
+            fireEvent.click(screen.getByLabelText('Use a bond tent'));
+            await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+
+            expect(screen.getByText(SAVE_FIRST)).toBeInTheDocument();
+            expect(mockSizeBondTent).not.toHaveBeenCalled();
+        });
+
+        it('treats an inactive guardrail profile as no plan for the tent', () => {
+            setupMocks();
+            const scenario = scenarioWith({
+                spending_profile: null,
+                guardrail_profile: { id: 'g-1', name: 'Guard', stale: false, active: false },
+            });
+            render(<ScenarioForm initialValues={scenario} onSubmit={vi.fn()} submitLabel="Save" />);
+
+            fireEvent.change(labeledInput<HTMLSelectElement>('Spending Plan'), { target: { value: 'guardrail' } });
+
+            expect(screen.getByLabelText('Use a bond tent')).toBeDisabled();
+            expect(screen.getByText(
+                'A bond tent needs a spending plan. Choose a spending profile or an optimized plan above.',
+            )).toBeInTheDocument();
+        });
+
+        it('keeps the tent available for an active guardrail profile', () => {
+            setupMocks();
+            const scenario = scenarioWith({
+                spending_profile: null,
+                guardrail_profile: { id: 'g-1', name: 'Guard', stale: false, active: true },
+            });
+            render(<ScenarioForm initialValues={scenario} onSubmit={vi.fn()} submitLabel="Save" />);
+
+            expect(screen.getByLabelText('Use a bond tent')).not.toBeDisabled();
+        });
+
+        it('names the mix that blocks saving even when another mix is selected', () => {
+            setupMocks();
+            const bad = {
+                ...tent,
+                mixes: [
+                    tent.mixes[0],
+                    { name: 'Other', shares: { ultrashort: 0.5, short: 0.4, intermediate: 0, long: 0 } },
+                ],
+            };
+            render(<ScenarioForm initialValues={scenarioWith({ spending_profile: spendingProfile }, bad)}
+                onSubmit={vi.fn()} submitLabel="Save" />);
+
+            expect(screen.getByText('Save')).toBeDisabled();
+            expect(screen.getByText(
+                "Bond mix 'Other' shares must each be between 0% and 100% and add up to 100%",
+            )).toBeInTheDocument();
         });
     });
 

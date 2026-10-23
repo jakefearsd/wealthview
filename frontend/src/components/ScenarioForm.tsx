@@ -12,7 +12,7 @@ import ScenarioTaxSection from './scenario/ScenarioTaxSection';
 import ScenarioHouseholdSection from './scenario/ScenarioHouseholdSection';
 import ScenarioAccountsSection from './scenario/ScenarioAccountsSection';
 import ScenarioTentSection from './scenario/ScenarioTentSection';
-import { isTentConfigValid } from './scenario/bondTentValidation';
+import { tentConfigError } from './scenario/bondTentValidation';
 import {
     DEFAULT_SURVIVOR_SPENDING_FACTOR,
     DEFAULT_LONGEVITY_CONDITIONAL_AGE,
@@ -67,11 +67,14 @@ function parseBondTent(paramsJson: string | null | undefined): BondTentConfig | 
     return parsed.bond_tent ?? null;
 }
 
+/** The Spending Plan dropdown value a saved scenario starts on: an active guardrail, else its profile id. */
+function savedPlanSelection(initialValues: Scenario | null | undefined): string {
+    return initialValues?.guardrail_profile?.active ? 'guardrail' : (initialValues?.spending_profile?.id ?? '');
+}
+
 function buildInitialFields(initialValues: Scenario | null | undefined): ScenarioFormFields {
     const parsedParams = initialValues?.params_json ? JSON.parse(initialValues.params_json) : {};
-    const spendingPlanSelection = initialValues?.guardrail_profile?.active
-        ? 'guardrail'
-        : (initialValues?.spending_profile?.id ?? '');
+    const spendingPlanSelection = savedPlanSelection(initialValues);
 
     return {
         name: initialValues?.name ?? '',
@@ -180,9 +183,16 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
 
     const household = spouseBirthYear != null;
     // A tent needs a spending plan; with "None" selected it is unavailable and never sent.
-    const tentPlanAvailable = spendingPlanSelection !== '';
+    // An inactive guardrail profile is not a plan: the server only counts an active one.
+    const savedSelection = savedPlanSelection(initialValues);
+    const tentPlanAvailable = spendingPlanSelection === 'guardrail'
+        ? Boolean(initialValues?.guardrail_profile?.active)
+        : spendingPlanSelection !== '';
+    // Sizing runs against the saved scenario, so it needs a saved plan that is still the selected one.
+    const savedPlanMatches = savedSelection !== '' && spendingPlanSelection === savedSelection;
     const bondTentOn = bondTent != null && tentPlanAvailable;
-    const hasInvalidTent = bondTentOn && !isTentConfigValid(bondTent);
+    const tentError = bondTentOn ? tentConfigError(bondTent) : null;
+    const hasInvalidTent = tentError !== null;
 
     // Clearing the spouse birth year nulls (and hides) every dependent household field — a
     // household field with no spouse is meaningless, mirrors the backend's own validation
@@ -351,6 +361,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 onChange={setBondTent}
                 planAvailable={tentPlanAvailable}
                 scenarioId={initialValues?.id ?? null}
+                savedPlanMatches={savedPlanMatches}
             />
 
             <ScenarioIncomeSourcesSection
@@ -412,7 +423,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
             </Button>
             {hasInvalidTent && (
                 <div style={{ fontSize: '0.8rem', color: '#d32f2f', marginTop: '0.4rem' }}>
-                    Fix the bond tent settings before saving.
+                    {tentError}
                 </div>
             )}
             {hasInvalidAllocation && (

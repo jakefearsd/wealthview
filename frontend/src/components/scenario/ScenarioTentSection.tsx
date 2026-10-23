@@ -17,7 +17,9 @@ import {
     DEFAULT_TENT_YIELDS,
     EXAMPLE_FUNDS,
 } from './bondTentDefaults';
-import { MATURITIES, MAX_MIXES, MAX_NAME_LENGTH, SHARE_TOLERANCE, isTentConfigValid, shareTotal } from './bondTentValidation';
+import {
+    MATURITIES, MAX_MIXES, MAX_NAME_LENGTH, SHARE_TOLERANCE, isTentConfigValid, mixError, shareTotal,
+} from './bondTentValidation';
 
 const SIZING_DEBOUNCE_MS = 500;
 const COVERAGE_OPTIONS = Array.from({ length: 19 }, (_, i) => 1 + i * 0.5);
@@ -30,6 +32,8 @@ export interface ScenarioTentSectionProps {
     planAvailable: boolean;
     /** Id of the saved scenario, or null for an unsaved one. Sizing runs against the saved scenario. */
     scenarioId: string | null;
+    /** True when the saved scenario has an active spending plan and the form still has that plan selected. */
+    savedPlanMatches: boolean;
 }
 
 /** Percent display value to decimal, rounded so 29 -> 0.29 rather than 0.28999999999999998. */
@@ -93,14 +97,20 @@ function SizingResult({ sizing }: { sizing: BondTentSizing }) {
     );
 }
 
-function SizingBox({ config, scenarioId }: { config: BondTentConfig; scenarioId: string | null }) {
+function SizingBox({ config, scenarioId, savedPlanMatches }: {
+    config: BondTentConfig;
+    scenarioId: string | null;
+    savedPlanMatches: boolean;
+}) {
     const [sizing, setSizing] = useState<BondTentSizing | null>(null);
     const [error, setError] = useState<string | null>(null);
     const valid = isTentConfigValid(config);
     const configKey = JSON.stringify(config);
+    // The endpoint sizes the SAVED scenario, which needs a saved spending plan that the form still selects.
+    const sizable = scenarioId != null && savedPlanMatches;
 
     useEffect(() => {
-        if (scenarioId == null || !valid) {
+        if (scenarioId == null || !sizable || !valid) {
             setSizing(null);
             setError(null);
             return undefined;
@@ -125,15 +135,22 @@ function SizingBox({ config, scenarioId }: { config: BondTentConfig; scenarioId:
             cancelled = true;
             clearTimeout(timer);
         };
-    }, [scenarioId, valid, configKey]);
+    }, [scenarioId, sizable, valid, configKey]);
 
     let body;
-    if (scenarioId == null) {
+    if (!sizable) {
         body = <div>Save the scenario to see how big the tent needs to be.</div>;
     } else if (error) {
         body = <div style={{ color: '#d32f2f' }}>{error}</div>;
     } else if (sizing) {
-        body = <SizingResult sizing={sizing} />;
+        body = (
+            <>
+                <SizingResult sizing={sizing} />
+                <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#555' }}>
+                    Based on your saved scenario. Save to include any changes you&apos;ve made since.
+                </div>
+            </>
+        );
     } else {
         body = <div>{valid ? 'Sizing the tent...' : 'Fix the tent settings above to see its size.'}</div>;
     }
@@ -145,7 +162,9 @@ function SizingBox({ config, scenarioId }: { config: BondTentConfig; scenarioId:
 }
 
 /** Bond tent configuration: coverage, build-up, up to three maturity mixes, yields, and the live tent size. */
-export default function ScenarioTentSection({ config, onChange, planAvailable, scenarioId }: ScenarioTentSectionProps) {
+export default function ScenarioTentSection({
+    config, onChange, planAvailable, scenarioId, savedPlanMatches,
+}: ScenarioTentSectionProps) {
     const [selected, setSelected] = useState(0);
     const on = config != null && planAvailable;
     const selectedIndex = config ? Math.min(selected, config.mixes.length - 1) : 0;
@@ -232,16 +251,21 @@ export default function ScenarioTentSection({ config, onChange, planAvailable, s
                     </div>
 
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', margin: '0.75rem 0 0.5rem', flexWrap: 'wrap' }}>
-                        {config.mixes.map((m, i) => (
+                        {config.mixes.map((m, i) => {
+                            const invalid = mixError(m) !== null;
+                            return (
                             <span
                                 key={i}
                                 style={{
                                     display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.2rem 0.5rem',
-                                    borderRadius: '999px', border: `1px solid ${i === selectedIndex ? '#1976d2' : '#ccc'}`,
+                                    borderRadius: '999px',
+                                    border: `1px solid ${invalid ? '#d32f2f' : i === selectedIndex ? '#1976d2' : '#ccc'}`,
+                                    background: invalid ? '#fdecea' : undefined,
                                 }}
                             >
                                 <input
                                     aria-label={`Mix ${i + 1} name`}
+                                    aria-invalid={invalid ? true : undefined}
                                     maxLength={MAX_NAME_LENGTH}
                                     value={m.name}
                                     onFocus={() => setSelected(i)}
@@ -260,7 +284,8 @@ export default function ScenarioTentSection({ config, onChange, planAvailable, s
                                     </button>
                                 )}
                             </span>
-                        ))}
+                            );
+                        })}
                         {config.mixes.length < MAX_MIXES && (
                             <button type="button" onClick={addMix}>Add mix</button>
                         )}
@@ -318,7 +343,7 @@ export default function ScenarioTentSection({ config, onChange, planAvailable, s
                         It is never refilled, and whatever is left stays in bonds.
                     </HelpText>
 
-                    <SizingBox config={config} scenarioId={scenarioId} />
+                    <SizingBox config={config} scenarioId={scenarioId} savedPlanMatches={savedPlanMatches} />
                 </div>
             )}
         </div>

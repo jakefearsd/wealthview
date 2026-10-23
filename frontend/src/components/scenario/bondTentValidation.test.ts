@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isTentConfigValid } from './bondTentValidation';
+import { isTentConfigValid, mixError, tentConfigError } from './bondTentValidation';
 import { DEFAULT_TENT_MIX, DEFAULT_TENT_YIELDS } from './bondTentDefaults';
 import type { BondTentConfig } from '../../types/projection';
 
@@ -35,5 +35,32 @@ describe('isTentConfigValid', () => {
         ['a yield below -2%', { yields: { ...DEFAULT_TENT_YIELDS, short: -0.03 } }],
     ] as const)('rejects %s', (_label, overrides) => {
         expect(isTentConfigValid(config(overrides as Partial<BondTentConfig>))).toBe(false);
+    });
+});
+
+describe('tentConfigError', () => {
+    it('is null for the defaults', () => {
+        expect(tentConfigError(config())).toBeNull();
+    });
+
+    it('names the mix whose shares are wrong, using the server wording', () => {
+        const bad = { ...DEFAULT_TENT_MIX, name: 'Other', shares: { ...DEFAULT_TENT_MIX.shares, long: 0.1 } };
+
+        expect(tentConfigError(config({ mixes: [structuredClone(DEFAULT_TENT_MIX), bad] })))
+            .toBe("Bond mix 'Other' shares must each be between 0% and 100% and add up to 100%");
+    });
+
+    it('reports a blank mix name', () => {
+        expect(mixError({ ...DEFAULT_TENT_MIX, name: ' ' }))
+            .toBe('Each bond mix needs a name of at most 40 characters');
+    });
+
+    it.each([
+        [{ coverage_years: 2.3 }, 'Bond tent coverage must be between 1 and 10 years, in half-year steps'],
+        [{ build_up_start_years: 41 }, 'Bond tent build-up start must be between 0 and 40 years before retirement'],
+        [{ mixes: [] }, 'A bond tent needs one to three bond mixes'],
+        [{ yields: { ...DEFAULT_TENT_YIELDS, long: 0.21 } }, 'Bond tent yields must each be between -2% and 20%'],
+    ] as const)('explains %j', (overrides, message) => {
+        expect(tentConfigError(config(overrides as Partial<BondTentConfig>))).toBe(message);
     });
 });

@@ -15,14 +15,39 @@ export function shareTotal(mix: BondTentMix): number {
     return MATURITIES.reduce((sum, m) => sum + mix.shares[m.key], 0);
 }
 
-/** Mirrors the backend's validation, so the form never sends a tent the server will reject. */
+/** The message for a mix that cannot be saved, or null; wording matches the backend's validation. */
+export function mixError(mix: BondTentMix): string | null {
+    if (mix.name.trim() === '' || mix.name.length > MAX_NAME_LENGTH) {
+        return `Each bond mix needs a name of at most ${MAX_NAME_LENGTH} characters`;
+    }
+    const sharesOk = MATURITIES.every(m => mix.shares[m.key] >= 0 && mix.shares[m.key] <= 1)
+        && Math.abs(shareTotal(mix) - 1) <= SHARE_TOLERANCE;
+    return sharesOk
+        ? null
+        : `Bond mix '${mix.name}' shares must each be between 0% and 100% and add up to 100%`;
+}
+
+/** The first problem that would stop the server accepting this tent, or null. Mirrors the backend's validation. */
+export function tentConfigError(config: BondTentConfig): string | null {
+    if (!(config.coverage_years >= 1 && config.coverage_years <= 10 && Number.isInteger(config.coverage_years * 2))) {
+        return 'Bond tent coverage must be between 1 and 10 years, in half-year steps';
+    }
+    if (!(Number.isInteger(config.build_up_start_years) && config.build_up_start_years >= 0
+        && config.build_up_start_years <= 40)) {
+        return 'Bond tent build-up start must be between 0 and 40 years before retirement';
+    }
+    if (config.mixes.length < 1 || config.mixes.length > MAX_MIXES) {
+        return 'A bond tent needs one to three bond mixes';
+    }
+    const mixProblem = config.mixes.map(mixError).find(message => message !== null);
+    if (mixProblem) {
+        return mixProblem;
+    }
+    return MATURITIES.every(m => config.yields[m.key] >= -0.02 && config.yields[m.key] <= 0.2)
+        ? null
+        : 'Bond tent yields must each be between -2% and 20%';
+}
+
 export function isTentConfigValid(config: BondTentConfig): boolean {
-    return config.coverage_years >= 1 && config.coverage_years <= 10
-        && Number.isInteger(config.coverage_years * 2)
-        && Number.isInteger(config.build_up_start_years) && config.build_up_start_years >= 0 && config.build_up_start_years <= 40
-        && config.mixes.length >= 1 && config.mixes.length <= MAX_MIXES
-        && config.mixes.every(mix => mix.name.trim() !== '' && mix.name.length <= MAX_NAME_LENGTH
-            && MATURITIES.every(m => mix.shares[m.key] >= 0 && mix.shares[m.key] <= 1)
-            && Math.abs(shareTotal(mix) - 1) <= SHARE_TOLERANCE)
-        && MATURITIES.every(m => config.yields[m.key] >= -0.02 && config.yields[m.key] <= 0.2);
+    return tentConfigError(config) === null;
 }
