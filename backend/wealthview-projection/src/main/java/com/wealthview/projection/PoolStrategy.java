@@ -82,17 +82,28 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
         }
     }
 
+    /** The bond-tent wiring; the four tent operations below delegate to it. */
+    TentPools tentPools();
+
     /** Enables the tent; until called, the three tent methods below are no-ops / zero. */
-    void configureTent(TentSetup setup);
+    default void configureTent(TentSetup setup) {
+        tentPools().configure(setup);
+    }
 
     /** Reserves {@code max(0, target - reserved)} more in the placement order, up to each pool's free balance. */
-    void topUpTent(BigDecimal targetBalance);
+    default void topUpTent(BigDecimal targetBalance) {
+        tentPools().topUp(targetBalance);
+    }
 
     /** The reserved tent balance after clamping each pool's reservation to its balance. */
-    BigDecimal tentTotal();
+    default BigDecimal tentTotal() {
+        return tentPools().total();
+    }
 
     /** The reserved tent balance by maturity (shortest first); empty until a tent is configured. */
-    Map<BondMaturity, BigDecimal> tentByMaturity();
+    default Map<BondMaturity, BigDecimal> tentByMaturity() {
+        return tentPools().byMaturity();
+    }
 
     /**
      * Task 14: parameter object for {@link #executeWithdrawals(WithdrawalCycleInputs)}, replacing the
@@ -875,10 +886,6 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
 
     // --- MultiPool ---
 
-    // PMD.CyclomaticComplexity: MultiPool is the one stateful pool implementation; the bond-tent glue
-    // (clamp, three per-pool growth branches, top-up) pushed its class total just over the ruleset
-    // ceiling. The tent arithmetic itself lives in TentReservation; only the wiring is counted here.
-    @SuppressWarnings("PMD.CyclomaticComplexity")
     final class MultiPool implements PoolStrategy {
         /**
          * The taxable pool, tracked as FIFO cost-basis lots so withdrawals can realize long-term
@@ -951,9 +958,8 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
          * negative (loss lots). Captured by the memento so the Social Security fixed point restores it. */
         private BigDecimal pendingTaxSaleGain = BigDecimal.ZERO;
 
-        /** Bond tent reservation (all empty, and never consulted, until {@link #configureTent}). */
-        private TentReservation tent = TentReservation.empty();
-        private TentSetup tentSetup;
+        /** Bond tent wiring (inert until {@link #configureTent}). */
+        private final TentPools tents;
 
         private final OwnerPool tradContrib;
         private final OwnerPool rothContrib;
@@ -1041,6 +1047,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             this.taxableEquityShare = taxableEquityShare(taxableAccounts);
             this.traditional = OwnerPool.ofBalances(grouped.getOrDefault(PoolType.TRADITIONAL, List.of()));
             this.roth = OwnerPool.ofBalances(grouped.getOrDefault(PoolType.ROTH, List.of()));
+            this.tents = new TentPools(lots, traditional, roth);
 
             this.tradContrib = OwnerPool.ofContributions(grouped.getOrDefault(PoolType.TRADITIONAL, List.of()));
             this.rothContrib = OwnerPool.ofContributions(grouped.getOrDefault(PoolType.ROTH, List.of()));
@@ -1102,6 +1109,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
 
         @Override
         public BigDecimal applyContributions() {
+            tents.clamp();   // a prior debit into the sleeves must not be hidden by this credit
             // Household task 4: contributions route to the owner configured on each account (the
             // tradContrib/rothContrib schedules are keyed the same way traditional/roth are), so a
             // spouse-owned account grows the spouse's pool only.
@@ -1120,16 +1128,13 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
 
         @Override
         public GrowthResult applyGrowth(boolean retired) {
-            clampTent();
-            BigDecimal tradGrowth = tentHeldIn(PoolType.TRADITIONAL)
-                    ? growWithTent(traditional, PoolType.TRADITIONAL, traditionalReturn)
-                    : traditional.grow(traditionalReturn);
-            BigDecimal rothGrowth = tentHeldIn(PoolType.ROTH)
-                    ? growWithTent(roth, PoolType.ROTH, rothReturn)
-                    : roth.grow(rothReturn);
-            BigDecimal taxableGrowth = tentHeldIn(PoolType.TAXABLE)
-                    ? growTaxableWithTent(retired)
-                    : growTaxableWithoutTent(retired);
+            tents.clamp();
+            BigDecimal tradGrowth = tents.growOwnerPool(traditional, PoolType.TRADITIONAL, traditionalReturn);
+            BigDecimal rothGrowth = tents.growOwnerPool(roth, PoolType.ROTH, rothReturn);
+            BigDecimal taxableGrowth = tents.growTaxable(retired, taxableReturn, taxableEquityShare,
+                            dividendYield, interestYield)
+                    .map(this::bookTaxableYear)
+                    .orElseGet(() -> growTaxableWithoutTent(retired));
 
             // OwnerPool.grow (above) already credited each owner's traditional/Roth slice with its
             // rounded growth; tradGrowth/rothGrowth are the summed totals for the GrowthResult.
@@ -1170,77 +1175,15 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             return taxableGrowth;
         }
 
-        private boolean tentHeldIn(PoolType pool) {
-            return tent.totalIn(pool).signum() > 0;
-        }
-
-        /** Lazily limits each pool's reservation to its balance (debits never touch the tent directly). */
-        private void clampTent() {
-            tent.clampAll(this::balanceOf);
-        }
-
-        private BigDecimal balanceOf(PoolType pool) {
-            return switch (pool) {
-                case TAXABLE -> lots.totalValue();
-                case TRADITIONAL -> traditional.total();
-                case ROTH -> roth.total();
-            };
-        }
-
-        /** Traditional/Roth with a reservation: every owner slice scales by the pool's blended rate. */
-        private BigDecimal growWithTent(OwnerPool pool, PoolType type, BigDecimal poolReturn) {
-            BigDecimal before = pool.total();
-            BigDecimal after = tent.balanceAfterGrowth(type, before, poolReturn, tentSetup.realReturns());
-            return pool.grow(TentReservation.effectiveRate(before, after));
-        }
-
-        /**
-         * Taxable with a reservation: the pool reaches {@code (V-T)(1+r) + sum T_m(1+r_m)}. A retired
-         * year distributes the audit-C1 split over the unreserved part only, plus the sleeves' typed
-         * nominal interest (booked as ordinary interest, reinvested at cost); an accumulation year
-         * books nothing (audit C8). Either way the pool total lands exactly on the blended target.
-         */
-        private BigDecimal growTaxableWithTent(boolean retired) {
-            BigDecimal before = lots.totalValue();
-            var year = tent.taxableYear(before, taxableReturn, retired,
-                    taxableEquityShare.multiply(dividendYield),
-                    BigDecimal.ONE.subtract(taxableEquityShare).multiply(interestYield),
-                    tentSetup.realReturns(), tentSetup.nominalYields());
-            BigDecimal appreciated = year.target().subtract(year.distribution());
-            lots.growToExactTotal(TentReservation.effectiveRate(before, appreciated), appreciated);
-            lots.addLot(year.distribution());   // zero (accumulation year) is a no-op
+        private BigDecimal bookTaxableYear(TentReservation.TaxableYear year) {
             qualifiedDividendIncome = year.dividend();
             ordinaryInterestIncome = year.interest();
-            return year.target().subtract(before);
+            return year.growth();
         }
 
         @Override
-        public void configureTent(TentSetup setup) {
-            this.tentSetup = setup;
-            this.tent = TentReservation.empty();
-        }
-
-        @Override
-        public void topUpTent(BigDecimal targetBalance) {
-            if (tentSetup != null) {
-                clampTent();
-                tent.topUp(targetBalance, tentSetup.placementOrder(), tentSetup.mixShares(), this::balanceOf);
-            }
-        }
-
-        @Override
-        public BigDecimal tentTotal() {
-            clampTent();
-            return tent.total();
-        }
-
-        @Override
-        public Map<BondMaturity, BigDecimal> tentByMaturity() {
-            if (tentSetup == null) {
-                return Map.of();
-            }
-            clampTent();
-            return tent.byMaturity();
+        public TentPools tentPools() {
+            return tents;
         }
 
         /**
@@ -1734,7 +1677,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             // repeatedly). BigDecimal is immutable, so copying the map is enough.
             return new MultiPoolMemento(lots.snapshot(), traditional.snapshot(), roth.snapshot(),
                     qualifiedDividendIncome, ordinaryInterestIncome, lastTaxBreakdown, pendingTaxSaleGain,
-                    tent.copy());
+                    tents.snapshot());
         }
 
         @Override
@@ -1747,7 +1690,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                 this.ordinaryInterestIncome = m.ordinaryInterestIncome();
                 this.lastTaxBreakdown = m.lastTaxBreakdown();
                 this.pendingTaxSaleGain = m.pendingTaxSaleGain();
-                this.tent = m.tent().copy();
+                tents.restore(m.tent());
             }
         }
 
@@ -1863,6 +1806,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             // byte-identical for a single owner.
             BigDecimal actual = conversionLimit.min(traditional.total());
             var converted = traditional.debitProportional(actual);
+            tents.clamp();
             for (var entry : converted.entrySet()) {
                 roth.credit(entry.getKey(), entry.getValue());
             }
@@ -1887,6 +1831,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             BigDecimal forced = rmdAmount.min(traditional.total()).max(BigDecimal.ZERO);
             if (forced.compareTo(BigDecimal.ZERO) > 0) {
                 traditional.debitProportional(forced);
+                tents.clamp();
                 lots.addLot(forced);
             }
             return forced;
@@ -1899,6 +1844,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             }
             BigDecimal forced = traditional.forceOwner(owner, rmdAmount);
             if (forced.compareTo(BigDecimal.ZERO) > 0) {
+                tents.clamp();
                 lots.addLot(forced);
             }
             return forced;
@@ -1937,6 +1883,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
 
         @Override
         public void depositToTaxable(BigDecimal amount) {
+            tents.clamp();
             lots.addLot(amount);   // reinvested surplus enters at cost (basis = value)
         }
 

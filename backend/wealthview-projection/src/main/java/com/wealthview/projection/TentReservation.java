@@ -139,7 +139,7 @@ final class TentReservation {
      * audit-C1 split runs over the unreserved part only; the sleeves add their typed nominal interest.
      * An accumulation year distributes nothing (audit C8).
      */
-    record TaxableYear(BigDecimal target, BigDecimal dividend, BigDecimal interest) {
+    record TaxableYear(BigDecimal growth, BigDecimal target, BigDecimal dividend, BigDecimal interest) {
         BigDecimal distribution() {
             return dividend.add(interest);
         }
@@ -153,12 +153,13 @@ final class TentReservation {
         BigDecimal sleeveInterest = interestIn(PoolType.TAXABLE, nominalYields);
         BigDecimal target = balanceAfterGrowth(PoolType.TAXABLE, before, poolReturn, realReturns);
         if (!retired) {
-            return new TaxableYear(target, BigDecimal.ZERO, BigDecimal.ZERO);
+            return new TaxableYear(target.subtract(before), target, BigDecimal.ZERO, BigDecimal.ZERO);
         }
         BigDecimal dividend = unreserved.multiply(equityYieldRate).setScale(SCALE, PoolStrategy.ROUNDING);
         BigDecimal interest = unreserved.multiply(bondYieldRate).setScale(SCALE, PoolStrategy.ROUNDING)
                 .add(sleeveInterest);
-        return new TaxableYear(target, dividend.max(BigDecimal.ZERO), interest.max(BigDecimal.ZERO));
+        return new TaxableYear(target.subtract(before), target, dividend.max(BigDecimal.ZERO),
+                interest.max(BigDecimal.ZERO));
     }
 
     /** Clamps every pool's reservation to that pool's balance (see {@link #clampTo}). */

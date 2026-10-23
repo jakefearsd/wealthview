@@ -164,6 +164,54 @@ class MultiPoolTentTest {
         assertThat(pool.tentByMaturity().get(BondMaturity.SHORT)).isEqualByComparingTo("50000");
     }
 
+    private static PoolStrategy.MultiPool debitedIntoSleeves(String taxableContribution, String rate) {
+        Map<PoolType, List<ProjectionAccountInput>> accounts = Map.of(
+                PoolType.TAXABLE, List.of(new HypotheticalAccountInput(
+                        bd("100000"), bd(taxableContribution), ZERO, "taxable")),
+                PoolType.TRADITIONAL, List.of(new HypotheticalAccountInput(ZERO, ZERO, ZERO, "traditional")),
+                PoolType.ROTH, List.of(new HypotheticalAccountInput(ZERO, ZERO, ZERO, "roth")));
+        BigDecimal r = bd(rate);
+        var pool = new PoolStrategy.MultiPool(accounts, r, r, r, r,
+                PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST));
+        pool.configureTent(setup(TAXABLE_FIRST, by("0.25", "0.75", "0", "0"), by("0.01", "0.01", "0.01", "0.01"),
+                by("0", "0", "0", "0")));
+        pool.topUpTent(bd("80000"));
+        pool.executeWithdrawals(bd("50000"), 2030, ZERO, ZERO, ZERO, 65);
+        return pool;
+    }
+
+    @Test
+    void depositToTaxable_afterDebitIntoSleeves_doesNotRestoreSpentSleeves() {
+        var pool = debitedIntoSleeves("0", "0");
+
+        pool.depositToTaxable(bd("30000"));
+
+        assertThat(pool.getTotal()).isEqualByComparingTo("80000");
+        assertThat(pool.tentTotal()).isEqualByComparingTo("50000");
+        assertThat(pool.tentByMaturity().get(BondMaturity.ULTRASHORT)).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void applyContributions_afterDebitIntoSleeves_doesNotRestoreSpentSleeves() {
+        var pool = debitedIntoSleeves("30000", "0");
+
+        pool.applyContributions();
+
+        assertThat(pool.getTotal()).isEqualByComparingTo("80000");
+        assertThat(pool.tentTotal()).isEqualByComparingTo("50000");
+    }
+
+    @Test
+    void applyGrowth_afterDebitIntoSleeves_growsOnlyRemainingSleeves() {
+        var pool = debitedIntoSleeves("0", "0.05");
+
+        pool.applyGrowth(false);
+
+        // 50,000 left, all of it sleeve, growing at 1% (not the 5% growth-asset rate)
+        assertThat(pool.getTotal()).isEqualByComparingTo("50500");
+        assertThat(pool.tentTotal()).isEqualByComparingTo("50500");
+    }
+
     @Test
     void snapshotRestore_restoresReservation() {
         var pool = pool("100000", "0", "0", "0.05");
