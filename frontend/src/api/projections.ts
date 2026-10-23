@@ -1,5 +1,5 @@
 import client from './client';
-import type { Scenario, ProjectionResult, CreateScenarioRequest, UpdateScenarioRequest, CompareResponse, GuardrailProfileResponse, GuardrailOptimizationRequest } from '../types/projection';
+import type { Scenario, ProjectionResult, CreateScenarioRequest, UpdateScenarioRequest, CompareResponse, GuardrailProfileResponse, GuardrailOptimizationRequest, BondTentConfig, BondTentSizing } from '../types/projection';
 
 export async function listScenarios(): Promise<Scenario[]> {
     const { data } = await client.get<Scenario[]>('/projections');
@@ -55,5 +55,10 @@ export async function deleteGuardrailProfile(scenarioId: string): Promise<void> 
 
 export async function reoptimize(scenarioId: string): Promise<GuardrailProfileResponse> {
     const { data } = await client.post<GuardrailProfileResponse>(`/projections/${scenarioId}/guardrail/reoptimize`);
+    return data;
+}
+
+export async function sizeBondTent(scenarioId: string, config: BondTentConfig): Promise<BondTentSizing> {
+    const { data } = await client.post<BondTentSizing>(`/projections/${scenarioId}/bond-tent/sizing`, config);
     return data;
 }

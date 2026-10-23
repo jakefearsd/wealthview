@@ -259,6 +259,70 @@ describe('ScenarioForm', () => {
         expect(labeledInput(label).value).toBe(display);
     });
 
+    describe('bond tent', () => {
+        const tent = {
+            coverage_years: 6.5,
+            build_up_start_years: 8,
+            mixes: [{ name: 'Mine', shares: { ultrashort: 0.5, short: 0.5, intermediate: 0, long: 0 } }],
+            yields: { ultrashort: 0.04, short: 0.045, intermediate: 0.05, long: 0.055 },
+        };
+
+        function tentScenario(bondTent: unknown, depression = false): Scenario {
+            return buildScenario({
+                spending_profile: spendingProfile,
+                params_json: JSON.stringify({
+                    birth_year: 1980,
+                    include_depression_years: depression,
+                    ...(bondTent ? { bond_tent: bondTent } : {}),
+                }),
+            } as Partial<Scenario>);
+        }
+
+        it('round-trips bond_tent from params_json into the submit payload', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm initialValues={tentScenario(tent, true)} onSubmit={onSubmit} submitLabel="Save" />);
+
+            fireEvent.click(screen.getByText('Save'));
+
+            await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+            const payload = onSubmit.mock.calls[0][0];
+            expect(payload.bond_tent).toEqual(tent);
+            expect(payload.include_depression_years).toBe(false);
+        });
+
+        it('omits bond_tent when the tent is off', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm initialValues={tentScenario(null)} onSubmit={onSubmit} submitLabel="Save" />);
+
+            fireEvent.click(screen.getByText('Save'));
+
+            await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+            expect('bond_tent' in onSubmit.mock.calls[0][0]).toBe(false);
+        });
+
+        it('omits bond_tent when the spending plan is None', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            const scenario = { ...tentScenario(tent), spending_profile: null } as Scenario;
+            render(<ScenarioForm initialValues={scenario} onSubmit={onSubmit} submitLabel="Save" />);
+
+            fireEvent.click(screen.getByText('Save'));
+
+            await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+            expect('bond_tent' in onSubmit.mock.calls[0][0]).toBe(false);
+        });
+
+        it('blocks saving while the tent shares do not add up to 100%', () => {
+            setupMocks();
+            const bad = { ...tent, mixes: [{ name: 'Mine', shares: { ultrashort: 0.5, short: 0.4, intermediate: 0, long: 0 } }] };
+            render(<ScenarioForm initialValues={tentScenario(bad)} onSubmit={vi.fn()} submitLabel="Save" />);
+
+            expect(screen.getByText('Save')).toBeDisabled();
+        });
+    });
+
     describe('other income', () => {
         it('is editable without any Roth conversion strategy active', () => {
             setupMocks();

@@ -200,6 +200,8 @@ export interface ProjectionResult extends ProjectionCompareResult {
     /** Phase 1a: omitted by the backend when empty. */
     tax_space?: TaxSpaceYear[] | null;
     terminal_value?: TerminalValue | null;
+    /** Present only when the scenario holds a bond tent. */
+    bond_tent?: BondTentResult | null;
 }
 
 export interface CompareResponse {
@@ -244,6 +246,8 @@ export interface CreateScenarioRequest {
     /** Nominal coupon assumption for the bond portion of taxable accounts (decimal, default 0.04, range 0-0.10). */
     interest_yield?: number | null;
     include_depression_years?: boolean | null;
+    /** Sent only while the bond tent is on; omitted otherwise. */
+    bond_tent?: BondTentConfig | null;
     /** Heirs' tax rate on inherited traditional balances (decimal, 0-0.50). Omitted ⇒ server default 0.24. */
     heir_tax_rate?: number | null;
     /** Phase 1a: primary's birth month (1-12). Null = unknown -> early access at the legacy age-60 year. Requires birth_year. */
@@ -553,4 +557,64 @@ export interface GuardrailOptimizationRequest {
      * behavior, so the checkbox state and the persisted profile never silently diverge.
      */
     gate_on_adaptive_rules: boolean;
+}
+
+/** One value per bond maturity bucket. Shares and yields are decimals (0.2 = 20%). */
+export interface BondMaturityValues {
+    ultrashort: number;
+    short: number;
+    intermediate: number;
+    long: number;
+}
+
+export interface BondTentMix {
+    name: string;
+    shares: BondMaturityValues;
+}
+
+/** The first mix is the plan mix. */
+export interface BondTentConfig {
+    coverage_years: number;
+    build_up_start_years: number;
+    mixes: BondTentMix[];
+    yields: BondMaturityValues;
+}
+
+export type BondTentReason = 'SPENDING_LEVEL' | 'INCOME' | 'WITHDRAWAL_TAX' | 'MIX_YIELDS';
+
+export interface BondTentMixSizing {
+    name: string;
+    real_yield: number;
+    target: number;
+    /** 0-1 fraction of the projected portfolio. */
+    percent_of_portfolio: number;
+    rule_of_thumb: number;
+    reason: BondTentReason;
+    reason_amount: number;
+}
+
+export interface BondTentCoveredYear {
+    year: number;
+    withdrawal: number;
+    /** Below 1 marks a partial year. */
+    fraction: number;
+}
+
+export interface BondTentSizing {
+    projected_portfolio_at_retirement: number;
+    coverage_years: number;
+    mixes: BondTentMixSizing[];
+    covered_years: BondTentCoveredYear[];
+}
+
+export interface BondTentYear {
+    year: number;
+    balances: BondMaturityValues;
+    total: number;
+    build_up_target: number | null;
+}
+
+export interface BondTentResult {
+    sizing: BondTentSizing;
+    years: BondTentYear[];
 }

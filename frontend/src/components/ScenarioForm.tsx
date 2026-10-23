@@ -11,6 +11,8 @@ import ScenarioIncomeSourcesSection from './scenario/ScenarioIncomeSourcesSectio
 import ScenarioTaxSection from './scenario/ScenarioTaxSection';
 import ScenarioHouseholdSection from './scenario/ScenarioHouseholdSection';
 import ScenarioAccountsSection from './scenario/ScenarioAccountsSection';
+import ScenarioTentSection from './scenario/ScenarioTentSection';
+import { isTentConfigValid } from './scenario/bondTentValidation';
 import {
     DEFAULT_SURVIVOR_SPENDING_FACTOR,
     DEFAULT_LONGEVITY_CONDITIONAL_AGE,
@@ -24,6 +26,7 @@ import type {
     ScenarioAccountInput,
     ScenarioIncomeSourceInput,
     AllocationInput,
+    BondTentConfig,
 } from '../types/projection';
 import Button from './Button';
 
@@ -57,6 +60,11 @@ function mapAccountType(realType: string): string {
         case 'ira': case '401k': return 'traditional';
         default: return 'taxable';
     }
+}
+
+function parseBondTent(paramsJson: string | null | undefined): BondTentConfig | null {
+    const parsed = paramsJson ? JSON.parse(paramsJson) : {};
+    return parsed.bond_tent ?? null;
 }
 
 function buildInitialFields(initialValues: Scenario | null | undefined): ScenarioFormFields {
@@ -153,6 +161,9 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
             override_annual_amount: is.override_annual_amount,
         })) ?? []
     );
+    const [bondTent, setBondTent] = useState<BondTentConfig | null>(
+        () => parseBondTent(initialValues?.params_json)
+    );
     const [saving, setSaving] = useState(false);
     const hasInvalidAllocation = accounts.some(a => a.allocation != null && !isAllocationValid(a.allocation));
 
@@ -168,6 +179,10 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
     } = fields;
 
     const household = spouseBirthYear != null;
+    // A tent needs a spending plan; with "None" selected it is unavailable and never sent.
+    const tentPlanAvailable = spendingPlanSelection !== '';
+    const bondTentOn = bondTent != null && tentPlanAvailable;
+    const hasInvalidTent = bondTentOn && !isTentConfigValid(bondTent);
 
     // Clearing the spouse birth year nulls (and hides) every dependent household field — a
     // household field with no spouse is meaningless, mirrors the backend's own validation
@@ -282,7 +297,10 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 dividend_yield: dividendYield != null ? dividendYield / 100 : undefined,
                 fee_rate: feeRate != null ? feeRate / 100 : undefined,
                 interest_yield: interestYield != null ? interestYield / 100 : undefined,
-                include_depression_years: includeDepressionYears,
+                // The backend rejects a tent combined with 1928-1971 history, so the tent forces it off.
+                include_depression_years: bondTentOn ? false : includeDepressionYears,
+                // Omitted entirely (not null) when the tent is off.
+                ...(bondTentOn ? { bond_tent: bondTent } : {}),
                 heir_tax_rate: heirTaxRate != null ? heirTaxRate / 100 : undefined,
                 spouse_birth_year: spouseBirthYear,
                 spouse_birth_month: household ? spouseBirthMonth : null,
@@ -325,6 +343,14 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 setField={setField}
                 profiles={profiles}
                 guardrailProfile={initialValues?.guardrail_profile ?? null}
+                bondTentOn={bondTentOn}
+            />
+
+            <ScenarioTentSection
+                config={bondTent}
+                onChange={setBondTent}
+                planAvailable={tentPlanAvailable}
+                scenarioId={initialValues?.id ?? null}
             />
 
             <ScenarioIncomeSourcesSection
@@ -379,11 +405,16 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
 
             <Button
                 onClick={handleSubmit}
-                disabled={saving || hasInvalidAllocation}
+                disabled={saving || hasInvalidAllocation || hasInvalidTent}
                 style={{ marginTop: '0.5rem' }}
             >
                 {saving ? 'Saving...' : submitLabel}
             </Button>
+            {hasInvalidTent && (
+                <div style={{ fontSize: '0.8rem', color: '#d32f2f', marginTop: '0.4rem' }}>
+                    Fix the bond tent settings before saving.
+                </div>
+            )}
             {hasInvalidAllocation && (
                 <div style={{ fontSize: '0.8rem', color: '#d32f2f', marginTop: '0.4rem' }}>
                     One or more account allocations must sum to 100% before saving.

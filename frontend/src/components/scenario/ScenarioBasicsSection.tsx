@@ -8,10 +8,12 @@ export interface ScenarioBasicsSectionProps {
     setField: SetScenarioField;
     profiles: SpendingProfile[] | null;
     guardrailProfile: GuardrailProfileSummary | null;
+    /** While a bond tent is on, 1928-1971 history is unavailable (bond maturity data starts in 1954). */
+    bondTentOn: boolean;
 }
 
 /** Core scenario inputs: name, dates, rates, market drags, and the unified Spending Plan dropdown. */
-export default function ScenarioBasicsSection({ fields, setField, profiles, guardrailProfile }: ScenarioBasicsSectionProps) {
+export default function ScenarioBasicsSection({ fields, setField, profiles, guardrailProfile, bondTentOn }: ScenarioBasicsSectionProps) {
     const {
         name, retirementDate, birthYear, birthMonth, endAge, inflationRate, withdrawalRate,
         dividendYield, interestYield, feeRate, includeDepressionYears, spendingPlanSelection,
@@ -91,11 +93,14 @@ export default function ScenarioBasicsSection({ fields, setField, profiles, guar
             </FormField>
             <FormField
                 label="Include 1928–1971 market history"
-                helpText="Widens the simulated return sample to include the Great Depression and postwar era. Slightly higher average equity returns, materially fatter tails."
+                helpText={bondTentOn
+                    ? 'Not available with a bond tent: bond maturity data starts in 1954.'
+                    : 'Widens the simulated return sample to include the Great Depression and postwar era. Slightly higher average equity returns, materially fatter tails.'}
             >
                 <input
                     type="checkbox"
-                    checked={includeDepressionYears}
+                    checked={includeDepressionYears && !bondTentOn}
+                    disabled={bondTentOn}
                     onChange={e => setField('includeDepressionYears', e.target.checked)}
                 />
             </FormField>
