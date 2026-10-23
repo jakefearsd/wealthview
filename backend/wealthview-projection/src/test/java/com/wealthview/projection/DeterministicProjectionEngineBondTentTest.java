@@ -7,8 +7,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 import com.wealthview.core.projection.BondTentAssumptions;
 import com.wealthview.core.projection.CapitalMarketAssumptionsProvider;
@@ -221,5 +226,64 @@ class DeterministicProjectionEngineBondTentTest {
         var sizing = engine.sizeBondTent(input, config);
 
         assertThat(sizing).isEqualTo(engine.runDetailed(input).bondTent().sizing());
+    }
+
+    @Test
+    void sizeBondTent_savedDepressionYearsFlag_usesDefaultWindow() {
+        var tentInput = tentInput("3", 3, 2029);
+        var config = ScenarioParams.parseOrEmpty(JsonMapper.builder().build(), tentInput.paramsJson()).bondTent();
+        var input = input(", \"include_depression_years\": true", 2029, spending());
+
+        var sizing = engine.sizeBondTent(input, config);
+
+        assertThat(sizing.mixes()).isNotEmpty();
+        verify(cma, never()).geometricMeans(true);
+        verify(cma, atLeastOnce()).geometricMeans(false);
+    }
+
+    @Test
+    void runDetailed_tentRun_logsFinalBalanceOnceAtInfo() {
+        var appender = captureEngineLogs();
+
+        engine.runDetailed(tentInput("3", 3, 2029));
+
+        assertThat(finalBalanceLines(appender, Level.INFO)).hasSize(1);
+    }
+
+    @Test
+    void sizeBondTent_logsNoInfoFinalBalanceLine() {
+        var appender = captureEngineLogs();
+        var input = tentInput("3", 3, 2029);
+        var config = ScenarioParams.parseOrEmpty(JsonMapper.builder().build(), input.paramsJson()).bondTent();
+
+        engine.sizeBondTent(input, config);
+
+        assertThat(finalBalanceLines(appender, Level.INFO)).isEmpty();
+    }
+
+    @Test
+    void runDetailed_noTentRun_logsFinalBalanceOnceAtInfo() {
+        var appender = captureEngineLogs();
+
+        engine.runDetailed(input("", 2029, spending()));
+
+        assertThat(finalBalanceLines(appender, Level.INFO)).hasSize(1);
+    }
+
+    private static ListAppender<ILoggingEvent> captureEngineLogs() {
+        var logger = (Logger) LoggerFactory.getLogger(DeterministicProjectionEngine.class);
+        logger.setLevel(Level.DEBUG);
+        var appender = new ListAppender<ILoggingEvent>();
+        appender.start();
+        logger.addAppender(appender);
+        return appender;
+    }
+
+    private static List<String> finalBalanceLines(ListAppender<ILoggingEvent> appender, Level level) {
+        return appender.list.stream()
+                .filter(e -> e.getLevel() == level)
+                .map(ILoggingEvent::getFormattedMessage)
+                .filter(m -> m.contains("final balance"))
+                .toList();
     }
 }

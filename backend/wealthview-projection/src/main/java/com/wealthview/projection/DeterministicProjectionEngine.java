@@ -10,6 +10,7 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.slf4j.event.Level;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
@@ -239,7 +240,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal survivorSpendingFactor,
             boolean communityProperty,
             BigDecimal heirTaxRate,
-            @Nullable BondTentPlanner.TentRun tent) {
+            @Nullable BondTentPlanner.TentRun tent,
+            boolean sizingPass) {
     }
 
     private ProjectionRunDetail runInternal(ProjectionInput input) {
@@ -296,7 +298,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 resolved.currentYear(), resolved.birthYear(), resolved.retirementYear(), resolved.endYear(),
                 resolved.inflationRate(), resolved.spendingPlan(), resolved.incomeSources(),
                 resolved.properties(), taxStrategy, survivorSpendingFactor, communityProperty,
-                paramsParser.heirTaxRate(params), tent);
+                paramsParser.heirTaxRate(params), tent, tentActive && tent == null);
         return runProjection(ctx);
     }
 
@@ -420,7 +422,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 ? ctx.pool().getTotal()
                 : yearlyData.getLast().endBalance();
 
-        log.info("{} for scenario '{}': {} years, final balance {}",
+        // Pass one of a tent run (or a sizing-only run) is discarded work: keep its summary off INFO.
+        var summaryLevel = ctx.sizingPass() ? Level.DEBUG : Level.INFO;
+        log.atLevel(summaryLevel).log("{} for scenario '{}': {} years, final balance {}",
                 ctx.pool().logTag(), ctx.input().scenarioName(), yearlyData.size(), finalBalance);
 
         var feasibility = feasibilityAnalyzer.computeFeasibility(yearlyData, ctx.spendingPlan());
