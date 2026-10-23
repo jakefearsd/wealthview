@@ -54,6 +54,11 @@ final class TentReservation {
         return sum;
     }
 
+    /** A copy of {@code pool}'s sleeves by maturity; every maturity is present, shortest first. */
+    Map<BondMaturity, BigDecimal> sleevesIn(PoolType pool) {
+        return new EnumMap<>(sleevesOf(pool));
+    }
+
     /** Sleeve value by maturity summed over pools; every maturity is present, shortest first. */
     Map<BondMaturity, BigDecimal> byMaturity() {
         var sum = zeroed();

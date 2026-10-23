@@ -2,6 +2,7 @@ package com.wealthview.projection;
 
 import java.math.BigDecimal;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -102,5 +103,50 @@ class TentReservationTest {
         tent.clampTo(PoolType.TAXABLE, bd("10"));
 
         assertThat(copy.total()).isEqualByComparingTo("100000");
+    }
+
+    private static TentReservation reservedInTraditional() {
+        var tent = TentReservation.empty();
+        tent.reserve(PoolType.TRADITIONAL, bd("100000"), shares("0.25", "0.25", "0.25", "0.25"));
+        return tent;
+    }
+
+    @Test
+    void clampAll_firstPoolAbsorbsOnlyPart_restSpentShortestFirst() {
+        var tent = reservedInTraditional();
+        var balances = Map.of(PoolType.TRADITIONAL, bd("0"), PoolType.TAXABLE, bd("30000"), PoolType.ROTH, bd("0"));
+
+        tent.clampAll(balances::get, List.of(PoolType.TAXABLE, PoolType.ROTH));
+
+        // taxable takes the longest first: all 25,000 long, then 5,000 intermediate
+        var taxable = tent.sleevesIn(PoolType.TAXABLE);
+        assertThat(taxable.get(BondMaturity.LONG)).isEqualByComparingTo("25000");
+        assertThat(taxable.get(BondMaturity.INTERMEDIATE)).isEqualByComparingTo("5000");
+        assertThat(taxable.get(BondMaturity.SHORT)).isEqualByComparingTo("0");
+        assertThat(taxable.get(BondMaturity.ULTRASHORT)).isEqualByComparingTo("0");
+        // no other pool has room: the 70,000 left is spent
+        assertThat(tent.total()).isEqualByComparingTo("30000");
+        assertThat(tent.totalIn(PoolType.TRADITIONAL)).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void clampAll_firstPoolAbsorbsOnlyPart_nextPoolTakesTheRestLongestFirst() {
+        var tent = reservedInTraditional();
+        var balances = Map.of(PoolType.TRADITIONAL, bd("0"), PoolType.TAXABLE, bd("30000"), PoolType.ROTH, bd("50000"));
+
+        tent.clampAll(balances::get, List.of(PoolType.TAXABLE, PoolType.ROTH));
+
+        var taxable = tent.sleevesIn(PoolType.TAXABLE);
+        assertThat(taxable.get(BondMaturity.LONG)).isEqualByComparingTo("25000");
+        assertThat(taxable.get(BondMaturity.INTERMEDIATE)).isEqualByComparingTo("5000");
+        // Roth gets the remaining 20,000 intermediate and 25,000 short, then 5,000 of the 25,000 ultrashort
+        var roth = tent.sleevesIn(PoolType.ROTH);
+        assertThat(roth.get(BondMaturity.LONG)).isEqualByComparingTo("0");
+        assertThat(roth.get(BondMaturity.INTERMEDIATE)).isEqualByComparingTo("20000");
+        assertThat(roth.get(BondMaturity.SHORT)).isEqualByComparingTo("25000");
+        assertThat(roth.get(BondMaturity.ULTRASHORT)).isEqualByComparingTo("5000");
+        // the 20,000 of ultrashort no pool can hold is the only part spent
+        assertThat(tent.total()).isEqualByComparingTo("80000");
+        assertThat(tent.byMaturity().get(BondMaturity.ULTRASHORT)).isEqualByComparingTo("5000");
     }
 }
