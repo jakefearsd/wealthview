@@ -4,7 +4,7 @@
 
 WealthView's data model comprises 42 JPA entities mapped onto 42 PostgreSQL tables across 9 domains. Almost all primary keys are UUID with `DEFAULT gen_random_uuid()`; the exceptions are `prices` (composite `(symbol, date)`), `system_config` (text `key`), and `mobile_app_versions` (text `platform`). Timestamps use `timestamptz`. Monetary amounts use `numeric(19,4)`.
 
-The schema is at **V081**, built from **90 migration files** — 81 versioned (`V001`–`V081`) plus 9 repeatable seeds (`R__…`) — in `backend/wealthview-persistence/src/main/resources/db/migration/`.
+The schema is at **V083**, built from **93 migration files** — 83 versioned (`V001`–`V083`) plus 10 repeatable seeds (`R__…`) — in `backend/wealthview-persistence/src/main/resources/db/migration/`.
 
 ## Entity Relationship Diagram
 
@@ -693,6 +693,22 @@ Real (CPI-adjusted) historical annual total returns per asset class, used by the
 
 **Lifecycle:** Seeded by `R__seed_asset_class_returns` (1928–2025; truncate-and-reload). Read-only at runtime.
 
+### BondMaturityReturnEntity (`bond_maturity_returns`)
+
+Real (CPI-adjusted) annual total returns for the bond tent's Treasury sleeves: short (2-year), intermediate (5-year) and long (25-year).
+
+| Field | Type | Notes |
+|-------|------|-------|
+| id | uuid PK | |
+| year | integer NOT NULL | Calendar year |
+| maturity | text NOT NULL | CHECK IN (`short`, `intermediate`, `long`) |
+| real_return | numeric(9,6) NOT NULL | Real annual total return as a decimal |
+| created_at / updated_at | timestamptz NOT NULL | |
+
+**Constraints:** `uq_bond_maturity_returns_year_maturity UNIQUE (year, maturity)`, `chk_bond_maturity_returns_maturity`.
+
+**Lifecycle:** Seeded by `R__seed_bond_maturity_returns` (1954–2025; truncate-and-reload). Read-only at runtime. Ultrashort is not stored: it is `asset_class_returns.cash`.
+
 ### SecurityAssetClassEntity (`security_asset_class`)
 
 Global symbol → asset class map used by the security classifier.
@@ -955,7 +971,7 @@ Force-update / version-check data for the React Native client — one row per pl
 
 ## Flyway Migration Inventory
 
-Flyway migrations live in `backend/wealthview-persistence/src/main/resources/db/migration/` and run automatically on application startup. There are **90 files**: 81 versioned (`V001`–`V081`) and 9 repeatable seeds.
+Flyway migrations live in `backend/wealthview-persistence/src/main/resources/db/migration/` and run automatically on application startup. There are **93 files**: 83 versioned (`V001`–`V083`) and 10 repeatable seeds.
 
 ### Versioned Migrations
 
@@ -1042,6 +1058,8 @@ Flyway migrations live in `backend/wealthview-persistence/src/main/resources/db/
 | V079      | Add `owner` + `survivor_percent` to income sources                              |
 | V080      | Create `mortality_rates` (SSA period-life qx by sex and age)                    |
 | V081      | Add `optimize_conversions` and `dynamic_sequencing_bracket_rate` to guardrail profiles |
+| V082      | Flag every guardrail profile stale (Monte Carlo trials now start today) |
+| V083      | Create bond_maturity_returns (short/intermediate/long Treasury real returns) |
 
 ### Repeatable Migrations
 
@@ -1056,6 +1074,7 @@ Repeatable migrations re-run whenever their checksum changes. Each is written to
 | R__seed_irmaa_tiers | 2025 IRMAA tiers; Part B surcharges pre-netted against the $185.00 standard premium |
 | R__seed_state_tax_brackets | State brackets, standard deductions, and surcharges — CA, AZ, OR for 2024–2025 |
 | R__seed_asset_class_returns | Real annual returns per asset class, 1928–2025 (Shiller, Damodaran, MSCI EAFE, CPI-U) |
+| R__seed_bond_maturity_returns | Real annual returns for 2-, 5- and 25-year Treasuries, 1954–2025 (FRED CMT yields, CPI-U) |
 | R__seed_security_asset_class | Symbol → asset class map for 24 common tickers |
 | R__seed_mortality_rates | SSA 2021 Period Life Table qx by sex, ages 40–119, plus a terminal age-120 row (qx = 1.0) |
 
