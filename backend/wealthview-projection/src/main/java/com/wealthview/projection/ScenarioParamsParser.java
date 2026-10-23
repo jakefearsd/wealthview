@@ -28,6 +28,20 @@ final class ScenarioParamsParser {
     static final BigDecimal DEFAULT_DIVIDEND_YIELD = new BigDecimal("0.018");
 
     /**
+     * Household task 5: the survivor spending factor assumed when a household scenario omits it (spec
+     * §1 default). Only ever consulted once a first-death transition fires, so single-person and
+     * both-alive years are unaffected.
+     */
+    private static final BigDecimal DEFAULT_SURVIVOR_SPENDING_FACTOR = new BigDecimal("0.75");
+
+    // HP3 Part B-2: ScenarioCrudService.validateSurvivorSpendingFactor enforces this SAME [0.5, 1.0]
+    // range at write time, but a params_json that bypasses that check (a stale persisted value, a
+    // future write path) previously reached the engine's survivor-factor scaling raw -- clamp
+    // defensively here too, mirroring the same guard on the MC seam (HouseholdMcResolver).
+    private static final BigDecimal MIN_SURVIVOR_SPENDING_FACTOR = new BigDecimal("0.5");
+    private static final BigDecimal MAX_SURVIVOR_SPENDING_FACTOR = BigDecimal.ONE;
+
+    /**
      * Annual all-in investment fee/expense-ratio drag (expense ratios + advisory) assumed when a
      * scenario doesn't set one — audit B1: no fee concept existed anywhere, so CMA returns were
      * gross index returns; at typical 0.3-0.8% blended cost, 30-year sustainable spending was
@@ -89,6 +103,25 @@ final class ScenarioParamsParser {
      */
     boolean includeDepressionYears(ScenarioParams params) {
         return Boolean.TRUE.equals(params.includeDepressionYears());
+    }
+
+    /**
+     * Like {@link #includeDepressionYears(ScenarioParams)}, but a bond tent always projects on the default
+     * 1972-2025 window (bond maturity data starts in 1954, and validation rejects the combination), so a legacy
+     * scenario with both never reaches the extended window.
+     */
+    boolean includeDepressionYears(ScenarioParams params, boolean tentActive) {
+        return !tentActive && includeDepressionYears(params);
+    }
+
+    /**
+     * The survivor spending factor: the scenario's explicit override clamped to the documented [0.5, 1.0]
+     * range (a no-op for every value {@code ScenarioCrudService} would have accepted), else the 0.75 default.
+     */
+    BigDecimal survivorSpendingFactor(ScenarioParams params) {
+        return params.survivorSpendingFactor() != null
+                ? params.survivorSpendingFactor().max(MIN_SURVIVOR_SPENDING_FACTOR).min(MAX_SURVIVOR_SPENDING_FACTOR)
+                : DEFAULT_SURVIVOR_SPENDING_FACTOR;
     }
 
     /**

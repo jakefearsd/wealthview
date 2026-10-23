@@ -17,6 +17,13 @@ import com.wealthview.api.testutil.WealthViewControllerTest;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.projection.ProjectionService;
 import com.wealthview.core.projection.ScenarioCrudService;
+import com.wealthview.core.projection.dto.BondMaturityValues;
+import com.wealthview.core.projection.dto.BondTentCoveredYear;
+import com.wealthview.core.projection.dto.BondTentMixSizing;
+import com.wealthview.core.projection.dto.BondTentResult;
+import com.wealthview.core.projection.dto.BondTentSizing;
+import com.wealthview.core.projection.dto.BondTentSizingReason;
+import com.wealthview.core.projection.dto.BondTentYear;
 import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.CompareResponse;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
@@ -421,6 +428,43 @@ class ProjectionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tax_space").doesNotExist())
                 .andExpect(jsonPath("$.terminal_value").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    void serialize_noTent_omitsBondTentKey() throws Exception {
+        var result = new ProjectionResultResponse(SCENARIO_ID, List.of(), BigDecimal.ZERO, 0, null);
+        when(projectionService.runProjection(TENANT_ID, SCENARIO_ID))
+                .thenReturn(new ProjectionRunResult(result, List.of()));
+
+        mockMvc.perform(get("/api/v1/projections/{id}/run", SCENARIO_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bond_tent").doesNotExist());
+    }
+
+    @Test
+    void serialize_withTent_includesSnakeCaseBondTent() throws Exception {
+        var result = new ProjectionResultResponse(SCENARIO_ID, List.of(), BigDecimal.ZERO, 0, null);
+        var balances = new BondMaturityValues(new BigDecimal("1.00"), BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO);
+        var sizing = new BondTentSizing(new BigDecimal("1000000.00"), new BigDecimal("5"),
+                List.of(new BondTentMixSizing("Plan", new BigDecimal("0.020000"), new BigDecimal("1.00"),
+                        new BigDecimal("0.000001"), new BigDecimal("2.00"), BondTentSizingReason.INCOME,
+                        new BigDecimal("-1.00"))),
+                List.of(new BondTentCoveredYear(2030, new BigDecimal("50000.00"), new BigDecimal("1.000000"))));
+        var tent = new BondTentResult(sizing,
+                List.of(new BondTentYear(2030, balances, new BigDecimal("1.00"), new BigDecimal("1.00"))));
+        when(projectionService.runProjection(TENANT_ID, SCENARIO_ID))
+                .thenReturn(new ProjectionRunResult(result, List.of(), List.of(), List.of(), null, tent));
+
+        mockMvc.perform(get("/api/v1/projections/{id}/run", SCENARIO_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bond_tent.sizing.mixes[0].real_yield").value(0.02))
+                .andExpect(jsonPath("$.bond_tent.sizing.mixes[0].reason").value("INCOME"))
+                .andExpect(jsonPath("$.bond_tent.sizing.covered_years[0].year").value(2030))
+                .andExpect(jsonPath("$.bond_tent.years[0].balances.ultrashort").value(1.0))
+                .andExpect(jsonPath("$.bond_tent.years[0].build_up_target").value(1.0));
     }
 
     private void assertScenarioRejected(String extraFields) throws Exception {

@@ -63,7 +63,7 @@ public class ProjectionService {
         var warnings = new ArrayList<>(inputResult.warnings());
         warnings.addAll(resolveWarnings(scenario));
         return new ProjectionRunResult(detail.result(), inputResult.unclassifiedSymbols(),
-                List.copyOf(warnings), detail.taxSpace(), detail.terminalValue());
+                List.copyOf(warnings), detail.taxSpace(), detail.terminalValue(), detail.bondTent());
     }
 
     /**

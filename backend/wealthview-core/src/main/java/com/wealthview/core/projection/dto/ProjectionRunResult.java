@@ -15,16 +15,23 @@ import org.springframework.lang.Nullable;
  */
 public record ProjectionRunResult(ProjectionResultResponse result, List<String> unclassifiedSymbols,
                                    List<String> warnings, List<TaxSpaceYear> taxSpace,
-                                   @Nullable TerminalValue terminalValue) {
+                                   @Nullable TerminalValue terminalValue, @Nullable BondTentResult bondTent) {
+
+    /** Back-compat for callers that predate the bond tent: {@code bondTent} is {@code null}. */
+    public ProjectionRunResult(ProjectionResultResponse result, List<String> unclassifiedSymbols,
+                               List<String> warnings, List<TaxSpaceYear> taxSpace,
+                               @Nullable TerminalValue terminalValue) {
+        this(result, unclassifiedSymbols, warnings, taxSpace, terminalValue, null);
+    }
 
     /** Back-compat for callers that predate run-level warnings (audit C3): defaults to none. */
     public ProjectionRunResult(ProjectionResultResponse result, List<String> unclassifiedSymbols) {
-        this(result, unclassifiedSymbols, List.of(), List.of(), null);
+        this(result, unclassifiedSymbols, List.of(), List.of(), null, null);
     }
 
     /** Back-compat for callers that predate Phase 1a tax space / legacy value: defaults to none. */
     public ProjectionRunResult(ProjectionResultResponse result, List<String> unclassifiedSymbols,
                                List<String> warnings) {
-        this(result, unclassifiedSymbols, warnings, List.of(), null);
+        this(result, unclassifiedSymbols, warnings, List.of(), null, null);
     }
 }

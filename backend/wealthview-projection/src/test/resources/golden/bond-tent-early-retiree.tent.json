@@ -1,0 +1,387 @@
+{
+  "sizing" : {
+    "projectedPortfolioAtRetirement" : 1085632.61,
+    "coverageYears" : 5,
+    "mixes" : [ {
+      "name" : "Plan",
+      "realYield" : 0.020322,
+      "target" : 141271.75,
+      "percentOfPortfolio" : 0.130129,
+      "ruleOfThumb" : 217126.52,
+      "reason" : "SPENDING_LEVEL",
+      "reasonAmount" : -67126.52
+    } ],
+    "coveredYears" : [ {
+      "year" : 2029,
+      "withdrawal" : 30000.00,
+      "fraction" : 1.000000
+    }, {
+      "year" : 2030,
+      "withdrawal" : 30000.00,
+      "fraction" : 1.000000
+    }, {
+      "year" : 2031,
+      "withdrawal" : 30000.00,
+      "fraction" : 1.000000
+    }, {
+      "year" : 2032,
+      "withdrawal" : 30000.00,
+      "fraction" : 1.000000
+    }, {
+      "year" : 2033,
+      "withdrawal" : 30000.00,
+      "fraction" : 1.000000
+    } ]
+  },
+  "years" : [ {
+    "year" : 2026,
+    "balances" : {
+      "ultrashort" : 0.00,
+      "short" : 0.00,
+      "intermediate" : 0.00,
+      "long" : 0.00
+    },
+    "total" : 0.00,
+    "buildUpTarget" : 0.00
+  }, {
+    "year" : 2027,
+    "balances" : {
+      "ultrashort" : 9441.66,
+      "short" : 14275.51,
+      "intermediate" : 23910.24,
+      "long" : 0.00
+    },
+    "total" : 47627.41,
+    "buildUpTarget" : 47090.58
+  }, {
+    "year" : 2028,
+    "balances" : {
+      "ultrashort" : 18799.29,
+      "short" : 28538.17,
+      "intermediate" : 47918.52,
+      "long" : 0.00
+    },
+    "total" : 95255.99,
+    "buildUpTarget" : 94181.17
+  }, {
+    "year" : 2029,
+    "balances" : {
+      "ultrashort" : 28072.45,
+      "short" : 42787.50,
+      "intermediate" : 72025.76,
+      "long" : 0.00
+    },
+    "total" : 142885.72,
+    "buildUpTarget" : 141271.75
+  }, {
+    "year" : 2030,
+    "balances" : {
+      "ultrashort" : 28142.63,
+      "short" : 43236.77,
+      "intermediate" : 73142.16,
+      "long" : 0.00
+    },
+    "total" : 144521.57,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2031,
+    "balances" : {
+      "ultrashort" : 28212.99,
+      "short" : 43690.76,
+      "intermediate" : 74275.86,
+      "long" : 0.00
+    },
+    "total" : 146179.61,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2032,
+    "balances" : {
+      "ultrashort" : 28283.52,
+      "short" : 44149.51,
+      "intermediate" : 75427.14,
+      "long" : 0.00
+    },
+    "total" : 147860.17,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2033,
+    "balances" : {
+      "ultrashort" : 28354.23,
+      "short" : 44613.08,
+      "intermediate" : 76596.26,
+      "long" : 0.00
+    },
+    "total" : 149563.57,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2034,
+    "balances" : {
+      "ultrashort" : 28425.12,
+      "short" : 45081.52,
+      "intermediate" : 77783.50,
+      "long" : 0.00
+    },
+    "total" : 151290.14,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2035,
+    "balances" : {
+      "ultrashort" : 28496.18,
+      "short" : 45554.87,
+      "intermediate" : 78989.15,
+      "long" : 0.00
+    },
+    "total" : 153040.20,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2036,
+    "balances" : {
+      "ultrashort" : 28567.42,
+      "short" : 46033.20,
+      "intermediate" : 80213.48,
+      "long" : 0.00
+    },
+    "total" : 154814.10,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2037,
+    "balances" : {
+      "ultrashort" : 28638.84,
+      "short" : 46516.55,
+      "intermediate" : 81456.79,
+      "long" : 0.00
+    },
+    "total" : 156612.17,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2038,
+    "balances" : {
+      "ultrashort" : 28710.44,
+      "short" : 47004.97,
+      "intermediate" : 82719.37,
+      "long" : 0.00
+    },
+    "total" : 158434.78,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2039,
+    "balances" : {
+      "ultrashort" : 28782.21,
+      "short" : 47498.52,
+      "intermediate" : 84001.52,
+      "long" : 0.00
+    },
+    "total" : 160282.25,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2040,
+    "balances" : {
+      "ultrashort" : 28854.17,
+      "short" : 47997.26,
+      "intermediate" : 85303.54,
+      "long" : 0.00
+    },
+    "total" : 162154.97,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2041,
+    "balances" : {
+      "ultrashort" : 28926.30,
+      "short" : 48501.23,
+      "intermediate" : 86625.75,
+      "long" : 0.00
+    },
+    "total" : 164053.28,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2042,
+    "balances" : {
+      "ultrashort" : 28998.62,
+      "short" : 49010.49,
+      "intermediate" : 87968.45,
+      "long" : 0.00
+    },
+    "total" : 165977.56,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2043,
+    "balances" : {
+      "ultrashort" : 29071.12,
+      "short" : 49525.10,
+      "intermediate" : 89331.96,
+      "long" : 0.00
+    },
+    "total" : 167928.17,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2044,
+    "balances" : {
+      "ultrashort" : 29143.79,
+      "short" : 50045.12,
+      "intermediate" : 90716.60,
+      "long" : 0.00
+    },
+    "total" : 169905.51,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2045,
+    "balances" : {
+      "ultrashort" : 29216.65,
+      "short" : 50570.59,
+      "intermediate" : 92122.71,
+      "long" : 0.00
+    },
+    "total" : 171909.95,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2046,
+    "balances" : {
+      "ultrashort" : 29289.69,
+      "short" : 51101.58,
+      "intermediate" : 93550.61,
+      "long" : 0.00
+    },
+    "total" : 173941.89,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2047,
+    "balances" : {
+      "ultrashort" : 29362.92,
+      "short" : 51638.15,
+      "intermediate" : 95000.65,
+      "long" : 0.00
+    },
+    "total" : 176001.71,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2048,
+    "balances" : {
+      "ultrashort" : 29436.33,
+      "short" : 52180.35,
+      "intermediate" : 96473.16,
+      "long" : 0.00
+    },
+    "total" : 178089.83,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2049,
+    "balances" : {
+      "ultrashort" : 29509.92,
+      "short" : 52728.24,
+      "intermediate" : 97968.49,
+      "long" : 0.00
+    },
+    "total" : 180206.65,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2050,
+    "balances" : {
+      "ultrashort" : 29583.69,
+      "short" : 53281.89,
+      "intermediate" : 99487.00,
+      "long" : 0.00
+    },
+    "total" : 182352.58,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2051,
+    "balances" : {
+      "ultrashort" : 29657.65,
+      "short" : 53841.35,
+      "intermediate" : 101029.05,
+      "long" : 0.00
+    },
+    "total" : 184528.05,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2052,
+    "balances" : {
+      "ultrashort" : 29731.79,
+      "short" : 54406.68,
+      "intermediate" : 102595.00,
+      "long" : 0.00
+    },
+    "total" : 186733.48,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2053,
+    "balances" : {
+      "ultrashort" : 29806.12,
+      "short" : 54977.95,
+      "intermediate" : 104185.22,
+      "long" : 0.00
+    },
+    "total" : 188969.30,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2054,
+    "balances" : {
+      "ultrashort" : 29880.64,
+      "short" : 55555.22,
+      "intermediate" : 105800.09,
+      "long" : 0.00
+    },
+    "total" : 191235.95,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2055,
+    "balances" : {
+      "ultrashort" : 29955.34,
+      "short" : 56138.55,
+      "intermediate" : 107439.99,
+      "long" : 0.00
+    },
+    "total" : 193533.89,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2056,
+    "balances" : {
+      "ultrashort" : 30030.23,
+      "short" : 56728.01,
+      "intermediate" : 109105.31,
+      "long" : 0.00
+    },
+    "total" : 195863.55,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2057,
+    "balances" : {
+      "ultrashort" : 30105.30,
+      "short" : 57323.65,
+      "intermediate" : 110796.45,
+      "long" : 0.00
+    },
+    "total" : 198225.40,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2058,
+    "balances" : {
+      "ultrashort" : 30180.57,
+      "short" : 57925.55,
+      "intermediate" : 112513.79,
+      "long" : 0.00
+    },
+    "total" : 200619.91,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2059,
+    "balances" : {
+      "ultrashort" : 30256.02,
+      "short" : 58533.77,
+      "intermediate" : 114257.76,
+      "long" : 0.00
+    },
+    "total" : 203047.54,
+    "buildUpTarget" : null
+  }, {
+    "year" : 2060,
+    "balances" : {
+      "ultrashort" : 30331.66,
+      "short" : 59148.37,
+      "intermediate" : 116028.75,
+      "long" : 0.00
+    },
+    "total" : 205508.78,
+    "buildUpTarget" : null
+  } ]
+}

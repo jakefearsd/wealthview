@@ -14,9 +14,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
+import com.wealthview.core.projection.BondTentAssumptions;
 import com.wealthview.core.projection.CapitalMarketAssumptionsProvider;
 import com.wealthview.core.projection.ProjectionEngine;
 import com.wealthview.core.projection.dto.AssetClass;
+import com.wealthview.core.projection.dto.BondTentConfig;
+import com.wealthview.core.projection.dto.BondTentSizing;
+import com.wealthview.core.projection.dto.BondTentYear;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
@@ -57,20 +61,6 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     /** Medicare (and thus IRMAA) eligibility age -- Wave-4 IRMAA item. */
     static final int MEDICARE_AGE = 65;
     /**
-     * Household task 5: the survivor spending factor assumed when a household scenario omits it (spec
-     * §1 default). Only ever consulted once a first-death transition fires, so single-person and
-     * both-alive years are unaffected.
-     */
-    private static final BigDecimal DEFAULT_SURVIVOR_SPENDING_FACTOR = new BigDecimal("0.75");
-
-    // HP3 Part B-2: ScenarioCrudService.validateSurvivorSpendingFactor enforces this SAME [0.5, 1.0]
-    // range at write time, but a params_json that bypasses that check (a stale persisted value, a
-    // future write path) previously reached the engine's survivor-factor scaling raw -- clamp
-    // defensively here too, mirroring the same guard on the MC seam (HouseholdMcResolver).
-    private static final BigDecimal MIN_SURVIVOR_SPENDING_FACTOR = new BigDecimal("0.5");
-    private static final BigDecimal MAX_SURVIVOR_SPENDING_FACTOR = BigDecimal.ONE;
-
-    /**
      * Fallback inflation assumption used to convert a user's NOMINAL expected-return override into a
      * REAL return via {@code (1+nominal)/(1+inflationRate)-1} when the scenario itself has no
      * inflation rate. The whole projection runs in real (today's-dollars) terms, and overrides must be
@@ -107,6 +97,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     /** Phase 1a: null omits tax-space computation (taxSpace stays empty; pictures still emitted). */
     @Nullable
     private final TaxSpaceCalculator taxSpaceCalculator;
+    /** Null leaves bond tents unsupported: a run that configures one throws rather than silently ignoring it. */
+    @Nullable
+    private final BondTentAssumptions bondTentAssumptions;
 
     /**
      * Test-friendly constructor that omits capital-gains taxation, IRMAA, the meter registry
@@ -150,7 +143,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 meterRegistry, capitalMarketAssumptions, null);
     }
 
-    @Autowired
+    /** Constructor without bond-tent assumptions: a scenario that configures a tent is rejected at run time. */
     public DeterministicProjectionEngine(@Nullable FederalTaxCalculator taxCalculator,
                                           @Nullable StateTaxCalculatorFactory stateTaxCalculatorFactory,
                                           @Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator,
@@ -158,6 +151,19 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                                           @Nullable MeterRegistry meterRegistry,
                                           @Nullable CapitalMarketAssumptionsProvider capitalMarketAssumptions,
                                           @Nullable TaxSpaceCalculator taxSpaceCalculator) {
+        this(taxCalculator, stateTaxCalculatorFactory, capitalGainsTaxCalculator, irmaaSurchargeCalculator,
+                meterRegistry, capitalMarketAssumptions, taxSpaceCalculator, null);
+    }
+
+    @Autowired
+    public DeterministicProjectionEngine(@Nullable FederalTaxCalculator taxCalculator,
+                                          @Nullable StateTaxCalculatorFactory stateTaxCalculatorFactory,
+                                          @Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator,
+                                          @Nullable IrmaaSurchargeCalculator irmaaSurchargeCalculator,
+                                          @Nullable MeterRegistry meterRegistry,
+                                          @Nullable CapitalMarketAssumptionsProvider capitalMarketAssumptions,
+                                          @Nullable TaxSpaceCalculator taxSpaceCalculator,
+                                          @Nullable BondTentAssumptions bondTentAssumptions) {
         this.taxStrategyFactory = new TaxStrategyFactory(taxCalculator, stateTaxCalculatorFactory);
         this.federalTaxCalculator = taxCalculator;
         this.capitalGainsTaxCalculator = capitalGainsTaxCalculator;
@@ -165,6 +171,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         this.meterRegistry = meterRegistry;
         this.capitalMarketAssumptions = capitalMarketAssumptions;
         this.taxSpaceCalculator = taxSpaceCalculator;
+        this.bondTentAssumptions = bondTentAssumptions;
         var rentalLossCalculator = new RentalLossCalculator();
         var ssTaxCalculator = new SocialSecurityTaxCalculator();
         var seTaxCalculator = new SelfEmploymentTaxCalculator();
@@ -231,44 +238,65 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             TaxCalculationStrategy taxStrategy,
             BigDecimal survivorSpendingFactor,
             boolean communityProperty,
-            BigDecimal heirTaxRate) {
+            BigDecimal heirTaxRate,
+            @Nullable BondTentPlanner.TentRun tent) {
     }
 
     private ProjectionRunDetail runInternal(ProjectionInput input) {
-        var accounts = input.accounts();
         var params = paramsParser.parseParams(input.paramsJson());
 
         log.info("Starting projection for scenario '{}': {} accounts, retirement year {}, end age {}",
-                input.scenarioName(), accounts.size(),
+                input.scenarioName(), input.accounts().size(),
                 input.retirementDate() != null ? input.retirementDate().getYear() : "default",
                 input.endAge() != null ? input.endAge() : 90);
 
         var resolved = resolveProjectionParams(input, params);
+        var tentConfig = BondTentPlanner.activeConfig(params, resolved.spendingPlan());
+        if (tentConfig.isEmpty()) {
+            // No tent, or nothing to size it from (a tent needs a spending plan): one pass, unchanged.
+            return runPass(input, params, resolved, null, false);
+        }
+        var frame = new BondTentPlanner.Frame(resolved.currentYear(), resolved.retirementYear(),
+                resolved.inflationRate(), paramsParser.feeRate(params), params.resolvedWithdrawalOrder());
+        return BondTentPlanner.twoPass(tent -> runPass(input, params, resolved, tent, true), tentConfig.get(),
+                bondTentAssumptions, frame);
+    }
+
+    /**
+     * Sizes every mix of {@code config} from a tent-free run of {@code input}: pass one of the two-pass tent
+     * projection, on its own. The configuration only supplies the mixes and yields; the run itself is tent-free.
+     */
+    public BondTentSizing sizeBondTent(ProjectionInput input, BondTentConfig config) {
+        var params = paramsParser.parseParams(input.paramsJson());
+        var resolved = resolveProjectionParams(input, params);
+        var passOne = runPass(input, params, resolved, null, true);
+        return BondTentPlanner.size(passOne.result().yearlyData(), config, resolved.inflationRate()).sizing();
+    }
+
+    /**
+     * One full year loop. {@code tent} (null for a tent-free pass) is configured on the fresh pools;
+     * {@code tentActive} marks either pass of a tent run, which projects on the default return window.
+     */
+    private ProjectionRunDetail runPass(ProjectionInput input, ScenarioParams params, ResolvedParams resolved,
+                                        @Nullable BondTentPlanner.TentRun tent, boolean tentActive) {
         var taxStrategy = taxStrategyFactory.buildTaxStrategy(params, input.household());
-        var pool = buildPoolStrategy(accounts, params, taxStrategy, resolved.inflationRate(),
-                resolved.currentYear());
+        var pool = buildPoolStrategy(input.accounts(), params, taxStrategy, resolved.inflationRate(),
+                resolved.currentYear(), tentActive);
+        BondTentPlanner.configure(pool, tent);
 
         // Household task 5: the survivor spending factor (spec default 0.75 when a household scenario
         // omits it) and the community-property flag drive the first-death transition. Both are inert
         // for a single-person context (no transition ever fires), so the defaults never move a
         // pre-household path.
-        BigDecimal survivorSpendingFactor = params.survivorSpendingFactor() != null
-                ? clampSurvivorSpendingFactor(params.survivorSpendingFactor()) : DEFAULT_SURVIVOR_SPENDING_FACTOR;
+        BigDecimal survivorSpendingFactor = paramsParser.survivorSpendingFactor(params);
         boolean communityProperty = Boolean.TRUE.equals(params.communityProperty());
 
         var ctx = new ProjectionRunContext(input, pool, resolved.strategy(),
                 resolved.currentYear(), resolved.birthYear(), resolved.retirementYear(), resolved.endYear(),
                 resolved.inflationRate(), resolved.spendingPlan(), resolved.incomeSources(),
                 resolved.properties(), taxStrategy, survivorSpendingFactor, communityProperty,
-                paramsParser.heirTaxRate(params));
+                paramsParser.heirTaxRate(params), tent);
         return runProjection(ctx);
-    }
-
-    /** HP3 Part B-2: clamps an explicit override to the documented [0.5, 1.0] range -- see the
-     * field comment above. A no-op for every value {@code ScenarioCrudService} would have accepted
-     * (the byte-identical anchor for the in-range/default paths). */
-    private static BigDecimal clampSurvivorSpendingFactor(BigDecimal factor) {
-        return factor.max(MIN_SURVIVOR_SPENDING_FACTOR).min(MAX_SURVIVOR_SPENDING_FACTOR);
     }
 
     // NPathComplexity: this method resolves many independent parameters, each via a small
@@ -311,11 +339,14 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                                               ScenarioParams params,
                                               TaxCalculationStrategy taxStrategy,
                                               BigDecimal scenarioInflationRate,
-                                              int baseYear) {
+                                              int baseYear, boolean tentActive) {
         // Audit C10: geometricMeans(false) (the unchanged default) unless the scenario opts into
         // the extended 1928-2025 Depression-era window via params_json.include_depression_years.
+        // A bond tent always projects on the default 1972-2025 window (bond maturity data starts in 1954, and
+        // validation rejects the combination), so a legacy scenario with both never reaches the extended window.
+        boolean depressionYears = paramsParser.includeDepressionYears(params, tentActive);
         Map<AssetClass, Double> geoMeans = capitalMarketAssumptions != null
-                ? capitalMarketAssumptions.geometricMeans(paramsParser.includeDepressionYears(params))
+                ? capitalMarketAssumptions.geometricMeans(depressionYears)
                 : Map.of();
         // Override accounts must deflate at the SAME inflation rate income/SS/spending use — the
         // scenario's own rate — not a fixed CMA constant, or a nominal-override account would compound
@@ -360,6 +391,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private ProjectionRunDetail runProjection(ProjectionRunContext ctx) {
         var yearlyData = new ArrayList<ProjectionYearDto>();
         var taxPictures = new ArrayList<YearTaxPicture>();
+        var tentYears = new ArrayList<BondTentYear>();
         var acc = YearAccumulator.INITIAL;
 
         // Household task 5 (transition step 6 — truncation): when the SECOND (survivor's) death falls
@@ -369,6 +401,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         // contexts report empty and the loop runs the full horizon unchanged (the byte-identical
         // anchor).
         int loopEndYear = ctx.endYear();
+        var tent = ctx.tent();
         var household = ctx.input().household();
         if (household != null && household.secondDeathYear().isPresent()) {
             loopEndYear = Math.min(loopEndYear, household.secondDeathYear().get() + 1);
@@ -378,6 +411,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             var step = processYear(ctx, year, acc);
             yearlyData.add(step.yearDto());
             step.taxPicture().ifPresent(taxPictures::add);
+            BondTentPlanner.record(tentYears, year, ctx.pool(), tent);
             acc = step.nextAccumulator();
         }
 
@@ -392,9 +426,10 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         BigDecimal finalNetWorth = yearlyData.isEmpty() ? null : yearlyData.getLast().totalNetWorth();
         var result = new ProjectionResultResponse(ctx.input().scenarioId(), yearlyData, finalBalance,
                 acc.yearsInRetirement(), feasibility, finalNetWorth);
+        var bondTent = BondTentPlanner.result(tent, tentYears);
         return new ProjectionRunDetail(result, List.copyOf(taxPictures),
                 YearTaxPictureBuilder.computeTaxSpace(taxSpaceCalculator, taxPictures, ctx.taxStrategy()),
-                TerminalValueResolver.resolve(yearlyData, ctx.input().household(), ctx.heirTaxRate()));
+                TerminalValueResolver.resolve(yearlyData, ctx.input().household(), ctx.heirTaxRate()), bondTent);
     }
 
     private YearStepResult processYear(ProjectionRunContext ctx, int year, YearAccumulator acc) {
@@ -408,6 +443,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         if (!retired) {
             contributions = pool.applyContributions();
         }
+        BondTentPlanner.topUp(pool, ctx.tent(), year);
 
         // Snapshot BEFORE applyGrowth(): each owner's RMD is computed off THAT owner's prior year-end
         // traditional balance (IRS Pub. 590-B), not this year's growth. Household task 4: per-owner
