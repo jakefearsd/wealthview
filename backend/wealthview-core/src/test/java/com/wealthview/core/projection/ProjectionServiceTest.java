@@ -315,13 +315,33 @@ class ProjectionServiceTest {
     }
 
     @Test
-    void sizeBondTent_savedScenarioWithDepressionYears_throws() {
+    void sizeBondTent_savedScenarioWithDepressionYears_sizes() {
         var scenario = ScenarioMother.scenarioWithParams(tenant, "{\"include_depression_years\":true}");
+        scenario.setSpendingProfile(
+                new SpendingProfileEntity(tenant, "Core", new BigDecimal("40000"), BigDecimal.ZERO, null));
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)).thenReturn(Optional.of(scenario));
+        var input = new ProjectionInput(scenarioId, "Plan", LocalDate.of(2055, 1, 1),
+                90, new BigDecimal("0.03"), null, List.of(), null, null, List.of());
+        when(projectionInputBuilder.buildWithMetadata(scenario, tenantId))
+                .thenReturn(new ProjectionInputResult(input, List.of()));
+        var config = tent();
+        var sizing = new BondTentSizing(BigDecimal.ONE, new BigDecimal("5"), List.of(), List.of());
+        when(projectionEngine.sizeBondTent(input, config)).thenReturn(sizing);
 
-        assertThatThrownBy(() -> service.sizeBondTent(tenantId, scenarioId, tent()))
+        assertThat(service.sizeBondTent(tenantId, scenarioId, config)).isSameAs(sizing);
+    }
+
+    @Test
+    void sizeBondTent_invalidConfig_throws() {
+        var scenario = ScenarioMother.scenario(tenant);
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)).thenReturn(Optional.of(scenario));
+        var shares = new BondMaturityValues(new BigDecimal("0.5"), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+        var bad = new BondTentConfig(new BigDecimal("5"), 10, List.of(new BondTentMix("Bad", shares)),
+                tent().yields());
+
+        assertThatThrownBy(() -> service.sizeBondTent(tenantId, scenarioId, bad))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("bond tent");
+                .hasMessageContaining("Bad");
     }
 
     @Test

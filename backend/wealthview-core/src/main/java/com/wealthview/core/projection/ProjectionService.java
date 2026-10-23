@@ -71,15 +71,16 @@ public class ProjectionService {
     /**
      * Sizes a bond tent for a SAVED scenario. The scenario needs an active spending plan (a spending
      * profile or an active guardrail profile, the same rule as the save-time check in
-     * {@code ScenarioCrudService}); the engine does not check it.
+     * {@code ScenarioCrudService}); the engine does not check it. The saved scenario's history flag is ignored.
      */
     @Transactional(readOnly = true)
     public BondTentSizing sizeBondTent(UUID tenantId, UUID scenarioId, BondTentConfig config) {
-        log.info("Sizing bond tent for scenario {} tenant {}", scenarioId, tenantId);
+        log.debug("Sizing bond tent for scenario {} tenant {}", scenarioId, tenantId);
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(Entities.notFound("Scenario", scenarioId));
-        var savedParams = ScenarioParams.parseOrEmpty(MAPPER, scenario.getParamsJson());
-        ScenarioParamsValidator.validateBondTent(config, savedParams.includeDepressionYears());
+        // A tent always projects on the 1972-2025 window, so the saved history flag is irrelevant here (the form
+        // clears it on save); only the posted configuration is validated.
+        ScenarioParamsValidator.validateBondTent(config, null);
         if (scenario.getSpendingProfile() == null && scenario.getGuardrailProfile() == null) {
             throw new IllegalArgumentException(
                     "A bond tent needs a spending plan: choose a spending profile or optimized plan first");
