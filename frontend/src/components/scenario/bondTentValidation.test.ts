@@ -23,6 +23,7 @@ describe('isTentConfigValid', () => {
         ['coverage above 10', { coverage_years: 10.5 }],
         ['coverage off the half-year grid', { coverage_years: 2.3 }],
         ['build-up below 0', { build_up_start_years: -1 }],
+        ['a fractional build-up', { build_up_start_years: 2.5 }],
         ['build-up above 40', { build_up_start_years: 41 }],
         ['no mixes', { mixes: [] }],
         ['four mixes', { mixes: Array.from({ length: 4 }, () => structuredClone(DEFAULT_TENT_MIX)) }],

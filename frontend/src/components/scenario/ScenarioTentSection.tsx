@@ -72,8 +72,8 @@ function SizingResult({ sizing }: { sizing: BondTentSizing }) {
             {planMix && (
                 <>
                     <div style={{ fontWeight: 600 }}>{sizingLine(planMix, portfolio, '')}</div>
-                    {otherMixes.map(mix => (
-                        <div key={mix.name}>{sizingLine(mix, portfolio, `${mix.name}: `)}</div>
+                    {otherMixes.map((mix, i) => (
+                        <div key={i}>{sizingLine(mix, portfolio, `${mix.name}: `)}</div>
                     ))}
                     <div style={{ marginTop: '0.5rem', fontWeight: 600 }}>
                         {`Why it differs from the rule of thumb (${money(planMix.rule_of_thumb)})`}
@@ -101,6 +101,8 @@ function SizingBox({ config, scenarioId }: { config: BondTentConfig; scenarioId:
 
     useEffect(() => {
         if (scenarioId == null || !valid) {
+            setSizing(null);
+            setError(null);
             return undefined;
         }
         let cancelled = false;
@@ -171,7 +173,10 @@ export default function ScenarioTentSection({ config, onChange, planAvailable, s
 
     function addMix() {
         if (!config || config.mixes.length >= MAX_MIXES) return;
-        update({ mixes: [...config.mixes, { name: `Mix ${config.mixes.length + 1}`, shares: { ...DEFAULT_TENT_MIX.shares } }] });
+        const taken = new Set(config.mixes.map(m => m.name));
+        let n = config.mixes.length + 1;
+        while (taken.has(`Mix ${n}`)) n++;
+        update({ mixes: [...config.mixes, { name: `Mix ${n}`, shares: { ...DEFAULT_TENT_MIX.shares } }] });
         setSelected(config.mixes.length);
     }
 
@@ -219,6 +224,7 @@ export default function ScenarioTentSection({ config, onChange, planAvailable, s
                                 type="number"
                                 min={0}
                                 max={40}
+                                step={1}
                                 value={config.build_up_start_years}
                                 onChange={e => update({ build_up_start_years: Number(e.target.value) })}
                             />

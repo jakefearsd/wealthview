@@ -19,7 +19,7 @@ export function shareTotal(mix: BondTentMix): number {
 export function isTentConfigValid(config: BondTentConfig): boolean {
     return config.coverage_years >= 1 && config.coverage_years <= 10
         && Number.isInteger(config.coverage_years * 2)
-        && config.build_up_start_years >= 0 && config.build_up_start_years <= 40
+        && Number.isInteger(config.build_up_start_years) && config.build_up_start_years >= 0 && config.build_up_start_years <= 40
         && config.mixes.length >= 1 && config.mixes.length <= MAX_MIXES
         && config.mixes.every(mix => mix.name.trim() !== '' && mix.name.length <= MAX_NAME_LENGTH
             && MATURITIES.every(m => mix.shares[m.key] >= 0 && mix.shares[m.key] <= 1)

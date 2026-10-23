@@ -257,4 +257,31 @@ describe('ScenarioTentSection', () => {
         expect(screen.getByText('Save the scenario to see how big the tent needs to be.')).toBeInTheDocument();
         expect(mockSize).not.toHaveBeenCalled();
     });
+
+    it('clears a stale sizing result when the config becomes invalid', async () => {
+        vi.useFakeTimers();
+        mockSize.mockResolvedValue(sizing());
+        const onChange = vi.fn();
+        const props = { onChange, planAvailable: true, scenarioId: 'sc-1' };
+        const { rerender } = render(<ScenarioTentSection config={defaultConfig()} {...props} />);
+        await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+        expect(screen.getByText(/Tent size needed: \$240,000/)).toBeInTheDocument();
+
+        const bad = defaultConfig();
+        bad.mixes[0].shares.long = 0.1;
+        rerender(<ScenarioTentSection config={bad} {...props} />);
+
+        expect(screen.queryByText(/Tent size needed/)).not.toBeInTheDocument();
+        expect(screen.getByText('Fix the tent settings above to see its size.')).toBeInTheDocument();
+    });
+
+    it('names a new mix without colliding with existing names', () => {
+        const config = defaultConfig();
+        config.mixes[0].name = 'Mix 2';
+        const onChange = renderSection(config);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Add mix' }));
+
+        expect(onChange.mock.calls[0][0].mixes[1].name).toBe('Mix 3');
+    });
 });
