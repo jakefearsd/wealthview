@@ -156,6 +156,20 @@ class BondTentSizerTest {
         assertThat(sizing.target()).isZero();
     }
 
+    @Test
+    void size_incomeAboveSpendingClamped_tiesSpendingLevelAndIncomeAndPicksSpendingLevel() {
+        var spending = flat(20_000.0, 5);
+        var income = flat(30_000.0, 5);
+        var zeros = flat(0.0, 5);
+
+        var sizing = BondTentSizer.size(spending, income, zeros, 5.0, 0.0, PORTFOLIO);
+
+        assertThat(sizing.target()).isZero();
+        assertThat(sizing.ruleOfThumb()).isCloseTo(200_000.0, within(1e-6));
+        assertThat(sizing.reason()).isEqualTo(BondTentSizingReason.SPENDING_LEVEL);
+        assertThat(sizing.reasonAmount()).isCloseTo(-100_000.0, within(1e-6));
+    }
+
     private static double[] flat(double value, int years) {
         var values = new double[years];
         Arrays.fill(values, value);
