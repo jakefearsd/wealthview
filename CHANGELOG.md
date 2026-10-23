@@ -6,6 +6,9 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Bond tent on the scenario form: turn it on, choose how many years of spending to cover, when to start building it and up to three bond-maturity mixes, and see how big the tent needs to be for a saved scenario. A tent turns off the 1928-1971 market history option.
+
 ### Changed
 - Monte Carlo simulations now start today rather than at retirement, for every scenario.
 - Success rates and recommended spending may move, especially when retirement is years away.

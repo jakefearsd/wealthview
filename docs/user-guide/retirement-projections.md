@@ -121,6 +121,23 @@ Picking one automatically clears the other. There is no way to have both.
 
 The form's own help text: *"Choose a spending profile (user-defined tiers) or guardrail profile (Monte Carlo optimized). When linked, the projection withdraws what you need each year, minus non-portfolio income."*
 
+### Bond Tent
+
+A **bond tent** is a reserve of bonds that covers the first several years of retirement withdrawals. The idea is to protect against a stock-market drop early in retirement: while stocks are down, you spend from the tent instead of selling stocks at a loss. Turn it on with the **Use a bond tent** checkbox. It is available only when the Spending Plan is set to a spending profile or an optimized plan; with **None** it is disabled, because the tent is sized against the plan's withdrawals.
+
+- **Years of spending to cover** (1 to 10, in half-year steps) is how many years of withdrawals the tent should hold.
+- **Start building this many years before retirement** (0 to 40) is when the build-up begins. The projection shifts money from stocks into the tent gradually over those years, so it is full on the retirement date.
+- **Mixes** describe what the tent is made of. Each mix splits the tent across four bond maturities: ultrashort (for example SGOV), short (VGSH), intermediate (VGIT) and long (TLT). The shares must add up to 100%. You can keep up to three mixes to compare. The first, marked **(plan)**, is the one the projection uses; the others only appear in the sizing box. Picking 100% ultrashort is a classic cash reserve, and the form notes that moving part of it into short or intermediate bonds usually earns more, at the cost of some price swings.
+- **Today's yields** are the four yields used to estimate what the tent earns. They are prefilled from recent market averages and can be edited.
+
+**How it is drawn.** The tent is drawn only when stocks are below their previous high, shortest bonds first. It is never refilled, and whatever is left stays in bonds.
+
+**Sizing.** For a saved scenario the form shows how big the tent needs to be, updating half a second after you stop editing: the dollar target and its share of your projected portfolio at retirement for each mix, a line explaining why the target differs from the simple rule of thumb (spending level, income that pays for part of the withdrawals, tax on withdrawals, or what the mix's yields earn while the tent is spent down), and the covered withdrawals by year, with partial years marked. For a scenario you have not saved yet, the form asks you to save it first.
+
+**1928 to 1971 history.** A bond tent turns off the **Include 1928-1971 market history** option, because bond maturity data starts in 1954. The checkbox is unchecked and disabled while the tent is on.
+
+The optimizer does not yet take a tent into account. That arrives in a later release.
+
 ### Income Sources
 
 Add one or more income sources to the scenario from the **Income Sources** section. For each, you can set a **per-scenario override amount** so the same income source can be reused across scenarios with different assumptions (e.g. Social Security at 62 vs. 67). See [Spending and Income](spending-and-income.md).
