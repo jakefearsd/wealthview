@@ -11,6 +11,7 @@ import com.wealthview.core.projection.dto.BondMaturity;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.household.PersonId;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
@@ -266,5 +267,75 @@ class MultiPoolTentTest {
     void placementFor_traditionalFirst_putsTraditionalFirst() {
         assertThat(PoolStrategy.TentSetup.placementFor(WithdrawalOrder.TRADITIONAL_FIRST))
                 .containsExactly(PoolType.TRADITIONAL, PoolType.TAXABLE, PoolType.ROTH);
+    }
+
+    private static final List<PoolType> TRADITIONAL_FIRST =
+            List.of(PoolType.TRADITIONAL, PoolType.TAXABLE, PoolType.ROTH);
+
+    /** Traditional 100k holding an 80k tent (25% ultrashort, 75% short); taxable and Roth empty. */
+    private static PoolStrategy.MultiPool tentInTraditional() {
+        var pool = pool("0", "100000", "0", "0");
+        pool.configureTent(setup(TRADITIONAL_FIRST, by("0.25", "0.75", "0", "0"), by("0", "0", "0", "0"),
+                by("0", "0", "0", "0")));
+        pool.topUpTent(bd("80000"));
+        return pool;
+    }
+
+    @Test
+    void executeRothConversion_onlyFreeRoomIsTheCreditedDollars_tentMigratesIntoRoth() {
+        var pool = tentInTraditional();
+
+        pool.executeRothConversionOverride(2030, ZERO, bd("50000"), ZERO, ZERO);
+
+        assertThat(pool.tentTotal()).isEqualByComparingTo("80000");
+        var reserved = pool.tentPools().snapshot();
+        assertThat(reserved.totalIn(PoolType.TRADITIONAL)).isEqualByComparingTo("50000");
+        assertThat(reserved.totalIn(PoolType.ROTH)).isEqualByComparingTo("30000");
+        assertThat(pool.getTraditional()).isEqualByComparingTo("50000");
+    }
+
+    @Test
+    void executeRothConversion_afterEarlierDebitIntoSleeves_doesNotRestoreSpentSleeves() {
+        var pool = tentInTraditional();
+        pool.executeWithdrawals(bd("50000"), 2030, ZERO, ZERO, ZERO, 65);
+
+        pool.executeRothConversionOverride(2030, ZERO, bd("30000"), ZERO, ZERO);
+
+        // the 50k withdrawal spent 30k of sleeves (no free room then); the conversion moves 30k of what is left
+        assertThat(pool.tentTotal()).isEqualByComparingTo("50000");
+        assertThat(pool.tentPools().snapshot().totalIn(PoolType.ROTH)).isEqualByComparingTo("30000");
+    }
+
+    @Test
+    void forceRmd_onlyFreeRoomIsTheCreditedDollars_tentMigratesIntoTaxable() {
+        var pool = tentInTraditional();
+
+        pool.forceRmd(bd("50000"));
+
+        assertThat(pool.tentTotal()).isEqualByComparingTo("80000");
+        var reserved = pool.tentPools().snapshot();
+        assertThat(reserved.totalIn(PoolType.TRADITIONAL)).isEqualByComparingTo("50000");
+        assertThat(reserved.totalIn(PoolType.TAXABLE)).isEqualByComparingTo("30000");
+        assertThat(pool.getTraditional()).isEqualByComparingTo("50000");
+    }
+
+    @Test
+    void forceRmd_perOwner_onlyFreeRoomIsTheCreditedDollars_tentMigratesIntoTaxable() {
+        var pool = tentInTraditional();
+
+        pool.forceRmd(PersonId.PRIMARY, bd("50000"));
+
+        assertThat(pool.tentTotal()).isEqualByComparingTo("80000");
+        assertThat(pool.tentPools().snapshot().totalIn(PoolType.TAXABLE)).isEqualByComparingTo("30000");
+    }
+
+    @Test
+    void forceRmd_afterEarlierDebitIntoSleeves_doesNotRestoreSpentSleeves() {
+        var pool = tentInTraditional();
+        pool.executeWithdrawals(bd("50000"), 2030, ZERO, ZERO, ZERO, 65);
+
+        pool.forceRmd(bd("30000"));
+
+        assertThat(pool.tentTotal()).isEqualByComparingTo("50000");
     }
 }

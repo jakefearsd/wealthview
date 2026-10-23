@@ -15,7 +15,9 @@ import com.wealthview.core.projection.dto.PoolType;
  *
  * <p>The reservation is clamped lazily: a debit never touches it, so the clamp must run before
  * anything that could hide a debit by crediting the pool (contributions, reinvested surplus, a Roth
- * conversion, RMD proceeds) and before growth. That keeps spent sleeves spent -- never refilled.
+ * conversion, RMD proceeds) and before growth. That keeps spent sleeves spent -- never refilled. A
+ * transfer in kind (a conversion or an RMD) clamps before its debit and again after its credit, so the
+ * sleeves a debit displaces can migrate into the dollars the credit lands.
  */
 final class TentPools {
 

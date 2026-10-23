@@ -1805,11 +1805,14 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             // conversion stays within one person's accounts) — conservation-preserving and
             // byte-identical for a single owner.
             BigDecimal actual = conversionLimit.min(traditional.total());
-            var converted = traditional.debitProportional(actual);
+            // An in-kind transfer: settle every earlier debit first (so a spent sleeve stays spent), then clamp
+            // again once the converted dollars have landed, so displaced sleeves can follow the money.
             tents.clamp();
+            var converted = traditional.debitProportional(actual);
             for (var entry : converted.entrySet()) {
                 roth.credit(entry.getKey(), entry.getValue());
             }
+            tents.clamp();
 
             if (taxCalculator != null) {
                 BigDecimal taxableIncome = actual.add(effectiveOtherIncome);
@@ -1830,9 +1833,10 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             }
             BigDecimal forced = rmdAmount.min(traditional.total()).max(BigDecimal.ZERO);
             if (forced.compareTo(BigDecimal.ZERO) > 0) {
+                tents.clamp();   // an in-kind transfer: settle earlier debits, then follow the money (below)
                 traditional.debitProportional(forced);
-                tents.clamp();
                 lots.addLot(forced);
+                tents.clamp();
             }
             return forced;
         }
@@ -1842,10 +1846,11 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             if (rmdAmount == null || rmdAmount.compareTo(BigDecimal.ZERO) <= 0) {
                 return BigDecimal.ZERO;
             }
+            tents.clamp();   // an in-kind transfer: settle earlier debits before the owner's slice is debited
             BigDecimal forced = traditional.forceOwner(owner, rmdAmount);
             if (forced.compareTo(BigDecimal.ZERO) > 0) {
-                tents.clamp();
                 lots.addLot(forced);
+                tents.clamp();
             }
             return forced;
         }
