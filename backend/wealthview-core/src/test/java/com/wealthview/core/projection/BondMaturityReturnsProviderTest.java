@@ -160,6 +160,17 @@ class BondMaturityReturnsProviderTest {
     }
 
     @Test
+    void geometricMeansOf_iteratesShortestFirst() {
+        var matrix = new BondMaturityReturnsProvider.MaturityReturnMatrix(
+                new int[] {2000, 2001}, BondMaturity.values(),
+                new double[][] {{0.01, 0.10, 0.20, 0.30}, {0.02, -0.05, 0.40, -0.10}});
+
+        var means = BondMaturityReturnsProvider.geometricMeansOf(matrix);
+
+        assertThat(means.keySet()).containsExactly(BondMaturity.values());
+    }
+
+    @Test
     void fromKey_unknownKey_throws() {
         assertThatThrownBy(() -> BondMaturity.fromKey("ultra"))
                 .isInstanceOf(IllegalArgumentException.class);

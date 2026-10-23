@@ -1,6 +1,7 @@
 package com.wealthview.core.projection;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -17,9 +18,9 @@ import com.wealthview.persistence.repository.BondMaturityReturnRepository;
 /**
  * Serves the tent's per-maturity real returns, aligned to a {@link CapitalMarketAssumptionsProvider.RealReturnMatrix}.
  *
- * <p>Nothing consumes this provider until the bond tent's projection wiring (plan 3). The stored series covers
- * 1954-2025 for {@link BondMaturity#SHORT}, {@link BondMaturity#INTERMEDIATE} and {@link BondMaturity#LONG};
- * ultrashort is always the base matrix's cash column.
+ * <p>The stored series covers {@link BondMaturity#SHORT}, {@link BondMaturity#INTERMEDIATE} and
+ * {@link BondMaturity#LONG} for every year from {@link #firstYear()} to {@link #lastYear()}; ultrashort is always
+ * the base matrix's cash column.
  */
 @Component
 public class BondMaturityReturnsProvider {
@@ -85,7 +86,8 @@ public class BondMaturityReturnsProvider {
     }
 
     /**
-     * Per-maturity compound mean, {@code (product of (1 + r))^(1/n) - 1}, over every row of {@code m}.
+     * Per-maturity compound mean, {@code (product of (1 + r))^(1/n) - 1}, over every row of {@code m}. The
+     * returned map iterates in {@link BondMaturity#values()} order, shortest-first.
      */
     public static Map<BondMaturity, Double> geometricMeansOf(MaturityReturnMatrix m) {
         var means = new EnumMap<BondMaturity, Double>(BondMaturity.class);
@@ -96,7 +98,7 @@ public class BondMaturityReturnsProvider {
                     .reduce(1.0, (a, b) -> a * b);
             means.put(m.maturities()[c], Math.pow(growth, 1.0 / m.realReturns().length) - 1.0);
         }
-        return Map.copyOf(means);
+        return Collections.unmodifiableMap(means);
     }
 
     void clearCache() {
