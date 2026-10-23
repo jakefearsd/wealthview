@@ -117,20 +117,23 @@ final class TentReservation {
         return after.divide(before, RATE_SCALE, PoolStrategy.ROUNDING).subtract(BigDecimal.ONE);
     }
 
-    /** Removes any excess of this pool's sleeves over {@code poolBalance}, shortest maturity first. */
-    void clampTo(PoolType pool, BigDecimal poolBalance) {
+    /**
+     * Removes any excess of this pool's sleeves over {@code poolBalance}, shortest maturity first, and
+     * returns what was removed by maturity (all zero when nothing was).
+     */
+    Map<BondMaturity, BigDecimal> clampTo(PoolType pool, BigDecimal poolBalance) {
+        var removed = zeroed();
         BigDecimal excess = totalIn(pool).subtract(poolBalance.max(BigDecimal.ZERO));
-        if (excess.signum() <= 0) {
-            return;
-        }
         for (var entry : sleevesOf(pool).entrySet()) {
+            if (excess.signum() <= 0) {
+                break;
+            }
             BigDecimal taken = excess.min(entry.getValue());
             entry.setValue(entry.getValue().subtract(taken));
+            removed.put(entry.getKey(), taken);
             excess = excess.subtract(taken);
-            if (excess.signum() == 0) {
-                return;
-            }
         }
+        return removed;
     }
 
     /**
@@ -162,10 +165,28 @@ final class TentReservation {
                 interest.max(BigDecimal.ZERO));
     }
 
-    /** Clamps every pool's reservation to that pool's balance (see {@link #clampTo}). */
-    void clampAll(Function<PoolType, BigDecimal> balanceOf) {
+    /**
+     * Clamps every pool's reservation to that pool's balance. The tent is a household reservation: what a
+     * pool can no longer hold is re-placed (an untaxed relabel, spec rule 2) into the other pools' unreserved
+     * balance in {@code placementOrder}, longest maturity first, so the shortest maturity is what stays
+     * unplaced. Only the part no pool can hold is spent.
+     */
+    void clampAll(Function<PoolType, BigDecimal> balanceOf, List<PoolType> placementOrder) {
+        var displaced = zeroed();
         for (PoolType pool : PoolType.values()) {
-            clampTo(pool, balanceOf.apply(pool));
+            clampTo(pool, balanceOf.apply(pool)).forEach((maturity, value) -> displaced.merge(maturity, value,
+                    BigDecimal::add));
+        }
+        for (PoolType pool : placementOrder) {
+            BigDecimal free = balanceOf.apply(pool).subtract(totalIn(pool)).max(BigDecimal.ZERO);
+            var target = sleevesOf(pool);
+            for (int i = BondMaturity.values().length - 1; i >= 0 && free.signum() > 0; i--) {
+                BondMaturity maturity = BondMaturity.values()[i];
+                BigDecimal moved = displaced.get(maturity).min(free);
+                target.merge(maturity, moved, BigDecimal::add);
+                displaced.merge(maturity, moved.negate(), BigDecimal::add);
+                free = free.subtract(moved);
+            }
         }
     }
 

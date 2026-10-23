@@ -164,6 +164,37 @@ class MultiPoolTentTest {
         assertThat(pool.tentByMaturity().get(BondMaturity.SHORT)).isEqualByComparingTo("50000");
     }
 
+    @Test
+    void clamp_debitBeyondPoolGrowthPart_movesExcessToNextPoolWithFreeBalance() {
+        var pool = pool("100000", "500000", "0", "0");
+        pool.configureTent(setup(TAXABLE_FIRST, by("0.25", "0.75", "0", "0"), by("0", "0", "0", "0"),
+                by("0", "0", "0", "0")));
+        pool.topUpTent(bd("80000"));
+
+        pool.executeWithdrawals(bd("50000"), 2030, ZERO, ZERO, ZERO, 65);
+
+        assertThat(pool.tentTotal()).isEqualByComparingTo("80000");   // clamps (lazily) before the snapshot
+        var reserved = pool.tentPools().snapshot();
+        assertThat(reserved.totalIn(PoolType.TAXABLE)).isEqualByComparingTo("50000");
+        assertThat(reserved.totalIn(PoolType.TRADITIONAL)).isEqualByComparingTo("30000");
+        assertThat(pool.tentByMaturity().get(BondMaturity.ULTRASHORT)).isEqualByComparingTo("20000");
+        assertThat(pool.tentByMaturity().get(BondMaturity.SHORT)).isEqualByComparingTo("60000");
+    }
+
+    @Test
+    void clamp_noFreeBalanceAnywhere_spendsShortestFirst() {
+        var pool = pool("100000", "0", "0", "0");
+        pool.configureTent(setup(TAXABLE_FIRST, by("0.25", "0.75", "0", "0"), by("0", "0", "0", "0"),
+                by("0", "0", "0", "0")));
+        pool.topUpTent(bd("80000"));
+
+        pool.executeWithdrawals(bd("50000"), 2030, ZERO, ZERO, ZERO, 65);
+
+        assertThat(pool.tentTotal()).isEqualByComparingTo("50000");
+        assertThat(pool.tentByMaturity().get(BondMaturity.ULTRASHORT)).isEqualByComparingTo("0");
+        assertThat(pool.tentByMaturity().get(BondMaturity.SHORT)).isEqualByComparingTo("50000");
+    }
+
     private static PoolStrategy.MultiPool debitedIntoSleeves(String taxableContribution, String rate) {
         Map<PoolType, List<ProjectionAccountInput>> accounts = Map.of(
                 PoolType.TAXABLE, List.of(new HypotheticalAccountInput(

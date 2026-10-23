@@ -20,8 +20,8 @@
     }
   ],
   "spendingProfile": {
-    "essentialExpenses": "20000",
-    "discretionaryExpenses": "10000",
+    "essentialExpenses": "40000",
+    "discretionaryExpenses": "20000",
     "spendingTiers": null
   },
   "incomeSources": [

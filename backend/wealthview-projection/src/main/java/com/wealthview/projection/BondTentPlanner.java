@@ -179,6 +179,7 @@ final class BondTentPlanner {
         if (tent != null) {
             var target = tent.buildUp().targetFor(year);
             if (target != null) {
+                // Top-ups buy at the mix shares; sleeves already held are not rebalanced within the tent.
                 pool.topUpTent(target);
             }
         }

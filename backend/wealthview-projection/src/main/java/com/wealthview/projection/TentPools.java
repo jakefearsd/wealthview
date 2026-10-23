@@ -39,7 +39,7 @@ final class TentPools {
     /** Limits each pool's reservation to its balance; a no-op without a reservation. */
     void clamp() {
         if (!tent.isEmpty()) {
-            tent.clampAll(this::balanceOf);
+            tent.clampAll(this::balanceOf, setup.placementOrder());
         }
     }
 

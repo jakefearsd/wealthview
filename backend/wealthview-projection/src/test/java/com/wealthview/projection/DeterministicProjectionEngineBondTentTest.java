@@ -153,9 +153,19 @@ class DeterministicProjectionEngineBondTentTest {
 
     @Test
     void runDetailed_tentNeverDrawnInGoodProjection() {
-        var detail = engine.runDetailed(tentInput("3", 3, 2029));
+        // Taxable-first with a small taxable pool: its growth part is gone in year one while traditional
+        // still holds stocks, so the tent must migrate there rather than be spent.
+        var params = "{\"birth_year\": 1969, \"fee_rate\": 0.002, \"withdrawal_order\": \"taxable_first\", "
+                + tentJson("3", 3, PLAN_MIX) + "}";
+        var input = new ProjectionInput(UUID.nameUUIDFromBytes("tent".getBytes()), "Tent",
+                LocalDate.of(2029, 1, 1), 90, bd("0.025"), params,
+                List.of(acct("300000", "0", "0.05", "taxable"), acct("700000", "0", "0.05", "traditional")),
+                new SpendingProfileInput(bd("40000"), bd("20000"), "[]"), CURRENT_YEAR, List.of(), null, List.of());
 
-        var retired = detail.bondTent().years().stream().filter(y -> y.year() >= 2029).toList();
+        var detail = engine.runDetailed(input);
+
+        var retired = detail.bondTent().years().stream().filter(y -> y.year() >= 2029 && y.year() <= 2040).toList();
+        assertThat(retired.getFirst().total()).isPositive();
         for (int i = 1; i < retired.size(); i++) {
             assertThat(retired.get(i).total()).isGreaterThanOrEqualTo(retired.get(i - 1).total());
         }
