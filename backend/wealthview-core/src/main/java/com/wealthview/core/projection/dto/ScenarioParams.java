@@ -60,7 +60,8 @@ public record ScenarioParams(
         Integer longevityConditionalAge,
         Integer birthMonth,
         Integer spouseBirthMonth,
-        BigDecimal heirTaxRate) {
+        BigDecimal heirTaxRate,
+        BondTentConfig bondTent) {
 
     private static final Logger log = LoggerFactory.getLogger(ScenarioParams.class);
 
@@ -94,7 +95,36 @@ public record ScenarioParams(
                 primaryResidencePropertyTax, primaryResidenceMortgageInterest, dividendYield, feeRate,
                 includeDepressionYears, interestYield, spouseBirthYear, primaryDeathAge, spouseDeathAge,
                 survivorSpendingFactor, communityProperty, stochasticMortality, primarySex, spouseSex,
-                longevityConditionalAge, null, null, null);
+                longevityConditionalAge, null, null, null, null);
+    }
+
+    /**
+     * Back-compat convenience for positional callers that predate the bond tent (plan 3): the
+     * 32-component shape. {@code bondTent} is padded with {@code null}, meaning "no tent".
+     */
+    // ExcessiveParameterList: mirrors the record's pre-bond-tent canonical constructor so existing
+    // positional call sites keep compiling unchanged.
+    @SuppressWarnings("PMD.ExcessiveParameterList")
+    public ScenarioParams(
+            Integer birthYear, BigDecimal withdrawalRate, String withdrawalStrategy,
+            BigDecimal dynamicCeiling, BigDecimal dynamicFloor, String filingStatus,
+            BigDecimal otherIncome, BigDecimal annualRothConversion, String withdrawalOrder,
+            BigDecimal dynamicSequencingBracketRate, String rothConversionStrategy,
+            BigDecimal targetBracketRate, Integer rothConversionStartYear, String state,
+            BigDecimal primaryResidencePropertyTax, BigDecimal primaryResidenceMortgageInterest,
+            BigDecimal dividendYield, BigDecimal feeRate, Boolean includeDepressionYears,
+            BigDecimal interestYield, Integer spouseBirthYear, Integer primaryDeathAge,
+            Integer spouseDeathAge, BigDecimal survivorSpendingFactor, Boolean communityProperty,
+            Boolean stochasticMortality, String primarySex, String spouseSex,
+            Integer longevityConditionalAge, Integer birthMonth, Integer spouseBirthMonth,
+            BigDecimal heirTaxRate) {
+        this(birthYear, withdrawalRate, withdrawalStrategy, dynamicCeiling, dynamicFloor, filingStatus,
+                otherIncome, annualRothConversion, withdrawalOrder, dynamicSequencingBracketRate,
+                rothConversionStrategy, targetBracketRate, rothConversionStartYear, state,
+                primaryResidencePropertyTax, primaryResidenceMortgageInterest, dividendYield, feeRate,
+                includeDepressionYears, interestYield, spouseBirthYear, primaryDeathAge, spouseDeathAge,
+                survivorSpendingFactor, communityProperty, stochasticMortality, primarySex, spouseSex,
+                longevityConditionalAge, birthMonth, spouseBirthMonth, heirTaxRate, null);
     }
 
     public static ScenarioParams from(ScenarioParamsSource source) {
@@ -110,7 +140,7 @@ public record ScenarioParams(
                 source.spouseDeathAge(), source.survivorSpendingFactor(), source.communityProperty(),
                 source.stochasticMortality(), source.primarySex(), source.spouseSex(),
                 source.longevityConditionalAge(), source.birthMonth(), source.spouseBirthMonth(),
-                source.heirTaxRate());
+                source.heirTaxRate(), source.bondTent());
     }
 
     /**

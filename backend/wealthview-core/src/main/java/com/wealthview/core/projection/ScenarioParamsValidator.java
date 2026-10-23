@@ -3,6 +3,12 @@ package com.wealthview.core.projection;
 import java.math.BigDecimal;
 import java.util.Set;
 
+import org.springframework.lang.Nullable;
+
+import com.wealthview.core.projection.dto.BondMaturity;
+import com.wealthview.core.projection.dto.BondMaturityValues;
+import com.wealthview.core.projection.dto.BondTentConfig;
+import com.wealthview.core.projection.dto.BondTentMix;
 import com.wealthview.core.projection.dto.ScenarioParamsSource;
 
 /**
@@ -10,7 +16,7 @@ import com.wealthview.core.projection.dto.ScenarioParamsSource;
  * Extracted from {@link ScenarioCrudService} so that service's cyclomatic complexity stays within
  * PMD's class threshold as new params-level validation lands; behavior is unchanged.
  */
-final class ScenarioParamsValidator {
+public final class ScenarioParamsValidator {
 
     private static final int MIN_DEATH_AGE = 50;
     private static final int MAX_DEATH_AGE = 120;
@@ -23,15 +29,26 @@ final class ScenarioParamsValidator {
     private static final int MAX_BIRTH_MONTH = 12;
     private static final BigDecimal MAX_HEIR_TAX_RATE = new BigDecimal("0.50");
 
+    private static final BigDecimal TWO = BigDecimal.valueOf(2);
+    private static final BigDecimal MIN_TENT_COVERAGE_YEARS = BigDecimal.ONE;
+    private static final BigDecimal MAX_TENT_COVERAGE_YEARS = BigDecimal.TEN;
+    private static final int MAX_TENT_BUILD_UP_START_YEARS = 40;
+    private static final int MAX_TENT_MIXES = 3;
+    private static final int MAX_TENT_MIX_NAME_LENGTH = 40;
+    private static final BigDecimal SHARE_SUM_TOLERANCE = new BigDecimal("0.000001");
+    private static final BigDecimal MIN_TENT_YIELD = new BigDecimal("-0.02");
+    private static final BigDecimal MAX_TENT_YIELD = new BigDecimal("0.20");
+
     private ScenarioParamsValidator() {
     }
 
     /** Runs every params-level validation; throws {@link IllegalArgumentException} on the first violation. */
-    static void validate(ScenarioParamsSource request) {
+    public static void validate(ScenarioParamsSource request) {
         validateHouseholdFields(request);
         validateStochasticMortalityFields(request);
         validateBirthMonths(request);
         validateHeirTaxRate(request.heirTaxRate());
+        validateBondTent(request.bondTent(), request.includeDepressionYears());
     }
 
     /**
@@ -149,6 +166,88 @@ final class ScenarioParamsValidator {
         }
         if (heirTaxRate.signum() < 0 || heirTaxRate.compareTo(MAX_HEIR_TAX_RATE) > 0) {
             throw new IllegalArgumentException("heir_tax_rate must be between 0 and 0.50");
+        }
+    }
+
+    /**
+     * Bond tent plan 3: validates a tent configuration (no-op when {@code tent} is null). Bond
+     * maturity data starts in 1954, so a tent cannot be combined with the 1928-1971 history.
+     */
+    public static void validateBondTent(@Nullable BondTentConfig tent, @Nullable Boolean includeDepressionYears) {
+        if (tent == null) {
+            return;
+        }
+        if (Boolean.TRUE.equals(includeDepressionYears)) {
+            throw new IllegalArgumentException("Turn off the 1928–1971 market history to use a bond tent: "
+                    + "bond maturity data starts in 1954");
+        }
+        validateTentCoverage(tent.coverageYears());
+        validateTentBuildUp(tent.buildUpStartYears());
+        validateTentMixes(tent);
+        validateTentYields(tent.yields());
+    }
+
+    private static void validateTentCoverage(BigDecimal coverageYears) {
+        if (coverageYears == null
+                || coverageYears.compareTo(MIN_TENT_COVERAGE_YEARS) < 0
+                || coverageYears.compareTo(MAX_TENT_COVERAGE_YEARS) > 0
+                || coverageYears.multiply(TWO).remainder(BigDecimal.ONE).signum() != 0) {
+            throw new IllegalArgumentException(
+                    "Bond tent coverage must be between 1 and 10 years, in half-year steps");
+        }
+    }
+
+    private static void validateTentBuildUp(Integer buildUpStartYears) {
+        if (buildUpStartYears == null || buildUpStartYears < 0 || buildUpStartYears > MAX_TENT_BUILD_UP_START_YEARS) {
+            throw new IllegalArgumentException(
+                    "Bond tent build-up start must be between 0 and 40 years before retirement");
+        }
+    }
+
+    private static void validateTentMixes(BondTentConfig tent) {
+        if (tent.mixes() == null || tent.mixes().isEmpty() || tent.mixes().size() > MAX_TENT_MIXES) {
+            throw new IllegalArgumentException("A bond tent needs one to three bond mixes");
+        }
+        for (var mix : tent.mixes()) {
+            validateTentMix(mix);
+        }
+    }
+
+    private static void validateTentMix(BondTentMix mix) {
+        if (mix == null || mix.name() == null || mix.name().isBlank()
+                || mix.name().length() > MAX_TENT_MIX_NAME_LENGTH) {
+            throw new IllegalArgumentException("Each bond mix needs a name of at most 40 characters");
+        }
+        if (!hasValidShares(mix.shares())) {
+            throw new IllegalArgumentException("Bond mix '" + mix.name()
+                    + "' shares must each be between 0% and 100% and add up to 100%");
+        }
+    }
+
+    private static boolean hasValidShares(BondMaturityValues shares) {
+        if (shares == null) {
+            return false;
+        }
+        for (var maturity : BondMaturity.values()) {
+            var share = shares.get(maturity);
+            if (share == null || share.signum() < 0 || share.compareTo(BigDecimal.ONE) > 0) {
+                return false;
+            }
+        }
+        return shares.sum().subtract(BigDecimal.ONE).abs().compareTo(SHARE_SUM_TOLERANCE) <= 0;
+    }
+
+    private static void validateTentYields(BondMaturityValues yields) {
+        var valid = yields != null;
+        if (valid) {
+            for (var maturity : BondMaturity.values()) {
+                var value = yields.get(maturity);
+                valid &= value != null
+                        && value.compareTo(MIN_TENT_YIELD) >= 0 && value.compareTo(MAX_TENT_YIELD) <= 0;
+            }
+        }
+        if (!valid) {
+            throw new IllegalArgumentException("Bond tent yields must each be between -2% and 20%");
         }
     }
 }

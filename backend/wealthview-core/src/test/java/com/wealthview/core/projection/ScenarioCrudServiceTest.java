@@ -23,6 +23,9 @@ import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.projection.dto.AllocationDto;
 import com.wealthview.core.projection.dto.AssetAllocation;
 import com.wealthview.core.projection.dto.AssetClass;
+import com.wealthview.core.projection.dto.BondMaturityValues;
+import com.wealthview.core.projection.dto.BondTentConfig;
+import com.wealthview.core.projection.dto.BondTentMix;
 import com.wealthview.core.projection.dto.CreateProjectionAccountRequest;
 import com.wealthview.core.projection.dto.ScenarioRequest;
 import com.wealthview.core.projection.dto.ScenarioIncomeSourceInput;
@@ -117,6 +120,79 @@ class ScenarioCrudServiceTest {
         var captor = ArgumentCaptor.forClass(ProjectionScenarioEntity.class);
         verify(scenarioRepository).save(captor.capture());
         return captor.getValue();
+    }
+
+    private static BondTentConfig sampleTent() {
+        return new BondTentConfig(
+                new BigDecimal("2.5"), 3,
+                List.of(new BondTentMix("Balanced", new BondMaturityValues(
+                        new BigDecimal("0.2"), new BigDecimal("0.3"), new BigDecimal("0.5"), BigDecimal.ZERO))),
+                new BondMaturityValues(new BigDecimal("0.0394"), new BigDecimal("0.0465"),
+                        new BigDecimal("0.048"), new BigDecimal("0.0539")));
+    }
+
+    @Test
+    void createScenario_tentWithoutSpendingPlan_throws() {
+        var request = ScenarioRequestBuilder.builder().withBondTent(sampleTent()).build();
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("A bond tent needs a spending plan: choose a spending profile or optimized plan first");
+        verify(scenarioRepository, never()).save(any(ProjectionScenarioEntity.class));
+    }
+
+    @Test
+    void updateScenario_tentWithoutSpendingPlan_throws() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90, new BigDecimal("0.03"), null);
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)).thenReturn(Optional.of(scenario));
+        var request = ScenarioRequestBuilder.builder().withBondTent(sampleTent()).build();
+
+        assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("A bond tent needs a spending plan");
+    }
+
+    @Test
+    void updateScenario_tentWithActiveSpendingProfile_savesTentInParamsJson() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90, new BigDecimal("0.03"), null);
+        var profileId = UUID.randomUUID();
+        var profile = new SpendingProfileEntity(tenant, "Core", new BigDecimal("40000"), BigDecimal.ZERO, null);
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)).thenReturn(Optional.of(scenario));
+        when(spendingProfileRepository.findByTenant_IdAndId(tenantId, profileId)).thenReturn(Optional.of(profile));
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        var request = ScenarioRequestBuilder.builder()
+                .withBondTent(sampleTent()).withSpendingProfileId(profileId).build();
+
+        service.updateScenario(tenantId, scenarioId, request);
+
+        assertThat(captureSavedScenario().getParamsJson()).contains("\"bond_tent\":{\"coverage_years\":2.5");
+    }
+
+    @Test
+    void updateScenario_tentWithKeptGuardrailProfile_savesTent() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90, new BigDecimal("0.03"), null);
+        scenario.setGuardrailProfile(new GuardrailSpendingProfileEntity(
+                tenant, scenario, "Guardrail", new BigDecimal("30000")));
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)).thenReturn(Optional.of(scenario));
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        var request = ScenarioRequestBuilder.builder().withBondTent(sampleTent()).build();
+
+        service.updateScenario(tenantId, scenarioId, request);
+
+        assertThat(captureSavedScenario().getParamsJson()).contains("bond_tent");
+    }
+
+    @Test
+    void createScenario_tentWithDepressionYears_throws() {
+        var request = ScenarioRequestBuilder.builder()
+                .withBondTent(sampleTent()).withIncludeDepressionYears(true).build();
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Turn off the 1928");
     }
 
     @Test

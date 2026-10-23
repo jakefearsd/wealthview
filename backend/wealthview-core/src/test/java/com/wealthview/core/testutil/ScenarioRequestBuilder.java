@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.dto.BondTentConfig;
 import com.wealthview.core.projection.dto.CreateProjectionAccountRequest;
 import com.wealthview.core.projection.dto.ScenarioIncomeSourceInput;
 import com.wealthview.core.projection.dto.ScenarioRequest;
@@ -60,6 +61,8 @@ public final class ScenarioRequestBuilder {
     private Integer birthMonth;
     private Integer spouseBirthMonth;
     private BigDecimal heirTaxRate;
+    private BondTentConfig bondTent;
+    private UUID spendingProfileId;
     private List<CreateProjectionAccountRequest> accounts = List.of();
     private List<ScenarioIncomeSourceInput> incomeSources;
 
@@ -215,6 +218,16 @@ public final class ScenarioRequestBuilder {
         return this;
     }
 
+    public ScenarioRequestBuilder withBondTent(@Nullable BondTentConfig bondTent) {
+        this.bondTent = bondTent;
+        return this;
+    }
+
+    public ScenarioRequestBuilder withSpendingProfileId(@Nullable UUID spendingProfileId) {
+        this.spendingProfileId = spendingProfileId;
+        return this;
+    }
+
     public ScenarioRequestBuilder withAccounts(List<CreateProjectionAccountRequest> accounts) {
         this.accounts = accounts;
         return this;
@@ -233,6 +246,6 @@ public final class ScenarioRequestBuilder {
                 dividendYield, feeRate, includeDepressionYears, interestYield,
                 spouseBirthYear, primaryDeathAge, spouseDeathAge, survivorSpendingFactor, communityProperty,
                 stochasticMortality, primarySex, spouseSex, longevityConditionalAge, birthMonth, spouseBirthMonth,
-                heirTaxRate, accounts, null, null, incomeSources);
+                heirTaxRate, bondTent, accounts, spendingProfileId, null, incomeSources);
     }
 }

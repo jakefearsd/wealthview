@@ -12,6 +12,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import org.springframework.lang.Nullable;
 
 /**
  * Request body for both scenario create and update — the two endpoints take
@@ -63,6 +64,7 @@ public record ScenarioRequest(
         Integer birthMonth,
         Integer spouseBirthMonth,
         BigDecimal heirTaxRate,
+        @Valid @Nullable BondTentConfig bondTent,
         List<@Valid CreateProjectionAccountRequest> accounts,
         UUID spendingProfileId,
         Boolean useGuardrailProfile,
@@ -113,7 +115,7 @@ public record ScenarioRequest(
                 dynamicCeiling, dynamicFloor, filingStatus, otherIncome, annualRothConversion, withdrawalOrder,
                 dynamicSequencingBracketRate, rothConversionStrategy, targetBracketRate, rothConversionStartYear,
                 state, primaryResidencePropertyTax, primaryResidenceMortgageInterest, dividendYield, feeRate,
-                null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
                 accounts, spendingProfileId, useGuardrailProfile, incomeSources);
     }
 
@@ -141,7 +143,8 @@ public record ScenarioRequest(
                 dynamicCeiling, dynamicFloor, filingStatus, otherIncome, annualRothConversion, withdrawalOrder,
                 dynamicSequencingBracketRate, rothConversionStrategy, targetBracketRate, rothConversionStartYear,
                 state, primaryResidencePropertyTax, primaryResidenceMortgageInterest, dividendYield, feeRate,
-                includeDepressionYears, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                includeDepressionYears, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null,
                 accounts, spendingProfileId, useGuardrailProfile, incomeSources);
     }
 }

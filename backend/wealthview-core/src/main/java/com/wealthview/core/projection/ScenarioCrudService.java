@@ -103,6 +103,7 @@ public class ScenarioCrudService {
         validateInterestYield(request.interestYield());
         ScenarioParamsValidator.validate(request);
         validateAccounts(request.accounts());
+        requireSpendingPlanForTent(request, request.spendingProfileId() != null);
         var tenant = tenantLookup.requireTenant(tenantId);
 
         String paramsJson = ScenarioParams.from(request).toJson(objectMapper);
@@ -128,6 +129,13 @@ public class ScenarioCrudService {
                 request.name(), request.accounts() != null ? request.accounts().size() : 0, tenantId);
         return toScenarioResponse(saved, tenantId,
                 scenarioIncomeSourceRepository.findWithIncomeSourceByScenarioId(saved.getId()));
+    }
+
+    private static void requireSpendingPlanForTent(ScenarioRequest request, boolean hasSpendingPlan) {
+        if (request.bondTent() != null && !hasSpendingPlan) {
+            throw new IllegalArgumentException(
+                    "A bond tent needs a spending plan: choose a spending profile or optimized plan first");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -156,6 +164,10 @@ public class ScenarioCrudService {
         validateAccounts(request.accounts());
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(Entities.notFound("Scenario"));
+        // Mirrors the plan-resolution below: a chosen spending profile wins; otherwise an existing
+        // guardrail profile is preserved (the edit form never clears it).
+        requireSpendingPlanForTent(request,
+                request.spendingProfileId() != null || scenario.getGuardrailProfile() != null);
 
         scenario.setName(request.name());
         scenario.setRetirementDate(request.retirementDate());

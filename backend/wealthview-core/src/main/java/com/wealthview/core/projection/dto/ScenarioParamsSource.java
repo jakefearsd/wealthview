@@ -2,6 +2,8 @@ package com.wealthview.core.projection.dto;
 
 import java.math.BigDecimal;
 
+import org.springframework.lang.Nullable;
+
 /**
  * Common accessor interface shared by {@link ScenarioRequest} (create and update share one payload).
  * Allows serialization via {@link ScenarioParams}.
@@ -148,4 +150,12 @@ public interface ScenarioParamsSource {
      * ({@code ScenarioParamsParser.DEFAULT_HEIR_TAX_RATE}); valid range {@code [0, 0.50]}.
      */
     BigDecimal heirTaxRate();
+
+    /**
+     * Bond tent plan 3: the optional bond-tent configuration (reserve of bonds covering the first
+     * years of retirement withdrawals). {@code null} means no tent, which keeps the params JSON
+     * byte-identical to a scenario saved before tents existed.
+     */
+    @Nullable
+    BondTentConfig bondTent();
 }
