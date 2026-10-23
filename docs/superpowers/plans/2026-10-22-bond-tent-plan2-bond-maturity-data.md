@@ -341,3 +341,16 @@ git commit -F <message file>   # feat(core): serve tent bond maturities aligned 
 ```
 
 The body says that nothing consumes the provider until plan 3, and why ultrashort is the cash column.
+
+## Amendments (final review, 2026-10-22)
+
+- **Bridge and guard (F1).** January 1973's 20-year CMT moves +83bp (6.03 to 6.86) while the 10-year moves +13bp,
+  a change in the 20-year point's bond composition rather than a market move. The long sleeve's end yield in that
+  one month is `y0 + (GS10 y1 - GS10 y0)` (`BRIDGE_MONTHS = {("long", "1973-01")}`), and a guard stops the script
+  on any other month where the long-minus-10-year spread moves more than 50bp while the 10-year moves less than
+  20bp. This is an explicit exception to the Global Constraint "the only interpolation allowed...".
+- **Long = 20/30-year midpoint (F2).** The 25-year long sleeve is priced off the midpoint of the 20- and 30-year
+  CMT where both exist, else the 20-year, else the 30-year. Short and intermediate are unchanged.
+- **Script emits the full seed (F3).** `derive_bond_maturity_returns.py` writes the complete
+  `R__seed_bond_maturity_returns.sql` (generated header, TRUNCATE, INSERT) via `--output`, with `--last-year`;
+  the header is generated from what the script used. No hand edits afterwards.

@@ -73,13 +73,15 @@ class BondMaturityReturnsSeedIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void seed_spotValues_matchThePlanMethod() {
-        // Algorithm-fidelity pins from the plan-writing prototype (2026-10-22). They prove the plan's method was
-        // followed exactly; the shape tests above are the independent sanity checks.
+    void seed_spotValues_matchTheAmendedMethodPrototype() {
+        // Algorithm-fidelity pins from the controller's independent prototype of the amended method (2026-10-22):
+        // 25-year long priced off the 20/30-year midpoint, January 1973 long bridged. They prove the script follows
+        // that method; the shape tests above are the independent sanity checks.
         assertThat(r(1954, "intermediate")).isCloseTo(0.024519, within(0.000002));
-        assertThat(r(2008, "long")).isCloseTo(0.261409, within(0.000002));
+        assertThat(r(1973, "long")).isCloseTo(-0.064879, within(0.000002));
+        assertThat(r(2008, "long")).isCloseTo(0.296490, within(0.000002));
         assertThat(r(2022, "short")).isCloseTo(-0.111088, within(0.000002));
-        assertThat(r(2022, "long")).isCloseTo(-0.352644, within(0.000002));
+        assertThat(r(2022, "long")).isCloseTo(-0.347061, within(0.000002));
         assertThat(r(2025, "intermediate")).isCloseTo(0.042347, within(0.000002));
     }
 
