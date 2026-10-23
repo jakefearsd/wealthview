@@ -18,6 +18,7 @@ import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.projection.ProjectionService;
 import com.wealthview.core.projection.ScenarioCrudService;
 import com.wealthview.core.projection.dto.BondMaturityValues;
+import com.wealthview.core.projection.dto.BondTentConfig;
 import com.wealthview.core.projection.dto.BondTentCoveredYear;
 import com.wealthview.core.projection.dto.BondTentMixSizing;
 import com.wealthview.core.projection.dto.BondTentResult;
@@ -465,6 +466,55 @@ class ProjectionControllerTest {
                 .andExpect(jsonPath("$.bond_tent.sizing.covered_years[0].year").value(2030))
                 .andExpect(jsonPath("$.bond_tent.years[0].balances.ultrashort").value(1.0))
                 .andExpect(jsonPath("$.bond_tent.years[0].build_up_target").value(1.0));
+    }
+
+    private static final String TENT_BODY = """
+            {"coverage_years":5,"build_up_start_years":10,
+             "mixes":[{"name":"Plan","shares":{"ultrashort":0.25,"short":0.25,"intermediate":0.25,"long":0.25}}],
+             "yields":{"ultrashort":0.03,"short":0.035,"intermediate":0.04,"long":0.045}}
+            """;
+
+    @Test
+    void sizeBondTent_valid_returns200WithSnakeCaseSizing() throws Exception {
+        var sizing = new BondTentSizing(new BigDecimal("1000000.00"), new BigDecimal("5"),
+                List.of(new BondTentMixSizing("Plan", new BigDecimal("0.020000"), new BigDecimal("150000.00"),
+                        new BigDecimal("0.150000"), new BigDecimal("200000.00"), BondTentSizingReason.INCOME,
+                        new BigDecimal("-1.00"))),
+                List.of(new BondTentCoveredYear(2030, new BigDecimal("50000.00"), new BigDecimal("1.000000"))));
+        when(projectionService.sizeBondTent(eq(TENANT_ID), eq(SCENARIO_ID), any(BondTentConfig.class)))
+                .thenReturn(sizing);
+
+        mockMvc.perform(post("/api/v1/projections/{id}/bond-tent/sizing", SCENARIO_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(TENT_BODY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mixes[0].percent_of_portfolio").value(0.15))
+                .andExpect(jsonPath("$.covered_years[0].year").value(2030));
+    }
+
+    @Test
+    void sizeBondTent_invalidShares_returns400() throws Exception {
+        when(projectionService.sizeBondTent(eq(TENANT_ID), eq(SCENARIO_ID), any(BondTentConfig.class)))
+                .thenThrow(new IllegalArgumentException("Mix shares must sum to 1"));
+
+        mockMvc.perform(post("/api/v1/projections/{id}/bond-tent/sizing", SCENARIO_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(TENT_BODY))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void sizeBondTent_unknownScenario_returns404() throws Exception {
+        when(projectionService.sizeBondTent(eq(TENANT_ID), eq(SCENARIO_ID), any(BondTentConfig.class)))
+                .thenThrow(new EntityNotFoundException("Scenario not found"));
+
+        mockMvc.perform(post("/api/v1/projections/{id}/bond-tent/sizing", SCENARIO_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(TENT_BODY))
+                .andExpect(status().isNotFound());
     }
 
     private void assertScenarioRejected(String extraFields) throws Exception {

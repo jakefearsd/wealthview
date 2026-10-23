@@ -2,6 +2,8 @@ package com.wealthview.core.projection;
 
 import java.util.List;
 
+import com.wealthview.core.projection.dto.BondTentConfig;
+import com.wealthview.core.projection.dto.BondTentSizing;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionRunDetail;
@@ -17,5 +19,13 @@ public interface ProjectionEngine {
      */
     default ProjectionRunDetail runDetailed(ProjectionInput input) {
         return new ProjectionRunDetail(run(input), List.of(), List.of(), null);
+    }
+
+    /**
+     * Sizes a bond tent for every mix of {@code config} from a tent-free run of {@code input}. Only the
+     * deterministic engine sizes tents; the default rejects the call.
+     */
+    default BondTentSizing sizeBondTent(ProjectionInput input, BondTentConfig config) {
+        throw new UnsupportedOperationException("This projection engine cannot size a bond tent");
     }
 }

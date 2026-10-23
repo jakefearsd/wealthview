@@ -14,6 +14,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.projection.dto.BondMaturityValues;
+import com.wealthview.core.projection.dto.BondTentConfig;
+import com.wealthview.core.projection.dto.BondTentMix;
+import com.wealthview.core.projection.dto.BondTentSizing;
 import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionInputResult;
@@ -24,7 +28,9 @@ import com.wealthview.core.projection.dto.TaxSpaceYear;
 import com.wealthview.core.projection.dto.TerminalValue;
 import com.wealthview.core.projection.tax.StateTaxCalculatorFactory;
 import com.wealthview.core.testutil.ScenarioMother;
+import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
+import com.wealthview.persistence.entity.SpendingProfileEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 
@@ -280,5 +286,77 @@ class ProjectionServiceTest {
 
         assertThat(result.warnings()).containsExactly(
                 "Mortgage not modelled", "State tax for NY is not modeled (treated as $0)");
+    }
+
+    private static BondTentConfig tent() {
+        var shares = new BondMaturityValues(new BigDecimal("0.25"), new BigDecimal("0.25"),
+                new BigDecimal("0.25"), new BigDecimal("0.25"));
+        var yields = new BondMaturityValues(new BigDecimal("0.03"), new BigDecimal("0.035"),
+                new BigDecimal("0.04"), new BigDecimal("0.045"));
+        return new BondTentConfig(new BigDecimal("5"), 10, List.of(new BondTentMix("Plan", shares)), yields);
+    }
+
+    @Test
+    void sizeBondTent_noSpendingPlan_throws() {
+        var scenario = ScenarioMother.scenario(tenant);
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)).thenReturn(Optional.of(scenario));
+
+        assertThatThrownBy(() -> service.sizeBondTent(tenantId, scenarioId, tent()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("A bond tent needs a spending plan: choose a spending profile or optimized plan first");
+    }
+
+    @Test
+    void sizeBondTent_otherTenantsScenario_throwsNotFound() {
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.sizeBondTent(tenantId, scenarioId, tent()))
+                .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
+    void sizeBondTent_savedScenarioWithDepressionYears_throws() {
+        var scenario = ScenarioMother.scenarioWithParams(tenant, "{\"include_depression_years\":true}");
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)).thenReturn(Optional.of(scenario));
+
+        assertThatThrownBy(() -> service.sizeBondTent(tenantId, scenarioId, tent()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("bond tent");
+    }
+
+    @Test
+    void sizeBondTent_spendingProfile_sizesWithEngine() {
+        var scenario = ScenarioMother.scenario(tenant);
+        scenario.setSpendingProfile(
+                new SpendingProfileEntity(tenant, "Core", new BigDecimal("40000"), BigDecimal.ZERO, null));
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)).thenReturn(Optional.of(scenario));
+        var input = new ProjectionInput(scenarioId, "Plan", LocalDate.of(2055, 1, 1),
+                90, new BigDecimal("0.03"), null, List.of(), null, null, List.of());
+        when(projectionInputBuilder.buildWithMetadata(scenario, tenantId))
+                .thenReturn(new ProjectionInputResult(input, List.of()));
+        var config = tent();
+        var sizing = new BondTentSizing(BigDecimal.ONE, new BigDecimal("5"), List.of(), List.of());
+        when(projectionEngine.sizeBondTent(input, config)).thenReturn(sizing);
+
+        var result = service.sizeBondTent(tenantId, scenarioId, config);
+
+        assertThat(result).isSameAs(sizing);
+    }
+
+    @Test
+    void sizeBondTent_guardrailProfile_countsAsSpendingPlan() {
+        var scenario = ScenarioMother.scenario(tenant);
+        scenario.setGuardrailProfile(
+                new GuardrailSpendingProfileEntity(tenant, scenario, "Guardrail", new BigDecimal("30000")));
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)).thenReturn(Optional.of(scenario));
+        var input = new ProjectionInput(scenarioId, "Plan", LocalDate.of(2055, 1, 1),
+                90, new BigDecimal("0.03"), null, List.of(), null, null, List.of());
+        when(projectionInputBuilder.buildWithMetadata(scenario, tenantId))
+                .thenReturn(new ProjectionInputResult(input, List.of()));
+        var config = tent();
+        var sizing = new BondTentSizing(BigDecimal.ONE, new BigDecimal("5"), List.of(), List.of());
+        when(projectionEngine.sizeBondTent(input, config)).thenReturn(sizing);
+
+        assertThat(service.sizeBondTent(tenantId, scenarioId, config)).isSameAs(sizing);
     }
 }

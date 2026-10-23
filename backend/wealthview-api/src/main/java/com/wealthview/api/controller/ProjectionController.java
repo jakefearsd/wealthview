@@ -22,6 +22,8 @@ import com.wealthview.api.dto.ProjectionRunResponse;
 import com.wealthview.api.security.TenantUserPrincipal;
 import com.wealthview.core.projection.ProjectionService;
 import com.wealthview.core.projection.ScenarioCrudService;
+import com.wealthview.core.projection.dto.BondTentConfig;
+import com.wealthview.core.projection.dto.BondTentSizing;
 import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.CompareResponse;
 import com.wealthview.core.projection.dto.ScenarioRequest;
@@ -94,5 +96,13 @@ public class ProjectionController {
             @PathVariable UUID id) {
         var runResult = projectionService.runProjection(principal.tenantId(), id);
         return ResponseEntity.ok(ProjectionRunResponse.from(runResult));
+    }
+
+    @PostMapping("/{id}/bond-tent/sizing")
+    public ResponseEntity<BondTentSizing> sizeBondTent(
+            @AuthenticationPrincipal TenantUserPrincipal principal,
+            @PathVariable UUID id,
+            @Valid @RequestBody BondTentConfig config) {
+        return ResponseEntity.ok(projectionService.sizeBondTent(principal.tenantId(), id, config));
     }
 }

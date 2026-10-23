@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.wealthview.core.common.Entities;
+import com.wealthview.core.projection.dto.BondTentConfig;
+import com.wealthview.core.projection.dto.BondTentSizing;
 import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.CompareResponse;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
@@ -64,6 +66,26 @@ public class ProjectionService {
         warnings.addAll(resolveWarnings(scenario));
         return new ProjectionRunResult(detail.result(), inputResult.unclassifiedSymbols(),
                 List.copyOf(warnings), detail.taxSpace(), detail.terminalValue(), detail.bondTent());
+    }
+
+    /**
+     * Sizes a bond tent for a SAVED scenario. The scenario needs an active spending plan (a spending
+     * profile or an active guardrail profile, the same rule as the save-time check in
+     * {@code ScenarioCrudService}); the engine does not check it.
+     */
+    @Transactional(readOnly = true)
+    public BondTentSizing sizeBondTent(UUID tenantId, UUID scenarioId, BondTentConfig config) {
+        log.info("Sizing bond tent for scenario {} tenant {}", scenarioId, tenantId);
+        var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
+                .orElseThrow(Entities.notFound("Scenario", scenarioId));
+        var savedParams = ScenarioParams.parseOrEmpty(MAPPER, scenario.getParamsJson());
+        ScenarioParamsValidator.validateBondTent(config, savedParams.includeDepressionYears());
+        if (scenario.getSpendingProfile() == null && scenario.getGuardrailProfile() == null) {
+            throw new IllegalArgumentException(
+                    "A bond tent needs a spending plan: choose a spending profile or optimized plan first");
+        }
+        var input = projectionInputBuilder.buildWithMetadata(scenario, tenantId).input();
+        return projectionEngine.sizeBondTent(input, config);
     }
 
     /**

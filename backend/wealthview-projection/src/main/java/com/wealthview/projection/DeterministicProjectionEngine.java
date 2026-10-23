@@ -266,6 +266,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
      * Sizes every mix of {@code config} from a tent-free run of {@code input}: pass one of the two-pass tent
      * projection, on its own. The configuration only supplies the mixes and yields; the run itself is tent-free.
      */
+    @Override
     public BondTentSizing sizeBondTent(ProjectionInput input, BondTentConfig config) {
         var params = paramsParser.parseParams(input.paramsJson());
         var resolved = resolveProjectionParams(input, params);
