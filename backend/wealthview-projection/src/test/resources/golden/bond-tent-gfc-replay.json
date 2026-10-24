@@ -1,0 +1,649 @@
+[ {
+  "name" : "No tent",
+  "tentTarget" : null,
+  "lowestBalance" : 865093.22,
+  "stocksSoldWhileDown" : 303922.74,
+  "yearsCovered" : null,
+  "tentLeftAtCheckpoint" : null,
+  "balanceAt90" : 1011283.23,
+  "years" : [ {
+    "year" : 2026,
+    "age" : 57,
+    "balance" : 1003577.60,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2005
+  }, {
+    "year" : 2027,
+    "age" : 58,
+    "balance" : 1074966.49,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2006
+  }, {
+    "year" : 2028,
+    "age" : 59,
+    "balance" : 1115162.93,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2007
+  }, {
+    "year" : 2029,
+    "age" : 60,
+    "balance" : 865093.22,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 60000.00,
+    "stocksBelowHigh" : true,
+    "historyYear" : 2008
+  }, {
+    "year" : 2030,
+    "age" : 61,
+    "balance" : 887630.38,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 60000.00,
+    "stocksBelowHigh" : true,
+    "historyYear" : 2009
+  }, {
+    "year" : 2031,
+    "age" : 62,
+    "balance" : 916925.64,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2010
+  }, {
+    "year" : 2032,
+    "age" : 63,
+    "balance" : 899283.57,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2011
+  }, {
+    "year" : 2033,
+    "age" : 64,
+    "balance" : 910353.59,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2012
+  }, {
+    "year" : 2034,
+    "age" : 65,
+    "balance" : 973206.54,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2013
+  }, {
+    "year" : 2035,
+    "age" : 66,
+    "balance" : 1012248.21,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2014
+  }, {
+    "year" : 2036,
+    "age" : 67,
+    "balance" : 961698.75,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 48282.02,
+    "stocksBelowHigh" : true,
+    "historyYear" : 2015
+  }, {
+    "year" : 2037,
+    "age" : 68,
+    "balance" : 973803.63,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2016
+  }, {
+    "year" : 2038,
+    "age" : 69,
+    "balance" : 1044289.19,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2017
+  }, {
+    "year" : 2039,
+    "age" : 70,
+    "balance" : 946813.54,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 43657.59,
+    "stocksBelowHigh" : true,
+    "historyYear" : 2018
+  }, {
+    "year" : 2040,
+    "age" : 71,
+    "balance" : 1093031.76,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2019
+  }, {
+    "year" : 2041,
+    "age" : 72,
+    "balance" : 1191746.57,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2020
+  }, {
+    "year" : 2042,
+    "age" : 73,
+    "balance" : 1254171.92,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2021
+  }, {
+    "year" : 2043,
+    "age" : 74,
+    "balance" : 940065.03,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 45746.21,
+    "stocksBelowHigh" : true,
+    "historyYear" : 2022
+  }, {
+    "year" : 2044,
+    "age" : 75,
+    "balance" : 1026726.98,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 46236.92,
+    "stocksBelowHigh" : true,
+    "historyYear" : 2023
+  }, {
+    "year" : 2045,
+    "age" : 76,
+    "balance" : 1100146.59,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2024
+  }, {
+    "year" : 2046,
+    "age" : 77,
+    "balance" : 1084603.51,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2025
+  }, {
+    "year" : 2047,
+    "age" : 78,
+    "balance" : 1083941.36,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2048,
+    "age" : 79,
+    "balance" : 1082444.52,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2049,
+    "age" : 80,
+    "balance" : 1080059.11,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2050,
+    "age" : 81,
+    "balance" : 1076790.34,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2051,
+    "age" : 82,
+    "balance" : 1072520.29,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2052,
+    "age" : 83,
+    "balance" : 1067257.78,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2053,
+    "age" : 84,
+    "balance" : 1060866.69,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2054,
+    "age" : 85,
+    "balance" : 1053361.64,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2055,
+    "age" : 86,
+    "balance" : 1044681.37,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2056,
+    "age" : 87,
+    "balance" : 1034787.81,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2057,
+    "age" : 88,
+    "balance" : 1023714.46,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2058,
+    "age" : 89,
+    "balance" : 1011283.23,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2059,
+    "age" : 90,
+    "balance" : 997526.91,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2060,
+    "age" : 91,
+    "balance" : 982338.99,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  } ]
+}, {
+  "name" : "Plan",
+  "tentTarget" : 282543.50,
+  "lowestBalance" : 771157.81,
+  "stocksSoldWhileDown" : 30389.14,
+  "yearsCovered" : 4.97,
+  "tentLeftAtCheckpoint" : 72961.20,
+  "balanceAt90" : 812012.25,
+  "years" : [ {
+    "year" : 2026,
+    "age" : 57,
+    "balance" : 1003577.60,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2005
+  }, {
+    "year" : 2027,
+    "age" : 58,
+    "balance" : 1068566.27,
+    "tentBalance" : 94480.47,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2006
+  }, {
+    "year" : 2028,
+    "age" : 59,
+    "balance" : 1111307.56,
+    "tentBalance" : 198189.98,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2007
+  }, {
+    "year" : 2029,
+    "age" : 60,
+    "balance" : 921799.93,
+    "tentBalance" : 234291.42,
+    "tentDrawn" : 60051.49,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : true,
+    "historyYear" : 2008
+  }, {
+    "year" : 2030,
+    "age" : 61,
+    "balance" : 922917.73,
+    "tentBalance" : 169815.13,
+    "tentDrawn" : 60000.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : true,
+    "historyYear" : 2009
+  }, {
+    "year" : 2031,
+    "age" : 62,
+    "balance" : 943401.64,
+    "tentBalance" : 174537.22,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2010
+  }, {
+    "year" : 2032,
+    "age" : 63,
+    "balance" : 924403.28,
+    "tentBalance" : 180020.70,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2011
+  }, {
+    "year" : 2033,
+    "age" : 64,
+    "balance" : 921158.74,
+    "tentBalance" : 177947.91,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2012
+  }, {
+    "year" : 2034,
+    "age" : 65,
+    "balance" : 952616.64,
+    "tentBalance" : 169108.91,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2013
+  }, {
+    "year" : 2035,
+    "age" : 66,
+    "balance" : 972319.50,
+    "tentBalance" : 169075.43,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2014
+  }, {
+    "year" : 2036,
+    "age" : 67,
+    "balance" : 923029.37,
+    "tentBalance" : 121584.57,
+    "tentDrawn" : 48282.02,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : true,
+    "historyYear" : 2015
+  }, {
+    "year" : 2037,
+    "age" : 68,
+    "balance" : 921313.18,
+    "tentBalance" : 120340.28,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2016
+  }, {
+    "year" : 2038,
+    "age" : 69,
+    "balance" : 969573.15,
+    "tentBalance" : 118274.27,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2017
+  }, {
+    "year" : 2039,
+    "age" : 70,
+    "balance" : 880387.88,
+    "tentBalance" : 72961.20,
+    "tentDrawn" : 43657.59,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : true,
+    "historyYear" : 2018
+  }, {
+    "year" : 2040,
+    "age" : 71,
+    "balance" : 1001328.33,
+    "tentBalance" : 75716.07,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2019
+  }, {
+    "year" : 2041,
+    "age" : 72,
+    "balance" : 1082290.90,
+    "tentBalance" : 79934.90,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2020
+  }, {
+    "year" : 2042,
+    "age" : 73,
+    "balance" : 1121172.09,
+    "tentBalance" : 73501.26,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2021
+  }, {
+    "year" : 2043,
+    "age" : 74,
+    "balance" : 839283.67,
+    "tentBalance" : 15787.57,
+    "tentDrawn" : 45746.21,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : true,
+    "historyYear" : 2022
+  }, {
+    "year" : 2044,
+    "age" : 75,
+    "balance" : 909526.25,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 15847.79,
+    "stocksSoldWhileDown" : 30389.14,
+    "stocksBelowHigh" : true,
+    "historyYear" : 2023
+  }, {
+    "year" : 2045,
+    "age" : 76,
+    "balance" : 969232.44,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2024
+  }, {
+    "year" : 2046,
+    "age" : 77,
+    "balance" : 950026.41,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : 2025
+  }, {
+    "year" : 2047,
+    "age" : 78,
+    "balance" : 943796.86,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2048,
+    "age" : 79,
+    "balance" : 936851.22,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2049,
+    "age" : 80,
+    "balance" : 929169.12,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2050,
+    "age" : 81,
+    "balance" : 920729.04,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2051,
+    "age" : 82,
+    "balance" : 911453.43,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2052,
+    "age" : 83,
+    "balance" : 901074.79,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2053,
+    "age" : 84,
+    "balance" : 889467.50,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2054,
+    "age" : 85,
+    "balance" : 876636.23,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2055,
+    "age" : 86,
+    "balance" : 862519.61,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2056,
+    "age" : 87,
+    "balance" : 847053.82,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2057,
+    "age" : 88,
+    "balance" : 830270.43,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2058,
+    "age" : 89,
+    "balance" : 812012.25,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2059,
+    "age" : 90,
+    "balance" : 792325.25,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  }, {
+    "year" : 2060,
+    "age" : 91,
+    "balance" : 771157.81,
+    "tentBalance" : 0.00,
+    "tentDrawn" : 0.00,
+    "stocksSoldWhileDown" : 0.00,
+    "stocksBelowHigh" : false,
+    "historyYear" : null
+  } ]
+} ]

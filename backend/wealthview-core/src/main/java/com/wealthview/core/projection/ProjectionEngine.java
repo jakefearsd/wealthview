@@ -3,7 +3,9 @@ package com.wealthview.core.projection;
 import java.util.List;
 
 import com.wealthview.core.projection.dto.BondTentConfig;
+import com.wealthview.core.projection.dto.BondTentReplayOutcome;
 import com.wealthview.core.projection.dto.BondTentSizing;
+import com.wealthview.core.projection.dto.HistoricalReturnPath;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionRunDetail;
@@ -27,5 +29,13 @@ public interface ProjectionEngine {
      */
     default BondTentSizing sizeBondTent(ProjectionInput input, BondTentConfig config) {
         throw new UnsupportedOperationException("This projection engine cannot size a bond tent");
+    }
+
+    /**
+     * Replays {@code input} through the historical {@code path} once without its bond tent and once per tent mix.
+     * Only the deterministic engine replays; the default rejects the call.
+     */
+    default List<BondTentReplayOutcome> replayBondTent(ProjectionInput input, HistoricalReturnPath path) {
+        throw new UnsupportedOperationException("This projection engine cannot replay a bond tent");
     }
 }

@@ -142,29 +142,42 @@ final class BondTentPlanner {
     static ProjectionRunDetail twoPass(Function<TentRun, ProjectionRunDetail> pass,
                                        BondTentConfig config, @Nullable BondTentAssumptions assumptions,
                                        Frame frame) {
-        if (assumptions == null) {
-            throw new IllegalStateException("A bond tent is configured but bond return assumptions are not wired");
-        }
+        var returns = requireAssumptions(assumptions).realReturns();
         var passOne = pass.apply(null);
         var sized = size(passOne.result().yearlyData(), config, frame.inflationRate());
         var buildUp = BuildUp.starting(frame.currentYear(), frame.retirementYear(), config.buildUpStartYears(),
                 sized.planTarget());
-        return pass.apply(run(sized, config, buildUp, assumptions.realReturns(), frame.feeRate(), frame.order()));
+        return pass.apply(runFor(sized, config, 0, buildUp, returns, frame.feeRate(), frame.order()));
     }
 
-    private static TentRun run(Sized sized, BondTentConfig config, BuildUp buildUp,
-                               Map<BondMaturity, Double> realReturns, BigDecimal feeRate, WithdrawalOrder order) {
+    /** The bond return assumptions a tent run needs; a run that configures a tent without them is a wiring error. */
+    static BondTentAssumptions requireAssumptions(@Nullable BondTentAssumptions assumptions) {
+        if (assumptions == null) {
+            throw new IllegalStateException("A bond tent is configured but bond return assumptions are not wired");
+        }
+        return assumptions;
+    }
+
+    /**
+     * The tent for mix {@code mixIndex}: its shares, built to the mix's own target along {@code buildUp}'s line.
+     * {@code twoPass} runs the plan mix (index 0); a replay runs every mix.
+     */
+    static TentRun runFor(Sized sized, BondTentConfig config, int mixIndex, BuildUp buildUp,
+                          Map<BondMaturity, Double> realReturns, BigDecimal feeRate, WithdrawalOrder order) {
         var net = new EnumMap<BondMaturity, BigDecimal>(BondMaturity.class);
         var shares = new EnumMap<BondMaturity, BigDecimal>(BondMaturity.class);
         var yields = new EnumMap<BondMaturity, BigDecimal>(BondMaturity.class);
+        var mix = config.mixes().get(mixIndex);
         for (var maturity : BondMaturity.values()) {
             // A fee is a fee: bond funds carry the advisory fee and expense ratio like every other account.
             net.put(maturity, BigDecimal.valueOf(realReturns.getOrDefault(maturity, 0.0)).subtract(feeRate));
-            shares.put(maturity, orZero(config.planMix().shares().get(maturity)));
+            shares.put(maturity, orZero(mix.shares().get(maturity)));
             yields.put(maturity, orZero(config.yields().get(maturity)));
         }
         var setup = new PoolStrategy.TentSetup(PoolStrategy.TentSetup.placementFor(order), shares, net, yields);
-        return new TentRun(sized.sizing(), buildUp, setup);
+        var line = new BuildUp(buildUp.currentYear(), buildUp.retirementYear(), buildUp.start(),
+                sized.sizing().mixes().get(mixIndex).target());
+        return new TentRun(sized.sizing(), line, setup);
     }
 
     /** Configures the fresh pools for the tent; a tent-free pass ({@code tent == null}) leaves them untouched. */
@@ -174,15 +187,26 @@ final class BondTentPlanner {
         }
     }
 
-    /** Build-up line: reserve the year's share after contributions and before growth; inert without a tent. */
-    static void topUp(PoolStrategy pool, @Nullable TentRun tent, int year) {
+    /**
+     * Build-up line: reserve the year's share after contributions and before growth; inert without a tent. In a
+     * replay, a build-up year that starts with the stock index below its high reserves at most the year's
+     * contributions, so a crash during the build-up cannot be funded from the portfolio that just fell.
+     */
+    static void topUp(PoolStrategy pool, @Nullable TentRun tent, int year, @Nullable CrashReplayer replay,
+                      BigDecimal contributions) {
         if (tent != null) {
             var target = tent.buildUp().targetFor(year);
             if (target != null) {
                 // Top-ups buy at the mix shares; sleeves already held are not rebalanced within the tent.
-                pool.topUpTent(target);
+                pool.topUpTent(target, buildUpCap(tent.buildUp(), replay, contributions));
             }
         }
+    }
+
+    @Nullable
+    private static BigDecimal buildUpCap(BuildUp buildUp, @Nullable CrashReplayer replay, BigDecimal contributions) {
+        boolean hasBuildUp = buildUp.retirementYear() > buildUp.start();
+        return replay != null && hasBuildUp && replay.isBelowPeak() ? contributions.max(BigDecimal.ZERO) : null;
     }
 
     /** The side channel of a finished pass: {@code null} for a tent-free pass. */

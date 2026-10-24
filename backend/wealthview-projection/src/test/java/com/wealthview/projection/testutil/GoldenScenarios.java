@@ -4,11 +4,13 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import com.wealthview.core.projection.dto.AssetAllocation;
+import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
@@ -168,7 +170,21 @@ public final class GoldenScenarios {
             // fixture) and the account owner (per-owner pools). Absent, the legacy 4-arg
             // constructor path is used verbatim (costBasis = initialBalance, owner = "primary"),
             // keeping the five pre-household input files byte-identical.
-            if (acctNode.has("costBasis") || acctNode.has("owner")) {
+            if (acctNode.has("allocation")) {
+                // Bond-tent replay fixtures: an allocation instead of a fixed return, so a replay's
+                // historical asset-class returns drive the account.
+                var initialBalance = new BigDecimal(acctNode.get("initialBalance").asText());
+                accounts.add(new HypotheticalAccountInput(
+                        initialBalance,
+                        new BigDecimal(acctNode.get("annualContribution").asText()),
+                        parseAllocation(acctNode.get("allocation")),
+                        Optional.empty(),
+                        acctNode.has("costBasis")
+                                ? new BigDecimal(acctNode.get("costBasis").asText()) : initialBalance,
+                        acctNode.get("accountType").asText(),
+                        acctNode.has("owner") ? acctNode.get("owner").asText() : "primary"
+                ));
+            } else if (acctNode.has("costBasis") || acctNode.has("owner")) {
                 var initialBalance = new BigDecimal(acctNode.get("initialBalance").asText());
                 accounts.add(new HypotheticalAccountInput(
                         initialBalance,
@@ -190,6 +206,13 @@ public final class GoldenScenarios {
             }
         }
         return accounts;
+    }
+
+    private static AssetAllocation parseAllocation(JsonNode allocationNode) {
+        var weights = new EnumMap<AssetClass, Double>(AssetClass.class);
+        allocationNode.properties().forEach(
+                e -> weights.put(AssetClass.fromKey(e.getKey()), e.getValue().asDouble()));
+        return AssetAllocation.fromDoubles(weights);
     }
 
     private static String readResource(String path) throws IOException {

@@ -1,0 +1,46 @@
+{
+  "scenarioName": "Bond Tent GFC Replay",
+  "retirementDate": "2029-01-01",
+  "endAge": 92,
+  "inflationRate": "0.025",
+  "paramsJson": "{\"birth_year\": 1969, \"filing_status\": \"single\", \"withdrawal_order\": \"taxable_first\", \"bond_tent\": {\"coverage_years\": 5, \"build_up_start_years\": 3, \"mixes\": [{\"name\": \"Plan\", \"shares\": {\"ultrashort\": 0.2, \"short\": 0.3, \"intermediate\": 0.5, \"long\": 0}}], \"yields\": {\"ultrashort\": 0.0394, \"short\": 0.0465, \"intermediate\": 0.048, \"long\": 0.0539}}}",
+  "referenceYear": 2026,
+  "accounts": [
+    {
+      "initialBalance": "400000",
+      "annualContribution": "0",
+      "accountType": "taxable",
+      "allocation": {
+        "us_stock": 0.6,
+        "bond": 0.4
+      }
+    },
+    {
+      "initialBalance": "600000",
+      "annualContribution": "0",
+      "accountType": "traditional",
+      "allocation": {
+        "us_stock": 0.6,
+        "bond": 0.4
+      }
+    }
+  ],
+  "spendingProfile": {
+    "essentialExpenses": "40000",
+    "discretionaryExpenses": "20000",
+    "spendingTiers": null
+  },
+  "incomeSources": [
+    {
+      "id": "00000000-0000-0000-0000-0000000000c1",
+      "name": "Social Security",
+      "incomeType": "social_security",
+      "annualAmount": "30000",
+      "startAge": 67,
+      "endAge": null,
+      "inflationRate": "0",
+      "oneTime": false,
+      "taxTreatment": "taxable"
+    }
+  ]
+}
