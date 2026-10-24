@@ -75,6 +75,7 @@ final class StochasticMortalityEvaluator {
                 .interestYield(sim.interestYield())
                 .taxableEquityShare(sim.taxableEquityShare())
                 .survivorRegimes(arrays.survivorRegimes(), sim.survivorSpendingFactor())
+                .tent(sim.tentPlan(), sim.tentPaths())
                 // No .household(...)/.trackYearBalances(...)/.adaptation(...) here: every trial below
                 // supplies its OWN spliced household via the per-trial override (this factory's
                 // baked-in household default is never read), and this evaluation pass never tracks

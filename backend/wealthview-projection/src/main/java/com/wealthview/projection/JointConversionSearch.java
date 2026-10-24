@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.BondMaturityReturnsProvider.MaturityReturnMatrix;
 import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealReturnMatrix;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
@@ -95,6 +96,13 @@ final class JointConversionSearch {
                 convSchedule.conversionByYear(), convSchedule.conversionTaxByYear(), convSchedule);
     }
 
+    /** The tent's maturity returns when the run has a bond tent, else {@code null} (no tent paths recorded). */
+    @Nullable
+    private static MaturityReturnMatrix tentMaturitiesOf(OptimizationSetup ctx) {
+        TrialTentPlan plan = ctx.sim().tentPlan();
+        return plan == null ? null : plan.maturities();
+    }
+
     private RothConversionOptimizer.RothConversionSchedule jointSearch(
             OptimizationSetup ctx, GuardrailOptimizationInput input,
             RothConversionOptimizer convOptimizer, RealReturnMatrix matrix) {
@@ -107,7 +115,7 @@ final class JointConversionSearch {
         PoolReturnModel searchModel = Objects.requireNonNull(ctx.sim().returnModel(), "returnModel");
         PortfolioReturnPaths searchPaths = PortfolioPathGenerator.generate(
                 searchTrials, ctx.sim().preRetirementYears(), ctx.sim().years(), searchModel, matrix,
-                searchRng, ctx.sim().feeRate());
+                searchRng, ctx.sim().feeRate(), tentMaturitiesOf(ctx));
 
         double[] searchFloors = SustainabilitySearch.verifyEssentialFloor(
                 searchPaths.portfolioPaths(), ctx.taxIncome().incomeByYear(), ctx.taxIncome().essentialFloor(),

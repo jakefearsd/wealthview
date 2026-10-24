@@ -2,13 +2,16 @@ package com.wealthview.projection.testutil;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import com.wealthview.core.projection.BondMaturityReturnsProvider.MaturityReturnMatrix;
 import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealReturnMatrix;
 import com.wealthview.core.projection.dto.AssetClass;
+import com.wealthview.core.projection.dto.BondMaturity;
 import com.wealthview.core.projection.dto.GuardrailSpendingInput;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.IncomeSourceType;
@@ -51,6 +54,25 @@ public final class ProjectionTestFixtures {
                     { 0.30,  0.25,  0.00, -0.010},
                     { 0.02, -0.03,  0.07,  0.012},
             });
+
+    /**
+     * Bond maturity returns matching {@link #TEST_CMA_MATRIX} row by row (years 1-8), columns shortest first:
+     * ultrashort is that row's cash column, short is cash + 0.005, intermediate is the bond column x 0.6 and long
+     * is the bond column x 1.5.
+     */
+    public static final MaturityReturnMatrix TEST_MATURITY_MATRIX = maturitiesFor(TEST_CMA_MATRIX);
+
+    private static MaturityReturnMatrix maturitiesFor(RealReturnMatrix base) {
+        int bondColumn = Arrays.asList(base.classes()).indexOf(AssetClass.BOND);
+        int cashColumn = Arrays.asList(base.classes()).indexOf(AssetClass.CASH);
+        var grid = new double[base.years().length][];
+        for (int i = 0; i < grid.length; i++) {
+            double cash = base.realReturns()[i][cashColumn];
+            double bond = base.realReturns()[i][bondColumn];
+            grid[i] = new double[]{cash, cash + 0.005, bond * 0.6, bond * 1.5};
+        }
+        return new MaturityReturnMatrix(base.years().clone(), BondMaturity.values(), grid);
+    }
 
     /**
      * A mortgage interest or principal schedule (nominal, keyed by calendar year) paying the same

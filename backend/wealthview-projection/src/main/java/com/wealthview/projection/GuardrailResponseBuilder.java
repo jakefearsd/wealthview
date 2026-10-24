@@ -1,6 +1,7 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -171,7 +172,25 @@ final class GuardrailResponseBuilder {
                         // T24: which metric actually certified this run's search gate.
                         GuardrailProfileResponse.resolveGatedOn(
                                 input.gateOnAdaptiveRules(), input.maxAnnualAdjustmentRate())),
-                toStochasticMortalityResponse(stochasticMortality));
+                toStochasticMortalityResponse(stochasticMortality),
+                certifiedTentTarget(ctx, configFactory, discretionaryByYear));
+    }
+
+    /**
+     * The tent target of the final, survivor-scaled schedule this response reports, at scale 2; {@code null}
+     * when the run has no bond tent.
+     */
+    // UseVarargs: discretionaryByYear is a per-year indexed array, not a variable argument list.
+    @SuppressWarnings("PMD.UseVarargs")
+    @Nullable
+    private static BigDecimal certifiedTentTarget(OptimizationSetup ctx, TrialConfigFactory configFactory,
+                                                  double[] discretionaryByYear) {
+        if (ctx.sim().tentPlan() == null) {
+            return null;
+        }
+        double target = configFactory.tentTargetFor(ctx.taxIncome().adjustedFloors(), discretionaryByYear,
+                ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear());
+        return BigDecimal.valueOf(target).setScale(2, RoundingMode.HALF_UP);
     }
 
     /**
@@ -230,6 +249,7 @@ final class GuardrailResponseBuilder {
                 // Household task 6: the terminal/response passes run the same household economics as
                 // the search (per-owner RMD streams, first-death transition, second-death truncation).
                 .household(ctx.sim().household())
+                .tent(ctx.sim().tentPlan(), ctx.sim().tentPaths())
                 .build();
     }
 

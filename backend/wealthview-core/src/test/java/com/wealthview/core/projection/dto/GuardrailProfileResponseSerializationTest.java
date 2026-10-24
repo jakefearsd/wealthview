@@ -46,7 +46,7 @@ class GuardrailProfileResponseSerializationTest {
             "success_probability_with_rules", "gated_on",
             // Sub-project B (stochastic mortality), task 8: nested (NOT @JsonUnwrapped) block, so it
             // is exactly ONE top-level key regardless of whether stochasticMortality is null.
-            "stochastic_mortality");
+            "stochastic_mortality", "bond_tent_target");
 
     /** A response with every field populated to a distinct value, so a swapped field is detectable. */
     private GuardrailProfileResponse fullyPopulated() {

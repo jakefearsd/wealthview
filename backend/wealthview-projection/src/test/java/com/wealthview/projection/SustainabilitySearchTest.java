@@ -1,11 +1,19 @@
 package com.wealthview.projection;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
+import com.wealthview.core.projection.dto.BondMaturityValues;
+import com.wealthview.core.projection.dto.BondTentConfig;
+import com.wealthview.core.projection.dto.BondTentMix;
+import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.household.AgeMilestones;
+import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
+import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -114,7 +122,7 @@ class SustainabilitySearchTest {
         var portfolio = new PortfolioSetup(0.0, 0.0, 0.0, 0.0, null, 0.0, 0.0, 0.0);
         var sim = new SimulationParameters(0, retirementAge, 0, years, trialCount, confidenceLevel, 0.0,
                 paths, taxableReturns, traditionalReturns, rothReturns, Integer.MAX_VALUE,
-                0.0, 0.0, 0.0, 0.0, 1.0, 1.0, null, null, null, AgeMilestones.LEGACY_EARLY_ACCESS_AGE, null, 0, null);
+                0.0, 0.0, 0.0, 0.0, 1.0, 1.0, null, null, null, AgeMilestones.LEGACY_EARLY_ACCESS_AGE, null, 0, null, null, null);
         var taxIncome = new TaxIncomeContext(null, 0.0, income, null, surplusTax, null, null, null,
                 null, null, null, null, null);
         return new OptimizationSetup(portfolio, sim, taxIncome);
@@ -338,5 +346,53 @@ class SustainabilitySearchTest {
             floors[y] = Math.min(inflatedFloors[y], Math.max(0, capacityForFloor));
         }
         return floors;
+    }
+
+    private static SustainabilitySearch.SearchContext tentContext(OptimizationSetup setup) {
+        var sim = setup.sim();
+        var returnPaths = new PortfolioReturnPaths(sim.taxableReturns(), sim.traditionalReturns(),
+                sim.rothReturns(), sim.portfolioPaths(), sim.startBalances(), sim.tentPaths());
+        return new SustainabilitySearch.SearchContext(setup, returnPaths, sim.trialCount(),
+                setup.taxIncome().taxCtx(), null, null, false, 0.0);
+    }
+
+    @Test
+    void isSustainable_withTent_isMonotoneInDiscretionary() {
+        var shares = new BondMaturityValues(new BigDecimal("0.2"), new BigDecimal("0.3"),
+                new BigDecimal("0.5"), BigDecimal.ZERO);
+        var yields = new BondMaturityValues(new BigDecimal("0.0394"), new BigDecimal("0.0465"),
+                new BigDecimal("0.048"), new BigDecimal("0.0539"));
+        var tent = new BondTentConfig(new BigDecimal("5"), 0, List.of(new BondTentMix("Balanced", shares)), yields);
+        var input = GuardrailOptimizationInputBuilder.builder()
+                .withBondTent(tent)
+                .withAccounts(List.of(new HypotheticalAccountInput(
+                        new BigDecimal("1000000"), BigDecimal.ZERO, null, "taxable")))
+                .withTrialCount(300)
+                .withConfidenceLevel(new BigDecimal("0.90"))
+                .build();
+        var setup = new OptimizationContextBuilder(null).build(
+                input, input.accounts(), ProjectionTestFixtures.TEST_CMA_MATRIX,
+                ProjectionTestFixtures.TEST_MATURITY_MATRIX);
+        var ctx = tentContext(setup);
+        var search = new SustainabilitySearch(new TrialSimulator());
+        int years = setup.sim().years();
+        double[] floors = setup.taxIncome().adjustedFloors();
+
+        int transitions = 0;
+        boolean previous = true;
+        for (int step = 0; step <= 20; step++) {
+            double[] discretionary = new double[years];
+            Arrays.fill(discretionary, step * 10_000.0);
+            boolean sustainable = search.isSustainable(ctx, floors, discretionary);
+            if (previous && !sustainable) {
+                transitions++;
+            }
+            assertThat(!previous && sustainable)
+                    .as("sustainability must not recover at discretionary %s", step * 10_000)
+                    .isFalse();
+            previous = sustainable;
+        }
+
+        assertThat(transitions).isLessThanOrEqualTo(1);
     }
 }

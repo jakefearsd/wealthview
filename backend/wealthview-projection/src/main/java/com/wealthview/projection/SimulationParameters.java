@@ -69,7 +69,10 @@ record SimulationParameters(
         // produced them (so JointConversionSearch can generate matching search paths).
         @Nullable TrialStartBalances[] startBalances,
         int preRetirementYears,
-        @Nullable PoolReturnModel returnModel
+        @Nullable PoolReturnModel returnModel,
+        // Bond tent plan 4: the pass's tent plan and the per-trial recorded paths (both null: no tent).
+        @Nullable TrialTentPlan tentPlan,
+        @Nullable TentPaths tentPaths
 ) {
 
     /**
@@ -82,6 +85,6 @@ record SimulationParameters(
                                              int years, int rmdStartAge) {
         return new SimulationParameters(retirementYear, retirementAge, endAge, years, 0, 0, 0,
                 null, null, null, null, rmdStartAge, 0, 0, 0, 0, 1, 1.0, null, null, null,
-                AgeMilestones.LEGACY_EARLY_ACCESS_AGE, null, 0, null);
+                AgeMilestones.LEGACY_EARLY_ACCESS_AGE, null, 0, null, null, null);
     }
 }

@@ -483,6 +483,7 @@ final class SustainabilitySearch {
                 .interestYield(ctx.interestYield())
                 .taxableEquityShare(ctx.taxableEquityShare())
                 .household(ctx.household())
+                .tent(ctx.setup().sim().tentPlan(), ctx.returnPaths().tentPaths())
                 .build();
     }
 

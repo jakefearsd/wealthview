@@ -6,6 +6,8 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.lang.Nullable;
+
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 import tools.jackson.core.type.TypeReference;
@@ -64,7 +66,8 @@ public record GuardrailProfileResponse(
         String riskTolerance,
         RothConversionScheduleResponse conversionSchedule,
         @JsonUnwrapped Disclosure disclosure,
-        StochasticMortalityResponse stochasticMortality
+        StochasticMortalityResponse stochasticMortality,
+        @Nullable BigDecimal bondTentTarget
 ) {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -225,7 +228,25 @@ public record GuardrailProfileResponse(
         this(id, scenarioId, name, essentialFloor, terminalBalanceTarget, returnMean, trialCount, confidenceLevel,
                 phases, yearlySpending, medianFinalBalance, failureRate, successProbability, percentile10Final,
                 stale, createdAt, updatedAt, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears,
-                riskTolerance, conversionSchedule, disclosure, null);
+                riskTolerance, conversionSchedule, disclosure, null, null);
+    }
+
+    // ExcessiveParameterList: mirrors the record's canonical constructor minus the bond tent target, so
+    // existing positional call sites keep compiling unchanged.
+    @SuppressWarnings("PMD.ExcessiveParameterList")
+    public GuardrailProfileResponse(
+            UUID id, UUID scenarioId, String name, BigDecimal essentialFloor, BigDecimal terminalBalanceTarget,
+            BigDecimal returnMean, int trialCount, BigDecimal confidenceLevel, List<GuardrailPhaseInput> phases,
+            List<GuardrailYearlySpending> yearlySpending, BigDecimal medianFinalBalance, BigDecimal failureRate,
+            BigDecimal successProbability, BigDecimal percentile10Final, boolean stale,
+            OffsetDateTime createdAt, OffsetDateTime updatedAt, BigDecimal portfolioFloor,
+            BigDecimal maxAnnualAdjustmentRate, int phaseBlendYears, String riskTolerance,
+            RothConversionScheduleResponse conversionSchedule, Disclosure disclosure,
+            StochasticMortalityResponse stochasticMortality) {
+        this(id, scenarioId, name, essentialFloor, terminalBalanceTarget, returnMean, trialCount, confidenceLevel,
+                phases, yearlySpending, medianFinalBalance, failureRate, successProbability, percentile10Final,
+                stale, createdAt, updatedAt, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears,
+                riskTolerance, conversionSchedule, disclosure, stochasticMortality, null);
     }
 
     // --- Flat delegate accessors (mirrors ProjectionYearDto's grouped-field pattern): preserve

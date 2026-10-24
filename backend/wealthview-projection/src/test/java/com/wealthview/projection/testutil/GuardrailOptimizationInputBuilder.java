@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.dto.BondTentConfig;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
@@ -196,6 +197,11 @@ public final class GuardrailOptimizationInputBuilder {
 
     public GuardrailOptimizationInputBuilder withInterestYield(@Nullable BigDecimal interestYield) {
         delegate.interestYield(interestYield);
+        return this;
+    }
+
+    public GuardrailOptimizationInputBuilder withBondTent(@Nullable BondTentConfig bondTent) {
+        delegate.bondTent(bondTent);
         return this;
     }
 

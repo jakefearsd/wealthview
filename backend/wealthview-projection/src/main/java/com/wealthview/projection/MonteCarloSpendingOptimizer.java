@@ -12,6 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
+import com.wealthview.core.projection.BondMaturityReturnsProvider;
+import com.wealthview.core.projection.BondMaturityReturnsProvider.MaturityReturnMatrix;
 import com.wealthview.core.projection.CapitalMarketAssumptionsProvider;
 import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealReturnMatrix;
 import com.wealthview.core.projection.SpendingOptimizer;
@@ -49,6 +51,10 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     private final CapitalMarketAssumptionsProvider capitalMarketAssumptions;
     @Nullable
     private final RealReturnMatrix presetMatrix;
+    @Nullable
+    private final BondMaturityReturnsProvider bondMaturityReturns;
+    @Nullable
+    private final MaturityReturnMatrix presetMaturities;
     private final TrialSimulator trialSimulator = new TrialSimulator();
     private final SustainabilitySearch sustainabilitySearch = new SustainabilitySearch(trialSimulator);
     private final GuardrailResponseBuilder responseBuilder = new GuardrailResponseBuilder(trialSimulator);
@@ -65,22 +71,34 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
      */
     public MonteCarloSpendingOptimizer(@Nullable FederalTaxCalculator taxCalculator,
                                         RealReturnMatrix matrix) {
-        this(taxCalculator, null, matrix, null, null);
+        this(taxCalculator, null, matrix, null, null, null, null);
+    }
+
+    /** Test constructor for a bond-tent run: also supplies the maturity returns aligned to {@code matrix}. */
+    public MonteCarloSpendingOptimizer(@Nullable FederalTaxCalculator taxCalculator,
+                                        RealReturnMatrix matrix, MaturityReturnMatrix maturities) {
+        this(taxCalculator, null, matrix, null, null, null, maturities);
     }
 
     @Autowired
     public MonteCarloSpendingOptimizer(@Nullable FederalTaxCalculator taxCalculator,
                                         CapitalMarketAssumptionsProvider capitalMarketAssumptions,
                                         @Nullable MeterRegistry meterRegistry,
-                                        @Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator) {
-        this(taxCalculator, capitalMarketAssumptions, null, meterRegistry, capitalGainsTaxCalculator);
+                                        @Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator,
+                                        @Nullable BondMaturityReturnsProvider bondMaturityReturns) {
+        this(taxCalculator, capitalMarketAssumptions, null, meterRegistry, capitalGainsTaxCalculator,
+                bondMaturityReturns, null);
     }
 
     private MonteCarloSpendingOptimizer(@Nullable FederalTaxCalculator taxCalculator,
                                         @Nullable CapitalMarketAssumptionsProvider capitalMarketAssumptions,
                                         @Nullable RealReturnMatrix presetMatrix,
                                         @Nullable MeterRegistry meterRegistry,
-                                        @Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator) {
+                                        @Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator,
+                                        @Nullable BondMaturityReturnsProvider bondMaturityReturns,
+                                        @Nullable MaturityReturnMatrix presetMaturities) {
+        this.bondMaturityReturns = bondMaturityReturns;
+        this.presetMaturities = presetMaturities;
         this.taxCalculator = taxCalculator;
         this.capitalMarketAssumptions = capitalMarketAssumptions;
         this.presetMatrix = presetMatrix;
@@ -105,6 +123,26 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         return Objects.requireNonNull(capitalMarketAssumptions,
                 "capitalMarketAssumptions required when no preset matrix is supplied")
                 .matrix(includeDepressionYears);
+    }
+
+    /**
+     * The bond-tent maturity returns aligned to {@code matrix}: the preset (tests) or the provider's. {@code
+     * null} when the request has no tent, so nothing is aligned or read for a tent-free run.
+     *
+     * @throws IllegalStateException if a tent is configured and neither source is wired
+     */
+    @Nullable
+    private MaturityReturnMatrix maturitiesFor(GuardrailOptimizationInput request, RealReturnMatrix matrix) {
+        if (request.bondTent() == null) {
+            return null;
+        }
+        if (presetMaturities != null) {
+            return presetMaturities;
+        }
+        if (bondMaturityReturns == null) {
+            throw new IllegalStateException("A bond tent is configured but bond return assumptions are not wired");
+        }
+        return bondMaturityReturns.alignedTo(matrix);
     }
 
     // No @Timed here: @Observed already registers a Timer under this exact name (Spring Boot wires
@@ -153,12 +191,14 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             meterRegistry.counter("wealthview.projection.runs", "type", "monte_carlo").increment();
         }
         try {
-            RealReturnMatrix matrix = matrix(request.includeDepressionYears());
+            // A bond tent forces the default 1972-2025 window, as the deterministic engine does.
+            RealReturnMatrix matrix = matrix(request.includeDepressionYears() && request.bondTent() == null);
+            var maturities = maturitiesFor(request, matrix);
             // API #22: the expected-path scalars are the accounts as they will stand at retirement
             // (contributions + growth from the base year); every trial itself starts today and
             // accumulates through its own pre-retirement market (bond tent plan 1).
             var input = PreRetirementAccumulation.seedAtRetirement(request, matrix);
-            var ctx = contextBuilder.build(input, request.accounts(), matrix);
+            var ctx = contextBuilder.build(input, request.accounts(), matrix, maturities);
             if (ctx.sim().years() <= 0) {
                 return new OptimizeResult(emptyResult(input), null);
             }
@@ -266,9 +306,10 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
      */
     @Nullable
     StochasticMortalityEvaluation evaluateStochasticMortality(GuardrailOptimizationInput request) {
-        RealReturnMatrix matrix = matrix(request.includeDepressionYears());
+        RealReturnMatrix matrix = matrix(request.includeDepressionYears() && request.bondTent() == null);
+        var maturities = maturitiesFor(request, matrix);
         var input = PreRetirementAccumulation.seedAtRetirement(request, matrix);
-        var ctx = contextBuilder.build(input, request.accounts(), matrix);
+        var ctx = contextBuilder.build(input, request.accounts(), matrix, maturities);
         if (ctx.sim().years() <= 0) {
             return null;
         }
@@ -355,7 +396,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         double maxAdjRate = input.maxAnnualAdjustmentRate() != null
                 ? input.maxAnnualAdjustmentRate().doubleValue() : 0.0;
         var returnPaths = new PortfolioReturnPaths(ctx.sim().taxableReturns(), ctx.sim().traditionalReturns(),
-                ctx.sim().rothReturns(), ctx.sim().portfolioPaths(), ctx.sim().startBalances());
+                ctx.sim().rothReturns(), ctx.sim().portfolioPaths(), ctx.sim().startBalances(),
+                ctx.sim().tentPaths());
         return new SustainabilitySearch.SearchContext(
                 ctx, returnPaths, ctx.sim().trialCount(), ctx.taxIncome().taxCtx(),
                 conversionByYear, conversionTaxByYear,

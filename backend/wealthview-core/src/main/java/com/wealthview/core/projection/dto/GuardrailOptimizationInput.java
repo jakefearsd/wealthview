@@ -131,8 +131,40 @@ public record GuardrailOptimizationInput(
         @Nullable MortalityTable mortalityTable,
         // Phase 1a: the primary's birth month (1-12, null = unknown). Resolved engine-side to the
         // early-access (59 1/2) age via AgeMilestones; null => legacy whole-year age 60.
-        @Nullable Integer birthMonth
+        @Nullable Integer birthMonth,
+        // Bond tent plan 4: the scenario's tent (null = none; every Monte Carlo output is then unchanged).
+        @Nullable BondTentConfig bondTent
 ) {
+
+    // ExcessiveParameterList: mirrors the record's canonical constructor minus the bond tent, so existing
+    // positional call sites keep compiling unchanged.
+    @SuppressWarnings("PMD.ExcessiveParameterList")
+    public GuardrailOptimizationInput(
+            LocalDate retirementDate, int birthYear, int endAge, BigDecimal inflationRate,
+            List<ProjectionAccountInput> accounts, List<ProjectionIncomeSourceInput> incomeSources,
+            BigDecimal essentialFloor, BigDecimal terminalBalanceTarget, BigDecimal returnMean,
+            int trialCount, BigDecimal confidenceLevel, List<GuardrailPhaseInput> phases, @Nullable Long seed,
+            BigDecimal portfolioFloor, BigDecimal maxAnnualAdjustmentRate, int phaseBlendYears,
+            @Nullable String filingStatus, @Nullable String withdrawalOrder,
+            boolean optimizeConversions, BigDecimal conversionBracketRate, BigDecimal rmdTargetBracketRate,
+            int traditionalExhaustionBuffer, BigDecimal rmdBracketHeadroom,
+            BigDecimal dynamicSequencingBracketRate, BigDecimal dividendYield, BigDecimal feeRate,
+            int baseYear, boolean includeDepressionYears, BigDecimal interestYield, boolean gateOnAdaptiveRules,
+            @Nullable Integer spouseBirthYear, @Nullable Integer primaryDeathAge,
+            @Nullable Integer spouseDeathAge, @Nullable BigDecimal survivorSpendingFactor,
+            boolean communityProperty, @Nullable Boolean stochasticMortality, @Nullable String primarySex,
+            @Nullable String spouseSex, @Nullable Integer longevityConditionalAge,
+            @Nullable MortalityTable mortalityTable, @Nullable Integer birthMonth) {
+        this(retirementDate, birthYear, endAge, inflationRate, accounts, incomeSources, essentialFloor,
+                terminalBalanceTarget, returnMean, trialCount, confidenceLevel, phases, seed, portfolioFloor,
+                maxAnnualAdjustmentRate, phaseBlendYears, filingStatus, withdrawalOrder, optimizeConversions,
+                conversionBracketRate, rmdTargetBracketRate, traditionalExhaustionBuffer, rmdBracketHeadroom,
+                dynamicSequencingBracketRate, dividendYield, feeRate, baseYear, includeDepressionYears,
+                interestYield, gateOnAdaptiveRules, spouseBirthYear, primaryDeathAge, spouseDeathAge,
+                survivorSpendingFactor, communityProperty, stochasticMortality, primarySex, spouseSex,
+                longevityConditionalAge, mortalityTable, birthMonth, null);
+    }
+
 
     /**
      * Back-compat convenience for callers that predate {@link #baseYear} (audit C7 / T7-M3) AND
@@ -167,8 +199,8 @@ public record GuardrailOptimizationInput(
                 null, null, null, null, false,
                 // Sub-project B: pre-stochastic-mortality callers keep the toggle off.
                 null, null, null, null, null,
-                // Phase 1a: birthMonth null (legacy age 60)
-                null);
+                // Phase 1a: birthMonth null (legacy age 60); no bond tent
+                null, null);
     }
 
     /**
@@ -184,7 +216,7 @@ public record GuardrailOptimizationInput(
                 dynamicSequencingBracketRate, dividendYield, feeRate, baseYear, includeDepressionYears,
                 interestYield, gateOnAdaptiveRules, spouseBirthYear, primaryDeathAge, spouseDeathAge,
                 survivorSpendingFactor, communityProperty, stochasticMortality, primarySex, spouseSex,
-                longevityConditionalAge, mortalityTable, birthMonth);
+                longevityConditionalAge, mortalityTable, birthMonth, bondTent);
     }
 
     /**
@@ -248,6 +280,7 @@ public record GuardrailOptimizationInput(
         private Integer longevityConditionalAge;
         private MortalityTable mortalityTable;
         private Integer birthMonth;
+        private BondTentConfig bondTent;
 
         private Builder() {}
 
@@ -456,6 +489,11 @@ public record GuardrailOptimizationInput(
             return this;
         }
 
+        public Builder bondTent(@Nullable BondTentConfig bondTent) {
+            this.bondTent = bondTent;
+            return this;
+        }
+
         public GuardrailOptimizationInput build() {
             return new GuardrailOptimizationInput(retirementDate, birthYear, endAge, inflationRate, accounts,
                     incomeSources, essentialFloor, terminalBalanceTarget, returnMean, trialCount, confidenceLevel,
@@ -466,7 +504,7 @@ public record GuardrailOptimizationInput(
                     baseYear != null ? baseYear : retirementDate.getYear(), includeDepressionYears, interestYield,
                     gateOnAdaptiveRules, spouseBirthYear, primaryDeathAge, spouseDeathAge, survivorSpendingFactor,
                     communityProperty, stochasticMortality, primarySex, spouseSex, longevityConditionalAge,
-                    mortalityTable, birthMonth);
+                    mortalityTable, birthMonth, bondTent);
         }
     }
 }

@@ -7,8 +7,10 @@ import java.util.Random;
 
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.BondMaturityReturnsProvider.MaturityReturnMatrix;
 import com.wealthview.core.projection.CapitalMarketAssumptionsProvider;
 import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealReturnMatrix;
+import com.wealthview.core.projection.dto.BondTentConfig;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
@@ -16,6 +18,7 @@ import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.household.AgeMilestones;
 import com.wealthview.core.projection.household.HouseholdContext;
 import com.wealthview.core.projection.household.PersonId;
+import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
@@ -93,6 +96,17 @@ final class OptimizationContextBuilder {
      */
     OptimizationSetup build(GuardrailOptimizationInput input, List<? extends ProjectionAccountInput> todayAccounts,
                             RealReturnMatrix matrix) {
+        return build(input, todayAccounts, matrix, null);
+    }
+
+    /**
+     * As the three-argument overload, plus the bond-tent maturity returns aligned to {@code matrix}.
+     * A request with a bond tent requires them; without a tent they are ignored.
+     *
+     * @throws IllegalStateException if the input has a bond tent and {@code maturities} is null
+     */
+    OptimizationSetup build(GuardrailOptimizationInput input, List<? extends ProjectionAccountInput> todayAccounts,
+                            RealReturnMatrix matrix, @Nullable MaturityReturnMatrix maturities) {
         int retirementYear = input.retirementDate().getYear();
         int retirementAge = retirementYear - input.birthYear();
         int endAge = input.endAge();
@@ -129,8 +143,11 @@ final class OptimizationContextBuilder {
         PoolReturnModel returnModel = PoolReturnModel.from(todayAccounts, inflationRate);
         double feeRate = resolveFeeRate(input);
         int preRetirementYears = Math.max(0, retirementYear - input.baseYear());
+        TrialTentPlan tentPlan = tentPlanFor(input, withdrawalOrder, inflationRate, preRetirementYears,
+                returnModel, maturities);
         PortfolioReturnPaths returnPaths = PortfolioPathGenerator.generate(
-                trialCount, preRetirementYears, years, returnModel, matrix, rng, feeRate);
+                trialCount, preRetirementYears, years, returnModel, matrix, rng, feeRate,
+                tentPlan == null ? null : maturities);
         double[][] portfolioPaths = returnPaths.portfolioPaths();
 
         // Audit C7 / T7-M3: the MC engine only models years from retirement onward, so its own
@@ -231,11 +248,36 @@ final class OptimizationContextBuilder {
                         returnPaths.rothReturns(), rmdStartAge, dividendYield, feeRate, returnMean,
                         interestYield, taxableEquityShare, household.survivorFactor(), household.sim(),
                         mortalityDraws, stochasticEval, earlyAccessAge,
-                        returnPaths.startBalances(), preRetirementYears, returnModel),
+                        returnPaths.startBalances(), preRetirementYears, returnModel,
+                        tentPlan, returnPaths.tentPaths()),
                 new TaxIncomeContext(filingStatus, essentialFloor,
                         incomeByYear, taxableIncomeByYear, surplusTaxByYear,
                         incomeData, rentalAwareTaxableIncome, adjustedFloors, ordinaryTaxTables,
                         taxCtx, dsBracketCeilingByYear, ltcgTaxTables, rentalIncomeByYear));
+    }
+
+    /**
+     * The pass's bond tent, or {@code null} when the request has none. {@code contributionCap} is the sum of
+     * today's positive account contributions.
+     */
+    @Nullable
+    private static TrialTentPlan tentPlanFor(GuardrailOptimizationInput input, String withdrawalOrder,
+                                             double inflationRate, int preRetirementYears,
+                                             PoolReturnModel returnModel,
+                                             @Nullable MaturityReturnMatrix maturities) {
+        BondTentConfig tent = input.bondTent();
+        if (tent == null) {
+            return null;
+        }
+        if (maturities == null) {
+            throw new IllegalStateException("A bond tent is configured but bond return assumptions are not wired");
+        }
+        double contributionCap = 0;
+        for (var account : returnModel.allAccounts()) {
+            contributionCap += Math.max(0, account.contribution());
+        }
+        return TrialTentPlan.of(tent, WithdrawalOrder.fromString(withdrawalOrder), inflationRate,
+                preRetirementYears, contributionCap, maturities);
     }
 
     private static List<ProjectionAccountInput> taxableAccounts(List<ProjectionAccountInput> accounts) {
