@@ -23,9 +23,10 @@ final class PoolStrategyAssembler {
      * REAL return via {@code (1+nominal)/(1+inflationRate)-1} when the scenario itself has no
      * inflation rate. The whole projection runs in real (today's-dollars) terms, and overrides must be
      * deflated at the SAME rate as income/Social Security/spending — the scenario's own inflation rate
-     * — so that all cash flows share one real-dollar frame. {@code DeterministicProjectionEngine.resolveProjectionParams} already
-     * defaults a missing scenario rate to this same value, so in practice this constant is only ever
-     * used as that upstream default flowing through, never as an independent override (allocation
+     * — so that all cash flows share one real-dollar frame.
+     * {@code DeterministicProjectionEngine.resolveProjectionParams} already defaults a missing scenario rate
+     * to this same value, so in practice this constant is only ever used as that upstream default flowing through,
+     * never as an independent override (allocation
      * accounts already grow at real geometric means and are unaffected by this constant either way).
      */
     private static final BigDecimal CMA_INFLATION_RATE = new BigDecimal("0.025");
