@@ -2,6 +2,7 @@ package com.wealthview.projection;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,6 +30,7 @@ import com.wealthview.projection.testutil.SsaMortalityTables;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubMfj2025;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 /**
  * Pins the bond tent through the two passes the plain optimizer tests do not reach: the joint Roth-conversion
@@ -68,10 +70,10 @@ class MonteCarloTentConversionAndMortalityTest {
         return GuardrailOptimizationInputBuilder.builder()
                 .withEndAge(92)
                 .withAccounts(List.of(
-                        new HypotheticalAccountInput(bd("400000"), BigDecimal.ZERO, null, "taxable"),
-                        new HypotheticalAccountInput(bd("900000"), BigDecimal.ZERO, null, "traditional"),
-                        new HypotheticalAccountInput(bd("200000"), BigDecimal.ZERO, null, "roth")))
-                .withEssentialFloor(bd("50000"))
+                        new HypotheticalAccountInput(bd("300000"), BigDecimal.ZERO, null, "taxable"),
+                        new HypotheticalAccountInput(bd("1800000"), BigDecimal.ZERO, null, "traditional"),
+                        new HypotheticalAccountInput(bd("100000"), BigDecimal.ZERO, null, "roth")))
+                .withEssentialFloor(bd("40000"))
                 .withReturnMean(bd("0.06"))
                 .withTrialCount(300)
                 .withConfidenceLevel(bd("0.90"))
@@ -94,6 +96,24 @@ class MonteCarloTentConversionAndMortalityTest {
         assertThat(withTent.conversionSchedule()).isNotNull();
         assertThat(withTent.bondTentTarget()).isNotNull();
         assertThat(withTent.medianFinalBalance()).isNotEqualByComparingTo(withoutTent.medianFinalBalance());
+    }
+
+    private static double totalConverted(GuardrailOptimizationInput input) {
+        var ctx = contextFor(input);
+        var search = new JointConversionSearch(realCalc(), new SustainabilitySearch(new TrialSimulator()));
+        return Arrays.stream(search.optimize(ctx, input, ProjectionTestFixtures.TEST_CMA_MATRIX).byYear()).sum();
+    }
+
+    @Test
+    void optimize_jointSearchWithTent_choosesTheConversionScoredOnItsOwnTentPaths() {
+        double withTent = totalConverted(conversionsInput(balancedTent()));
+        double withoutTent = totalConverted(conversionsInput(null));
+
+        // Recorded 2026-10-24 by running the joint search on this fixture (seed 20261024, 300 trials). The
+        // tent-free search converts 17300.84 in total; the tent shifts the scored paths and so the choice.
+        // Scoring the search on the main run's tent paths instead of its own returns 0, so this pins them.
+        assertThat(withTent).isCloseTo(5669.6723, within(0.01));
+        assertThat(withTent).isNotEqualTo(withoutTent);
     }
 
     // === stochastic mortality ===
@@ -132,7 +152,7 @@ class MonteCarloTentConversionAndMortalityTest {
         var withTentCtx = contextFor(householdInput(balancedTent()));
         var withoutTentCtx = contextFor(householdInput(null));
         double[] discretionary = new double[withTentCtx.sim().years()];
-        java.util.Arrays.fill(discretionary, 60_000);
+        Arrays.fill(discretionary, 60_000);
         var evaluator = new StochasticMortalityEvaluator(new TrialSimulator());
 
         var withTent = evaluator.evaluate(withTentCtx, discretionary, null, null);
