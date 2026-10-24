@@ -445,8 +445,8 @@ export interface GuardrailProfileResponse {
     max_annual_adjustment_rate: number;
     phase_blend_years: number;
     risk_tolerance: string | null;
-    cash_reserve_years: number;
-    cash_return_rate: number;
+    /** Bond tent size (dollars) the schedule was certified with; null when the scenario has no tent. */
+    bond_tent_target: number | null;
     conversion_schedule: RothConversionScheduleResponse | null;
     /**
      * Sub-project B (stochastic mortality): the optional longevity-aware summary of one
@@ -543,8 +543,6 @@ export interface GuardrailOptimizationRequest {
     max_annual_adjustment_rate?: number;
     phase_blend_years?: number;
     risk_tolerance?: 'conservative' | 'moderate' | 'aggressive';
-    cash_reserve_years?: number;
-    cash_return_rate?: number;
     optimize_conversions?: boolean;
     conversion_bracket_rate?: number;
     rmd_target_bracket_rate?: number;
@@ -578,6 +576,8 @@ export interface BondTentConfig {
     build_up_start_years: number;
     mixes: BondTentMix[];
     yields: BondMaturityValues;
+    /** Set by the cash-reserve conversion; read-only on the client and dropped on the next save. */
+    converted_from_cash_reserve?: boolean;
 }
 
 export type BondTentReason = 'SPENDING_LEVEL' | 'INCOME' | 'WITHDRAWAL_TAX' | 'MIX_YIELDS';

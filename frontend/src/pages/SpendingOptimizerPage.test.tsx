@@ -73,8 +73,7 @@ const mockProfile = makeProfile({
     max_annual_adjustment_rate: 0.05,
     phase_blend_years: 1,
     risk_tolerance: 'moderate',
-    cash_reserve_years: 2,
-    cash_return_rate: 0.04,
+    bond_tent_target: null,
 });
 
 function renderPage() {
@@ -163,12 +162,99 @@ describe('SpendingOptimizerPage', () => {
         });
 
         // Advanced fields should not be visible initially
-        expect(screen.queryByText('Cash Reserve')).not.toBeInTheDocument();
+        expect(screen.queryByText('Confidence Level')).not.toBeInTheDocument();
 
         await user.click(screen.getByText('Advanced Settings'));
-        expect(screen.getByText('Cash Reserve')).toBeInTheDocument();
-        expect(screen.getByText('Cash Rate')).toBeInTheDocument();
         expect(screen.getByText('Confidence Level')).toBeInTheDocument();
+    });
+
+    function tentScenario(extra: Record<string, unknown> = {}) {
+        return makeScenario({
+            id: 'sc-1',
+            name: 'Test Scenario',
+            retirement_date: '2030-01-01',
+            params_json: JSON.stringify({
+                birth_year: 1968,
+                bond_tent: {
+                    coverage_years: 2.5,
+                    build_up_start_years: 0,
+                    mixes: [{ name: 'Cash reserve', shares: { ultrashort: 1, short: 0, intermediate: 0, long: 0 } }],
+                    yields: { ultrashort: 0.0394, short: 0.0465, intermediate: 0.048, long: 0.0539 },
+                    ...extra,
+                },
+            }),
+        });
+    }
+
+    it('shows the cash-reserve moved note instead of the reserve controls', async () => {
+        const user = userEvent.setup();
+        renderPage();
+        await waitFor(() => expect(screen.getByText('Advanced Settings')).toBeInTheDocument());
+        await user.click(screen.getByText('Advanced Settings'));
+
+        expect(screen.queryByText('Cash Reserve')).not.toBeInTheDocument();
+        expect(screen.queryByText('Cash Rate')).not.toBeInTheDocument();
+        expect(screen.getByText(/Cash reserve has moved\./)).toHaveTextContent(
+            'Cash reserve has moved. A cash reserve is the simplest kind of bond tent: a few years of spending '
+            + 'held in a money market fund. Set it up under Bond tent in your scenario.');
+        expect(screen.getByRole('link', { name: 'your scenario' })).toHaveAttribute('href', '/projections/sc-1');
+    });
+
+    it('shows the converted notice for a converted scenario', async () => {
+        const user = userEvent.setup();
+        mockGetScenario.mockResolvedValue(tentScenario({ converted_from_cash_reserve: true }));
+        renderPage();
+        await waitFor(() => expect(screen.getByText('Advanced Settings')).toBeInTheDocument());
+        await user.click(screen.getByText('Advanced Settings'));
+
+        expect(screen.getByText(/Your 2\.5-year cash reserve is now a 2\.5-year bond tent/)).toHaveTextContent(
+            'Your 2.5-year cash reserve is now a 2.5-year bond tent, held entirely in ultrashort Treasuries '
+            + '(the same thing as a money market fund). It works the same way with one difference: once spent, '
+            + "it isn't refilled, so results may shift slightly from before.");
+        expect(screen.queryByText(/Cash reserve has moved/)).not.toBeInTheDocument();
+    });
+
+    it('shows the tent line when the scenario has a tent', async () => {
+        mockGetScenario.mockResolvedValue(tentScenario());
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByText(
+                "Includes your scenario's bond tent: 2.5 years of spending, Cash reserve mix.")).toBeInTheDocument();
+        });
+    });
+
+    it('shows no tent line without a tent', async () => {
+        renderPage();
+        await waitFor(() => expect(screen.getByText('Spending Optimizer')).toBeInTheDocument());
+
+        expect(screen.queryByText(/Includes your scenario's bond tent/)).not.toBeInTheDocument();
+    });
+
+    it('sends no cash reserve fields in the optimize request', async () => {
+        const user = userEvent.setup();
+        mockOptimizeSpending.mockResolvedValue(mockProfile);
+        renderPage();
+        await user.click(await screen.findByRole('button', { name: /run optimization/i }));
+
+        await waitFor(() => expect(mockOptimizeSpending).toHaveBeenCalled());
+        const [, request] = mockOptimizeSpending.mock.calls[0];
+        expect(Object.keys(request).filter(k => /cash/i.test(k))).toEqual([]);
+    });
+
+    it('shows the certified tent size in the results', async () => {
+        mockGetProfile.mockResolvedValue({ ...mockProfile, bond_tent_target: 312500 });
+        renderPage();
+
+        expect(await screen.findByText('Certified with a $312,500 bond tent.')).toBeInTheDocument();
+    });
+
+    it('shows no certified tent line when the profile has no tent', async () => {
+        mockGetProfile.mockResolvedValue(mockProfile);
+        renderPage();
+        await screen.findByTestId('corridor-chart');
+
+        expect(screen.queryByText(/Certified with a/)).not.toBeInTheDocument();
     });
 
     it('gives every adorned numeric input an accessible name', async () => {
@@ -182,7 +268,7 @@ describe('SpendingOptimizerPage', () => {
         expect(screen.getByRole('textbox', { name: 'Essential Spending Floor (per year)' })).toBeInTheDocument();
         expect(screen.getByRole('textbox', { name: 'Terminal Balance Target' })).toBeInTheDocument();
         expect(screen.getByRole('textbox', { name: 'Portfolio Safety Net' })).toBeInTheDocument();
-        for (const name of ['Spending Flexibility', 'Cash Rate', 'Confidence Level',
+        for (const name of ['Spending Flexibility', 'Confidence Level',
             'Dynamic-Sequencing Bracket Rate (%)']) {
             expect(screen.getByRole('spinbutton', { name })).toBeInTheDocument();
         }

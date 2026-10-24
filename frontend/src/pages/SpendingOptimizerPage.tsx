@@ -15,6 +15,8 @@ import FormField from '../components/FormField';
 import PhaseEditor from '../components/PhaseEditor';
 import OptimizerResultsView from '../components/OptimizerResultsView';
 import Button from '../components/Button';
+import ConvertedTentNotice from '../components/scenario/ConvertedTentNotice';
+import { parseBondTent } from '../components/scenario/parseBondTent';
 import SegmentedControl, { type SegmentedControlOption } from '../components/SegmentedControl';
 
 type OptimizerState = 'configure' | 'running' | 'results';
@@ -229,6 +231,8 @@ export default function SpendingOptimizerPage() {
         return <LoadingState message="Loading scenario..." />;
     }
 
+    const tent = parseBondTent(scenario.params_json);
+
     return (
         <div>
             <div style={{ marginBottom: '1rem' }}>
@@ -304,6 +308,12 @@ export default function SpendingOptimizerPage() {
                         {scenario.income_sources.length > 3 && (
                             <span> and {scenario.income_sources.length - 3} more</span>
                         )}
+                    </div>
+                )}
+                {tent && (
+                    <div style={{ color: '#555', marginBottom: '0.35rem' }}>
+                        {`Includes your scenario's bond tent: ${tent.coverage_years} years of spending, `
+                            + `${tent.mixes[0]?.name ?? ''} mix.`}
                     </div>
                 )}
                 <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
@@ -406,22 +416,17 @@ export default function SpendingOptimizerPage() {
                             </button>
                             {showAdvanced && (
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', marginTop: '0.75rem' }}>
-                                    <FormField label="Cash Reserve" helpText="Years of spending held in cash to avoid selling during downturns">
-                                        <select style={selectStyle} value={config.cashReserveYears}
-                                            onChange={e => updateConfig('cashReserveYears', Number(e.target.value))}>
-                                            <option value={0}>0 years</option>
-                                            <option value={1}>1 year</option>
-                                            <option value={2}>2 years</option>
-                                            <option value={3}>3 years</option>
-                                        </select>
-                                    </FormField>
-                                    <FormField label="Cash Rate" helpText="Expected annual return on cash reserves (money market rate)">
-                                        <div style={adornmentWrapStyle}>
-                                            <input aria-label="Cash Rate" style={adornedInputStyle} type="number" step="0.1" value={config.cashReturnRatePct || ''}
-                                                onChange={e => updateConfig('cashReturnRatePct', Number(e.target.value))} />
-                                            <span style={adornmentSuffixStyle}>%</span>
-                                        </div>
-                                    </FormField>
+                                    <div style={{ gridColumn: '1 / -1', fontSize: '0.85rem', color: '#555' }}>
+                                        {tent?.converted_from_cash_reserve ? (
+                                            <ConvertedTentNotice tent={tent} />
+                                        ) : (
+                                            <span>
+                                                Cash reserve has moved. A cash reserve is the simplest kind of bond tent: a few
+                                                years of spending held in a money market fund. Set it up under <strong>Bond tent</strong> in{' '}
+                                                <Link to={`/projections/${id}`}>your scenario</Link>.
+                                            </span>
+                                        )}
+                                    </div>
                                     <FormField label="Trial Count">
                                         <select style={selectStyle} value={config.trialCount}
                                             onChange={e => updateConfig('trialCount', Number(e.target.value))}>

@@ -6,7 +6,7 @@ import { useApiQuery } from '../hooks/useApiQuery';
 import { useApiMutation } from '../hooks/useApiMutation';
 import { useCrudForm } from '../hooks/useCrudForm';
 import { cardStyle, inputStyle, labelStyle } from '../utils/styles';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatWholeCurrency } from '../utils/format';
 import { failureRateSeverity } from '../utils/projectionCalcs';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
@@ -357,8 +357,8 @@ export default function SpendingProfilesPage() {
                                             value={`${g.trial_count.toLocaleString()} at ${(g.confidence_level * 100).toFixed(0)}% confidence`}
                                         />
                                         <StatTile
-                                            label="Cash Buffer"
-                                            value={`${g.cash_reserve_years ?? 2}yr reserve, ${((g.cash_return_rate ?? 0.015) * 100).toFixed(1)}% cash rate`}
+                                            label="Bond Tent"
+                                            value={g.bond_tent_target != null ? formatWholeCurrency(g.bond_tent_target) : 'None'}
                                         />
                                         <StatTile
                                             label="Balance Range (P10-P50)"

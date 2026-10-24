@@ -69,6 +69,18 @@ describe('ScenarioTentSection', () => {
         vi.useRealTimers();
     });
 
+    it('shows the converted notice when the tent came from a cash reserve', () => {
+        renderSection({ ...defaultConfig(), coverage_years: 2, converted_from_cash_reserve: true });
+
+        expect(screen.getByText(/Your 2-year cash reserve is now a 2-year bond tent/)).toBeInTheDocument();
+    });
+
+    it('shows no converted notice for an ordinary tent', () => {
+        renderSection(defaultConfig());
+
+        expect(screen.queryByText(/cash reserve is now/)).not.toBeInTheDocument();
+    });
+
     it('turns the tent on with the defaults', () => {
         const onChange = renderSection(null);
 

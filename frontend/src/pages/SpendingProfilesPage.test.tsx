@@ -53,8 +53,7 @@ const mockGuardrailProfile = makeProfile({
     max_annual_adjustment_rate: 0.05,
     phase_blend_years: 1,
     risk_tolerance: 'moderate',
-    cash_reserve_years: 2,
-    cash_return_rate: 0.04,
+    bond_tent_target: 250000,
 });
 
 const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
@@ -202,6 +201,24 @@ describe('SpendingProfilesPage', () => {
     const guardrailDelete = () =>
         within(screen.getByRole('button', { name: /Re-?optimize/i }).parentElement!)
             .getByRole('button', { name: /^Delete$/i });
+
+    it('shows the certified bond tent tile', async () => {
+        await renderWithGuardrail();
+
+        expect(screen.getByText('Bond Tent')).toBeInTheDocument();
+        expect(screen.getByText('$250,000')).toBeInTheDocument();
+        expect(screen.queryByText('Cash Buffer')).not.toBeInTheDocument();
+    });
+
+    it('shows None without a tent', async () => {
+        mockUseApiQuery.mockReturnValue({ data: mockProfiles, loading: false, error: null, refetch: vi.fn() });
+        mockListScenarios.mockResolvedValue([makeScenario({ id: 'sc-1', name: 'Base Case' })] as never);
+        mockGetGuardrailProfile.mockResolvedValue({ ...mockGuardrailProfile, bond_tent_target: null } as never);
+        renderWithRouter(<SpendingProfilesPage />);
+        await screen.findByText('Optimized Plan');
+
+        expect(screen.getByText('None')).toBeInTheDocument();
+    });
 
     it('lists a guardrail profile against the scenario that owns it', async () => {
         await renderWithGuardrail();

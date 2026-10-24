@@ -294,6 +294,20 @@ describe('ScenarioForm', () => {
             expect(payload.include_depression_years).toBe(false);
         });
 
+        it('submit omits converted_from_cash_reserve', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            const converted = { ...tent, converted_from_cash_reserve: true };
+            render(<ScenarioForm initialValues={tentScenario(converted)} onSubmit={onSubmit} submitLabel="Save" />);
+
+            fireEvent.click(screen.getByText('Save'));
+
+            await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+            const sent = onSubmit.mock.calls[0][0].bond_tent;
+            expect('converted_from_cash_reserve' in sent).toBe(false);
+            expect(sent).toEqual(tent);
+        });
+
         it('omits bond_tent when the tent is off', async () => {
             setupMocks();
             const onSubmit = vi.fn().mockResolvedValue(undefined);

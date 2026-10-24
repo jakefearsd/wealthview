@@ -19,9 +19,6 @@ export interface OptimizerConfig {
     /** Max annual spending change, percent (5 = 5%/yr). API: fraction. */
     spendingFlexibilityPct: number;
     phaseBlendYears: number;
-    cashReserveYears: number;
-    /** Expected cash return, percent (4 = 4%). API: fraction. */
-    cashReturnRatePct: number;
     trialCount: number;
     /** Confidence override, percent — null means "use risk tolerance". API: fraction. */
     confidenceLevelPct: number | null;
@@ -56,10 +53,6 @@ export function defaultOptimizerConfig(): OptimizerConfig {
         riskTolerance: 'moderate',
         spendingFlexibilityPct: 5,
         phaseBlendYears: 1,
-        cashReserveYears: 2,
-        // D7 (Phase 1a): REAL return on the cash bucket -- matches the backend default
-        // (GuardrailProfileService.DEFAULT_CASH_RETURN_RATE = 0.015). 4% real was optimistic.
-        cashReturnRatePct: 1.5,
         trialCount: 5000,
         confidenceLevelPct: null,
         optimizeConversions: false,
@@ -93,10 +86,6 @@ export function fromProfile(profile: GuardrailProfileResponse): OptimizerConfig 
         essentialFloor: profile.essential_floor,
         terminalTarget: profile.terminal_balance_target,
         trialCount: profile.trial_count,
-        cashReserveYears: profile.cash_reserve_years ?? defaults.cashReserveYears,
-        cashReturnRatePct: profile.cash_return_rate != null
-            ? toPercent(profile.cash_return_rate)
-            : defaults.cashReturnRatePct,
         portfolioFloor: profile.portfolio_floor ?? defaults.portfolioFloor,
         spendingFlexibilityPct: profile.max_annual_adjustment_rate != null
             ? toPercent(profile.max_annual_adjustment_rate)
@@ -135,8 +124,6 @@ export function toRequest(config: OptimizerConfig, scenarioId: string): Guardrai
         essential_floor: config.essentialFloor,
         terminal_balance_target: config.terminalTarget,
         trial_count: config.trialCount,
-        cash_reserve_years: config.cashReserveYears,
-        cash_return_rate: config.cashReturnRatePct / 100,
         phases: config.phases,
         portfolio_floor: config.portfolioFloor,
         max_annual_adjustment_rate: config.spendingFlexibilityPct / 100,

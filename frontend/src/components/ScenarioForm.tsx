@@ -13,6 +13,7 @@ import ScenarioHouseholdSection from './scenario/ScenarioHouseholdSection';
 import ScenarioAccountsSection from './scenario/ScenarioAccountsSection';
 import ScenarioTentSection from './scenario/ScenarioTentSection';
 import { tentConfigError } from './scenario/bondTentValidation';
+import { parseBondTent } from './scenario/parseBondTent';
 import {
     DEFAULT_SURVIVOR_SPENDING_FACTOR,
     DEFAULT_LONGEVITY_CONDITIONAL_AGE,
@@ -62,9 +63,9 @@ function mapAccountType(realType: string): string {
     }
 }
 
-function parseBondTent(paramsJson: string | null | undefined): BondTentConfig | null {
-    const parsed = paramsJson ? JSON.parse(paramsJson) : {};
-    return parsed.bond_tent ?? null;
+function withoutConversionMarker(tent: BondTentConfig): BondTentConfig {
+    const { converted_from_cash_reserve: _marker, ...rest } = tent;
+    return rest;
 }
 
 /** The Spending Plan dropdown value a saved scenario starts on: an active guardrail, else its profile id. */
@@ -310,7 +311,8 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 // The backend rejects a tent combined with 1928-1971 history, so the tent forces it off.
                 include_depression_years: bondTentOn ? false : includeDepressionYears,
                 // Omitted entirely (not null) when the tent is off.
-                ...(bondTentOn ? { bond_tent: bondTent } : {}),
+                // The conversion marker is a one-time notice; the first save retires it.
+                ...(bondTentOn ? { bond_tent: withoutConversionMarker(bondTent) } : {}),
                 heir_tax_rate: heirTaxRate != null ? heirTaxRate / 100 : undefined,
                 spouse_birth_year: spouseBirthYear,
                 spouse_birth_month: household ? spouseBirthMonth : null,

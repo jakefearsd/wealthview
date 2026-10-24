@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { extractErrorMessage, formatPercent, formatWholeCurrency } from '@wealthview/shared';
 import FormField from '../FormField';
 import HelpText from '../HelpText';
+import ConvertedTentNotice from './ConvertedTentNotice';
 import { inputStyle } from '../../utils/styles';
 import { sizeBondTent } from '../../api/projections';
 import type {
@@ -212,6 +213,7 @@ export default function ScenarioTentSection({
     return (
         <div style={{ marginBottom: '1rem' }}>
             <h3 style={{ margin: '0 0 0.5rem' }}>Bond tent</h3>
+            <ConvertedTentNotice tent={config} />
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <input
                     type="checkbox"

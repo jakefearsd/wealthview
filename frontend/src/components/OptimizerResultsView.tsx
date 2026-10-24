@@ -62,6 +62,12 @@ export default function OptimizerResultsView({
                 </div>
             )}
 
+            {result.bond_tent_target != null && (
+                <div style={{ fontSize: '0.9rem', color: '#555', marginBottom: '1rem' }}>
+                    {`Certified with a ${fmt(result.bond_tent_target)} bond tent.`}
+                </div>
+            )}
+
             {result.floor_reduced && (
                 <div data-testid="floor-reduced-banner" style={{
                     background: '#fff8e1', border: '1px solid #ffe082', borderRadius: '8px',

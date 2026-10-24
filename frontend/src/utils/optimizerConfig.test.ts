@@ -13,8 +13,6 @@ describe('defaultOptimizerConfig', () => {
         expect(config.riskTolerance).toBe('moderate');
         expect(config.spendingFlexibilityPct).toBe(5);
         expect(config.phaseBlendYears).toBe(1);
-        expect(config.cashReserveYears).toBe(2);
-        expect(config.cashReturnRatePct).toBe(1.5);
         expect(config.trialCount).toBe(5000);
         expect(config.confidenceLevelPct).toBeNull();
         expect(config.optimizeConversions).toBe(false);
@@ -26,10 +24,12 @@ describe('defaultOptimizerConfig', () => {
         expect(config.phases).toHaveLength(3);
     });
 
-    it('defaults the cash return to the backend real-terms default (1.5%), not 4%', () => {
-        const request = toRequest(defaultOptimizerConfig(), 'scenario-1');
+    it('carries no cash-reserve fields in the config or the request', () => {
+        const config = defaultOptimizerConfig();
+        const request = toRequest(config, 'scenario-1');
 
-        expect(request.cash_return_rate).toBeCloseTo(0.015);
+        expect(Object.keys(config).filter(k => /cash/i.test(k))).toEqual([]);
+        expect(Object.keys(request).filter(k => /cash/i.test(k))).toEqual([]);
     });
 });
 
@@ -42,18 +42,15 @@ describe('fromProfile', () => {
         expect(config.terminalTarget).toBe(250000);
         expect(config.portfolioFloor).toBe(100000);
         expect(config.trialCount).toBe(2500);
-        expect(config.cashReserveYears).toBe(3);
-        expect(config.cashReturnRatePct).toBeCloseTo(4.5);
         expect(config.spendingFlexibilityPct).toBeCloseTo(8);
         expect(config.phaseBlendYears).toBe(2);
         expect(config.riskTolerance).toBe('aggressive');
         expect(config.phases).toEqual(makeProfile().phases);
     });
 
-    it('converts stored fractions without float noise (0.035 -> 3.5, 0.07 -> 7)', () => {
-        const config = fromProfile(makeProfile({ cash_return_rate: 0.035, max_annual_adjustment_rate: 0.07 }));
+    it('converts stored fractions without float noise (0.07 -> 7)', () => {
+        const config = fromProfile(makeProfile({ max_annual_adjustment_rate: 0.07 }));
 
-        expect(config.cashReturnRatePct).toBe(3.5);
         expect(config.spendingFlexibilityPct).toBe(7);
     });
 
@@ -65,8 +62,6 @@ describe('fromProfile', () => {
 
     it('falls back to defaults for absent nullable fields', () => {
         const config = fromProfile(makeProfile({
-            cash_reserve_years: null as unknown as number,
-            cash_return_rate: null as unknown as number,
             max_annual_adjustment_rate: null as unknown as number,
             phase_blend_years: null as unknown as number,
             portfolio_floor: null as unknown as number,
@@ -74,8 +69,6 @@ describe('fromProfile', () => {
             phases: [],
         }));
 
-        expect(config.cashReserveYears).toBe(2);
-        expect(config.cashReturnRatePct).toBe(1.5);
         expect(config.spendingFlexibilityPct).toBe(5);
         expect(config.phaseBlendYears).toBe(1);
         expect(config.portfolioFloor).toBe(0);
@@ -130,12 +123,11 @@ describe('fromProfile', () => {
 
 describe('toRequest', () => {
     it('converts display percentages back to fractions', () => {
-        const config = { ...defaultOptimizerConfig(), cashReturnRatePct: 4.5, spendingFlexibilityPct: 8 };
+        const config = { ...defaultOptimizerConfig(), spendingFlexibilityPct: 8 };
 
         const request = toRequest(config, 's1');
 
         expect(request.scenario_id).toBe('s1');
-        expect(request.cash_return_rate).toBeCloseTo(0.045);
         expect(request.max_annual_adjustment_rate).toBeCloseTo(0.08);
     });
 
@@ -200,8 +192,6 @@ describe('toRequest', () => {
         expect(request.terminal_balance_target).toBe(profile.terminal_balance_target);
         expect(request.portfolio_floor).toBe(profile.portfolio_floor);
         expect(request.trial_count).toBe(profile.trial_count);
-        expect(request.cash_reserve_years).toBe(profile.cash_reserve_years);
-        expect(request.cash_return_rate).toBeCloseTo(profile.cash_return_rate);
         expect(request.max_annual_adjustment_rate).toBeCloseTo(profile.max_annual_adjustment_rate);
         expect(request.phase_blend_years).toBe(profile.phase_blend_years);
         expect(request.risk_tolerance).toBe('aggressive');
