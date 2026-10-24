@@ -16,12 +16,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 - Success rates and recommended spending may move, especially when retirement is years away.
 - Existing optimized profiles are marked out of date. Re-optimize to refresh them.
 - Scenarios retiring this year are unaffected.
-- The optimizer's cash reserve (Cash Reserve and Cash Rate) has been replaced by the bond tent. Each existing reserve was converted into a bond tent of the same length, held entirely in ultrashort Treasuries, and shows a one-time notice until the scenario is next saved. Four things differ from the old reserve:
+- The optimizer's cash reserve (Cash Reserve and Cash Rate) has been replaced by the bond tent. Existing reserves were converted when the migration ran. A reserve converts when the scenario's optimized plan had one, the scenario has a spending plan (a spending profile or an optimized plan) and it has no bond tent yet. The new tent has the same number of years (up to 10) and is held entirely in ultrashort Treasuries; a one-time notice shows until the scenario is next saved. This includes scenarios whose active plan is a regular spending profile: their main projection now shows the tent's cost. Only the converted scenarios' optimized plans are marked out of date; re-optimize them. Five things differ from the old reserve:
   - A spent tent is not refilled.
   - The tent is drawn when stocks are below their previous high, not in any negative year. This also ends the old reserve's habit of refilling after any up year.
   - It earns historical Treasury bill returns instead of a fixed cash rate.
   - The reserve now also appears in the main projection, as cash held.
-- Optimized profiles that had a cash reserve are marked out of date. Re-optimize them.
+  - It is sized differently. The old reserve held years times the first year's total spending. The tent is sized to the years of withdrawals it covers: spending minus income such as Social Security, plus tax, discounted at the mix's yield. A converted tent can be noticeably smaller than the old reserve when income covers part of your spending.
 - Known gap: the Roth conversion optimizer ignores a bond tent held in an IRA.
 
 ### Upgrade notes

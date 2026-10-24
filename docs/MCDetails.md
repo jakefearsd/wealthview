@@ -54,8 +54,10 @@ randomness, but nothing in the application takes that path.)
 If the scenario has a bond tent, every trial models it. It adds no randomness of its own: each maturity's
 return comes from the same bootstrapped market year as the rest of that trial.
 
-- **Paths.** The tent is built before retirement along the scenario's build-up line. Contributions always go
-  in; stocks are sold into the tent only in years when stocks are at or above their previous high. During
+- **Paths.** The tent is built before retirement along the scenario's build-up line. During build-up,
+  contributions go into the tent first, up to the build-up line. In a year when stocks are below their previous
+  high, only contributions go in and no stocks are sold; stocks are sold into the tent only in years when stocks
+  are at or above their previous high. During
   retirement the tent grows at each maturity's own historical return, net of the fee rate. A configured tent
   forces the 1972-2025 window.
 - **Trigger.** "Stocks" means the growth part of the pools, the non-tent holdings, tracked as a cumulative return
