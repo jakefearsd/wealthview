@@ -98,8 +98,6 @@ public record GuardrailOptimizationInput(
         BigDecimal portfolioFloor,
         BigDecimal maxAnnualAdjustmentRate,
         int phaseBlendYears,
-        int cashReserveYears,
-        BigDecimal cashReturnRate,
         String filingStatus,
         String withdrawalOrder,
         boolean optimizeConversions,
@@ -155,13 +153,13 @@ public record GuardrailOptimizationInput(
             BigDecimal essentialFloor, BigDecimal terminalBalanceTarget, BigDecimal returnMean,
             int trialCount, BigDecimal confidenceLevel, List<GuardrailPhaseInput> phases, Long seed,
             BigDecimal portfolioFloor, BigDecimal maxAnnualAdjustmentRate, int phaseBlendYears,
-            int cashReserveYears, BigDecimal cashReturnRate, String filingStatus, String withdrawalOrder,
+            String filingStatus, String withdrawalOrder,
             boolean optimizeConversions, BigDecimal conversionBracketRate, BigDecimal rmdTargetBracketRate,
             int traditionalExhaustionBuffer, BigDecimal rmdBracketHeadroom,
             BigDecimal dynamicSequencingBracketRate, BigDecimal dividendYield, BigDecimal feeRate) {
         this(retirementDate, birthYear, endAge, inflationRate, accounts, incomeSources, essentialFloor,
                 terminalBalanceTarget, returnMean, trialCount, confidenceLevel, phases, seed, portfolioFloor,
-                maxAnnualAdjustmentRate, phaseBlendYears, cashReserveYears, cashReturnRate, filingStatus,
+                maxAnnualAdjustmentRate, phaseBlendYears, filingStatus,
                 withdrawalOrder, optimizeConversions, conversionBracketRate, rmdTargetBracketRate,
                 traditionalExhaustionBuffer, rmdBracketHeadroom, dynamicSequencingBracketRate, dividendYield,
                 feeRate, retirementDate.getYear(), false, null, false,
@@ -180,8 +178,8 @@ public record GuardrailOptimizationInput(
     public GuardrailOptimizationInput withAccounts(List<ProjectionAccountInput> newAccounts) {
         return new GuardrailOptimizationInput(retirementDate, birthYear, endAge, inflationRate, newAccounts,
                 incomeSources, essentialFloor, terminalBalanceTarget, returnMean, trialCount, confidenceLevel,
-                phases, seed, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears, cashReserveYears,
-                cashReturnRate, filingStatus, withdrawalOrder, optimizeConversions, conversionBracketRate,
+                phases, seed, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears,
+                filingStatus, withdrawalOrder, optimizeConversions, conversionBracketRate,
                 rmdTargetBracketRate, traditionalExhaustionBuffer, rmdBracketHeadroom,
                 dynamicSequencingBracketRate, dividendYield, feeRate, baseYear, includeDepressionYears,
                 interestYield, gateOnAdaptiveRules, spouseBirthYear, primaryDeathAge, spouseDeathAge,
@@ -225,8 +223,6 @@ public record GuardrailOptimizationInput(
         private BigDecimal portfolioFloor;
         private BigDecimal maxAnnualAdjustmentRate;
         private int phaseBlendYears;
-        private int cashReserveYears;
-        private BigDecimal cashReturnRate;
         private String filingStatus;
         private String withdrawalOrder;
         private boolean optimizeConversions;
@@ -332,16 +328,6 @@ public record GuardrailOptimizationInput(
 
         public Builder phaseBlendYears(int phaseBlendYears) {
             this.phaseBlendYears = phaseBlendYears;
-            return this;
-        }
-
-        public Builder cashReserveYears(int cashReserveYears) {
-            this.cashReserveYears = cashReserveYears;
-            return this;
-        }
-
-        public Builder cashReturnRate(BigDecimal cashReturnRate) {
-            this.cashReturnRate = cashReturnRate;
             return this;
         }
 
@@ -473,8 +459,8 @@ public record GuardrailOptimizationInput(
         public GuardrailOptimizationInput build() {
             return new GuardrailOptimizationInput(retirementDate, birthYear, endAge, inflationRate, accounts,
                     incomeSources, essentialFloor, terminalBalanceTarget, returnMean, trialCount, confidenceLevel,
-                    phases, seed, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears, cashReserveYears,
-                    cashReturnRate, filingStatus, withdrawalOrder, optimizeConversions, conversionBracketRate,
+                    phases, seed, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears,
+                    filingStatus, withdrawalOrder, optimizeConversions, conversionBracketRate,
                     rmdTargetBracketRate, traditionalExhaustionBuffer, rmdBracketHeadroom,
                     dynamicSequencingBracketRate, dividendYield, feeRate,
                     baseYear != null ? baseYear : retirementDate.getYear(), includeDepressionYears, interestYield,

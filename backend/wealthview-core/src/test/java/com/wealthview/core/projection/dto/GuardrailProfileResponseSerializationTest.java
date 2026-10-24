@@ -41,7 +41,7 @@ class GuardrailProfileResponseSerializationTest {
             "trial_count", "confidence_level", "phases", "yearly_spending", "median_final_balance",
             "failure_rate", "success_probability", "percentile10_final", "stale", "created_at",
             "updated_at", "portfolio_floor", "max_annual_adjustment_rate", "phase_blend_years",
-            "risk_tolerance", "cash_reserve_years", "cash_return_rate", "conversion_schedule",
+            "risk_tolerance", "conversion_schedule",
             "fixed_return_share", "floor_reduced", "original_floor_success_probability",
             "success_probability_with_rules", "gated_on",
             // Sub-project B (stochastic mortality), task 8: nested (NOT @JsonUnwrapped) block, so it
@@ -71,7 +71,7 @@ class GuardrailProfileResponseSerializationTest {
                 false,
                 OffsetDateTime.parse("2026-01-01T00:00:00Z"), OffsetDateTime.parse("2026-01-02T00:00:00Z"),
                 BigDecimal.ZERO, new BigDecimal("0.10"),
-                2, "moderate", 2, new BigDecimal("0.04"),
+                2, "moderate",
                 null,
                 disclosure);
     }
@@ -82,6 +82,14 @@ class GuardrailProfileResponseSerializationTest {
 
         assertThat(tree.properties()).extracting(Map.Entry::getKey)
                 .containsExactlyInAnyOrderElementsOf(SNAKE_KEYS);
+    }
+
+    @Test
+    void serialize_profile_hasNoCashReserveKeys() throws Exception {
+        JsonNode tree = SNAKE.readTree(SNAKE.writeValueAsString(fullyPopulated()));
+
+        assertThat(tree.has("cash_reserve_years")).isFalse();
+        assertThat(tree.has("cash_return_rate")).isFalse();
     }
 
     @Test
@@ -107,7 +115,7 @@ class GuardrailProfileResponseSerializationTest {
                 new BigDecimal("1000000"), new BigDecimal("0.05"), new BigDecimal("0.95"),
                 new BigDecimal("500000"), false,
                 OffsetDateTime.now(), OffsetDateTime.now(),
-                BigDecimal.ZERO, null, 2, "moderate", 2, new BigDecimal("0.04"), null,
+                BigDecimal.ZERO, null, 2, "moderate", null,
                 null);
 
         JsonNode t = SNAKE.readTree(SNAKE.writeValueAsString(minimal));
@@ -166,7 +174,7 @@ class GuardrailProfileResponseSerializationTest {
                 false,
                 OffsetDateTime.parse("2026-01-01T00:00:00Z"), OffsetDateTime.parse("2026-01-02T00:00:00Z"),
                 BigDecimal.ZERO, new BigDecimal("0.10"),
-                2, "moderate", 2, new BigDecimal("0.04"),
+                2, "moderate",
                 null,
                 disclosure,
                 stochasticMortality);

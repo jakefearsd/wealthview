@@ -35,8 +35,6 @@ final class TrialConfigFactory {
     private final int rmdStartAge;
     private final int earlyAccessAge;
     private final double[] dsBracketCeilingByYear;
-    private final int cashReserveYears;
-    private final double cashReturnRate;
     private final double[][] taxableReturns;
     private final double[][] traditionalReturns;
     private final double[][] rothReturns;
@@ -62,8 +60,6 @@ final class TrialConfigFactory {
         this.rmdStartAge = b.rmdStartAge;
         this.earlyAccessAge = b.earlyAccessAge;
         this.dsBracketCeilingByYear = b.dsBracketCeilingByYear;
-        this.cashReserveYears = b.cashReserveYears;
-        this.cashReturnRate = b.cashReturnRate;
         this.taxableReturns = b.taxableReturns;
         this.traditionalReturns = b.traditionalReturns;
         this.rothReturns = b.rothReturns;
@@ -130,7 +126,6 @@ final class TrialConfigFactory {
                 .rmdStartAge(rmdStartAge)
                 .earlyAccessAge(earlyAccessAge)
                 .dsBracketCeilingByYear(dsBracketCeilingByYear)
-                .cashReserve(cashReserveYears, cashReturnRate)
                 .trackYearBalances(trackYearBalances)
                 .returns(taxableReturns[t], traditionalReturns[t], rothReturns[t])
                 .taxableBasis(initTaxableBasis)
@@ -168,8 +163,6 @@ final class TrialConfigFactory {
         private int rmdStartAge = Integer.MAX_VALUE;
         private int earlyAccessAge = AgeMilestones.LEGACY_EARLY_ACCESS_AGE;
         private double[] dsBracketCeilingByYear;
-        private int cashReserveYears;
-        private double cashReturnRate;
         private double[][] taxableReturns;
         private double[][] traditionalReturns;
         private double[][] rothReturns;
@@ -237,12 +230,6 @@ final class TrialConfigFactory {
 
         Builder dsBracketCeilingByYear(double[] dsBracketCeilingByYear) {
             this.dsBracketCeilingByYear = dsBracketCeilingByYear;
-            return this;
-        }
-
-        Builder cashReserve(int cashReserveYears, double cashReturnRate) {
-            this.cashReserveYears = cashReserveYears;
-            this.cashReturnRate = cashReturnRate;
             return this;
         }
 

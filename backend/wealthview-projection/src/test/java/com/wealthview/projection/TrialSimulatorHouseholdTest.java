@@ -17,20 +17,19 @@ class TrialSimulatorHouseholdTest {
 
     private final TrialSimulator simulator = new TrialSimulator();
 
-    /** Builds a household SimulationConfig (taxable_first, tracked, 0% cash return). */
+    /** Builds a household SimulationConfig (taxable_first, tracked). */
     // ExcessiveParameterList mirrors the SimulationConfig canonical shape for readable test call sites.
     @SuppressWarnings("PMD.ExcessiveParameterList")
     private static TrialSimulator.SimulationConfig cfg(
             double initTaxable, double initTraditional, double initRoth,
             String order, OrdinaryTaxTable[] tables, double[] base,
-            double[] conv, double[] convTax, int retirementAge, int cashReserveYears,
+            double[] conv, double[] convTax, int retirementAge,
             double[] taxRet, double[] tradRet, double[] rothRet, int rmdStartAge,
             double initTaxableBasis, LtcgTaxTable[] ltcg, TrialSimulator.HouseholdSim household) {
         return TrialSimulator.SimulationConfig.builder(initTaxable, initTraditional, initRoth, order)
                 .taxTables(tables, base)
                 .conversions(conv, convTax)
                 .retirementAge(retirementAge)
-                .cashReserve(cashReserveYears, 0.0)
                 .trackYearBalances(true)
                 .returns(taxRet, tradRet, rothRet)
                 .rmdStartAge(rmdStartAge)
@@ -60,7 +59,7 @@ class TrialSimulatorHouseholdTest {
                 /*jointStepUpFactor=*/0.0, /*truncateYearIndex=*/1, TrialSimulator.TaxableSeed.EMPTY);
         var config = cfg(0.0, 150_000.0, 0.0, "taxable_first",
                 new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0},
-                null, null, /*retirementAge=*/80, 0,
+                null, null, /*retirementAge=*/80,
                 new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, /*rmdStartAge=*/73,
                 0.0, null, household);
 
@@ -82,7 +81,7 @@ class TrialSimulatorHouseholdTest {
                 -1, true, 0.0, 1, TrialSimulator.TaxableSeed.EMPTY);
         var config = cfg(0.0, 150_000.0, 0.0, "taxable_first",
                 new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0},
-                null, null, 80, 0,
+                null, null, 80,
                 new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, 73,
                 0.0, null, household);
 
@@ -109,7 +108,7 @@ class TrialSimulatorHouseholdTest {
                 -1, true, 0.0, 1, TrialSimulator.TaxableSeed.EMPTY);
         var config = cfg(500_000.0, 300_000.0, 0.0, "traditional_first",
                 new OrdinaryTaxTable[]{table}, new double[]{60_000.0},
-                new double[]{50_000.0}, new double[]{0.0}, 75, 0,
+                new double[]{50_000.0}, new double[]{0.0}, 75,
                 new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, 73,
                 500_000.0, null, household);
 
@@ -140,7 +139,7 @@ class TrialSimulatorHouseholdTest {
                 /*jointStepUpFactor=*/0.0, /*truncateYearIndex=*/2, TrialSimulator.TaxableSeed.EMPTY);
         var config = cfg(0.0, 150_000.0, 0.0, "taxable_first",
                 new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20), OrdinaryTaxTable.flat(0.20)},
-                new double[]{0.0, 0.0}, null, null, /*retirementAge=*/79, 0,
+                new double[]{0.0, 0.0}, null, null, /*retirementAge=*/79,
                 new double[]{0.0, 0.0}, new double[]{0.0, 0.0}, new double[]{0.0, 0.0},
                 /*rmdStartAge=*/80, 0.0, null, household);
 
@@ -165,7 +164,7 @@ class TrialSimulatorHouseholdTest {
         // age here (offset 0), reaching its start (80) at year 1.
         var config = cfg(0.0, 150_000.0, 0.0, "taxable_first",
                 new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20), OrdinaryTaxTable.flat(0.20)},
-                new double[]{0.0, 0.0}, null, null, /*retirementAge=*/79, 0,
+                new double[]{0.0, 0.0}, null, null, /*retirementAge=*/79,
                 new double[]{0.0, 0.0}, new double[]{0.0, 0.0}, new double[]{0.0, 0.0},
                 /*rmdStartAge=*/99, 0.0, null, household);
 
@@ -185,7 +184,7 @@ class TrialSimulatorHouseholdTest {
                 50_000.0, 20_000.0, 0, 99, /*transitionYearIndex=*/0, true, 0.0, 1,
                 TrialSimulator.TaxableSeed.EMPTY);
         var config = cfg(0.0, 150_000.0, 50_000.0, "taxable_first",
-                null, null, null, null, 60, 0,
+                null, null, null, null, 60,
                 new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, 99,
                 0.0, null, household);
 
@@ -224,7 +223,7 @@ class TrialSimulatorHouseholdTest {
                 new double[]{0.0}, new double[]{0.0}, new double[]{100_000.0}, new double[]{0.0}, 1,
                 cfg(200_000.0, 0.0, 0.0, "taxable_first",
                         new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.0)}, new double[]{0.0},
-                        null, null, 60, 0,
+                        null, null, 60,
                         new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, 99,
                         110_000.0, new LtcgTaxTable[]{ltcg}, household));
 
@@ -246,7 +245,7 @@ class TrialSimulatorHouseholdTest {
         double[] zero5 = {0.0, 0.0, 0.0, 0.0, 0.0};
         double[] floors5 = {30_000.0, 30_000.0, 30_000.0, 30_000.0, 30_000.0};
         var config = cfg(100_000.0, 0.0, 0.0, "taxable_first",
-                null, null, null, null, 60, 0,
+                null, null, null, null, 60,
                 zero5, zero5, zero5, 99, 0.0, null, household);
 
         var result = simulator.simulateTrial(

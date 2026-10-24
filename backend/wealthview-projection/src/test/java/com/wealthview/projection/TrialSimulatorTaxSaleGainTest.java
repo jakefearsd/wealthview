@@ -44,11 +44,11 @@ class TrialSimulatorTaxSaleGainTest {
     }
 
     @Test
-    void sellTaxableForTaxAndRefill_accumulate() {
+    void sellTaxableForTax_calledTwice_accumulatesBothGains() {
         var tp = gainPools();
 
         tp.sellTaxableForTax(4_000);
-        tp.debitTaxableWithTraditionalSpillover(6_000);
+        tp.sellTaxableForTax(6_000);
 
         assertThat(tp.drainTaxSaleGain()).isEqualTo(5_000.0, within(1e-6));
     }

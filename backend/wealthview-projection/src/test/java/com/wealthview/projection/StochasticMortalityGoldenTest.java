@@ -155,7 +155,7 @@ class StochasticMortalityGoldenTest {
                 new BigDecimal(ESSENTIAL_FLOOR), BigDecimal.ZERO, null,
                 TRIALS, new BigDecimal("0.90"),
                 List.of(new GuardrailPhaseInput("Retirement", 72, null, 1)),
-                SEED, BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
+                SEED, BigDecimal.ZERO, null, 0,
                 "married_filing_jointly", "taxable_first",
                 false, null, null, 5, null, null, null, null, 2025, false, null, true,
                 1966, 85, 90, new BigDecimal("0.75"), false,

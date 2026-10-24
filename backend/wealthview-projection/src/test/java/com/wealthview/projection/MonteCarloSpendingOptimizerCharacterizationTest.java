@@ -57,7 +57,7 @@ class MonteCarloSpendingOptimizerCharacterizationTest {
                         null, "taxable")),
                 List.of(), new BigDecimal("40000"), BigDecimal.ZERO,
                 new BigDecimal("0.06"), 1000, new BigDecimal("0.90"),
-                phases, SEED, BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
+                phases, SEED, BigDecimal.ZERO, null, 0,
                 null, null, false, null, null, 5, null, null,
                 // T24/V077: gateOnAdaptiveRules is EXPLICITLY false (last arg) so this golden
                 // anchor keeps its historical no-adaptation-gate meaning permanently, independent

@@ -68,7 +68,7 @@ class GuardrailControllerTest {
                 new BigDecimal("250000"), new BigDecimal("0.05"), new BigDecimal("0.95"),
                 new BigDecimal("100000"),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
-                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
+                BigDecimal.ZERO, null, 0, null, null);
     }
 
     /** Sub-project B (stochastic mortality), task 8: same shape as {@link #sampleResponse()} but
@@ -95,7 +95,7 @@ class GuardrailControllerTest {
                 new BigDecimal("250000"), new BigDecimal("0.05"), new BigDecimal("0.95"),
                 new BigDecimal("100000"),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
-                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null,
+                BigDecimal.ZERO, null, 0, null, null,
                 GuardrailProfileResponse.Disclosure.empty(),
                 stochasticMortality);
     }
@@ -111,7 +111,6 @@ class GuardrailControllerTest {
                 BigDecimal.ZERO, null, null, null,
                 List.of(new GuardrailPhaseInput("Early", 62, 72, 3)),
                 null, null, null, null,
-                null, null,
                 null, null, null, null, null, null);
 
         mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
@@ -196,8 +195,25 @@ class GuardrailControllerTest {
     }
 
     @Test
-    void optimize_absurdCashReserveYears_returns400() throws Exception {
-        assertOptimizeRejected(", \"cash_reserve_years\": 500");
+    void optimize_requestWithRetiredCashReserveFields_returns200() throws Exception {
+        when(guardrailProfileService.optimize(eq(TENANT_ID), eq(SCENARIO_ID),
+                any(GuardrailOptimizationRequest.class)))
+                .thenReturn(sampleResponse());
+        var body = """
+                {"scenario_id": "%s", "name": "Plan", "essential_floor": 30000, "terminal_balance_target": 0,
+                 "phases": [{"name": "Early", "start_age": 62, "end_age": 72, "priority_weight": 3}],
+                 "cash_reserve_years": 3, "cash_return_rate": 0.02}
+                """.formatted(SCENARIO_ID);
+
+        mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cash_reserve_years").doesNotExist())
+                .andExpect(jsonPath("$.cash_return_rate").doesNotExist());
+        verify(guardrailProfileService).optimize(eq(TENANT_ID), eq(SCENARIO_ID),
+                any(GuardrailOptimizationRequest.class));
     }
 
     @Test
@@ -215,7 +231,6 @@ class GuardrailControllerTest {
                 SCENARIO_ID, "Plan", new BigDecimal("30000"),
                 BigDecimal.ZERO, null, null, null, List.of(),
                 null, null, null, null,
-                null, null,
                 null, null, null, null, null, null);
 
         mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
@@ -233,7 +248,6 @@ class GuardrailControllerTest {
                 SCENARIO_ID, "Plan", new BigDecimal("30000"),
                 BigDecimal.ZERO, null, 99, null, List.of(),
                 null, null, null, null,
-                null, null,
                 null, null, null, null, null, null);
 
         mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
@@ -249,7 +263,6 @@ class GuardrailControllerTest {
                 SCENARIO_ID, "Plan", new BigDecimal("30000"),
                 BigDecimal.ZERO, null, 50001, null, List.of(),
                 null, null, null, null,
-                null, null,
                 null, null, null, null, null, null);
 
         mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
@@ -265,7 +278,6 @@ class GuardrailControllerTest {
                 SCENARIO_ID, "Plan", new BigDecimal("30000"),
                 BigDecimal.ZERO, null, null, new BigDecimal("0.4"), List.of(),
                 null, null, null, null,
-                null, null,
                 null, null, null, null, null, null);
 
         mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
@@ -281,7 +293,6 @@ class GuardrailControllerTest {
                 SCENARIO_ID, "Plan", new BigDecimal("30000"),
                 BigDecimal.ZERO, null, null, new BigDecimal("1.0"), List.of(),
                 null, null, null, null,
-                null, null,
                 null, null, null, null, null, null);
 
         mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
@@ -303,7 +314,6 @@ class GuardrailControllerTest {
                 SCENARIO_ID, "Plan", new BigDecimal("30000"),
                 BigDecimal.ZERO, null, 5000, new BigDecimal("0.95"), List.of(),
                 null, null, null, null,
-                null, null,
                 null, null, null, null, null, null);
 
         mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
@@ -334,7 +344,7 @@ class GuardrailControllerTest {
                 new BigDecimal("250000"), new BigDecimal("0.05"), new BigDecimal("0.95"),
                 new BigDecimal("100000"),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
-                BigDecimal.ZERO, new BigDecimal("0.10"), 0, null, 2, new BigDecimal("0.04"), null,
+                BigDecimal.ZERO, new BigDecimal("0.10"), 0, null, null,
                 new GuardrailProfileResponse.Disclosure(null, false, null, new BigDecimal("0.8000"),
                         GuardrailProfileResponse.GATED_ON_WITH_RULES));
         var requestCaptor = ArgumentCaptor.forClass(GuardrailOptimizationRequest.class);
@@ -398,7 +408,6 @@ class GuardrailControllerTest {
                 BigDecimal.ZERO, null, null, null,
                 List.of(new GuardrailPhaseInput("Early", 62, 72, 3)),
                 null, null, null, null,
-                null, null,
                 null, null, null, null, null, null);
 
         mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
@@ -431,7 +440,6 @@ class GuardrailControllerTest {
                 SCENARIO_ID, "Plan", new BigDecimal("30000"),
                 BigDecimal.ZERO, null, null, null, List.of(),
                 null, null, null, null,
-                null, null,
                 null, null, null, null, null, null);
 
         mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)

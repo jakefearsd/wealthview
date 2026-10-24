@@ -55,7 +55,6 @@ public final class GuardrailOptimizationInputBuilder {
                 .phases(List.of())
                 .seed(42L)
                 .portfolioFloor(BigDecimal.ZERO)
-                .cashReturnRate(BigDecimal.ZERO)
                 .traditionalExhaustionBuffer(5);
     }
 
@@ -146,16 +145,6 @@ public final class GuardrailOptimizationInputBuilder {
 
     public GuardrailOptimizationInputBuilder withPhaseBlendYears(int phaseBlendYears) {
         delegate.phaseBlendYears(phaseBlendYears);
-        return this;
-    }
-
-    public GuardrailOptimizationInputBuilder withCashReserveYears(int cashReserveYears) {
-        delegate.cashReserveYears(cashReserveYears);
-        return this;
-    }
-
-    public GuardrailOptimizationInputBuilder withCashReturnRate(BigDecimal cashReturnRate) {
-        delegate.cashReturnRate(cashReturnRate);
         return this;
     }
 

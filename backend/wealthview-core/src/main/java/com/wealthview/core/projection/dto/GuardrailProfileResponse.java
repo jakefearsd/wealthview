@@ -62,8 +62,6 @@ public record GuardrailProfileResponse(
         BigDecimal maxAnnualAdjustmentRate,
         int phaseBlendYears,
         String riskTolerance,
-        int cashReserveYears,
-        BigDecimal cashReturnRate,
         RothConversionScheduleResponse conversionSchedule,
         @JsonUnwrapped Disclosure disclosure,
         StochasticMortalityResponse stochasticMortality
@@ -182,13 +180,11 @@ public record GuardrailProfileResponse(
             BigDecimal maxAnnualAdjustmentRate,
             int phaseBlendYears,
             String riskTolerance,
-            int cashReserveYears,
-            BigDecimal cashReturnRate,
             RothConversionScheduleResponse conversionSchedule) {
         this(id, scenarioId, name, essentialFloor, terminalBalanceTarget, returnMean, trialCount, confidenceLevel,
                 phases, yearlySpending, medianFinalBalance, failureRate, successProbability, percentile10Final,
                 stale, createdAt, updatedAt, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears,
-                riskTolerance, cashReserveYears, cashReturnRate, conversionSchedule, Disclosure.empty());
+                riskTolerance, conversionSchedule, Disclosure.empty());
     }
 
     /**
@@ -224,14 +220,12 @@ public record GuardrailProfileResponse(
             BigDecimal maxAnnualAdjustmentRate,
             int phaseBlendYears,
             String riskTolerance,
-            int cashReserveYears,
-            BigDecimal cashReturnRate,
             RothConversionScheduleResponse conversionSchedule,
             Disclosure disclosure) {
         this(id, scenarioId, name, essentialFloor, terminalBalanceTarget, returnMean, trialCount, confidenceLevel,
                 phases, yearlySpending, medianFinalBalance, failureRate, successProbability, percentile10Final,
                 stale, createdAt, updatedAt, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears,
-                riskTolerance, cashReserveYears, cashReturnRate, conversionSchedule, disclosure, null);
+                riskTolerance, conversionSchedule, disclosure, null);
     }
 
     // --- Flat delegate accessors (mirrors ProjectionYearDto's grouped-field pattern): preserve
@@ -353,8 +347,6 @@ public record GuardrailProfileResponse(
                 entity.getMaxAnnualAdjustmentRate(),
                 entity.getPhaseBlendYears(),
                 entity.getRiskTolerance(),
-                entity.getCashReserveYears(),
-                entity.getCashReturnRate(),
                 conversionSchedule,
                 new Disclosure(fixedReturnShare, floorReduced, originalFloorSuccessProbability,
                         successProbabilityWithRules,

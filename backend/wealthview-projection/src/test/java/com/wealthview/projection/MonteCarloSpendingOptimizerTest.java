@@ -64,23 +64,6 @@ class MonteCarloSpendingOptimizerTest {
                                                    BigDecimal portfolioFloor,
                                                    BigDecimal maxAnnualAdjustmentRate,
                                                    int phaseBlendYears) {
-        return buildInput(portfolio, essentialFloor, terminalTarget, phases, incomeSources,
-                trialCount, seed, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears,
-                0, BigDecimal.ZERO);
-    }
-
-    private GuardrailOptimizationInput buildInput(BigDecimal portfolio,
-                                                   BigDecimal essentialFloor,
-                                                   BigDecimal terminalTarget,
-                                                   List<GuardrailPhaseInput> phases,
-                                                   List<ProjectionIncomeSourceInput> incomeSources,
-                                                   int trialCount,
-                                                   Long seed,
-                                                   BigDecimal portfolioFloor,
-                                                   BigDecimal maxAnnualAdjustmentRate,
-                                                   int phaseBlendYears,
-                                                   int cashReserveYears,
-                                                   BigDecimal cashReturnRate) {
         return GuardrailOptimizationInputBuilder.builder()
                 .withAccounts(List.of(new HypotheticalAccountInput(portfolio, BigDecimal.ZERO, null, "taxable")))
                 .withIncomeSources(incomeSources != null ? incomeSources : List.of())
@@ -92,8 +75,6 @@ class MonteCarloSpendingOptimizerTest {
                 .withPortfolioFloor(portfolioFloor != null ? portfolioFloor : BigDecimal.ZERO)
                 .withMaxAnnualAdjustmentRate(maxAnnualAdjustmentRate)
                 .withPhaseBlendYears(phaseBlendYears)
-                .withCashReserveYears(cashReserveYears)
-                .withCashReturnRate(cashReturnRate != null ? cashReturnRate : BigDecimal.ZERO)
                 .build();
     }
 
@@ -111,17 +92,13 @@ class MonteCarloSpendingOptimizerTest {
                 42L,
                 new BigDecimal("50000"),
                 new BigDecimal("0.15"),
-                3,
-                1,
-                new BigDecimal("0.03"));
+                3);
 
         var response = optimizer.optimize(input);
 
         assertThat(response.portfolioFloor()).isEqualByComparingTo(new BigDecimal("50000"));
         assertThat(response.maxAnnualAdjustmentRate()).isEqualByComparingTo(new BigDecimal("0.15"));
         assertThat(response.phaseBlendYears()).isEqualTo(3);
-        assertThat(response.cashReserveYears()).isEqualTo(1);
-        assertThat(response.cashReturnRate()).isEqualByComparingTo(new BigDecimal("0.03"));
     }
 
     @Test
@@ -323,73 +300,6 @@ class MonteCarloSpendingOptimizerTest {
     }
 
     @Test
-    void optimize_withCashBuffer_producesResults() {
-        var phases = List.of(
-                new GuardrailPhaseInput("All", 62, null, 1));
-
-        var withBuffer = buildInput(
-                new BigDecimal("1000000"),
-                new BigDecimal("30000"),
-                BigDecimal.ZERO,
-                phases,
-                List.of(),
-                500,
-                42L,
-                BigDecimal.ZERO,
-                null,
-                0,
-                2,
-                new BigDecimal("0.04"));
-
-        var result = optimizer.optimize(withBuffer);
-
-        assertThat(result).isNotNull();
-        assertThat(result.yearlySpending()).isNotEmpty();
-        assertThat(result.failureRate()).isNotNull();
-    }
-
-    @Test
-    void optimize_withCashBuffer_zeroCashReserve_matchesNoCashBehavior() {
-        var phases = List.of(
-                new GuardrailPhaseInput("All", 62, null, 1));
-
-        var noCash = buildInput(
-                new BigDecimal("1000000"),
-                new BigDecimal("30000"),
-                BigDecimal.ZERO,
-                phases,
-                List.of(),
-                500,
-                42L,
-                BigDecimal.ZERO,
-                null,
-                0,
-                0,
-                BigDecimal.ZERO);
-
-        var zeroCash = buildInput(
-                new BigDecimal("1000000"),
-                new BigDecimal("30000"),
-                BigDecimal.ZERO,
-                phases,
-                List.of(),
-                500,
-                42L);
-
-        var resultNoCash = optimizer.optimize(noCash);
-        var resultZeroCash = optimizer.optimize(zeroCash);
-
-        // Both should produce the same results since cash reserve is 0 in both
-        assertThat(resultNoCash.yearlySpending().size())
-                .isEqualTo(resultZeroCash.yearlySpending().size());
-
-        for (int i = 0; i < resultNoCash.yearlySpending().size(); i++) {
-            assertThat(resultNoCash.yearlySpending().get(i).recommended())
-                    .isEqualByComparingTo(resultZeroCash.yearlySpending().get(i).recommended());
-        }
-    }
-
-    @Test
     void optimize_withSeed_bootstrapProducesReproducibleResults() {
         var phases = List.of(
                 new GuardrailPhaseInput("All", 62, null, 1));
@@ -404,9 +314,7 @@ class MonteCarloSpendingOptimizerTest {
                 42L,
                 BigDecimal.ZERO,
                 null,
-                0,
-                2,
-                new BigDecimal("0.04"));
+                0);
 
         var input2 = buildInput(
                 new BigDecimal("1000000"),
@@ -418,9 +326,7 @@ class MonteCarloSpendingOptimizerTest {
                 42L,
                 BigDecimal.ZERO,
                 null,
-                0,
-                2,
-                new BigDecimal("0.04"));
+                0);
 
         var result1 = optimizer.optimize(input1);
         var result2 = optimizer.optimize(input2);
@@ -2154,54 +2060,7 @@ class MonteCarloSpendingOptimizerTest {
         assertThat(dsRmd.roth()).isEqualTo(0);
     }
 
-    // === simulateTrial branch coverage: multi-pool + cash buffer + conversions ===
-
-    @Test
-    void optimize_multiPool_withCashBuffer_taxAwareWithdrawal() {
-        // Multi-pool (traditional + taxable) with cash buffer + tax awareness.
-        // Exercises the hasPools + cashReserveYears > 0 branches in simulateTrial.
-        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
-        var input = GuardrailOptimizationInputBuilder.builder()
-                .withAccounts(List.of(
-                        new HypotheticalAccountInput(new BigDecimal("300000"),
-                                BigDecimal.ZERO, null, "taxable"),
-                        new HypotheticalAccountInput(new BigDecimal("700000"),
-                                BigDecimal.ZERO, null, "traditional")))
-                .withEssentialFloor(new BigDecimal("20000"))
-                .withTerminalBalanceTarget(new BigDecimal("100000"))
-                .withPhases(phases)
-                .withCashReserveYears(2)
-                .withFilingStatus("single")
-                .withWithdrawalOrder("taxable_first")
-                .withTrialCount(500)
-                .build();
-
-        var taxOptimizer = taxAwareOptimizer();
-        var result = taxOptimizer.optimize(input);
-
-        assertThat(result).isNotNull();
-        assertThat(result.yearlySpending()).isNotEmpty();
-        // Multi-pool + cash buffer should produce valid spending
-        assertThat(result.yearlySpending().getFirst().recommended().doubleValue()).isGreaterThan(0);
-
-        // Compare with same input WITHOUT cash buffer
-        var noCashInput = GuardrailOptimizationInputBuilder.builder()
-                .withAccounts(List.of(
-                        new HypotheticalAccountInput(new BigDecimal("300000"),
-                                BigDecimal.ZERO, null, "taxable"),
-                        new HypotheticalAccountInput(new BigDecimal("700000"),
-                                BigDecimal.ZERO, null, "traditional")))
-                .withEssentialFloor(new BigDecimal("20000"))
-                .withTerminalBalanceTarget(new BigDecimal("100000"))
-                .withPhases(phases)
-                .withFilingStatus("single")
-                .withWithdrawalOrder("taxable_first")
-                .withTrialCount(500)
-                .build();
-        var noCashResult = taxOptimizer.optimize(noCashInput);
-        // Both should produce valid, comparable results
-        assertThat(noCashResult.yearlySpending().getFirst().recommended().doubleValue()).isGreaterThan(0);
-    }
+    // === simulateTrial branch coverage: multi-pool + conversions ===
 
     @Test
     void optimize_multiPool_conversionsAndWithdrawalTax_combinedPath() {
@@ -2235,45 +2094,6 @@ class MonteCarloSpendingOptimizerTest {
         assertThat(result.yearlySpending().getFirst().recommended().doubleValue()).isGreaterThan(0);
         // With conversions enabled, should produce a conversion schedule
         assertThat(result.conversionSchedule()).isNotNull();
-    }
-
-    @Test
-    void optimize_multiPool_cashBufferAndConversions_allBranchesCombined() {
-        // The most complex scenario — exercises ALL major branches in simulateTrial
-        // simultaneously: multi-pool, cash buffer, and Roth conversions.
-        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
-        var input = GuardrailOptimizationInputBuilder.builder()
-                .withAccounts(List.of(
-                        new HypotheticalAccountInput(new BigDecimal("200000"),
-                                BigDecimal.ZERO, null, "taxable"),
-                        new HypotheticalAccountInput(new BigDecimal("600000"),
-                                BigDecimal.ZERO, null, "traditional"),
-                        new HypotheticalAccountInput(new BigDecimal("200000"),
-                                BigDecimal.ZERO, null, "roth")))
-                .withEssentialFloor(new BigDecimal("20000"))
-                .withTerminalBalanceTarget(new BigDecimal("100000"))
-                .withPhases(phases)
-                .withCashReserveYears(2)
-                .withFilingStatus("single")
-                .withWithdrawalOrder("taxable_first")
-                .withOptimizeConversions(true)
-                .withConversionBracketRate(new BigDecimal("0.22"))
-                .withRmdTargetBracketRate(new BigDecimal("0.12"))
-                .withTrialCount(500)
-                .build();
-
-        var taxOptimizer = taxAwareOptimizer();
-        var result = taxOptimizer.optimize(input);
-
-        assertThat(result).isNotNull();
-        assertThat(result.yearlySpending()).isNotEmpty();
-        double spending = result.yearlySpending().getFirst().recommended().doubleValue();
-        assertThat(spending).isGreaterThan(0);
-        // Should not produce NaN or negative values
-        for (var ys : result.yearlySpending()) {
-            assertThat(ys.recommended().doubleValue()).isGreaterThanOrEqualTo(0);
-            assertThat(Double.isNaN(ys.recommended().doubleValue())).isFalse();
-        }
     }
 
     // === Tax pool deduction ordering ===

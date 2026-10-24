@@ -25,20 +25,20 @@ class TrialSimulatorStochasticTest {
 
     private final TrialSimulator simulator = new TrialSimulator();
 
-    /** Builds a stochastic SimulationConfig (tracked, 0% cash return) with survivor regimes + factor. */
+    /** Builds a stochastic SimulationConfig (tracked) with survivor regimes + factor. */
     // ExcessiveParameterList mirrors the SimulationConfig canonical shape for readable test call sites.
     @SuppressWarnings("PMD.ExcessiveParameterList")
     private static TrialSimulator.SimulationConfig cfg(
             double initTaxable, double initTraditional, double initRoth,
             String order, OrdinaryTaxTable[] tables, double[] base,
-            double[] conv, double[] convTax, int retirementAge, int cashReserveYears,
+            double[] conv, double[] convTax, int retirementAge,
             double[] taxRet, double[] tradRet, double[] rothRet, int rmdStartAge,
             double initTaxableBasis, LtcgTaxTable[] ltcg, TrialSimulator.HouseholdSim household,
             TrialSimulator.SurvivorRegime[] regimes, double survivorFactor) {
         return new TrialSimulator.SimulationConfig(
                 initTaxable, initTraditional, initRoth, order,
                 tables, base, conv, convTax, retirementAge, null,
-                cashReserveYears, 0.0, true,
+                true,
                 taxRet, tradRet, rothRet, rmdStartAge,
                 initTaxableBasis, ltcg, 0.0, null, null, 0.0, 1.0, household,
                 regimes, survivorFactor, AgeMilestones.LEGACY_EARLY_ACCESS_AGE);
@@ -78,7 +78,7 @@ class TrialSimulatorStochasticTest {
                 /*transitionYearIndex=*/1, /*survivorIsPrimary=*/false,
                 /*jointStepUpFactor=*/0.5, /*truncateYearIndex=*/2, TrialSimulator.TaxableSeed.EMPTY);
         var config = cfg(0.0, 1_000_000.0, 0.0, "traditional_first",
-                joint, new double[]{0.0, 0.0}, null, null, /*retirementAge=*/65, 0,
+                joint, new double[]{0.0, 0.0}, null, null, /*retirementAge=*/65,
                 new double[]{0.0, 0.0}, new double[]{0.0, 0.0}, new double[]{0.0, 0.0}, /*rmdStartAge=*/99,
                 0.0, null, household, regimes, /*survivorFactor=*/0.75);
 
@@ -118,7 +118,7 @@ class TrialSimulatorStochasticTest {
                 0.0, 0.0, 0, 99, /*transitionYearIndex=*/1, /*survivorIsPrimary=*/true,
                 0.5, /*truncateYearIndex=*/2, TrialSimulator.TaxableSeed.EMPTY);
         var config = cfg(0.0, 1_000_000.0, 0.0, "traditional_first",
-                joint, new double[]{0.0, 0.0}, null, null, 65, 0,
+                joint, new double[]{0.0, 0.0}, null, null, 65,
                 new double[]{0.0, 0.0}, new double[]{0.0, 0.0}, new double[]{0.0, 0.0}, 99,
                 0.0, null, household, regimes, 0.75);
 
@@ -151,7 +151,7 @@ class TrialSimulatorStochasticTest {
         double[] zero5 = {0.0, 0.0, 0.0, 0.0, 0.0};
         double[] floors5 = {30_000.0, 30_000.0, 30_000.0, 30_000.0, 30_000.0};
         var config = cfg(100_000.0, 0.0, 0.0, "taxable_first",
-                null, null, null, null, 60, 0,
+                null, null, null, null, 60,
                 zero5, zero5, zero5, 99, 0.0, null, household, regimes, /*survivorFactor=*/1.0);
 
         var result = simulator.simulateTrial(
@@ -188,7 +188,7 @@ class TrialSimulatorStochasticTest {
                 /*transitionYearIndex=*/1, /*survivorIsPrimary=*/true,
                 /*jointStepUpFactor=*/0.5, /*truncateYearIndex=*/2, TrialSimulator.TaxableSeed.EMPTY);
         var config = cfg(1_000_000.0, 300_000.0, 0.0, "traditional_first",
-                joint, new double[]{0.0, 0.0}, null, null, /*retirementAge=*/75, 0,
+                joint, new double[]{0.0, 0.0}, null, null, /*retirementAge=*/75,
                 new double[]{0.0, 0.0}, new double[]{0.0, 0.0}, new double[]{0.0, 0.0}, /*rmdStartAge=*/73,
                 1_000_000.0, null, household, regimes, /*survivorFactor=*/1.0);
 

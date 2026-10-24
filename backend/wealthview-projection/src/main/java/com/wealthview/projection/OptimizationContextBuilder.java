@@ -115,10 +115,6 @@ final class OptimizationContextBuilder {
         double terminalTarget = input.terminalBalanceTarget().doubleValue();
         double confidenceLevel = input.confidenceLevel().doubleValue();
 
-        int cashReserveYears = input.cashReserveYears();
-        double cashReturnRate = input.cashReturnRate() != null
-                ? input.cashReturnRate().doubleValue() : 0.0;
-
         Random rng = input.seed() != null ? new Random(input.seed()) : new Random();
 
         double inflationRate = input.inflationRate() != null
@@ -227,7 +223,7 @@ final class OptimizationContextBuilder {
 
         return new OptimizationSetup(
                 new PortfolioSetup(initTaxable, initTraditional, initRoth,
-                        initialPortfolio, withdrawalOrder, cashReserveYears, cashReturnRate,
+                        initialPortfolio, withdrawalOrder,
                         terminalTarget, portfolioFloor, initTaxableBasis),
                 new SimulationParameters(retirementYear, retirementAge, endAge, years,
                         trialCount, confidenceLevel, inflationRate, portfolioPaths,

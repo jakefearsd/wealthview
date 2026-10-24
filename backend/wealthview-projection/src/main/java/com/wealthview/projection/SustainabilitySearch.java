@@ -55,7 +55,7 @@ final class SustainabilitySearch {
      *       request's toggle at each site, not carried on {@code setup}.
      * </ul>
      * Every other accessor below (income, surplusTax, terminalTarget, retirementAge, years,
-     * confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate, dsBracketCeilingByYear,
+     * confidenceLevel, portfolioFloor, dsBracketCeilingByYear,
      * the per-pool return arrays, rmdStartAge, initTaxableBasis, ltcgTaxTableByYear, dividendYield,
      * interestYield, taxableEquityShare, household) delegates to {@code setup}/{@code returnPaths}
      * and is named identically to the pre-Task-13 flattened accessor so the rest of this class did
@@ -119,14 +119,6 @@ final class SustainabilitySearch {
 
         double portfolioFloor() {
             return setup.portfolio().portfolioFloor();
-        }
-
-        int cashReserveYears() {
-            return setup.portfolio().cashReserveYears();
-        }
-
-        double cashReturnRate() {
-            return setup.portfolio().cashReturnRate();
         }
 
         double[] dsBracketCeilingByYear() {
@@ -482,7 +474,6 @@ final class SustainabilitySearch {
                 .conversions(ctx.conversionByYear(), ctx.conversionTaxByYear())
                 .ages(ctx.retirementAge(), ctx.rmdStartAge(), ctx.earlyAccessAge())
                 .dsBracketCeilingByYear(ctx.dsBracketCeilingByYear())
-                .cashReserve(ctx.cashReserveYears(), ctx.cashReturnRate())
                 .returns(ctx.taxableReturns(), ctx.traditionalReturns(), ctx.rothReturns())
                 .taxableBasis(ctx.initTaxableBasis())
                 .ltcgTaxTableByYear(ctx.ltcgTaxTableByYear())

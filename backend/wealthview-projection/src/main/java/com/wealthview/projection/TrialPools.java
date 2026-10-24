@@ -59,7 +59,7 @@ final class TrialPools {
     private final TaxableLots lots;
 
     /** D5: realized FIFO gain of this trial-year's NON-spending taxable sales (tax cascades,
-     * pre-60 conversion-tax sale, cash-reserve seed/refill), drained once per year by
+     * pre-60 conversion-tax sale), drained once per year by
      * {@link TrialSimulator#ltcgTaxForYear}. Negative for loss lots. */
     private double taxSaleGain;
 
@@ -190,18 +190,17 @@ final class TrialPools {
 
     /**
      * Debits {@code amount} from the joint-taxable pool AND sells the same amount FIFO from
-     * {@link #lots} in one lockstep call -- the recurring pattern (spending sale, tax-payment sale,
-     * cash-reserve churn) that keeps the value invariant {@code lots.totalValue() ==
-     * pools[JOINT_TAXABLE]} intact by construction. Returns the realized FIFO gain; spending-sale
-     * callers tax it directly, while tax-payment and cash-reserve sales use {@link #sellTaxableForTax}
-     * (D5).
+     * {@link #lots} in one lockstep call -- the recurring pattern (spending sale, tax-payment sale)
+     * that keeps the value invariant {@code lots.totalValue() == pools[JOINT_TAXABLE]} intact by
+     * construction. Returns the realized FIFO gain; spending-sale callers tax it directly, while
+     * tax-payment sales use {@link #sellTaxableForTax} (D5).
      */
     double sellTaxable(double amount) {
         pools[JOINT_TAXABLE] -= amount;
         return lots.sellFifo(amount);
     }
 
-    /** D5: {@link #sellTaxable} for a tax-payment or cash-reserve sale -- the realized gain is
+    /** D5: {@link #sellTaxable} for a tax-payment sale -- the realized gain is
      * accumulated for this year's LTCG instead of being discarded. */
     double sellTaxableForTax(double amount) {
         double gain = sellTaxable(amount);
@@ -226,21 +225,6 @@ final class TrialPools {
     void creditTaxable(double amount) {
         pools[JOINT_TAXABLE] += amount;
         lots.addLot(amount);
-    }
-
-    /**
-     * Debits {@code amount} from the joint-taxable pool (via {@link #sellTaxableForTax}, gain
-     * accumulated for this year's LTCG -- D5), then spills any resulting negative balance into traditional
-     * (proportional across owners, household task 6) and clamps taxable back to 0. Used by the
-     * up-market cash-reserve replenishment draw, which can overdraw taxable when the target cash
-     * level exceeds what taxable alone can fund.
-     */
-    void debitTaxableWithTraditionalSpillover(double amount) {
-        sellTaxableForTax(amount);
-        if (pools[JOINT_TAXABLE] < 0) {
-            debitPair(TRAD_P, TRAD_S, -pools[JOINT_TAXABLE]);
-            pools[JOINT_TAXABLE] = 0;
-        }
     }
 
     /**

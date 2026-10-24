@@ -111,7 +111,7 @@ class SustainabilitySearchTest {
                                                          double[][] taxableReturns,
                                                          double[][] traditionalReturns,
                                                          double[][] rothReturns) {
-        var portfolio = new PortfolioSetup(0.0, 0.0, 0.0, 0.0, null, 0, 0.0, 0.0, 0.0, 0.0);
+        var portfolio = new PortfolioSetup(0.0, 0.0, 0.0, 0.0, null, 0.0, 0.0, 0.0);
         var sim = new SimulationParameters(0, retirementAge, 0, years, trialCount, confidenceLevel, 0.0,
                 paths, taxableReturns, traditionalReturns, rothReturns, Integer.MAX_VALUE,
                 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, null, null, null, AgeMilestones.LEGACY_EARLY_ACCESS_AGE, null, 0, null);

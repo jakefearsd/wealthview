@@ -33,8 +33,6 @@ public record GuardrailOptimizationRequest(
         @DecimalMin("0") @DecimalMax("1") BigDecimal maxAnnualAdjustmentRate,
         @Min(0) @Max(30) Integer phaseBlendYears,
         @Pattern(regexp = "conservative|moderate|aggressive") String riskTolerance,
-        @Min(0) @Max(30) Integer cashReserveYears,
-        @DecimalMin("-1") @DecimalMax("1") BigDecimal cashReturnRate,
         Boolean optimizeConversions,
         @DecimalMin("0") @DecimalMax("0.5") BigDecimal conversionBracketRate,
         @DecimalMin("0") @DecimalMax("0.5") BigDecimal rmdTargetBracketRate,
@@ -59,13 +57,13 @@ public record GuardrailOptimizationRequest(
             UUID scenarioId, String name, BigDecimal essentialFloor, BigDecimal terminalBalanceTarget,
             BigDecimal returnMean, Integer trialCount, BigDecimal confidenceLevel,
             List<GuardrailPhaseInput> phases, BigDecimal portfolioFloor, BigDecimal maxAnnualAdjustmentRate,
-            Integer phaseBlendYears, String riskTolerance, Integer cashReserveYears, BigDecimal cashReturnRate,
+            Integer phaseBlendYears, String riskTolerance,
             Boolean optimizeConversions, BigDecimal conversionBracketRate, BigDecimal rmdTargetBracketRate,
             Integer traditionalExhaustionBuffer, BigDecimal rmdBracketHeadroom,
             BigDecimal dynamicSequencingBracketRate) {
         this(scenarioId, name, essentialFloor, terminalBalanceTarget, returnMean, trialCount, confidenceLevel,
-                phases, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears, riskTolerance, cashReserveYears,
-                cashReturnRate, optimizeConversions, conversionBracketRate, rmdTargetBracketRate,
+                phases, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears, riskTolerance,
+                optimizeConversions, conversionBracketRate, rmdTargetBracketRate,
                 traditionalExhaustionBuffer, rmdBracketHeadroom, dynamicSequencingBracketRate, null);
     }
 
@@ -99,8 +97,6 @@ public record GuardrailOptimizationRequest(
         private BigDecimal maxAnnualAdjustmentRate;
         private Integer phaseBlendYears;
         private String riskTolerance;
-        private Integer cashReserveYears;
-        private BigDecimal cashReturnRate;
         private Boolean optimizeConversions;
         private BigDecimal conversionBracketRate;
         private BigDecimal rmdTargetBracketRate;
@@ -171,16 +167,6 @@ public record GuardrailOptimizationRequest(
             return this;
         }
 
-        public Builder cashReserveYears(Integer cashReserveYears) {
-            this.cashReserveYears = cashReserveYears;
-            return this;
-        }
-
-        public Builder cashReturnRate(BigDecimal cashReturnRate) {
-            this.cashReturnRate = cashReturnRate;
-            return this;
-        }
-
         public Builder optimizeConversions(Boolean optimizeConversions) {
             this.optimizeConversions = optimizeConversions;
             return this;
@@ -219,7 +205,7 @@ public record GuardrailOptimizationRequest(
         public GuardrailOptimizationRequest build() {
             return new GuardrailOptimizationRequest(scenarioId, name, essentialFloor, terminalBalanceTarget,
                     returnMean, trialCount, confidenceLevel, phases, portfolioFloor, maxAnnualAdjustmentRate,
-                    phaseBlendYears, riskTolerance, cashReserveYears, cashReturnRate, optimizeConversions,
+                    phaseBlendYears, riskTolerance, optimizeConversions,
                     conversionBracketRate, rmdTargetBracketRate, traditionalExhaustionBuffer, rmdBracketHeadroom,
                     dynamicSequencingBracketRate, gateOnAdaptiveRules);
         }

@@ -165,7 +165,6 @@ final class GuardrailResponseBuilder {
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
                 input.portfolioFloor(), input.maxAnnualAdjustmentRate(),
                 input.phaseBlendYears(), null,
-                input.cashReserveYears(), input.cashReturnRate(),
                 convScheduleResponse,
                 new GuardrailProfileResponse.Disclosure(null, floorReduced, originalFloorSuccessProbability,
                         successProbabilityWithRules,
@@ -219,7 +218,6 @@ final class GuardrailResponseBuilder {
                 .conversions(conversionByYear, conversionTaxByYear)
                 .ages(ctx.sim().retirementAge(), ctx.sim().rmdStartAge(), ctx.sim().earlyAccessAge())
                 .dsBracketCeilingByYear(ctx.taxIncome().dsBracketCeilingByYear())
-                .cashReserve(ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate())
                 .returns(ctx.sim().taxableReturns(), ctx.sim().traditionalReturns(), ctx.sim().rothReturns())
                 .startBalances(ctx.sim().startBalances())
                 .taxableBasis(ctx.portfolio().initTaxableBasis())

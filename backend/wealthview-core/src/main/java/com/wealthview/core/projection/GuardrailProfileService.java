@@ -52,10 +52,6 @@ public class GuardrailProfileService {
     private static final BigDecimal DEFAULT_CONFIDENCE = new BigDecimal("0.95");
     private static final BigDecimal DEFAULT_MAX_ADJUSTMENT_RATE = new BigDecimal("0.05");
     private static final int DEFAULT_PHASE_BLEND_YEARS = 1;
-    private static final int DEFAULT_CASH_RESERVE_YEARS = 2;
-    // Real-terms projection: the cash-reserve sleeve return is a REAL rate. A ~4% nominal money-market
-    // yield deflated at 2.5% inflation is ~1.5% real.
-    private static final BigDecimal DEFAULT_CASH_RETURN_RATE = new BigDecimal("0.015");
     // Real-terms default inflation assumption (matches the deterministic engine).
     private static final BigDecimal DEFAULT_INFLATION_RATE = new BigDecimal("0.025");
 
@@ -200,8 +196,6 @@ public class GuardrailProfileService {
         entity.setMaxAnnualAdjustmentRate(optimizationInput.maxAnnualAdjustmentRate() != null
                 ? optimizationInput.maxAnnualAdjustmentRate() : DEFAULT_MAX_ADJUSTMENT_RATE);
         entity.setPhaseBlendYears(optimizationInput.phaseBlendYears());
-        entity.setCashReserveYears(optimizationInput.cashReserveYears());
-        entity.setCashReturnRate(optimizationInput.cashReturnRate());
         entity.setRiskTolerance(request.riskTolerance());
         entity.setGateOnAdaptiveRules(optimizationInput.gateOnAdaptiveRules());
         // D13: persisted so reoptimize echoes the user's actual choice instead of inferring it.
@@ -282,8 +276,6 @@ public class GuardrailProfileService {
                 .maxAnnualAdjustmentRate(existing.getMaxAnnualAdjustmentRate())
                 .phaseBlendYears(existing.getPhaseBlendYears())
                 .riskTolerance(existing.getRiskTolerance())
-                .cashReserveYears(existing.getCashReserveYears())
-                .cashReturnRate(existing.getCashReturnRate())
                 // D13: the persisted flag (V081), not an inference from the always-written buffer.
                 .optimizeConversions(existing.isOptimizeConversions())
                 .conversionBracketRate(existing.getConversionBracketRate())
@@ -541,10 +533,6 @@ public class GuardrailProfileService {
                         ? request.maxAnnualAdjustmentRate() : DEFAULT_MAX_ADJUSTMENT_RATE)
                 .phaseBlendYears(request.phaseBlendYears() != null
                         ? request.phaseBlendYears() : DEFAULT_PHASE_BLEND_YEARS)
-                .cashReserveYears(request.cashReserveYears() != null
-                        ? request.cashReserveYears() : DEFAULT_CASH_RESERVE_YEARS)
-                .cashReturnRate(request.cashReturnRate() != null
-                        ? request.cashReturnRate() : DEFAULT_CASH_RETURN_RATE)
                 .filingStatus(params.filingStatus())
                 .withdrawalOrder(resolved.withdrawalOrder())
                 .optimizeConversions(request.optimizeConversions() != null && request.optimizeConversions())

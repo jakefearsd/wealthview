@@ -87,8 +87,6 @@ class PreRetirementAccumulationTest {
         var input = zeroInflationNoFee(accounts)
                 .withBaseYear(1997)
                 .withEssentialFloor(bd("30000"))
-                .withCashReserveYears(2)
-                .withCashReturnRate(bd("0.015"))
                 .build();
 
         var result = optimizer.optimize(input);

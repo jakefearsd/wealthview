@@ -76,12 +76,6 @@ public class GuardrailSpendingProfileEntity extends UuidAuditable {
     @Column(name = "phase_blend_years", nullable = false)
     private int phaseBlendYears = 1;
 
-    @Column(name = "cash_reserve_years", nullable = false)
-    private int cashReserveYears = 2;
-
-    @Column(name = "cash_return_rate", nullable = false, precision = 5, scale = 4)
-    private BigDecimal cashReturnRate = new BigDecimal("0.0400");
-
     @Column(name = "risk_tolerance")
     private String riskTolerance;
 
@@ -250,22 +244,6 @@ public class GuardrailSpendingProfileEntity extends UuidAuditable {
 
     public void setPhaseBlendYears(int phaseBlendYears) {
         this.phaseBlendYears = phaseBlendYears;
-    }
-
-    public int getCashReserveYears() {
-        return cashReserveYears;
-    }
-
-    public void setCashReserveYears(int cashReserveYears) {
-        this.cashReserveYears = cashReserveYears;
-    }
-
-    public BigDecimal getCashReturnRate() {
-        return cashReturnRate;
-    }
-
-    public void setCashReturnRate(BigDecimal cashReturnRate) {
-        this.cashReturnRate = cashReturnRate;
     }
 
     public String getRiskTolerance() {

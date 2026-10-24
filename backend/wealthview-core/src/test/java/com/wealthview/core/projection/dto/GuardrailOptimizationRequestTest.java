@@ -33,8 +33,6 @@ class GuardrailOptimizationRequestTest {
                 .maxAnnualAdjustmentRate(new BigDecimal("6.06"))
                 .phaseBlendYears(1102)
                 .riskTolerance("risk-tolerance")
-                .cashReserveYears(1103)
-                .cashReturnRate(new BigDecimal("7.07"))
                 .optimizeConversions(true)
                 .conversionBracketRate(new BigDecimal("8.08"))
                 .rmdTargetBracketRate(new BigDecimal("9.09"))
@@ -56,8 +54,6 @@ class GuardrailOptimizationRequestTest {
         assertThat(request.maxAnnualAdjustmentRate()).isEqualByComparingTo("6.06");
         assertThat(request.phaseBlendYears()).isEqualTo(1102);
         assertThat(request.riskTolerance()).isEqualTo("risk-tolerance");
-        assertThat(request.cashReserveYears()).isEqualTo(1103);
-        assertThat(request.cashReturnRate()).isEqualByComparingTo("7.07");
         assertThat(request.optimizeConversions()).isTrue();
         assertThat(request.conversionBracketRate()).isEqualByComparingTo("8.08");
         assertThat(request.rmdTargetBracketRate()).isEqualByComparingTo("9.09");

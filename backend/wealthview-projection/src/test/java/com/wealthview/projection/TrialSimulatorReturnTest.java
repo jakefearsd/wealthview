@@ -9,8 +9,7 @@ import static org.assertj.core.api.Assertions.within;
 
 /**
  * Verifies that {@link TrialSimulator} grows each tax pool at its own per-year return sequence
- * (Task 15: per-pool allocation-driven Monte Carlo returns), and that the cash-reserve down-year
- * decision keys on the balance-weighted portfolio return across the three pools.
+ * (Task 15: per-pool allocation-driven Monte Carlo returns), and the withdrawal-tax mechanics.
  */
 class TrialSimulatorReturnTest {
 
@@ -18,11 +17,9 @@ class TrialSimulatorReturnTest {
 
     private static TrialSimulator.SimulationConfig config(
             double initTaxable, double initTraditional, double initRoth,
-            int cashReserveYears,
             double[] taxableReturns, double[] traditionalReturns, double[] rothReturns) {
         return TrialSimulator.SimulationConfig.builder(initTaxable, initTraditional, initRoth, "taxable_first")
                 .retirementAge(62)
-                .cashReserve(cashReserveYears, 0.0)
                 .returns(taxableReturns, traditionalReturns, rothReturns)
                 .taxableBasis(initTaxable)
                 .build();
@@ -32,7 +29,7 @@ class TrialSimulatorReturnTest {
     void simulateTrial_perPoolReturns_growEachPoolIndependently() {
         // 1 year, no withdrawals/income; taxable +10%, traditional +2%, roth +8%.
         // 110 + 102 + 108 = 320.
-        var config = config(100, 100, 100, 0,
+        var config = config(100, 100, 100,
                 new double[]{0.10}, new double[]{0.02}, new double[]{0.08});
 
         var result = simulator.simulateTrial(
@@ -45,44 +42,13 @@ class TrialSimulatorReturnTest {
     void simulateTrial_perPoolReturns_compoundIndependentlyAcrossYears() {
         // 2 years, no spend/income. taxable 100 -> 110 -> 121; traditional 100 -> 102 -> 104.04;
         // roth 100 -> 108 -> 116.64. Sum = 341.68.
-        var config = config(100, 100, 100, 0,
+        var config = config(100, 100, 100,
                 new double[]{0.10, 0.10}, new double[]{0.02, 0.02}, new double[]{0.08, 0.08});
 
         var result = simulator.simulateTrial(
                 new double[]{0, 0}, new double[]{0, 0}, new double[]{0, 0}, new double[]{0, 0}, 2, config);
 
         assertThat(result.finalBalance()).isEqualTo(121.0 + 104.04 + 116.64, within(1e-6));
-    }
-
-    @Test
-    void simulateTrial_cashReserveDownYear_keysOnBalanceWeightedPortfolioReturn() {
-        // Taxable pool is UP (+10%) but traditional is sharply DOWN (-30%); the balance-weighted
-        // portfolio return is negative, so the down-year branch draws the year's spending from the
-        // cash reserve and leaves the equity pools untouched.
-        var config = config(100, 100, 0, 1,
-                new double[]{0.10}, new double[]{-0.30}, new double[]{0.0});
-
-        // floor spend = 10 -> cash reserve seeded at 10 (drawn from taxable first).
-        var result = simulator.simulateTrial(
-                new double[]{0}, new double[]{0}, new double[]{10}, new double[]{0}, 1, config);
-
-        // taxable: (100 - 10 seeded) * 1.10 = 99 ; traditional: 100 * 0.70 = 70 ; cash: 10 - 10 spent = 0.
-        assertThat(result.finalBalance()).isEqualTo(99.0 + 70.0, within(1e-6));
-    }
-
-    @Test
-    void simulateTrial_cashReserveLargerThanPortfolio_seedsOnlyWhatThePoolsHold() {
-        // API #22 (P4): a 2-year reserve of 80 = 160 against a 100 portfolio used to seed 160 of cash
-        // -- 60 conjured from nothing -- so the "balance" rose while spending was drawn. The reserve
-        // can only hold what the pools actually gave up: with no return and no spending, the total
-        // stays 100.
-        var config = config(100, 0, 0, 2,
-                new double[]{0.0}, new double[]{0.0}, new double[]{0.0});
-
-        var result = simulator.simulateTrial(
-                new double[]{0}, new double[]{0}, new double[]{0}, new double[]{80}, 1, config);
-
-        assertThat(result.finalBalance()).isLessThanOrEqualTo(100.0 + 1e-6);
     }
 
     @Test
@@ -126,7 +92,7 @@ class TrialSimulatorReturnTest {
 
     @Test
     void simulateTrial_taxableWithdrawalWithEmbeddedGain_realizesLtcgTax() {
-        // 1 year, no growth, no cash reserve, no income. Taxable pool worth 1000 with a 600 basis
+        // 1 year, no growth, no income. Taxable pool worth 1000 with a 600 basis
         // (40% embedded gain). Spend 500 -> a FIFO half-lot sale realizes gain 500 - 600*(500/1000)
         // = 200. LTCG rate 0.15 -> tax 30, paid taxable-first. Final = (1000 - 500) - 30 = 470
         // (vs 500 with no LTCG tax: the 30 is exactly the extra cash the capital-gains tax removes).
@@ -277,69 +243,6 @@ class TrialSimulatorReturnTest {
         assertThat(result.finalBalance()).isEqualTo(99186.99, within(0.01));
     }
 
-    // === A1 fix: cash-reserve down-year pool accounting (audit 2026-07-11, item A1) ===
-
-    @Test
-    void applyTrialWithdrawals_cashPartiallyCovers_debitsEachPoolByScaledShareAndDeductsFullTax() {
-        // Down-year cash reserve partially covers a $600 draw: cash has $200, so equityDraw=$400
-        // is scaled across the three theoretical pool draws (taxable=95, traditional=285,
-        // roth=220, total=600) at scale=400/600=2/3. Withdrawal tax ($57) is then deducted in
-        // FULL via the shared PoolTaxCascade against the post-draw pools (taxable-first,
-        // spilling into traditional) -- not the old dimensionally-wrong tax^2/portfolio fraction
-        // that left ~99% of the tax unpaid.
-        // Household task 6: pools are now the owner-aware double[5] layout {joint-taxable, trad-P,
-        // trad-S, roth-P, roth-S}; a single-person case leaves the spouse slots (2, 4) at 0 so the
-        // economics are identical to the pre-household 3-pool contract (taxable=95, traditional=285,
-        // roth=285). Assertions read the trad/roth TOTALS across the owner slots.
-        double[] pools = {95.0, 285.0, 0.0, 285.0, 0.0};
-        TaxableLots lots = new TaxableLots();
-        lots.addLot(95.0, 95.0);
-        TrialPools tp = new TrialPools(pools, lots);
-        var drawn = new PoolWithdrawal(95.0, 285.0, 220.0);
-
-        // marginalRate=0 isolates the A1 pool-scaling fix from audit C2's gross-up (pinned
-        // separately below in applyTrialWithdrawals_taxDrainsTraditional_grossesUpByTMOverOneMinusM).
-        var outcome = TrialSimulator.applyTrialWithdrawals(tp,
-                200.0, drawn, 57.0, 600.0, 200.0, true, 1, -0.05,
-                OrdinaryTaxTable.flat(0.0), 0.0);
-
-        // Spending draw: taxable -= 95*(2/3)=63.3333 -> 31.6667; traditional -= 285*(2/3)=190 ->
-        // 95; roth -= 220*(2/3)=146.6667 -> 138.3333. Tax (57) then cascades taxable-first:
-        // taxable 31.6667 -> 0 (draws 31.6667), remainder 25.3333 from traditional -> 69.6667;
-        // roth untouched by tax.
-        assertThat(pools[0]).isEqualTo(0.0, within(1e-6));
-        assertThat(pools[1] + pools[2]).isEqualTo(69.666667, within(1e-4));   // traditional total
-        assertThat(pools[3] + pools[4]).isEqualTo(138.333333, within(1e-4));  // roth total
-        assertThat(outcome.cashBalance()).isEqualTo(0.0, within(1e-6));
-        assertThat(outcome.traditionalDrawn()).isEqualTo(190.0, within(1e-6));
-    }
-
-    @Test
-    void applyTrialWithdrawals_cashFullyCovers_leavesPoolsUntouchedButStillDeductsFullTax() {
-        // Cash ($100) fully covers the $100 spending draw -> equityDraw=0, so the theoretical
-        // pool split (100/0/0) must NOT be applied to the pools at all -- that is the entire
-        // point of the reserve. Withdrawal tax ($30) still leaves the pools in full via the
-        // cascade, proving tax is never skipped just because the spending draw was cash-funded
-        // (and proving the old "deduct pools twice on full cover" bug is gone).
-        double[] pools = {360.0, 180.0, 0.0, 90.0, 0.0};   // household task 6: double[5], spouse slots 0
-        TaxableLots lots = new TaxableLots();
-        lots.addLot(360.0, 360.0);
-        TrialPools tp = new TrialPools(pools, lots);
-        var drawn = new PoolWithdrawal(100.0, 0.0, 0.0);
-
-        // marginalRate=0.20 (nonzero, to prove it's IRRELEVANT here): taxable ($360) fully covers
-        // the $30 tax, so traditional is never touched and there is nothing to gross up (audit C2).
-        var outcome = TrialSimulator.applyTrialWithdrawals(tp,
-                100.0, drawn, 30.0, 100.0, 100.0, true, 1, -0.05,
-                OrdinaryTaxTable.flat(0.20), 0.0);
-
-        assertThat(pools[0]).isEqualTo(330.0, within(1e-6));           // 360 - 30 tax only
-        assertThat(pools[1] + pools[2]).isEqualTo(180.0, within(1e-6)); // traditional untouched
-        assertThat(pools[3] + pools[4]).isEqualTo(90.0, within(1e-6));  // roth untouched
-        assertThat(outcome.cashBalance()).isEqualTo(0.0, within(1e-6));    // cash drained by the $100 draw
-        assertThat(outcome.traditionalDrawn()).isEqualTo(0.0, within(1e-6));
-    }
-
     // === Audit C2: tax paid FROM the traditional pool must gross up (the draw is itself taxable) ===
 
     @Test
@@ -353,14 +256,12 @@ class TrialSimulatorReturnTest {
         TrialPools tp = new TrialPools(pools, lots);
         var drawn = new PoolWithdrawal(0.0, 0.0, 0.0); // no spending draw this call -- isolates the tax
 
-        var outcome = TrialSimulator.applyTrialWithdrawals(tp,
-                0.0, drawn, 57.0, 0.0, 0.0, true, 0, 0.05,
-                OrdinaryTaxTable.flat(0.20), 0.0);
+        TrialSimulator.applyTrialWithdrawals(tp,
+                drawn, 57.0, true, OrdinaryTaxTable.flat(0.20), 0.0);
 
         assertThat(pools[0]).isEqualTo(0.0, within(1e-9));
         assertThat(pools[1] + pools[2]).isEqualTo(500.0 - 57.0 - 14.25, within(1e-9)); // trad = 428.75
         assertThat(pools[3] + pools[4]).isEqualTo(0.0, within(1e-9));                  // roth
-        assertThat(outcome.cashBalance()).isEqualTo(0.0, within(1e-9));
     }
 
     @Test
@@ -374,14 +275,12 @@ class TrialSimulatorReturnTest {
         TrialPools tp = new TrialPools(pools, lots);
         var drawn = new PoolWithdrawal(0.0, 0.0, 0.0);
 
-        var outcome = TrialSimulator.applyTrialWithdrawals(tp,
-                0.0, drawn, 57.0, 0.0, 0.0, true, 0, 0.05,
-                OrdinaryTaxTable.flat(0.20), 0.0);
+        TrialSimulator.applyTrialWithdrawals(tp,
+                drawn, 57.0, true, OrdinaryTaxTable.flat(0.20), 0.0);
 
         assertThat(pools[0]).isEqualTo(500.0 - 57.0, within(1e-9)); // = 443.0, taxable-funded, no gross-up
         assertThat(pools[1] + pools[2]).isEqualTo(500.0, within(1e-9)); // traditional untouched
         assertThat(pools[3] + pools[4]).isEqualTo(0.0, within(1e-9));   // roth
-        assertThat(outcome.cashBalance()).isEqualTo(0.0, within(1e-9));
     }
 
     // === Audit C5: gross-up "m" is the EXACT rate at the post-draw point (base + T), not a flat
@@ -405,7 +304,7 @@ class TrialSimulatorReturnTest {
         var drawn = new PoolWithdrawal(0.0, 0.0, 0.0);
 
         TrialSimulator.applyTrialWithdrawals(tp,
-                0.0, drawn, 57.0, 0.0, 0.0, true, 0, 0.05, table, base);
+                drawn, 57.0, true, table, base);
 
         double expectedGrossUp = 57.0 * 0.30 / 0.70;
         double traditional = pools[1] + pools[2];
@@ -420,92 +319,6 @@ class TrialSimulatorReturnTest {
         assertThat(traditional).isLessThan(naiveResultingPool - 1.0);
         assertThat(table.rateAt(base)).isEqualTo(0.10, within(1e-9));      // pre-draw bracket
         assertThat(table.rateAt(base + 57.0)).isEqualTo(0.30, within(1e-9)); // actual post-draw point
-    }
-
-    @Test
-    void simulateTrial_cashReserveDownYear_partialCoverDebitsAllThreePoolsAndFullWithdrawalTax() {
-        // End-to-end version of the direct-call test above: taxable/traditional/roth all start
-        // at 300, a 1-year cash reserve seeds $200 out of taxable. A uniform -5% down year plus
-        // a deliberately outsized withdrawal need ($600, via a -$400 "other income" against a
-        // $200 floor) spills the theoretical draw across all three pools; cash covers $200 of
-        // it, leaving a $400 equity draw at marginal rate 20% ($57 tax, of which taxable funds
-        // $31.6667 and traditional funds the $25.3333 remainder). Post-draw pool total = 665
-        // (post-growth) - 400 (equity draw) - 57 (tax) = 208 pre-C2; audit C2 grosses up the
-        // $25.3333 traditional slice of the tax by 25.3333*0.20/0.80 = 6.3333 more, so finalBalance
-        // = 208 - 6.3333 = 201.6667, cash fully drained.
-        var config = TrialSimulator.SimulationConfig.builder(300.0, 300.0, 300.0, "taxable_first")
-                .taxTables(new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0})
-                .retirementAge(62)
-                .cashReserve(1, 0.0)
-                .returns(new double[]{-0.05}, new double[]{-0.05}, new double[]{-0.05})
-                .taxableBasis(300.0)
-                .build();
-
-        var result = simulator.simulateTrial(
-                new double[]{-400.0}, new double[]{0.0}, new double[]{200.0}, new double[]{0.0}, 1, config);
-
-        assertThat(result.finalBalance()).isEqualTo(201.666667, within(1e-4));
-    }
-
-    @Test
-    void simulateTrial_cashReserveDownYear_taxAwareFullCoverLeavesEquityPoolsUntouched() {
-        // Tax-aware (hasPools=true) counterpart of simulateTrial_cashReserveDownYear_
-        // keysOnBalanceWeightedPortfolioReturn above: cash ($100, seeded from taxable) fully
-        // covers a $100 down-year withdrawal (taxable-first, so the theoretical draw never even
-        // reaches traditional/roth) -> the equity pools must be debited NOTHING, exactly like
-        // the no-tax final-response path. taxable 500 -> (seed 100) 400 -> (*0.9) 360;
-        // traditional 200 -> 180; roth 100 -> 90; cash 100 -> 0 (drained by the draw).
-        var config = TrialSimulator.SimulationConfig.builder(500.0, 200.0, 100.0, "taxable_first")
-                .taxTables(new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0})
-                .retirementAge(62)
-                .cashReserve(1, 0.0)
-                .returns(new double[]{-0.10}, new double[]{-0.10}, new double[]{-0.10})
-                .taxableBasis(500.0)
-                .build();
-
-        var result = simulator.simulateTrial(
-                new double[]{0.0}, new double[]{0.0}, new double[]{100.0}, new double[]{0.0}, 1, config);
-
-        assertThat(result.finalBalance()).isEqualTo(630.0, within(1e-6));
-    }
-
-    @Test
-    void simulateTrial_rmdForcedFirstInCashCoveredDownYear_reinvestedRmdCashFundsTaxNoGrossUp() {
-        // T18a-1: the RMD is now forced out of traditional FIRST, before the spending draw is
-        // even resolved -- so its after-tax cash is already sitting in taxable by the time the
-        // withdrawal tax is assessed, unlike the pre-T18a-1 end-of-year forceRmdExcess.
-        // Age-75 RMD year, cash reserve fully covers the year's spending draw from a
-        // traditional-first ordered portfolio -- the ACTUAL traditional pool draw for spending
-        // is therefore zero, not the theoretical $1000 split.
-        // Seed: annualSpending=1000, cashReserveYears=1 -> cash=1000, drawn from traditional
-        // (taxable=0) -> traditional 100000-1000=99000. Growth -5% -> 94050 (pools1PreGrowth=
-        // 99000 is the RMD basis). rmd = 99000/24.6 = 4024.390243902439, forced out FIRST:
-        // traditional -> 94050-rmd, taxable gains the after-tax remainder (rmd*0.80).
-        // Withdrawal ($1000) is fully cash-covered (cashDraw=min(1000,1000)=1000, equityDraw=0)
-        // -> pools untouched by the spending draw; withdrawal tax 1000*0.20=200 (computed on the
-        // theoretical traditional-first split) is now funded ENTIRELY by the RMD's own taxable
-        // cash (rmd*0.80 = 3,219.51 comfortably covers $200) -- NO audit-C2 gross-up, unlike the
-        // pre-T18a-1 ordering (which forced only after the $200 tax had already drained/grossed
-        // up traditional, leaving nothing in taxable to absorb it -- see the superseded $50
-        // leakage this test used to pin).
-        double[] flatZero = {0.0};
-        var config = TrialSimulator.SimulationConfig.builder(0.0, 100_000.0, 0.0, "traditional_first")
-                .taxTables(new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0})
-                .retirementAge(75)
-                .cashReserve(1, 0.0)
-                .returns(flatZero, new double[]{-0.05}, flatZero)
-                .rmdStartAge(75)
-                .build();
-
-        var result = simulator.simulateTrial(
-                new double[]{0.0}, new double[]{0.0}, new double[]{1000.0}, new double[]{0.0}, 1, config);
-
-        double rmd = 99_000.0 / 24.6;
-        // (94,050 - rmd) traditional + (rmd - 0.2*rmd) reinvested taxable - 200 tax (fully
-        // taxable-funded, no gross-up) = 93,850 - 0.2*rmd.
-        double finalBalance = 93_850.0 - 0.20 * rmd;
-        assertThat(result.finalBalance()).isEqualTo(finalBalance, within(0.01));
-        assertThat(result.finalBalance()).isEqualTo(93045.12, within(0.01));
     }
 
     // === Audit C5 review fix: the ordinary tax BASE must stack across the year's own income

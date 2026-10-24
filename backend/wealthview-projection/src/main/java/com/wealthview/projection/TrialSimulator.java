@@ -8,7 +8,7 @@ import com.wealthview.core.projection.strategy.WithdrawalOrder;
 /**
  * Runs single-path Monte Carlo trials for the spending optimizer: year-by-year
  * portfolio evolution with growth, Roth conversions, withdrawals, withdrawal tax,
- * income surplus, and cash-reserve handling.
+ * income surplus, and early-withdrawal penalties.
  *
  * <p>Extracted from {@code MonteCarloSpendingOptimizer} during the Phase 3 decomposition.
  * The numeric logic is unchanged — this class only isolates the per-trial simulation
@@ -19,9 +19,6 @@ import com.wealthview.core.projection.strategy.WithdrawalOrder;
  * sequences (on the {@link SimulationConfig}) and never draws random numbers itself.
  */
 final class TrialSimulator {
-
-    /** Fraction of equity portfolio used each year to replenish the cash reserve bucket. */
-    private static final double CASH_REPLENISHMENT_RATE = 0.10;
 
     /** Defensive cap on the audit-C2 gross-up rate: a real marginal rate cannot reach 100% (which
      * would make the T*m/(1-m) closed form diverge), and this model's brackets never approach it --
@@ -57,13 +54,12 @@ final class TrialSimulator {
      * Task 17: {@link #applyTrialWithdrawals}'s per-year result -- replaces the old two
      * single-element out-arrays the caller allocated every year ({@code realizedGainOut},
      * {@code traditionalDrawnOut}) with a plain returned record, matching every sibling helper in
-     * this class. {@code cashBalance} is the post-withdrawal cash-reserve balance; {@code
-     * realizedGain} the FIFO long-term gain realized by this call's taxable sale(s) (spending sale
-     * only -- secondary tax/replenishment sales sell FIFO but their gain is deliberately excluded,
-     * see {@link #applyTrialWithdrawals}); {@code traditionalDrawn} the dollars actually debited
-     * from traditional for the spending draw (0 when the draw never reached traditional).
+     * this class. {@code realizedGain} is the FIFO long-term gain realized by this call's taxable
+     * sale (spending sale only -- the secondary tax sale sells FIFO but its gain is deliberately
+     * excluded, see {@link #applyTrialWithdrawals}); {@code traditionalDrawn} the dollars actually
+     * debited from traditional for the spending draw (0 when the draw never reached traditional).
      */
-    record WithdrawalOutcome(double cashBalance, double realizedGain, double traditionalDrawn) {}
+    record WithdrawalOutcome(double realizedGain, double traditionalDrawn) {}
 
     /** Per-trial simulation result. */
     record TrialResult(
@@ -206,7 +202,7 @@ final class TrialSimulator {
 
     /**
      * Configuration for one trial. The run-invariant fields (balances, order, tax/conversion
-     * arrays, cash config) are shared across trials; the three per-pool real return sequences
+     * arrays) are shared across trials; the three per-pool real return sequences
      * ({@code taxableReturns}/{@code traditionalReturns}/{@code rothReturns}) vary per trial —
      * each pool grows at its own allocation/override-driven sequence.
      *
@@ -220,7 +216,6 @@ final class TrialSimulator {
             double[] conversionByYear, double[] conversionTaxByYear,
             int retirementAge,
             double[] dsBracketCeilingByYear,
-            int cashReserveYears, double cashReturnRate,
             boolean trackYearBalances,
             double[] taxableReturns, double[] traditionalReturns, double[] rothReturns,
             int rmdStartAge,
@@ -255,8 +250,8 @@ final class TrialSimulator {
 
         /**
          * Fluent builder. Defaults are the no-op anchors the old back-compat constructor chain
-         * documented per feature: null tax/conversion/rental arrays (mechanism inactive), no cash
-         * reserve, no tracking, {@code rmdStartAge = Integer.MAX_VALUE} (no RMDs), zero dividend
+         * documented per feature: null tax/conversion/rental arrays (mechanism inactive), no
+         * tracking, {@code rmdStartAge = Integer.MAX_VALUE} (no RMDs), zero dividend
          * and interest yield, {@code taxableEquityShare = 1.0} (pre-C1 all-equity path), no
          * household, no survivor regimes, {@code survivorFactor = 1.0}, early-access age 60.
          */
@@ -280,8 +275,6 @@ final class TrialSimulator {
             private double[] conversionTaxByYear;
             private int retirementAge;
             private double[] dsBracketCeilingByYear;
-            private int cashReserveYears;
-            private double cashReturnRate;
             private boolean trackYearBalances;
             private double[] taxableReturns;
             private double[] traditionalReturns;
@@ -331,12 +324,6 @@ final class TrialSimulator {
 
             Builder dsBracketCeilingByYear(double[] dsBracketCeilingByYear) {
                 this.dsBracketCeilingByYear = dsBracketCeilingByYear;
-                return this;
-            }
-
-            Builder cashReserve(int cashReserveYears, double cashReturnRate) {
-                this.cashReserveYears = cashReserveYears;
-                this.cashReturnRate = cashReturnRate;
                 return this;
             }
 
@@ -409,7 +396,7 @@ final class TrialSimulator {
                 return new SimulationConfig(initTaxable, initTraditional, initRoth, withdrawalOrder,
                         ordinaryTaxTableByYear, ordinaryBaseIncomeByYear,
                         conversionByYear, conversionTaxByYear,
-                        retirementAge, dsBracketCeilingByYear, cashReserveYears, cashReturnRate,
+                        retirementAge, dsBracketCeilingByYear,
                         trackYearBalances, taxableReturns, traditionalReturns, rothReturns,
                         rmdStartAge, initTaxableBasis, ltcgTaxTableByYear, dividendYield,
                         adaptation, rentalIncomeByYear, interestYield, taxableEquityShare,
@@ -431,7 +418,7 @@ final class TrialSimulator {
      * recorded in the returned {@link TrialResult#yearBalances()}.
      */
     // NPathComplexity: the year-by-year simulation loop branches on independent per-year
-    // conditions (tax mode, cash reserve, tracking). The path count is multiplicative but each
+    // conditions (tax mode, tracking). The path count is multiplicative but each
     // branch is a small guarded block, so the method is far simpler than its NPath number.
     @SuppressWarnings("PMD.NPathComplexity")
     TrialResult simulateTrial(
@@ -459,9 +446,7 @@ final class TrialSimulator {
         // (transition index 0). 1.0 for the fixed-death / single-person path (survivorRegimes null),
         // so the seed reads floors[0]+discretionary[0] unchanged (the byte-identical anchor).
         double seedFactor = regimeAt(config, household, 0) != null ? config.survivorFactor() : 1.0;
-        double cashBalance = seedCashReserve(tp, floors, discretionary, config, seedFactor);
-
-        double minBalance = tp.poolTotal() + cashBalance;
+        double minBalance = tp.poolTotal();
         double[] yearBalances = config.trackYearBalances() ? new double[years] : null;
         boolean essentialFloorMet = true;
 
@@ -485,21 +470,12 @@ final class TrialSimulator {
             double traditionalReturn = config.traditionalReturns()[y];
             double rothReturn = config.rothReturns()[y];
 
-            // Cash-reserve down-year logic keys on the balance-weighted portfolio real return
-            // across the three pools (pre-growth balances). Now that pools grow at distinct rates
-            // there is no single "the return" — this weighted figure preserves the original bucket
-            // behavior: draw from cash when the portfolio as a whole had a down year.
             double preGrowthTotal = tp.poolTotal();
-            double portfolioReturn = preGrowthTotal > 0
-                    ? (tp.taxable() * taxableReturn
-                            + tp.traditionalTotal() * traditionalReturn
-                            + tp.rothTotal() * rothReturn) / preGrowthTotal
-                    : 0.0;
 
-            // Audit C9: the trial's start-of-year total portfolio (pre-growth pools + pre-growth
-            // cash) — the signal the simulated guardrail rule measures against the no-adaptation
-            // median. Captured before this year's growth is applied below.
-            double trialStartTotal = preGrowthTotal + cashBalance;
+            // Audit C9: the trial's start-of-year total portfolio (pre-growth pools) — the signal
+            // the simulated guardrail rule measures against the no-adaptation median. Captured
+            // before this year's growth is applied below.
+            double trialStartTotal = preGrowthTotal;
 
             // Household task 6: each owner's prior-year-end traditional balance — the IRS RMD basis
             // for that owner's own stream this year, snapshotted before this year's growth. Spouse is
@@ -536,7 +512,6 @@ final class TrialSimulator {
             double dividendIncome = growthResult.dividendIncome();
             double baseWithInterest = growthResult.baseWithInterest();
             tp.growNonTaxablePools(traditionalReturn, rothReturn);
-            cashBalance *= (1 + config.cashReturnRate());
 
             int age = config.retirementAge() + y;
 
@@ -579,7 +554,7 @@ final class TrialSimulator {
             // just when income exceeds spending -- fund it from any surplus first; the unfunded
             // remainder drains straight from the pools via the shared tax cascade below
             // (deductTaxFromPoolsGrossedUp), deliberately NOT folded into the spending withdrawal: it
-            // must neither draw from the cash reserve nor generate marginal withdrawal tax on the
+            // must not generate marginal withdrawal tax on the
             // SPENDING side (that would double-count -- this is a separate, already-computed bill).
             // The funding draw itself IS grossed up when it touches traditional (audit C2) exactly
             // like the deterministic engine's extraPoolFundedTax now is. surplusTax[y] is the
@@ -611,25 +586,20 @@ final class TrialSimulator {
                         drawn.traditional());
             }
 
-            // Withdraw from pools + handle cash reserve. The taxable spending sale realizes a FIFO
-            // long-term gain (returned via WithdrawalOutcome.realizedGain()); secondary taxable
-            // sales — the withdrawal-tax payment and cash-reserve replenishment — sell FIFO to keep
-            // the lots in sync and accumulate their gain on TrialPools for this year's LTCG (D5),
-            // matching the deterministic MultiPool's tax-funding-sale treatment.
-            double cashBeforeWithdrawals = cashBalance;
-            WithdrawalOutcome outcome = applyTrialWithdrawals(tp,
-                    cashBalance, drawn, withdrawalTax, withdrawal, spending, hasPools,
-                    config.cashReserveYears(), portfolioReturn, table,
+            // Withdraw from pools. The taxable spending sale realizes a FIFO long-term gain
+            // (returned via WithdrawalOutcome.realizedGain()); the secondary taxable sale — the
+            // withdrawal-tax payment — sells FIFO to keep the lots in sync and accumulates its gain
+            // on TrialPools for this year's LTCG (D5), matching the deterministic MultiPool's
+            // tax-funding-sale treatment.
+            WithdrawalOutcome outcome = applyTrialWithdrawals(tp, drawn, withdrawalTax, hasPools, table,
                     baseWithInterest + rmdForced + actualConv);
-            cashBalance = outcome.cashBalance();
-            double cashDrawn = Math.max(0, cashBeforeWithdrawals - cashBalance);
 
             applyEarlyWithdrawalPenalty(tp, outcome.traditionalDrawn(), age, config.earlyAccessAge());
 
-            // The base-income-tax deduction is NOT part of drawn/cashDrawn (it drains via
+            // The base-income-tax deduction is NOT part of drawn (it drains via
             // deductTaxFromPoolsGrossedUp below, like withdrawalTax), so this metric already measures
             // spending resources only -- identical to its pre-A4 shape.
-            double resourcesForSpending = view.income() + drawn.total() + cashDrawn;
+            double resourcesForSpending = view.income() + drawn.total();
             if (resourcesForSpending < view.floor() - 1e-6) {
                 essentialFloorMet = false;
             }
@@ -649,9 +619,8 @@ final class TrialSimulator {
                     aux.rentalIncome());
 
             tp.clampNonNegative();
-            cashBalance = Math.max(0, cashBalance);
 
-            double totalBalance = tp.poolTotal() + cashBalance;
+            double totalBalance = tp.poolTotal();
             minBalance = Math.min(minBalance, totalBalance);
             if (yearBalances != null) {
                 yearBalances[y] = totalBalance;
@@ -665,7 +634,7 @@ final class TrialSimulator {
             tp.consolidateLotsIfNeeded(200);
         }
 
-        double finalBalance = Math.max(0, tp.poolTotal() + cashBalance);
+        double finalBalance = Math.max(0, tp.poolTotal());
         carryForwardBequest(yearBalances, loopYears, years, finalBalance);
         boolean traditionalExhausted = config.conversionByYear() != null
                 && tp.traditionalTotal() <= 0;
@@ -783,7 +752,7 @@ final class TrialSimulator {
      * calendar year from {@code AgeMilestones}, legacy 60 -- already used above by
      * {@code preAge595} to steer clear of traditional draws). Flat 10% on the ACTUAL dollars
      * debited from traditional for this year's spending draw ({@code traditionalDrawn} -- branch-
-     * agnostic across the cash-reserve down-year scaling and the plain up-market draw); Roth
+     * agnostic); Roth
      * conversions are OUT OF SCOPE. Funded via the simple (non-grossed-up) tax cascade -- hot-loop
      * cheap, matching the Roth-conversion-tax drain's own no-gross-up design.
      */
@@ -833,48 +802,11 @@ final class TrialSimulator {
     }
 
     /**
-     * Seeds the cash-reserve bucket from the first year's spending, drawing it out of the pools in
-     * order (taxable, traditional, roth). The taxable draw is mirrored on the lots to keep the value
-     * invariant; its gain is taxed with year 0's LTCG (D5). Returns the initial cash
-     * balance (0 when no cash reserve is configured). {@code seedFactor} is the survivor spending
-     * factor at year 0 (task 6) -- 1.0 on every path except the stochastic corner where the first
-     * death lands at retirement, so this is byte-identical to the pre-task-6 seed elsewhere.
-     */
-    private static double seedCashReserve(TrialPools tp,
-                                           double[] floors, double[] discretionary,
-                                           SimulationConfig config, double seedFactor) {
-        if (config.cashReserveYears() <= 0) {
-            return 0;
-        }
-        double annualSpending = (floors[0] + discretionary[0]) * seedFactor;
-        double target = annualSpending * config.cashReserveYears();
-        double cashFromTaxable = Math.min(target, tp.taxable());
-        tp.sellTaxableForTax(cashFromTaxable);
-        double funded = cashFromTaxable;
-        double remaining = target - cashFromTaxable;
-        if (remaining > 0) {
-            // Household task 6: draw from traditional (proportional across owners), then Roth for any
-            // remainder, flooring Roth at zero — the same taxable→trad→roth seed cascade, generalized
-            // to the five-pool layout. Single-person: TRAD_P then ROTH_P only, bit-for-bit.
-            double tradTotal = tp.traditionalTotal();
-            double fromTrad = Math.min(remaining, tradTotal);
-            tp.debitPair(TRAD_P, TRAD_S, fromTrad);
-            remaining -= fromTrad;
-            double fromRoth = Math.min(remaining, Math.max(0, tp.rothTotal()));
-            tp.debitPair(ROTH_P, ROTH_S, fromRoth);
-            funded += fromTrad + fromRoth;
-        }
-        // API #22: the reserve holds only what the pools actually gave up. Returning the full target
-        // conjured the shortfall out of nothing whenever the portfolio was smaller than the reserve.
-        return funded;
-    }
-
-    /**
      * Settles the year's base-income-tax obligation and surplus deposit (audit A4).
      * Deposits whatever surplus remains after funding the year's base income tax to taxable
      * (at cost), then drains the unfunded remainder straight from the pools via the shared
-     * taxable-first cascade -- exactly like the ordinary withdrawal tax and LTCG tax: never funded
-     * from the cash reserve, never part of the spending draw. The funding draw IS grossed up when it
+     * taxable-first cascade -- exactly like the ordinary withdrawal tax and LTCG tax: never part
+     * of the spending draw. The funding draw IS grossed up when it
      * touches traditional (audit C2), at the year's full ordinary stack (C5 review fix), cross-engine
      * parity with the deterministic engine's {@code extraPoolFundedTax} treatment.
      */
@@ -928,7 +860,7 @@ final class TrialSimulator {
 
     /**
      * Applies the long-term capital-gains tax on this year's realized spending gain plus qualified
-     * dividend plus (D5) the accumulated gain of every tax-funding/cash-reserve sale -- see
+     * dividend plus (D5) the accumulated gain of every tax-funding sale -- see
      * {@link #ltcgTaxForYear} -- exactly (audit C5) via {@code ltcgTable}, evaluated at the ACTUAL full ordinary
      * stack for this trial-year ({@code ordinaryStack} = base income + actual capped Roth
      * conversion + actual traditional spending draw + forced RMD excess) -- fixing the old
@@ -1113,85 +1045,27 @@ final class TrialSimulator {
     }
 
     /**
-     * Deducts withdrawals and tax from pools, handling cash reserve logic. Returns a
+     * Deducts the spending draw and the withdrawal tax from pools. Returns a
      * {@link WithdrawalOutcome} (Task 17 -- replaces the old {@code realizedGainOut}/{@code
      * traditionalDrawnOut} single-element out-arrays the caller allocated fresh every year).
      * {@code traditionalDrawn} is the dollar amount actually debited from traditional for
      * this year's spending draw. {@code base} is the ordinary income already realized BEFORE this
      * call (income-source base + the year's actual Roth conversion); the withdrawal-tax drain's
-     * gross-up point additionally stacks the branch's own actual traditional spending draw on it.
-     * Package-private (mirrors {@link #splitWithdrawal}) so the cash-reserve down-year branches
-     * can be unit tested directly instead of only through the full {@link #simulateTrial} pipeline.
+     * gross-up point additionally stacks the actual traditional spending draw on it.
+     * Package-private (mirrors {@link #splitWithdrawal}) so it can be unit tested directly instead
+     * of only through the full {@link #simulateTrial} pipeline.
      */
-    static WithdrawalOutcome applyTrialWithdrawals(TrialPools tp, double cashBalance,
-                                         PoolWithdrawal drawn, double withdrawalTax,
-                                         double withdrawal, double spending,
-                                         boolean hasPools, int cashReserveYears,
-                                         double portfolioReturn, OrdinaryTaxTable table, double base) {
-        if (cashReserveYears > 0) {
-            if (portfolioReturn < 0) {
-                // Down-year cash reserve draw: cash covers as much of the spending withdrawal as
-                // it can; the equity pools fund only the remainder, scaled pro-rata across all
-                // three pools -- identical semantics whether or not withdrawal tax is estimated
-                // (hasPools). When cash fully covers the withdrawal the equity pools are debited
-                // NOTHING for the spending draw; that is the entire point of the reserve (see
-                // TrialSimulatorReturnTest's pinned non-pool test).
-                double cashDraw = Math.min(withdrawal, cashBalance);
-                double equityDraw = withdrawal - cashDraw;
-                double drawnTotal = drawn.total();
-                double realizedGain = 0;
-                double traditionalDrawn = 0;
-                if (drawnTotal > 0 && equityDraw > 0) {
-                    double scale = equityDraw / Math.max(drawnTotal, equityDraw);
-                    double spendingSale = drawn.taxable() * scale;
-                    double tradDrawn = drawn.traditional() * scale;
-                    realizedGain = tp.sellTaxable(spendingSale);
-                    tp.debitPair(TRAD_P, TRAD_S, tradDrawn);
-                    tp.debitPair(ROTH_P, ROTH_S, drawn.roth() * scale);
-                    traditionalDrawn = tradDrawn;
-                }
-                // The withdrawal tax is a separate, full-amount outflow paid straight from the
-                // pools via the shared cascade (grossed up when it touches traditional -- audit
-                // C2) -- the cash reserve funds spending only, never tax, matching the up-market
-                // and no-reserve branches below. (Replaces the old dimensionally-wrong
-                // tax^2/portfolio partial deduction, and the old double debit when cash fully
-                // covered the draw.)
-                if (hasPools) {
-                    deductTaxFromPoolsGrossedUp(withdrawalTax, tp, table,
-                            base + traditionalDrawn);
-                }
-                return new WithdrawalOutcome(cashBalance - cashDraw, realizedGain, traditionalDrawn);
-            } else {
-                // Up market: normal withdrawal + replenish cash
-                double realizedGain = tp.sellTaxable(drawn.taxable());
-                tp.debitPair(TRAD_P, TRAD_S, drawn.traditional());
-                tp.debitPair(ROTH_P, ROTH_S, drawn.roth());
-                double traditionalDrawn = drawn.traditional();
-                if (hasPools) {
-                    deductTaxFromPoolsGrossedUp(withdrawalTax, tp, table,
-                            base + traditionalDrawn);
-                }
-                double targetCash = spending * cashReserveYears;
-                double replenishment = Math.min(
-                        Math.max(0, targetCash - cashBalance),
-                        Math.max(0, tp.poolTotal()) * CASH_REPLENISHMENT_RATE);
-                // Household task 6: a taxable overdraw spills into traditional (proportional across
-                // owners), matching the pre-household `pools[1] += pools[JOINT_TAXABLE]` single-pool spill.
-                tp.debitTaxableWithTraditionalSpillover(replenishment);
-                return new WithdrawalOutcome(cashBalance + replenishment, realizedGain, traditionalDrawn);
-            }
-        } else {
-            // No cash reserve
-            double realizedGain = tp.sellTaxable(drawn.taxable());
-            tp.debitPair(TRAD_P, TRAD_S, drawn.traditional());
-            tp.debitPair(ROTH_P, ROTH_S, drawn.roth());
-            double traditionalDrawn = drawn.traditional();
-            if (hasPools) {
-                deductTaxFromPoolsGrossedUp(withdrawalTax, tp, table,
-                        base + traditionalDrawn);
-            }
-            return new WithdrawalOutcome(cashBalance, realizedGain, traditionalDrawn);
+    static WithdrawalOutcome applyTrialWithdrawals(TrialPools tp, PoolWithdrawal drawn,
+                                                   double withdrawalTax, boolean hasPools,
+                                                   OrdinaryTaxTable table, double base) {
+        double realizedGain = tp.sellTaxable(drawn.taxable());
+        tp.debitPair(TRAD_P, TRAD_S, drawn.traditional());
+        tp.debitPair(ROTH_P, ROTH_S, drawn.roth());
+        double traditionalDrawn = drawn.traditional();
+        if (hasPools) {
+            deductTaxFromPoolsGrossedUp(withdrawalTax, tp, table, base + traditionalDrawn);
         }
+        return new WithdrawalOutcome(realizedGain, traditionalDrawn);
     }
 
     /**

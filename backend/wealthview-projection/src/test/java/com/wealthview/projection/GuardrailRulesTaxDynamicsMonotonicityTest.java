@@ -201,7 +201,6 @@ class GuardrailRulesTaxDynamicsMonotonicityTest {
                 .taxTables(ctx.taxIncome().ordinaryTaxTableByYear(), ctx.taxIncome().rentalAwareTaxableIncome())
                 .retirementAge(ctx.sim().retirementAge())
                 .dsBracketCeilingByYear(ctx.taxIncome().dsBracketCeilingByYear())
-                .cashReserve(ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate())
                 .trackYearBalances(true)
                 .returns(ctx.sim().taxableReturns()[t], ctx.sim().traditionalReturns()[t],
                         ctx.sim().rothReturns()[t])

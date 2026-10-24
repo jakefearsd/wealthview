@@ -121,7 +121,7 @@ class GuardrailProfileServiceTest {
                 new BigDecimal("0"), new BigDecimal("0"), new BigDecimal("1.0000"),
                 new BigDecimal("0"),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
-                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null,
+                BigDecimal.ZERO, null, 0, null, null,
                 new GuardrailProfileResponse.Disclosure(null, true, new BigDecimal("0.0000"), null,
                         GuardrailProfileResponse.GATED_ON_NO_ADAPTATION));
 
@@ -419,6 +419,21 @@ class GuardrailProfileServiceTest {
     }
 
     @Test
+    void reoptimize_storedProfile_rebuildsRequestWithoutCashReserve() {
+        var entity = storedProfile();
+        entity.setPhaseBlendYears(3);
+        stubReoptimizeHappyPath(entity);
+        var captor = ArgumentCaptor.forClass(GuardrailOptimizationInput.class);
+        when(spendingOptimizer.optimize(captor.capture())).thenReturn(baseOptimizerResponse());
+        when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.reoptimize(tenantId, scenarioId);
+
+        assertThat(captor.getValue().phaseBlendYears()).isEqualTo(3);
+    }
+
+    @Test
     void reoptimize_profileSavedWithConversions_echoesConversionsAndDynamicSequencingRate() {
         var entity = storedProfile();
         entity.setOptimizeConversions(true);
@@ -686,8 +701,7 @@ class GuardrailProfileServiceTest {
         var input = captureOptimizationInput(buildRequest(req -> req
                 .withReturnMean(null).withTrialCount(null)
                 .withPortfolioFloor(null).withMaxAnnualAdjustmentRate(null)
-                .withPhaseBlendYears(null).withCashReserveYears(null)
-                .withCashReturnRate(null).withTerminalBalanceTarget(null)
+                .withPhaseBlendYears(null).withTerminalBalanceTarget(null)
                 .withPhases(null)));
 
         // Audit C4: an omitted return_mean must flow through as NULL so the projection engine
@@ -700,9 +714,6 @@ class GuardrailProfileServiceTest {
         assertThat(input.portfolioFloor()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(input.maxAnnualAdjustmentRate()).isEqualByComparingTo("0.05");
         assertThat(input.phaseBlendYears()).isEqualTo(1);
-        assertThat(input.cashReserveYears()).isEqualTo(2);
-        // Real terms: the cash-reserve sleeve return default is a REAL rate (~4% nominal deflated).
-        assertThat(input.cashReturnRate()).isEqualByComparingTo("0.015");
         assertThat(input.terminalBalanceTarget()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(input.phases()).isEmpty();
     }
@@ -813,7 +824,7 @@ class GuardrailProfileServiceTest {
                 new BigDecimal("250000"), new BigDecimal("0.05"), new BigDecimal("0.95"),
                 new BigDecimal("100000"),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
-                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
+                BigDecimal.ZERO, null, 0, null, null);
         when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
                 .thenReturn(optimizerResponse);
         var savedCaptor = ArgumentCaptor.forClass(GuardrailSpendingProfileEntity.class);
@@ -1527,7 +1538,7 @@ class GuardrailProfileServiceTest {
                 new BigDecimal("250000"), new BigDecimal("0.05"), new BigDecimal("0.95"),
                 new BigDecimal("100000"),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
-                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
+                BigDecimal.ZERO, null, 0, null, null);
     }
 
     private GuardrailProfileResponse withSchedule(GuardrailProfileResponse base,
@@ -1541,7 +1552,7 @@ class GuardrailProfileServiceTest {
                 base.stale(), base.createdAt(), base.updatedAt(),
                 base.portfolioFloor(), base.maxAnnualAdjustmentRate(),
                 base.phaseBlendYears(), base.riskTolerance(),
-                base.cashReserveYears(), base.cashReturnRate(), schedule);
+                schedule);
     }
 
     private GuardrailOptimizationRequest buildRequest(java.util.function.Function<RequestBuilder, RequestBuilder> fn) {
@@ -1561,8 +1572,6 @@ class GuardrailProfileServiceTest {
         private BigDecimal maxAnnualAdjustmentRate = new BigDecimal("0.05");
         private Integer phaseBlendYears = 1;
         private String riskTolerance;
-        private Integer cashReserveYears = 2;
-        private BigDecimal cashReturnRate = new BigDecimal("0.04");
         private Boolean optimizeConversions = false;
         private BigDecimal conversionBracketRate;
         private BigDecimal rmdTargetBracketRate;
@@ -1580,8 +1589,6 @@ class GuardrailProfileServiceTest {
         RequestBuilder withPortfolioFloor(BigDecimal v) { this.portfolioFloor = v; return this; }
         RequestBuilder withMaxAnnualAdjustmentRate(BigDecimal v) { this.maxAnnualAdjustmentRate = v; return this; }
         RequestBuilder withPhaseBlendYears(Integer v) { this.phaseBlendYears = v; return this; }
-        RequestBuilder withCashReserveYears(Integer v) { this.cashReserveYears = v; return this; }
-        RequestBuilder withCashReturnRate(BigDecimal v) { this.cashReturnRate = v; return this; }
         RequestBuilder withTerminalBalanceTarget(BigDecimal v) { this.terminalBalanceTarget = v; return this; }
         RequestBuilder withPhases(List<GuardrailPhaseInput> v) { this.phases = v; return this; }
         RequestBuilder withConvertOptimization(boolean v) { this.optimizeConversions = v; return this; }
@@ -1608,8 +1615,6 @@ class GuardrailProfileServiceTest {
                     .maxAnnualAdjustmentRate(maxAnnualAdjustmentRate)
                     .phaseBlendYears(phaseBlendYears)
                     .riskTolerance(riskTolerance)
-                    .cashReserveYears(cashReserveYears)
-                    .cashReturnRate(cashReturnRate)
                     .optimizeConversions(optimizeConversions)
                     .conversionBracketRate(conversionBracketRate)
                     .rmdTargetBracketRate(rmdTargetBracketRate)

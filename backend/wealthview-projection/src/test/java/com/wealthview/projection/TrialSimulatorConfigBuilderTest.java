@@ -11,7 +11,7 @@ class TrialSimulatorConfigBuilderTest {
     @Test
     void build_defaultsOnly_matchesCanonicalNoOpAnchors() {
         // Every optional knob must default to its documented byte-identical no-op
-        // value: null tax/conversion/rental arrays, no cash reserve, no tracking,
+        // value: null tax/conversion/rental arrays, no tracking,
         // no RMDs (MAX_VALUE), zero dividend/interest yield, 100% taxable equity
         // share, no household, no survivor regimes, survivor factor 1.0.
         double[] taxable = {0.10};
@@ -25,7 +25,7 @@ class TrialSimulatorConfigBuilderTest {
 
         var canonical = new TrialSimulator.SimulationConfig(
                 100.0, 50.0, 25.0, "taxable_first",
-                null, null, null, null, 62, null, 0, 0.0, false,
+                null, null, null, null, 62, null, false,
                 taxable, traditional, roth, Integer.MAX_VALUE,
                 0.0, null, 0.0, null, null, 0.0, 1.0, null, null, 1.0, AgeMilestones.LEGACY_EARLY_ACCESS_AGE);
 
@@ -52,7 +52,6 @@ class TrialSimulatorConfigBuilderTest {
                 .retirementAge(65)
                 .rmdStartAge(73)
                 .dsBracketCeilingByYear(dsCeilings)
-                .cashReserve(2, 0.03)
                 .trackYearBalances(true)
                 .returns(taxable, traditional, roth)
                 .taxableBasis(80.0)
@@ -70,7 +69,7 @@ class TrialSimulatorConfigBuilderTest {
         var canonical = new TrialSimulator.SimulationConfig(
                 100.0, 50.0, 25.0, "traditional_first",
                 taxTables, baseIncome, conversions, conversionTax, 65, dsCeilings,
-                2, 0.03, true, taxable, traditional, roth, 73,
+                true, taxable, traditional, roth, 73,
                 80.0, ltcgTables, 0.015, null, rental, 0.04, 0.7, null, regimes, 0.75, 59);
 
         assertThat(built).isEqualTo(canonical);

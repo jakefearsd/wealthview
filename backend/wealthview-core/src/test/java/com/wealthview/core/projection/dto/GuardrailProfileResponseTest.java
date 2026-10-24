@@ -39,8 +39,6 @@ class GuardrailProfileResponseTest {
         when(entity.getMaxAnnualAdjustmentRate()).thenReturn(null);
         when(entity.getPhaseBlendYears()).thenReturn(2);
         when(entity.getRiskTolerance()).thenReturn("moderate");
-        when(entity.getCashReserveYears()).thenReturn(2);
-        when(entity.getCashReturnRate()).thenReturn(new BigDecimal("0.04"));
         return entity;
     }
 

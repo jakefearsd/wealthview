@@ -393,7 +393,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
                 input.portfolioFloor(), input.maxAnnualAdjustmentRate(),
                 input.phaseBlendYears(), null,
-                input.cashReserveYears(), input.cashReturnRate(), null,
+                null,
                 new GuardrailProfileResponse.Disclosure(null, false, null, null,
                         // T24: no search ran (degenerate zero-year input), but the derivation is
                         // still the accurate statement of what WOULD have gated had one run.

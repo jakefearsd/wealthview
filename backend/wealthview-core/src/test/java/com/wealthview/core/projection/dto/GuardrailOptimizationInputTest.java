@@ -45,8 +45,6 @@ class GuardrailOptimizationInputTest {
         assertThat(input.portfolioFloor()).isEqualByComparingTo("5.05");
         assertThat(input.maxAnnualAdjustmentRate()).isEqualByComparingTo("6.06");
         assertThat(input.phaseBlendYears()).isEqualTo(3);
-        assertThat(input.cashReserveYears()).isEqualTo(4);
-        assertThat(input.cashReturnRate()).isEqualByComparingTo("7.07");
         assertThat(input.filingStatus()).isEqualTo("filing-status");
         assertThat(input.withdrawalOrder()).isEqualTo("withdrawal-order");
         assertThat(input.optimizeConversions()).isTrue();
@@ -95,8 +93,6 @@ class GuardrailOptimizationInputTest {
                 .portfolioFloor(new BigDecimal("5.05"))
                 .maxAnnualAdjustmentRate(new BigDecimal("6.06"))
                 .phaseBlendYears(3)
-                .cashReserveYears(4)
-                .cashReturnRate(new BigDecimal("7.07"))
                 .filingStatus("filing-status")
                 .withdrawalOrder("withdrawal-order")
                 .optimizeConversions(true)

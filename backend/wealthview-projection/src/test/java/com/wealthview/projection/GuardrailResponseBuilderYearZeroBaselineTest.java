@@ -9,7 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class GuardrailResponseBuilderYearZeroBaselineTest {
 
     private static OptimizationSetup setupWith(TrialStartBalances[] starts) {
-        var portfolio = new PortfolioSetup(0.0, 0.0, 0.0, 0.0, null, 0, 0.0, 0.0, 0.0, 0.0);
+        var portfolio = new PortfolioSetup(0.0, 0.0, 0.0, 0.0, null, 0.0, 0.0, 0.0);
         var sim = new SimulationParameters(0, 65, 0, 1, 3, 0.90, 0.0,
                 new double[3][2], new double[3][1], new double[3][1], new double[3][1], Integer.MAX_VALUE,
                 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, null, null, null, AgeMilestones.LEGACY_EARLY_ACCESS_AGE,
