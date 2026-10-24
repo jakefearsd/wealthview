@@ -80,4 +80,23 @@ class BondTentConfigTest {
 
         assertThat(config.planMix().name()).isEqualTo("Balanced");
     }
+
+    @Test
+    void toJson_convertedMarker_writesSnakeCaseKey() {
+        var base = tent();
+        var marked = new BondTentConfig(base.coverageYears(), base.buildUpStartYears(), base.mixes(),
+                base.yields(), true);
+
+        var json = paramsWith(marked).toJson(mapper);
+
+        assertThat(json).contains("\"converted_from_cash_reserve\":true");
+        assertThat(ScenarioParams.parseOrEmpty(mapper, json).bondTent().convertedFromCashReserve()).isTrue();
+    }
+
+    @Test
+    void toJson_noMarker_omitsTheKey() {
+        var json = paramsWith(tent()).toJson(mapper);
+
+        assertThat(json).doesNotContain("converted_from_cash_reserve");
+    }
 }

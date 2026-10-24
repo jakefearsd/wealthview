@@ -342,6 +342,16 @@ class GuardrailProfileServiceTest {
     }
 
     @Test
+    void computeScenarioHash_convertedMarker_keepsHash() {
+        var plain = tentScenario(tentJson("5", "Balanced", "0.2", "0.8"));
+        var marked = tentScenario(tentJson("5", "Balanced", "0.2", "0.8")
+                .replaceFirst("\\}$", ",\"converted_from_cash_reserve\":true}"));
+
+        assertThat(GuardrailProfileService.computeScenarioHash(marked, List.of()))
+                .isEqualTo(GuardrailProfileService.computeScenarioHash(plain, List.of()));
+    }
+
+    @Test
     void computeScenarioHash_trailingZeros_keepHash() {
         var plain = tentScenario(tentJson("5", "Balanced", "0.2", "0.8"));
         var padded = tentScenario(tentJson("5.0", "Balanced", "0.20", "0.80"));
