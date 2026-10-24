@@ -24,7 +24,7 @@ source tree nor a JDK, only Docker and read access to the registry.
 
 ```bash
 # 1. Pin the release you want in the env file (production only)
-#    WEALTHVIEW_VERSION=1.3.0
+#    WEALTHVIEW_VERSION=1.4.0
 # 2. Run the update
 ./wv update
 ```

@@ -6,6 +6,16 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-10-24
+
+The bond tent (roadmap item B5): configure a tent of short- to long-term
+Treasuries on a scenario, see how big it must be, and test it. The main
+projection, the Monte Carlo simulation and the spending optimizer all model it,
+and a new Bond tent tab compares no tent with up to three mixes across
+simulations and replays of real historical crashes. Monte Carlo trials now start
+today for every scenario, and the optimizer's cash reserve becomes a bond tent.
+Four schema changes (V082–V085) and a new seed of bond returns by maturity.
+
 ### Added
 - Bond tent on the scenario form: turn it on, choose how many years of spending to cover, when to start building it and up to three bond-maturity mixes, and see how big the tent needs to be for a saved scenario. A tent turns off the 1928-1971 market history option.
 - The main projection now builds and holds a configured bond tent: it is built up before retirement and held as bonds inside your accounts, which lowers projected growth (the tent's cost).
@@ -28,7 +38,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 - Known gap: For a scenario that is already retired, the simulation strip still counts ages from the original retirement date, so "Balance at 90" and age-based spending phases are shifted by the years since retirement; the crash replay counts from today.
 
 ### Upgrade notes
-- Migrations V084 and V085 apply when the app starts. V084 adds the certified tent size to optimizer profiles. V085 converts existing cash reserves into bond tents; the old cash columns stay in the database but are no longer read.
+- `wv update` delivers this release; no `wv` script reinstall is needed.
+- Migrations V082–V085 and the repeatable seed `R__seed_bond_maturity_returns` apply when the app starts:
+  - V082 marks existing optimized profiles out of date, because Monte Carlo trials now start today.
+  - V083 adds the bond returns by maturity (1954–2025) that the tent and the crash replays use.
+  - V084 adds the certified tent size to optimizer profiles.
+  - V085 converts existing cash reserves into bond tents; the old cash columns stay in the database but are no longer read.
 
 ## [1.3.0] — 2026-10-17
 
@@ -882,7 +897,8 @@ First tagged release. Consolidates all development prior to the 1.0 cut.
 - Test-first workflow mandated by `CLAUDE.md`; no production code without a
   failing test.
 
-[Unreleased]: https://github.com/jakefearsd/wealthview/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/jakefearsd/wealthview/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/jakefearsd/wealthview/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/jakefearsd/wealthview/compare/v1.2.8...v1.3.0
 [1.2.8]: https://github.com/jakefearsd/wealthview/compare/v1.2.7...v1.2.8
 [1.2.7]: https://github.com/jakefearsd/wealthview/compare/v1.2.6...v1.2.7
