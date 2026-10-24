@@ -397,6 +397,38 @@ when there are no retired years; `terminal_value` is null when absent).
 
 `compare` responses are unchanged — they carry neither field.
 
+## Bond Tent Analysis
+
+| Endpoint                                              | Method | Description                                   |
+|-------------------------------------------------------|--------|-----------------------------------------------|
+| `/api/v1/projections/{id}/bond-tent/simulation`       | GET    | Fixed-spending Monte Carlo, no tent vs each mix |
+| `/api/v1/projections/{id}/bond-tent/replay`           | GET    | Replay a historical crash, no tent vs each mix |
+
+Both are read-only and need a saved scenario with an active spending plan and a bond tent; otherwise they return
+400 `A bond tent analysis needs a spending plan and a bond tent`. An unknown scenario is a 404.
+
+`simulation` takes no parameters and returns `trial_count`, `planned_years` and `columns`: the no-tent column
+(`name` "No tent", null `tent_target`, `years_covered_median` and `years_covered_worst10`), then one per mix. Each
+column has `name`, `tent_target`, `success_rate` (0-1; every year paid in full), `years_covered_median`,
+`years_covered_worst10` and `balance_at90_median` (null when the horizon ends before age 90).
+
+`replay` takes exactly one of `crash` (`oil_shock_1973`, `dot_com_2000`, `financial_crisis_2008` or
+`inflation_2022`) or `start_year` (1954-2025, a one-year window), plus `offset` (default 0, from -3 to 3): the
+crash's first year lands `offset` years from the anchor, which is the retirement year, or today when already retired.
+Errors (400):
+- `Choose a crash or a start year`
+- `Unknown crash: <key>`
+- `Start year must be between <first> and <last>`
+- `Crash timing must be between 3 years before and 3 years after retirement`
+- `That timing would place the crash before today`
+
+The response has `crash_label`, `crash_first_year`, `crash_last_year`, `crash_calendar_year`, `offset`,
+`retirement_year` (the anchor), `planned_years`, `checkpoint_age` (70), `available_offsets`, `first_start_year`,
+`last_start_year` and `outcomes`. `outcomes` is the no-tent column then each mix, each with `name`, `tent_target`,
+`lowest_balance`, `stocks_sold_while_down`, `years_covered`, `tent_left_at_checkpoint`, `balance_at90` (the last
+three null when the horizon ends first) and `years`: per year `year`, `age`, `balance`, `tent_balance`, `tent_drawn`,
+`stocks_sold_while_down`, `stocks_below_high` and `history_year` (null for a long-run-average year).
+
 ## Guardrail Profiles
 
 Guardrail profiles are the Monte-Carlo-optimized form of a spending plan and hang off a

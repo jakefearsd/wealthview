@@ -10,6 +10,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 - Bond tent on the scenario form: turn it on, choose how many years of spending to cover, when to start building it and up to three bond-maturity mixes, and see how big the tent needs to be for a saved scenario. A tent turns off the 1928-1971 market history option.
 - The main projection now builds and holds a configured bond tent: it is built up before retirement and held as bonds inside your accounts, which lowers projected growth (the tent's cost).
 - The Monte Carlo simulation and the spending optimizer now model the bond tent: it is built on each market path, drawn when stocks are below their previous high, and re-sized for each spending level. Optimized profiles record the tent size they were certified with, shown as "Certified with a $X bond tent." and as the **Bond Tent** tile on Spending Profiles.
+- A **Bond tent** tab on the projection page: the scenario's spending plan simulated across Monte Carlo paths with no tent and with each mix (success means every year's planned spending is paid in full), and replays of the 1973-74, 2000-02, 2007-09 and 2022 crashes, or any start year from 1954 to 2025, hitting from 3 years before to 3 years after retirement. Backed by `GET /api/v1/projections/{id}/bond-tent/simulation` and `/bond-tent/replay`.
 
 ### Changed
 - Monte Carlo simulations now start today rather than at retirement, for every scenario.
@@ -23,6 +24,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   - The reserve now also appears in the main projection, as cash held.
   - It is sized differently. The old reserve held years times the first year's total spending. The tent is sized to the years of withdrawals it covers: spending minus income such as Social Security, plus tax, discounted at the mix's yield. A converted tent can be noticeably smaller than the old reserve when income covers part of your spending.
 - Known gap: the Roth conversion optimizer ignores a bond tent held in an IRA.
+- Known gap: the Bond tent tab's simulation runs a tier-based spending plan without Roth conversions; Monte Carlo has never modeled the deterministic Roth settings.
 
 ### Upgrade notes
 - Migrations V084 and V085 apply when the app starts. V084 adds the certified tent size to optimizer profiles. V085 converts existing cash reserves into bond tents; the old cash columns stay in the database but are no longer read.

@@ -154,6 +154,27 @@ Converted profiles are marked out of date, so re-optimize them to see the new nu
 
 **Known gap.** The Roth conversion optimizer ignores a tent held in an IRA.
 
+### Bond tent tab
+
+The projection page gets a **Bond tent** tab whenever the scenario has an active spending plan (a spending profile or an optimized plan). If the plan has no tent, the tab says so and points you to the scenario form. The main projection shows only what a tent costs: on average returns stocks never fall below their previous high, so the tent is built and held but never drawn. The tab shows what it buys.
+
+**The strip across the top.** It runs your spending plan, held fixed, through the same Monte Carlo market paths (5,000 simulations, starting today) once with no tent and once for each mix, so the columns differ only in the tent. **Success rate** counts a simulation as a success only when every year's planned spending is paid in full. That is stricter than the optimizer's success rate, which only requires the essential floor, because here the whole plan is the requirement. The strip also shows **Years covered, typical / worst 10%** (the median simulation and the 10th percentile) and **Balance at 90, typical** (the median balance entering age 90). The no-tent column has no years covered.
+
+**Historical crash replay.** Pick a named crash (1973-74, 2000-02, 2007-09 or 2022) or choose **Any start year**, and say when it hits relative to retirement. The crash's first year lands that many years from your retirement year, from 3 years before to 3 years after. An already-retired scenario is measured from today. A timing that would put the crash before today is disabled. The 2007-09 crash begins in the 2008 returns. A start year replays a single year, and can be any year from 1954 to 2025.
+
+The replay runs the scenario with no tent and with each mix, in the order of your mixes. It then shows one row per measure:
+- **Lowest balance** is the lowest end-of-year balance during retirement.
+- **Stocks sold while down** is the total sold from the non-tent holdings in retired years when stocks ended the year below their previous high.
+- **Years covered (planned N)** is the retirement years the tent paid for, plus the years' worth of spending still in it at the end of the covered window.
+- **Tent left over at 70** is the tent at the end of the year the primary turns 70, or at the end of the covered window if that is later. It is blank if the plan ends first.
+- **Balance at 90** is the balance entering age 90. It is blank if the plan ends first.
+
+The chart marks the crash, your retirement year and, when the replay runs past it, where history ends.
+
+**What a replay uses.** Years from 1954 to 2025 use actual inflation-adjusted returns (that is when both stock and bond-maturity history exist); every other year uses the long-run averages the main projection uses. A replay ignores the 1928-1971 history option. An account with a fixed expected return keeps that return in every replay, because it has no allocation to replay. Bond yields are the ones you entered, and taxes are estimates.
+
+**Two known gaps.** A tier-based spending plan runs the simulation strip without Roth conversions, because Monte Carlo has never modeled the deterministic Roth settings; an optimized plan uses its stored conversion schedule. The Roth conversion optimizer still ignores a tent held in an IRA.
+
 ### Income Sources
 
 Add one or more income sources to the scenario from the **Income Sources** section. For each, you can set a **per-scenario override amount** so the same income source can be reused across scenarios with different assumptions (e.g. Social Security at 62 vs. 67). See [Spending and Income](spending-and-income.md).

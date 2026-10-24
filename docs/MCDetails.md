@@ -75,6 +75,26 @@ Some figures ignore the tent's different returns and see only total pool balance
 behind the essential-floor check and the corridors, the expected-path scalars, and the median start balance used by
 the adaptation baseline. The Roth conversion optimizer ignores a tent held in an IRA.
 
+## Fixed-spending evaluation
+
+The Bond tent tab compares tent mixes by holding the scenario's spending plan fixed rather than searching for a
+spending level. It is read-only and saves nothing.
+
+- **Shared context and paths.** One optimization context is built with the scenario's own tent. That forces the
+  1972-2025 window and records the tent paths. Every column then runs on the same market paths and seed: the no-tent
+  column removes the tent, and mix *i* swaps in that mix's shares and target.
+- **Schedule and success.** Year *y*'s spending is the plan's resolved total for that year. A tier plan is scaled by
+  the survivor factor from the first-death index; a guardrail plan is already scaled. The whole schedule is passed as
+  the floors and discretionary is zero, so a trial succeeds only if every year is paid in full. That is stricter than
+  the optimizer's essential-floor metric on purpose. A guardrail plan's stored Roth conversions are applied; a tier plan
+  runs without conversions.
+- **Years covered.** For each trial, the covered window is the first `min(ceil(coverage), retired years)` retired
+  years. Years covered is the sum, over the window, of the tent drawn divided by that year's planned withdrawal, plus
+  what is left in the tent at the end of the window divided by the mean planned withdrawal. The strip reports the
+  median and the 10th percentile across trials.
+- **Trial count and timing.** 5,000 trials, the optimizer's default. Measured warm (median of three runs) on the bond
+  tent characterization fixture, the tab's simulation with three mixes took 78 ms and an optimize took 646 ms.
+
 ## The Confidence Level (Conservative/Moderate/Aggressive)
 
 This is the **target success probability** — the share of simulated market histories in which the plan
