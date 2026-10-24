@@ -25,6 +25,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   - It is sized differently. The old reserve held years times the first year's total spending. The tent is sized to the years of withdrawals it covers: spending minus income such as Social Security, plus tax, discounted at the mix's yield. A converted tent can be noticeably smaller than the old reserve when income covers part of your spending.
 - Known gap: the Roth conversion optimizer ignores a bond tent held in an IRA.
 - Known gap: the Bond tent tab's simulation runs a tier-based spending plan without Roth conversions; Monte Carlo has never modeled the deterministic Roth settings.
+- Known gap: For a scenario that is already retired, the simulation strip still counts ages from the original retirement date, so "Balance at 90" and age-based spending phases are shifted by the years since retirement; the crash replay counts from today.
 
 ### Upgrade notes
 - Migrations V084 and V085 apply when the app starts. V084 adds the certified tent size to optimizer profiles. V085 converts existing cash reserves into bond tents; the old cash columns stay in the database but are no longer read.

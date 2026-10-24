@@ -407,7 +407,8 @@ when there are no retired years; `terminal_value` is null when absent).
 Both are read-only and need a saved scenario with an active spending plan and a bond tent; otherwise they return
 400 `A bond tent analysis needs a spending plan and a bond tent`. An unknown scenario is a 404.
 
-`simulation` takes no parameters and returns `trial_count`, `planned_years` and `columns`: the no-tent column
+`simulation` also returns 400 `A bond tent simulation needs a retirement date` when the scenario has no retirement date.
+It takes no parameters and returns `trial_count`, `planned_years` and `columns`: the no-tent column
 (`name` "No tent", null `tent_target`, `years_covered_median` and `years_covered_worst10`), then one per mix. Each
 column has `name`, `tent_target`, `success_rate` (0-1; every year paid in full), `years_covered_median`,
 `years_covered_worst10` and `balance_at90_median` (null when the horizon ends before age 90).
@@ -425,8 +426,9 @@ Errors (400):
 The response has `crash_label`, `crash_first_year`, `crash_last_year`, `crash_calendar_year`, `offset`,
 `retirement_year` (the anchor), `planned_years`, `checkpoint_age` (70), `available_offsets`, `first_start_year`,
 `last_start_year` and `outcomes`. `outcomes` is the no-tent column then each mix, each with `name`, `tent_target`,
-`lowest_balance`, `stocks_sold_while_down`, `years_covered`, `tent_left_at_checkpoint`, `balance_at90` (the last
-three null when the horizon ends first) and `years`: per year `year`, `age`, `balance`, `tent_balance`, `tent_drawn`,
+`lowest_balance`, `stocks_sold_while_down`, `years_covered`, `tent_left_at_checkpoint`, `balance_at90` and `years`.
+`years_covered` and `tent_left_at_checkpoint` are null for the No tent column; `tent_left_at_checkpoint` and
+`balance_at90` are also null when the horizon ends first. Each entry of `years` has `year`, `age`, `balance`, `tent_balance`, `tent_drawn`,
 `stocks_sold_while_down`, `stocks_below_high` and `history_year` (null for a long-run-average year).
 
 ## Guardrail Profiles

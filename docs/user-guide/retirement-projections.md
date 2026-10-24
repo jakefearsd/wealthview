@@ -165,7 +165,7 @@ The projection page gets a **Bond tent** tab whenever the scenario has an active
 The replay runs the scenario with no tent and with each mix, in the order of your mixes. It then shows one row per measure:
 - **Lowest balance** is the lowest end-of-year balance during retirement.
 - **Stocks sold while down** is the total sold from the non-tent holdings in retired years when stocks ended the year below their previous high.
-- **Years covered (planned N)** is the retirement years the tent paid for, plus the years' worth of spending still in it at the end of the covered window.
+- **Years covered (planned N)** is the retirement years the tent paid for, plus the years' worth of spending still in it at the end of the covered window. The No tent column shows no years covered.
 - **Tent left over at 70** is the tent at the end of the year the primary turns 70, or at the end of the covered window if that is later. It is blank if the plan ends first.
 - **Balance at 90** is the balance entering age 90. It is blank if the plan ends first.
 
@@ -173,7 +173,7 @@ The chart marks the crash, your retirement year and, when the replay runs past i
 
 **What a replay uses.** Years from 1954 to 2025 use actual inflation-adjusted returns (that is when both stock and bond-maturity history exist); every other year uses the long-run averages the main projection uses. A replay ignores the 1928-1971 history option. An account with a fixed expected return keeps that return in every replay, because it has no allocation to replay. Bond yields are the ones you entered, and taxes are estimates.
 
-**Two known gaps.** A tier-based spending plan runs the simulation strip without Roth conversions, because Monte Carlo has never modeled the deterministic Roth settings; an optimized plan uses its stored conversion schedule. The Roth conversion optimizer still ignores a tent held in an IRA.
+**Three known gaps.** A tier-based spending plan runs the simulation strip without Roth conversions, because Monte Carlo has never modeled the deterministic Roth settings; an optimized plan uses its stored conversion schedule. The Roth conversion optimizer still ignores a tent held in an IRA. For a scenario that is already retired, the simulation strip still counts ages from the original retirement date, so "Balance at 90" and age-based spending phases are shifted by the years since retirement; the crash replay counts from today.
 
 ### Income Sources
 
