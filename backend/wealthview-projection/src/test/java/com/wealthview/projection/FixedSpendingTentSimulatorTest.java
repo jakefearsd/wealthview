@@ -2,6 +2,8 @@ package com.wealthview.projection;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,6 +19,8 @@ import com.wealthview.core.projection.dto.BondMaturityValues;
 import com.wealthview.core.projection.dto.BondTentConfig;
 import com.wealthview.core.projection.dto.BondTentMix;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
+import com.wealthview.core.projection.dto.GuardrailSpendingInput;
+import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
@@ -116,6 +120,45 @@ class FixedSpendingTentSimulatorTest {
         assertThat(cash.balanceAt90Median()).isEqualByComparingTo("250000.00");
         assertThat(result.trialCount()).isEqualTo(50);
         assertThat(result.plannedYears()).isEqualByComparingTo("2.00");
+    }
+
+    @Test
+    void simulate_guardrailPlanWithConversions_paysItsRecommendedSpendingAndKeepsTheTotal() {
+        var tent = cashTent();
+        var base = flatInput(90, tent);
+        var pools = List.<ProjectionAccountInput>of(
+                new HypotheticalAccountInput(bd("600000"), BigDecimal.ZERO, AssetAllocation.ALL_US,
+                        Optional.empty(), "traditional"),
+                new HypotheticalAccountInput(bd("400000"), BigDecimal.ZERO, AssetAllocation.ALL_US,
+                        Optional.empty(), "roth"));
+        var input = GuardrailOptimizationInputBuilder.builder()
+                .withRetirementDate(base.retirementDate()).withBirthYear(1965).withBaseYear(2030).withEndAge(90)
+                .withInflationRate(bd("0.025")).withAccounts(pools).withEssentialFloor(bd("1"))
+                .withFeeRate(bd("0")).withDividendYield(bd("0")).withInterestYield(bd("0"))
+                .withTrialCount(50).withSeed(SEED).withBondTent(tent).build();
+        var yearly = new ArrayList<GuardrailYearlySpending>();
+        var conversions = new HashMap<Integer, BigDecimal>();
+        for (int year = 2030; year < 2060; year++) {
+            yearly.add(new GuardrailYearlySpending(year, year - 1965, bd("20000"), bd("0"), bd("0"), bd("20000"),
+                    bd("0"), bd("0"), bd("20000"), "Core"));
+            if (year < 2040) {
+                conversions.put(year, bd("50000"));
+            }
+        }
+        var projection = new ProjectionInput(UUID.nameUUIDFromBytes("g".getBytes()), "Sim", input.retirementDate(),
+                input.endAge(), input.inflationRate(), "{}", input.accounts(),
+                new SpendingProfileInput(bd("0"), bd("0"), "[]"), 2030, List.of(),
+                new GuardrailSpendingInput(yearly, conversions), List.of(), null);
+
+        var result = flatSimulator().simulate(input, projection);
+
+        // The tier profile pays nothing; only the guardrail schedule's 20,000 a year can take 25 years off the
+        // 1,000,000, and conversions only move money between the pools on flat markets with no tax calculator.
+        assertThat(result.columns()).allSatisfy(c -> {
+            assertThat(c.successRate()).isEqualByComparingTo("1.0000");
+            assertThat(c.balanceAt90Median()).isEqualByComparingTo("500000.00");
+        });
+        assertThat(result.columns().get(1).tentTarget()).isEqualByComparingTo("40000.00");
     }
 
     @Test

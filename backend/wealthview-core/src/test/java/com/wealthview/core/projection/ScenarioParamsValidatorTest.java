@@ -131,6 +131,24 @@ class ScenarioParamsValidatorTest {
     }
 
     @Test
+    void validateBondTent_duplicateMixNames_throws() {
+        var config = tentWith(List.of(mix("Plan", "1", "0", "0", "0"), mix(" plan ", "0", "1", "0", "0")));
+
+        assertThatThrownBy(() -> ScenarioParamsValidator.validateBondTent(config, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Mix names must be unique");
+    }
+
+    @Test
+    void validateBondTent_reservedNoTentName_throws() {
+        var config = tentWith(List.of(mix(" no TENT", "1", "0", "0", "0")));
+
+        assertThatThrownBy(() -> ScenarioParamsValidator.validateBondTent(config, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("\"No tent\" is reserved; choose another mix name");
+    }
+
+    @Test
     void validateBondTent_nullName_throws() {
         var config = tentWith(List.of(new BondTentMix(null, values("1", "0", "0", "0"))));
 

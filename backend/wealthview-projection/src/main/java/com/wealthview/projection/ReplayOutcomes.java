@@ -15,8 +15,6 @@ import com.wealthview.core.projection.dto.BondTentSizing;
 /** Turns one replay pass's rows into the outcome metrics (spec 6.2, Builder's call 8). */
 final class ReplayOutcomes {
 
-    /** The age at which the tent left over is read, unless the covered window ends later. */
-    static final int TENT_CHECKPOINT_AGE = 70;
     private static final int BALANCE_AGE = 89;
     private static final int MONEY_SCALE = 2;
 
@@ -42,7 +40,7 @@ final class ReplayOutcomes {
         if (target != null && sizing != null) {
             int window = Math.min((int) Math.ceil(sizing.coverageYears().doubleValue()), retiredRows.size());
             yearsCovered = yearsCovered(retiredRows, covered, window);
-            checkpoint = checkpoint(rows, retiredRows, window, birthYear + TENT_CHECKPOINT_AGE);
+            checkpoint = checkpoint(rows, retiredRows, window, birthYear + BondTentReplayOutcome.TENT_CHECKPOINT_AGE);
         }
         return new BondTentReplayOutcome(name, target, lowest(retiredRows.isEmpty() ? rows : retiredRows), sold,
                 yearsCovered, checkpoint, balanceAt90(rows, birthYear), rows);
@@ -67,6 +65,7 @@ final class ReplayOutcomes {
         var planned = new double[window];
         double drawnShares = 0.0;
         for (int k = 0; k < window; k++) {
+            // Safe: pass one and the replay share the horizon, so the window never exceeds coveredYears.
             planned[k] = covered.get(k).withdrawal().doubleValue();
             drawnShares += TentCoverage.drawnShare(retiredRows.get(k).tentDrawn().doubleValue(), planned[k]);
         }

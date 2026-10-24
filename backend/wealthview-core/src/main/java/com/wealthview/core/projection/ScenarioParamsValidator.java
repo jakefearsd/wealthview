@@ -1,6 +1,8 @@
 package com.wealthview.core.projection;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 
 import org.springframework.lang.Nullable;
@@ -35,6 +37,7 @@ public final class ScenarioParamsValidator {
     private static final int MAX_TENT_BUILD_UP_START_YEARS = 40;
     private static final int MAX_TENT_MIXES = 3;
     private static final int MAX_TENT_MIX_NAME_LENGTH = 40;
+    private static final String RESERVED_NO_TENT_NAME = "no tent";
     private static final BigDecimal SHARE_SUM_TOLERANCE = new BigDecimal("0.000001");
     private static final BigDecimal MIN_TENT_YIELD = new BigDecimal("-0.02");
     private static final BigDecimal MAX_TENT_YIELD = new BigDecimal("0.20");
@@ -208,8 +211,16 @@ public final class ScenarioParamsValidator {
         if (tent.mixes() == null || tent.mixes().isEmpty() || tent.mixes().size() > MAX_TENT_MIXES) {
             throw new IllegalArgumentException("A bond tent needs one to three bond mixes");
         }
+        var seen = new HashSet<String>();
         for (var mix : tent.mixes()) {
             validateTentMix(mix);
+            var key = mix.name().trim().toLowerCase(Locale.ROOT);
+            if (RESERVED_NO_TENT_NAME.equals(key)) {
+                throw new IllegalArgumentException("\"No tent\" is reserved; choose another mix name");
+            }
+            if (!seen.add(key)) {
+                throw new IllegalArgumentException("Mix names must be unique");
+            }
         }
     }
 

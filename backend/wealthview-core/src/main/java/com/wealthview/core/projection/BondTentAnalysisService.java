@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.wealthview.core.common.Entities;
 import com.wealthview.core.projection.dto.BondTentConfig;
 import com.wealthview.core.projection.dto.BondTentReplay;
+import com.wealthview.core.projection.dto.BondTentReplayOutcome;
 import com.wealthview.core.projection.dto.BondTentSimulation;
 import com.wealthview.core.projection.dto.HistoricalCrash;
 import com.wealthview.core.projection.dto.ProjectionInput;
@@ -33,7 +34,6 @@ public class BondTentAnalysisService {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private static final int MAX_OFFSET = 3;
-    private static final int CHECKPOINT_AGE = 70;
     private static final int DEFAULT_END_AGE = 90;
     private static final int DEFAULT_YEARS_TO_RETIREMENT = 30;
     private static final int DEFAULT_AGE = 35;
@@ -64,6 +64,9 @@ public class BondTentAnalysisService {
         log.debug("Simulating bond tent for scenario {} tenant {}", scenarioId, tenantId);
         var scenario = loadAnalysable(tenantId, scenarioId).scenario();
         var projectionInput = projectionInputBuilder.buildWithMetadata(scenario, tenantId).input();
+        if (projectionInput.retirementDate() == null) {
+            throw new IllegalArgumentException("A bond tent simulation needs a retirement date");
+        }
         var evaluation = guardrailProfileService.evaluationInput(scenario, projectionInput);
         return bondTentSimulator.simulate(evaluation, projectionInput);
     }
@@ -92,7 +95,7 @@ public class BondTentAnalysisService {
         var path = crashReplayPaths.build(window.firstYear(), crashCalendarYear, years.currentYear(), years.endYear());
         var outcomes = projectionEngine.replayBondTent(input, path);
         return new BondTentReplay(window.label(), window.firstYear(), window.lastYear(), crashCalendarYear, offset,
-                years.anchor(), analysable.tent().coverageYears(), CHECKPOINT_AGE, years.availableOffsets(),
+                years.anchor(), analysable.tent().coverageYears(), BondTentReplayOutcome.TENT_CHECKPOINT_AGE, years.availableOffsets(),
                 crashReplayPaths.firstYear(), crashReplayPaths.lastYear(), outcomes);
     }
 
@@ -135,6 +138,7 @@ public class BondTentAnalysisService {
     /** The calendar years a replay is laid out on, resolved as the deterministic engine resolves them. */
     private record Years(int currentYear, int anchor, int endYear) {
 
+        // These defaults must mirror DeterministicProjectionEngine.resolveProjectionParams.
         static Years resolve(ProjectionInput input, ScenarioParams params) {
             int currentYear = input.referenceYear() != null ? input.referenceYear() : LocalDate.now().getYear();
             int birthYear = params.birthYear() != null ? params.birthYear() : currentYear - DEFAULT_AGE;

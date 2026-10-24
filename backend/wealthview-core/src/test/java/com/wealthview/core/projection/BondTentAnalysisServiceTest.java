@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -233,6 +234,17 @@ class BondTentAnalysisServiceTest {
         assertThatThrownBy(() -> service.simulate(tenantId, scenarioId))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("A bond tent analysis needs a spending plan and a bond tent");
+    }
+
+    @Test
+    void simulate_noRetirementDate_throws() {
+        var scenario = planned(TENT_PARAMS, null);
+        stubScenario(scenario, null, 2026);
+
+        assertThatThrownBy(() -> service.simulate(tenantId, scenarioId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("A bond tent simulation needs a retirement date");
+        verifyNoInteractions(guardrailProfileService, bondTentSimulator);
     }
 
     @Test

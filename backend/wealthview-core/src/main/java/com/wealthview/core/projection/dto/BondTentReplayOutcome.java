@@ -26,4 +26,7 @@ public record BondTentReplayOutcome(
         @Nullable BigDecimal tentLeftAtCheckpoint,
         @Nullable BigDecimal balanceAt90,
         List<BondTentReplayYear> years) {
+
+    /** The age at which the tent left over is read, unless the covered window ends later. */
+    public static final int TENT_CHECKPOINT_AGE = 70;
 }
