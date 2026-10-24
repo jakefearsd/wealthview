@@ -585,4 +585,38 @@ class PortfolioPathGeneratorTest {
 
         assertThat(paths.tentPaths()).isNull();
     }
+
+    @Test
+    void generate_noPreRetirementYearsWithMaturities_recordsSleevesWithoutPools() {
+        var model = PoolReturnModel.from(List.of(allocationAccount("100000", AssetAllocation.ALL_US, "taxable")),
+                0.0);
+        var oneRow = new MaturityReturnMatrix(new int[]{1}, BondMaturity.values(),
+                new double[][]{{0.01, 0.02, 0.03, 0.04}});
+        var oneRowMatrix = new RealReturnMatrix(new int[]{1}, ORDER, new double[][]{{0.1, 0.0, 0.0, 0.0}});
+
+        var paths = PortfolioPathGenerator.generate(2, 0, 3, model, oneRowMatrix, new Random(3L), 0.005, oneRow);
+
+        var tent = paths.tentPaths();
+        assertThat(tent.poolsBeforeGrowth()).isNull();
+        assertThat(tent.poolsAfterGrowth()).isNull();
+        assertThat(tent.sleeveReturnsOf(1)).hasSize(12);
+        assertThat(tent.sleeveReturn(1, 2, BondMaturity.LONG)).isEqualTo(0.04 - 0.005, within(1e-12));
+        assertThatThrownBy(() -> tent.poolBeforeGrowth(0, 0, PoolType.TAXABLE))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> tent.poolAfterGrowth(0, 0, PoolType.TAXABLE))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void generate_misalignedMaturityMatrix_throwsIllegalArgument() {
+        var model = PoolReturnModel.from(List.of(allocationAccount("100000", AssetAllocation.ALL_US, "taxable")),
+                0.0);
+        var oneRow = new MaturityReturnMatrix(new int[]{1}, BondMaturity.values(),
+                new double[][]{{0.01, 0.02, 0.03, 0.04}});
+
+        assertThatThrownBy(() -> PortfolioPathGenerator.generate(1, 1, 3, model, FLAT_US_MATRIX, new Random(1L),
+                0.0, oneRow))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Maturity return matrix has 1 rows");
+    }
 }
