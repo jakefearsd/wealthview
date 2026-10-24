@@ -1,5 +1,6 @@
 package com.wealthview.app.it.projection;
 
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,7 +24,8 @@ class BondTentAnalysisIT extends AbstractApiIntegrationTest {
     private String retireeWithTent() {
         var profileId = data.createSpendingProfile("Core").get("id");
         var body = new HashMap<>(data.scenarioBody("Tent analysis"));
-        body.put("retirement_date", "2027-01-01");
+        // Next January 1st, so the anchor is always the retirement year and offsets -1..3 stay available.
+        body.put("retirement_date", (LocalDate.now().getYear() + 1) + "-01-01");
         body.put("birth_year", 1962);
         body.put("end_age", 95);
         body.put("spending_profile_id", profileId);
