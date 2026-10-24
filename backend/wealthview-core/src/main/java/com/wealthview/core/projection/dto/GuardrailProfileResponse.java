@@ -1,6 +1,7 @@
 package com.wealthview.core.projection.dto;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -373,8 +374,14 @@ public record GuardrailProfileResponse(
                         successProbabilityWithRules,
                         resolveGatedOn(entity.isGateOnAdaptiveRules(), entity.getMaxAnnualAdjustmentRate())),
                 null,
-                entity.getBondTentTarget()
+                bondTentTargetAtScaleTwo(entity.getBondTentTarget())
         );
+    }
+
+    /** The numeric(19,4) column read back at the scale optimize returns (2), so both endpoints agree. */
+    @Nullable
+    private static BigDecimal bondTentTargetAtScaleTwo(@Nullable BigDecimal target) {
+        return target == null ? null : target.setScale(2, RoundingMode.HALF_UP);
     }
 
     static boolean isOlderThan24Hours(GuardrailSpendingProfileEntity entity) {

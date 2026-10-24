@@ -66,6 +66,31 @@ class GuardrailProfileResponseTest {
     }
 
     @Test
+    void from_bondTentTargetStoredAtScaleFour_returnsScaleTwoHalfUp() {
+        var entity = baseEntity();
+        when(entity.getPhases()).thenReturn("[]");
+        when(entity.getYearlySpending()).thenReturn("[]");
+        when(entity.getBondTentTarget()).thenReturn(new BigDecimal("331916.8850"));
+
+        var response = GuardrailProfileResponse.from(entity);
+
+        assertThat(response.bondTentTarget()).isEqualByComparingTo("331916.89");
+        assertThat(response.bondTentTarget().scale()).isEqualTo(2);
+    }
+
+    @Test
+    void from_noBondTentTarget_returnsNull() {
+        var entity = baseEntity();
+        when(entity.getPhases()).thenReturn("[]");
+        when(entity.getYearlySpending()).thenReturn("[]");
+        when(entity.getBondTentTarget()).thenReturn(null);
+
+        var response = GuardrailProfileResponse.from(entity);
+
+        assertThat(response.bondTentTarget()).isNull();
+    }
+
+    @Test
     void from_withMalformedJson_returnsEmptyLists() {
         var entity = baseEntity();
         when(entity.getPhases()).thenReturn("[not json");
