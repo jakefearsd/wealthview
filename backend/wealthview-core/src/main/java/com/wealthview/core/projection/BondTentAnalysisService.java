@@ -95,8 +95,8 @@ public class BondTentAnalysisService {
         var path = crashReplayPaths.build(window.firstYear(), crashCalendarYear, years.currentYear(), years.endYear());
         var outcomes = projectionEngine.replayBondTent(input, path);
         return new BondTentReplay(window.label(), window.firstYear(), window.lastYear(), crashCalendarYear, offset,
-                years.anchor(), analysable.tent().coverageYears(), BondTentReplayOutcome.TENT_CHECKPOINT_AGE, years.availableOffsets(),
-                crashReplayPaths.firstYear(), crashReplayPaths.lastYear(), outcomes);
+                years.anchor(), analysable.tent().coverageYears(), BondTentReplayOutcome.TENT_CHECKPOINT_AGE,
+                years.availableOffsets(), crashReplayPaths.firstYear(), crashReplayPaths.lastYear(), outcomes);
     }
 
     private Analysable loadAnalysable(UUID tenantId, UUID scenarioId) {
