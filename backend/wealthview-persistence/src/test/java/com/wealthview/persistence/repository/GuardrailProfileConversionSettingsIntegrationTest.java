@@ -73,6 +73,26 @@ class GuardrailProfileConversionSettingsIntegrationTest extends AbstractIntegrat
     }
 
     @Test
+    void save_bondTentTarget_roundTrips() {
+        var entity = newProfile(scenario);
+        entity.setBondTentTarget(new BigDecimal("812345.67"));
+
+        var saved = repository.saveAndFlush(entity);
+        em.clear();
+        var reloaded = repository.findById(saved.getId()).orElseThrow();
+
+        assertThat(reloaded.getBondTentTarget()).isEqualByComparingTo("812345.67");
+    }
+
+    @Test
+    void save_noBondTentTarget_readsBackNull() {
+        var saved = repository.saveAndFlush(newProfile(scenario));
+        em.clear();
+
+        assertThat(repository.findById(saved.getId()).orElseThrow().getBondTentTarget()).isNull();
+    }
+
+    @Test
     void v081Backfill_rowWithConversionSchedule_becomesOptimizeConversionsTrue() throws IOException {
         var withSchedule = newProfile(scenario);
         withSchedule.setConversionSchedule("{\"years\":[]}");

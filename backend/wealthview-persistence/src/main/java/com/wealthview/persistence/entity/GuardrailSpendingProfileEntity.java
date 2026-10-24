@@ -101,6 +101,9 @@ public class GuardrailSpendingProfileEntity extends UuidAuditable {
     @Column(name = "gate_on_adaptive_rules", nullable = false)
     private boolean gateOnAdaptiveRules = false;
 
+    @Column(name = "bond_tent_target", precision = 19, scale = 4)
+    private BigDecimal bondTentTarget;
+
     @Column(name = "optimize_conversions", nullable = false)
     private boolean optimizeConversions = false;
 
@@ -324,6 +327,14 @@ public class GuardrailSpendingProfileEntity extends UuidAuditable {
 
     public void setDynamicSequencingBracketRate(BigDecimal dynamicSequencingBracketRate) {
         this.dynamicSequencingBracketRate = dynamicSequencingBracketRate;
+    }
+
+    public BigDecimal getBondTentTarget() {
+        return bondTentTarget;
+    }
+
+    public void setBondTentTarget(BigDecimal bondTentTarget) {
+        this.bondTentTarget = bondTentTarget;
     }
 
 }
