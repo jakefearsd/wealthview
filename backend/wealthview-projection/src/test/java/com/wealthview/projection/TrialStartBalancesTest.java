@@ -11,6 +11,7 @@ import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 class TrialStartBalancesTest {
 
@@ -73,5 +74,38 @@ class TrialStartBalancesTest {
     void medianTotal_empty_throwsIllegalArgument() {
         assertThatThrownBy(() -> TrialStartBalances.medianTotal(new TrialStartBalances[0]))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void adjustedBy_scalesOwnerSlicesProportionally() {
+        var start = new TrialStartBalances(100_000, 200_000, 0, 50_000, 0, 60_000, 40_000, 0);
+
+        var adjusted = start.adjustedBy(10_000, -20_000, 0);
+
+        assertThat(adjusted.taxable()).isEqualTo(110_000, within(1e-6));
+        assertThat(adjusted.taxableJoint()).isEqualTo(66_000, within(1e-6));
+        assertThat(adjusted.taxablePrimary()).isEqualTo(44_000, within(1e-6));
+        assertThat(adjusted.traditional()).isEqualTo(180_000, within(1e-6));
+        assertThat(adjusted.traditionalSpouse()).isEqualTo(45_000, within(1e-6));
+    }
+
+    @Test
+    void adjustedBy_emptyPool_putsTheAmountOnThePrimarySlice() {
+        var start = new TrialStartBalances(0, 0, 0, 0, 0, 0, 0, 0);
+
+        var adjusted = start.adjustedBy(0, 0, 5_000);
+
+        assertThat(adjusted.roth()).isEqualTo(5_000);
+        assertThat(adjusted.rothSpouse()).isZero();
+    }
+
+    @Test
+    void adjustedBy_negativeBeyondBalance_floorsThePoolAtZero() {
+        var start = new TrialStartBalances(1_000, 0, 0, 0, 0, 1_000, 0, 0);
+
+        var adjusted = start.adjustedBy(-5_000, 0, 0);
+
+        assertThat(adjusted.taxable()).isZero();
+        assertThat(adjusted.taxableJoint()).isZero();
     }
 }

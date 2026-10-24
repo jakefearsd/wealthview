@@ -9,10 +9,13 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
+import com.wealthview.core.projection.BondMaturityReturnsProvider.MaturityReturnMatrix;
 import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealReturnMatrix;
 import com.wealthview.core.projection.dto.AssetAllocation;
 import com.wealthview.core.projection.dto.AssetClass;
+import com.wealthview.core.projection.dto.BondMaturity;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
+import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -506,5 +509,80 @@ class PortfolioPathGeneratorTest {
         assertThatThrownBy(() -> PortfolioPathGenerator.generate(1, -1, 4, model, FLAT_US_MATRIX,
                 new Random(1L), 0.0))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    private static final MaturityReturnMatrix TWO_ROW_MATURITIES = new MaturityReturnMatrix(
+            new int[]{1, 2}, BondMaturity.values(),
+            new double[][]{{0.01, 0.02, 0.03, 0.04}, {0.05, 0.06, 0.07, 0.08}});
+
+    private static final RealReturnMatrix TWO_ROW_MIXED_MATRIX = new RealReturnMatrix(
+            new int[]{1, 2}, ORDER,
+            new double[][]{{0.10, 0.02, 0.01, 0.00}, {-0.20, 0.03, 0.02, 0.01}});
+
+    @Test
+    void generate_withMaturities_leavesEveryExistingOutputIdentical() {
+        var model = PoolReturnModel.from(List.of(
+                allocationAccount("100000", AssetAllocation.ALL_US, "taxable"),
+                allocationAccount("50000", AssetAllocation.ALL_US, "traditional")), 0.0);
+
+        var plain = PortfolioPathGenerator.generate(5, 3, 10, model, TWO_ROW_MIXED_MATRIX, new Random(7L), 0.001);
+        var withTent = PortfolioPathGenerator.generate(5, 3, 10, model, TWO_ROW_MIXED_MATRIX, new Random(7L), 0.001,
+                TWO_ROW_MATURITIES);
+
+        assertThat(withTent.taxableReturns()).isEqualTo(plain.taxableReturns());
+        assertThat(withTent.traditionalReturns()).isEqualTo(plain.traditionalReturns());
+        assertThat(withTent.rothReturns()).isEqualTo(plain.rothReturns());
+        assertThat(withTent.portfolioPaths()).isEqualTo(plain.portfolioPaths());
+        assertThat(withTent.startBalances()).isEqualTo(plain.startBalances());
+        assertThat(plain.tentPaths()).isNull();
+        assertThat(withTent.tentPaths()).isNotNull();
+    }
+
+    @Test
+    void generate_withMaturities_sleeveReturnsAreTheTrialsMatrixRowsLessFee() {
+        var model = PoolReturnModel.from(List.of(allocationAccount("100000", AssetAllocation.ALL_US, "taxable")),
+                0.0);
+        var oneRow = new MaturityReturnMatrix(new int[]{1}, BondMaturity.values(),
+                new double[][]{{0.01, 0.02, 0.03, 0.04}});
+        var oneRowMatrix = new RealReturnMatrix(new int[]{1}, ORDER, new double[][]{{0.1, 0.0, 0.0, 0.0}});
+
+        var paths = PortfolioPathGenerator.generate(2, 1, 3, model, oneRowMatrix, new Random(3L), 0.005, oneRow);
+
+        for (int t = 0; t < 2; t++) {
+            assertThat(paths.tentPaths().sleeveReturnsOf(t)).hasSize(16);
+            for (int y = 0; y < 4; y++) {
+                for (var m : BondMaturity.values()) {
+                    assertThat(paths.tentPaths().sleeveReturn(t, y, m))
+                            .isEqualTo(oneRow.realReturns()[0][m.ordinal()] - 0.005, within(1e-12));
+                }
+            }
+        }
+    }
+
+    @Test
+    void generate_preRetirement_recordsPoolTotalsBeforeAndAfterGrowth() {
+        var account = new HypotheticalAccountInput(new BigDecimal("100000"), new BigDecimal("10000"),
+                AssetAllocation.ALL_US, Optional.empty(), "taxable");
+        var model = PoolReturnModel.from(List.of(account), 0.0);
+
+        var paths = PortfolioPathGenerator.generate(1, 2, 3, model, FLAT_US_MATRIX, new Random(1L), 0.0,
+                TWO_ROW_MATURITIES);
+
+        var tent = paths.tentPaths();
+        assertThat(tent.poolBeforeGrowth(0, 0, PoolType.TAXABLE)).isEqualTo(110_000, within(1e-6));
+        assertThat(tent.poolAfterGrowth(0, 0, PoolType.TAXABLE)).isEqualTo(121_000, within(1e-6));
+        assertThat(tent.poolBeforeGrowth(0, 1, PoolType.TAXABLE)).isEqualTo(131_000, within(1e-6));
+        assertThat(tent.poolAfterGrowth(0, 1, PoolType.TAXABLE)).isEqualTo(144_100, within(1e-6));
+        assertThat(tent.poolBeforeGrowth(0, 0, PoolType.ROTH)).isZero();
+    }
+
+    @Test
+    void generate_withoutMaturities_hasNoTentPaths() {
+        var model = PoolReturnModel.from(List.of(allocationAccount("100000", AssetAllocation.ALL_US, "taxable")),
+                0.0);
+
+        var paths = PortfolioPathGenerator.generate(2, 1, 3, model, FLAT_US_MATRIX, new Random(1L), 0.0);
+
+        assertThat(paths.tentPaths()).isNull();
     }
 }

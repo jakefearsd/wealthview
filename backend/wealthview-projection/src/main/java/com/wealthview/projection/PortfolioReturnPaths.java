@@ -14,19 +14,30 @@ import org.springframework.lang.Nullable;
  *
  * <p>{@code startBalances} holds each trial's balances at retirement start after its own
  * pre-retirement accumulation; it is {@code null} exactly when there are no pre-retirement years.
+ *
+ * <p>{@code tentPaths} is non-null only when a bond tent is configured (maturity data supplied).
  */
 record PortfolioReturnPaths(
         double[][] taxableReturns,
         double[][] traditionalReturns,
         double[][] rothReturns,
         double[][] portfolioPaths,
-        @Nullable TrialStartBalances[] startBalances) {
+        @Nullable TrialStartBalances[] startBalances,
+        @Nullable TentPaths tentPaths) {
+
+    /** Paths without tent data: {@code tentPaths} is {@code null}. */
+    // UseVarargs: portfolioPaths is a [trial][year] matrix, not a variable argument list.
+    @SuppressWarnings("PMD.UseVarargs")
+    PortfolioReturnPaths(double[][] taxableReturns, double[][] traditionalReturns, double[][] rothReturns,
+                         double[][] portfolioPaths, @Nullable TrialStartBalances[] startBalances) {
+        this(taxableReturns, traditionalReturns, rothReturns, portfolioPaths, startBalances, null);
+    }
 
     /** Paths with no pre-retirement prefix: {@code startBalances} is {@code null}. */
     // UseVarargs: portfolioPaths is a [trial][year] matrix, not a variable argument list.
     @SuppressWarnings("PMD.UseVarargs")
     PortfolioReturnPaths(double[][] taxableReturns, double[][] traditionalReturns, double[][] rothReturns,
                          double[][] portfolioPaths) {
-        this(taxableReturns, traditionalReturns, rothReturns, portfolioPaths, null);
+        this(taxableReturns, traditionalReturns, rothReturns, portfolioPaths, null, null);
     }
 }

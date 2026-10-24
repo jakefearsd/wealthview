@@ -72,6 +72,27 @@ record TrialStartBalances(double taxable, double traditional, double roth,
     }
 
     /**
+     * These balances with each pool moved by the given amount (floored at 0), its owner slices scaled
+     * proportionally. A pool with nothing in it takes the amount on its primary slice (taxable: joint).
+     */
+    TrialStartBalances adjustedBy(double taxableAmount, double traditionalAmount, double rothAmount) {
+        double newTaxable = Math.max(0, taxable + taxableAmount);
+        double newTraditional = Math.max(0, traditional + traditionalAmount);
+        double newRoth = Math.max(0, roth + rothAmount);
+        double taxableScale = scale(taxable, newTaxable);
+        boolean taxableEmpty = taxable <= 0;
+        return new TrialStartBalances(newTaxable, newTraditional, newRoth,
+                traditionalSpouse * scale(traditional, newTraditional), rothSpouse * scale(roth, newRoth),
+                taxableEmpty ? newTaxable : taxableJoint * taxableScale,
+                taxableEmpty ? 0 : taxablePrimary * taxableScale,
+                taxableEmpty ? 0 : taxableSpouse * taxableScale);
+    }
+
+    private static double scale(double old, double adjusted) {
+        return old > 0 ? adjusted / old : 0;
+    }
+
+    /**
      * Median of {@link #total()} over the given trials. An even count averages the two middle values.
      */
     // UseVarargs: starts is a collection of trial results already held as an array by the caller.

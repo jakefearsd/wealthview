@@ -6,7 +6,9 @@ import java.util.Random;
 
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.BondMaturityReturnsProvider.MaturityReturnMatrix;
 import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealReturnMatrix;
+import com.wealthview.core.projection.dto.BondMaturity;
 import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.projection.PoolReturnModel.AccountReturnSource;
 
@@ -24,9 +26,13 @@ import com.wealthview.projection.PoolReturnModel.AccountReturnSource;
  * <p>This class is stateless. Determinism is the caller's responsibility — the supplied
  * {@link Random} is the single source of randomness and must be seeded by the caller.
  */
+// GodClass: the tent recording joins the path generator's other per-trial steps; they all read the same
+// bootstrap index sequence and are only meaningful together.
+@SuppressWarnings("PMD.GodClass")
 final class PortfolioPathGenerator {
 
     private static final double DEFAULT_BLOCK_LENGTH = 5.0;
+    private static final int POOLS = PoolType.values().length;
 
     private PortfolioPathGenerator() {
     }
@@ -54,6 +60,22 @@ final class PortfolioPathGenerator {
     static PortfolioReturnPaths generate(int trialCount, int preRetirementYears, int years,
                                          PoolReturnModel model, RealReturnMatrix matrix, Random rng,
                                          double feeRate) {
+        return generate(trialCount, preRetirementYears, years, model, matrix, rng, feeRate, null);
+    }
+
+    /**
+     * As the seven-argument overload; with {@code maturities} non-null it also records {@link TentPaths}
+     * for the Monte Carlo bond tent: each trial's sleeve returns (the maturity matrix rows picked by the
+     * same index sequence, net of {@code feeRate}) and, when there are pre-retirement years, the pool totals
+     * before and after each year's growth. It makes no extra {@code rng} call, so every other output is
+     * identical to the call without it.
+     */
+    // NPathComplexity: one trial loop assembles every path set, each tent array guarded by the same null
+    // switch; splitting it would scatter the single bootstrap index sequence the whole class hinges on.
+    @SuppressWarnings("PMD.NPathComplexity")
+    static PortfolioReturnPaths generate(int trialCount, int preRetirementYears, int years,
+                                         PoolReturnModel model, RealReturnMatrix matrix, Random rng,
+                                         double feeRate, @Nullable MaturityReturnMatrix maturities) {
         if (preRetirementYears < 0) {
             throw new IllegalArgumentException("preRetirementYears must not be negative: " + preRetirementYears);
         }
@@ -62,6 +84,9 @@ final class PortfolioPathGenerator {
         double[][] roth = new double[trialCount][];
         double[][] portfolioPaths = new double[trialCount][years + 1];
         TrialStartBalances[] starts = preRetirementYears > 0 ? new TrialStartBalances[trialCount] : null;
+        double[][] sleeveReturns = maturities == null ? null : new double[trialCount][];
+        double[][] poolsBefore = maturities == null || starts == null ? null : new double[trialCount][];
+        double[][] poolsAfter = poolsBefore == null ? null : new double[trialCount][];
 
         var bootstrap = new BlockBootstrapReturnGenerator(DEFAULT_BLOCK_LENGTH, rng);
         int historicalSize = matrix.years().length;
@@ -72,10 +97,23 @@ final class PortfolioPathGenerator {
             if (starts == null) {
                 indexSequence = bootstrap.generateIndexSequence(years, historicalSize);
                 accountBalances = openingBalances(model.allAccounts());
+                if (sleeveReturns != null) {
+                    sleeveReturns[t] = sleeveReturnRow(maturities, indexSequence, feeRate);
+                }
             } else {
                 int[] full = bootstrap.generateIndexSequence(preRetirementYears + years, historicalSize);
+                double[] before = null;
+                double[] after = null;
+                if (poolsBefore != null) {
+                    before = new double[preRetirementYears * POOLS];
+                    after = new double[preRetirementYears * POOLS];
+                    poolsBefore[t] = before;
+                    poolsAfter[t] = after;
+                    sleeveReturns[t] = sleeveReturnRow(maturities, full, feeRate);
+                }
                 accountBalances = accumulate(model.allAccounts(),
-                        Arrays.copyOfRange(full, 0, preRetirementYears), matrix, preRetirementYears, feeRate);
+                        Arrays.copyOfRange(full, 0, preRetirementYears), matrix, preRetirementYears, feeRate,
+                        before, after);
                 indexSequence = Arrays.copyOfRange(full, preRetirementYears, preRetirementYears + years);
                 starts[t] = TrialStartBalances.of(model.allAccounts(), accountBalances);
             }
@@ -103,7 +141,8 @@ final class PortfolioPathGenerator {
                 portfolioPaths[t][y + 1] = portfolioPaths[t][y] * (1 + portfolioReal[y]);
             }
         }
-        return new PortfolioReturnPaths(taxable, traditional, roth, portfolioPaths, starts);
+        var tentPaths = sleeveReturns == null ? null : new TentPaths(sleeveReturns, poolsBefore, poolsAfter);
+        return new PortfolioReturnPaths(taxable, traditional, roth, portfolioPaths, starts, tentPaths);
     }
 
     private static double[] openingBalances(List<AccountReturnSource> accounts) {
@@ -143,9 +182,32 @@ final class PortfolioPathGenerator {
         return balances;
     }
 
-    /** Grows every account through the pre-retirement years: contribute, then grow net of fees, floored at 0. */
+    /**
+     * One trial's sleeve returns, {@code [yearFromToday * 4 + maturity]}: the maturity matrix rows picked by the
+     * trial's index sequence, net of the fee.
+     */
+    private static double[] sleeveReturnRow(MaturityReturnMatrix maturities, int[] sequence, double feeRate) {
+        int count = BondMaturity.values().length;
+        double[] row = new double[sequence.length * count];
+        for (int y = 0; y < sequence.length; y++) {
+            double[] source = maturities.realReturns()[sequence[y]];
+            for (int m = 0; m < count; m++) {
+                row[y * count + m] = source[m] - feeRate;
+            }
+        }
+        return row;
+    }
+
+    /**
+     * Grows every account through the pre-retirement years: contribute, then grow net of fees, floored at 0.
+     * When {@code poolBefore}/{@code poolAfter} are non-null, each year's pool totals (after contributions,
+     * before growth, and after growth) are added into {@code [year * 3 + pool]}.
+     */
+    // UseVarargs: the two optional recording arrays are year-by-pool grids, not variable arguments.
+    @SuppressWarnings("PMD.UseVarargs")
     private static double[] accumulate(List<AccountReturnSource> accounts, int[] preSequence,
-                                       RealReturnMatrix matrix, int preYears, double feeRate) {
+                                       RealReturnMatrix matrix, int preYears, double feeRate,
+                                       @Nullable double[] poolBefore, @Nullable double[] poolAfter) {
         double[] balances = new double[accounts.size()];
         for (int i = 0; i < balances.length; i++) {
             var account = accounts.get(i);
@@ -153,8 +215,14 @@ final class PortfolioPathGenerator {
                     ? PortfolioReturnResolver.fixed(preYears, account.overrideReal())
                     : PortfolioReturnResolver.resolveReal(preSequence, account.allocation(), matrix);
             double balance = account.balance();
+            int pool = account.poolType().ordinal();
             for (int y = 0; y < preYears; y++) {
-                balance = Math.max(0, (balance + account.contribution()) * (1 + real[y] - feeRate));
+                double contributed = balance + account.contribution();
+                balance = Math.max(0, contributed * (1 + real[y] - feeRate));
+                if (poolBefore != null) {
+                    poolBefore[y * POOLS + pool] += contributed;
+                    poolAfter[y * POOLS + pool] += balance;
+                }
             }
             balances[i] = balance;
         }
