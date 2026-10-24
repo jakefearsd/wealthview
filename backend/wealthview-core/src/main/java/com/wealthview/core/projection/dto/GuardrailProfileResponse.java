@@ -371,7 +371,9 @@ public record GuardrailProfileResponse(
                 conversionSchedule,
                 new Disclosure(fixedReturnShare, floorReduced, originalFloorSuccessProbability,
                         successProbabilityWithRules,
-                        resolveGatedOn(entity.isGateOnAdaptiveRules(), entity.getMaxAnnualAdjustmentRate()))
+                        resolveGatedOn(entity.isGateOnAdaptiveRules(), entity.getMaxAnnualAdjustmentRate())),
+                null,
+                entity.getBondTentTarget()
         );
     }
 

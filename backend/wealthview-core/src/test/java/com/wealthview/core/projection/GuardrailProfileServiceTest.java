@@ -288,6 +288,162 @@ class GuardrailProfileServiceTest {
         assertThat(hash1).isEqualTo(hash2);
     }
 
+    @Test
+    void computeScenarioHash_noTent_matchesPinnedValue() {
+        // Recorded from the pre-tent code: a scenario without a tent must keep its hash (and so its seed).
+        var fixed = ScenarioMother.guardrailScenario(tenant, "Pinned", "{\"birth_year\":1968}");
+
+        assertThat(GuardrailProfileService.computeScenarioHash(fixed, List.of())).isEqualTo("9eb4af14b10891f85199d423729ba988643ff6704a6c13c92e1e15b2ef7f1912");
+    }
+
+    @Test
+    void computeScenarioHash_tentCoverageChange_changesHash() {
+        var five = tentScenario(tentJson("5", "Balanced", "0.2", "0.8"));
+        var six = tentScenario(tentJson("6", "Balanced", "0.2", "0.8"));
+
+        assertThat(GuardrailProfileService.computeScenarioHash(six, List.of()))
+                .isNotEqualTo(GuardrailProfileService.computeScenarioHash(five, List.of()));
+    }
+
+    @Test
+    void computeScenarioHash_tentVersusNoTent_changesHash() {
+        var none = ScenarioMother.guardrailScenario(tenant, "Plan", "{\"birth_year\":1968}");
+        var tent = tentScenario(tentJson("5", "Balanced", "0.2", "0.8"));
+
+        assertThat(GuardrailProfileService.computeScenarioHash(tent, List.of()))
+                .isNotEqualTo(GuardrailProfileService.computeScenarioHash(none, List.of()));
+    }
+
+    @Test
+    void computeScenarioHash_comparisonMixEdit_keepsHash() {
+        var before = tentScenario(tentJsonWithSecondMix("0.5", "0.5"));
+        var after = tentScenario(tentJsonWithSecondMix("0.1", "0.9"));
+
+        assertThat(GuardrailProfileService.computeScenarioHash(after, List.of()))
+                .isEqualTo(GuardrailProfileService.computeScenarioHash(before, List.of()));
+    }
+
+    @Test
+    void computeScenarioHash_planMixShareChange_changesHash() {
+        var before = tentScenario(tentJson("5", "Balanced", "0.2", "0.8"));
+        var after = tentScenario(tentJson("5", "Balanced", "0.3", "0.7"));
+
+        assertThat(GuardrailProfileService.computeScenarioHash(after, List.of()))
+                .isNotEqualTo(GuardrailProfileService.computeScenarioHash(before, List.of()));
+    }
+
+    @Test
+    void computeScenarioHash_mixRename_keepsHash() {
+        var before = tentScenario(tentJson("5", "Balanced", "0.2", "0.8"));
+        var after = tentScenario(tentJson("5", "Renamed", "0.2", "0.8"));
+
+        assertThat(GuardrailProfileService.computeScenarioHash(after, List.of()))
+                .isEqualTo(GuardrailProfileService.computeScenarioHash(before, List.of()));
+    }
+
+    @Test
+    void computeScenarioHash_trailingZeros_keepHash() {
+        var plain = tentScenario(tentJson("5", "Balanced", "0.2", "0.8"));
+        var padded = tentScenario(tentJson("5.0", "Balanced", "0.20", "0.80"));
+
+        assertThat(GuardrailProfileService.computeScenarioHash(padded, List.of()))
+                .isEqualTo(GuardrailProfileService.computeScenarioHash(plain, List.of()));
+    }
+
+    @Test
+    void optimize_scenarioWithTent_passesTentToTheOptimizer() {
+        scenario = tentScenario(tentJson("5", "Balanced", "0.2", "0.8"));
+        stubOptimizeHappyPath();
+        when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class))).thenReturn(baseOptimizerResponse());
+        when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.optimize(tenantId, scenarioId, buildRequest(req -> req.withName("Plan")));
+
+        var captor = ArgumentCaptor.forClass(GuardrailOptimizationInput.class);
+        verify(spendingOptimizer).optimize(captor.capture());
+        assertThat(captor.getValue().bondTent()).isNotNull();
+        assertThat(captor.getValue().bondTent().coverageYears()).isEqualByComparingTo("5");
+    }
+
+    @Test
+    void optimize_scenarioWithoutTent_passesNoTentToTheOptimizer() {
+        stubOptimizeHappyPath();
+        when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class))).thenReturn(baseOptimizerResponse());
+        when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.optimize(tenantId, scenarioId, buildRequest(req -> req.withName("Plan")));
+
+        var captor = ArgumentCaptor.forClass(GuardrailOptimizationInput.class);
+        verify(spendingOptimizer).optimize(captor.capture());
+        assertThat(captor.getValue().bondTent()).isNull();
+    }
+
+    @Test
+    void optimize_persistsTheCertifiedTentTarget() {
+        scenario = tentScenario(tentJson("5", "Balanced", "0.2", "0.8"));
+        stubOptimizeHappyPath();
+        var certified = baseOptimizerResponse();
+        when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
+                .thenReturn(withTentTarget(certified, new BigDecimal("812345.67")));
+        when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var result = service.optimize(tenantId, scenarioId, buildRequest(req -> req.withName("Plan")));
+
+        var saved = ArgumentCaptor.forClass(GuardrailSpendingProfileEntity.class);
+        verify(guardrailRepository).save(saved.capture());
+        assertThat(saved.getValue().getBondTentTarget()).isEqualByComparingTo("812345.67");
+        assertThat(result.bondTentTarget()).isEqualByComparingTo("812345.67");
+    }
+
+    @Test
+    void getGuardrailProfile_storedTarget_isMappedToTheResponse() {
+        var entity = new GuardrailSpendingProfileEntity(tenant, scenario, "Test Plan", new BigDecimal("30000"));
+        entity.setPhases("[]");
+        entity.setYearlySpending("[]");
+        entity.setScenarioHash("abc123");
+        entity.setBondTentTarget(new BigDecimal("700000.0000"));
+        when(guardrailRepository.findByTenant_IdAndScenario_Id(tenantId, scenarioId))
+                .thenReturn(Optional.of(entity));
+
+        var result = service.getGuardrailProfile(tenantId, scenarioId);
+
+        assertThat(result.bondTentTarget()).isEqualByComparingTo("700000");
+    }
+
+    private ProjectionScenarioEntity tentScenario(String bondTentJson) {
+        return ScenarioMother.guardrailScenario(tenant, "Plan",
+                "{\"birth_year\":1968,\"bond_tent\":" + bondTentJson + "}");
+    }
+
+    private static String tentJson(String coverage, String mixName, String ultrashort, String intermediate) {
+        return "{\"coverage_years\":" + coverage + ",\"build_up_start_years\":3,\"mixes\":[{\"name\":\"" + mixName
+                + "\",\"shares\":{\"ultrashort\":" + ultrashort + ",\"short\":0,\"intermediate\":" + intermediate
+                + ",\"long\":0}}],\"yields\":{\"ultrashort\":0.0394,\"short\":0.0465,"
+                + "\"intermediate\":0.048,\"long\":0.0539}}";
+    }
+
+    private static String tentJsonWithSecondMix(String ultrashort, String intermediate) {
+        return "{\"coverage_years\":5,\"build_up_start_years\":3,\"mixes\":[{\"name\":\"Plan\","
+                + "\"shares\":{\"ultrashort\":0.2,\"short\":0,\"intermediate\":0.8,\"long\":0}},"
+                + "{\"name\":\"Compare\",\"shares\":{\"ultrashort\":" + ultrashort + ",\"short\":0,"
+                + "\"intermediate\":" + intermediate + ",\"long\":0}}],\"yields\":{\"ultrashort\":0.0394,"
+                + "\"short\":0.0465,\"intermediate\":0.048,\"long\":0.0539}}";
+    }
+
+    private static GuardrailProfileResponse withTentTarget(GuardrailProfileResponse base, BigDecimal target) {
+        return new GuardrailProfileResponse(
+                base.id(), base.scenarioId(), base.name(), base.essentialFloor(),
+                base.terminalBalanceTarget(), base.returnMean(), base.trialCount(), base.confidenceLevel(),
+                base.phases(), base.yearlySpending(), base.medianFinalBalance(), base.failureRate(),
+                base.successProbability(), base.percentile10Final(), base.stale(), base.createdAt(),
+                base.updatedAt(), base.portfolioFloor(), base.maxAnnualAdjustmentRate(), base.phaseBlendYears(),
+                base.riskTolerance(), base.conversionSchedule(), base.disclosure(), base.stochasticMortality(),
+                target);
+    }
+
     static Stream<Arguments> monteCarloAffectingParams() {
         return Stream.of(
                 Arguments.of("filing_status", "{\"birth_year\":1968,\"filing_status\":\"single\"}",

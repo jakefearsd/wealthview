@@ -1728,6 +1728,26 @@ class ScenarioCrudServiceTest {
     }
 
     @Test
+    void updateScenario_tentChanged_marksProfileStale() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90, new BigDecimal("0.03"), "{\"birth_year\":1990}");
+        var guardrailProfile = new GuardrailSpendingProfileEntity(
+                tenant, scenario, "Guardrail", new BigDecimal("30000"));
+        guardrailProfile.setScenarioHash(GuardrailProfileService.computeScenarioHash(scenario, List.of()));
+        guardrailProfile.setStale(false);
+        scenario.setGuardrailProfile(guardrailProfile);
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)).thenReturn(Optional.of(scenario));
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(guardrailProfileRepository.findByScenario_Id(scenarioId)).thenReturn(Optional.of(guardrailProfile));
+        var request = ScenarioRequestBuilder.builder()
+                .withName("Plan").withEndAge(90).withBirthYear(1990).withBondTent(sampleTent()).build();
+
+        service.updateScenario(tenantId, scenarioId, request);
+
+        assertThat(guardrailProfile.isStale()).isTrue();
+    }
+
+    @Test
     void updateScenario_withGuardrailProfile_irrelevantParamsDoNotTriggerStaleness() {
         var scenario = ScenarioMother.scenarioWithParams(tenant, "{\"birth_year\":1990}");
         var guardrailProfile = new GuardrailSpendingProfileEntity(

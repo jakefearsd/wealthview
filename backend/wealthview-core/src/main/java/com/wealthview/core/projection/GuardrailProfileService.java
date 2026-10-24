@@ -9,6 +9,7 @@ import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.StringJoiner;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -20,6 +21,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.wealthview.core.common.Entities;
+import com.wealthview.core.projection.dto.BondMaturity;
+import com.wealthview.core.projection.dto.BondMaturityValues;
+import com.wealthview.core.projection.dto.BondTentConfig;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.GuardrailOptimizationRequest;
 import com.wealthview.core.projection.dto.GuardrailPhaseInput;
@@ -198,6 +202,7 @@ public class GuardrailProfileService {
         entity.setPhaseBlendYears(optimizationInput.phaseBlendYears());
         entity.setRiskTolerance(request.riskTolerance());
         entity.setGateOnAdaptiveRules(optimizationInput.gateOnAdaptiveRules());
+        entity.setBondTentTarget(optimizerResult.bondTentTarget());
         // D13: persisted so reoptimize echoes the user's actual choice instead of inferring it.
         entity.setOptimizeConversions(optimizationInput.optimizeConversions());
         entity.setDynamicSequencingBracketRate(optimizationInput.dynamicSequencingBracketRate());
@@ -440,6 +445,7 @@ public class GuardrailProfileService {
                         .append(':').append(src.owner())
                         .append(':').append(src.survivorPercent()));
 
+        appendTentSignature(sb, hashParams.bondTent());
         return sb.toString();
     }
 
@@ -467,6 +473,33 @@ public class GuardrailProfileService {
                 .sorted(Map.Entry.comparingByKey())
                 .map(e -> e.getKey() + "=" + e.getValue())
                 .collect(Collectors.joining(","));
+    }
+
+    /**
+     * Appends only the tent fields that change optimizer results (coverage, build-up start, the plan mix's
+     * shares and the yields), and only when a tent exists, so a scenario without one keeps its hash and seed.
+     * Mix names and comparison mixes are excluded.
+     */
+    private static void appendTentSignature(StringBuilder sb, @Nullable BondTentConfig tent) {
+        if (tent == null) {
+            return;
+        }
+        sb.append("|tent:").append(tentNumber(tent.coverageYears()))
+                .append(':').append(tent.buildUpStartYears() != null ? tent.buildUpStartYears() : 0)
+                .append(':').append(tentMaturities(tent.planMix().shares()))
+                .append(':').append(tentMaturities(tent.yields()));
+    }
+
+    private static String tentMaturities(@Nullable BondMaturityValues values) {
+        var joiner = new StringJoiner(",");
+        for (var maturity : BondMaturity.values()) {
+            joiner.add(tentNumber(values != null ? values.get(maturity) : null));
+        }
+        return joiner.toString();
+    }
+
+    private static String tentNumber(@Nullable BigDecimal value) {
+        return value == null ? "0" : value.stripTrailingZeros().toPlainString();
     }
 
     /**
@@ -528,6 +561,7 @@ public class GuardrailProfileService {
                 .confidenceLevel(resolved.confidence())
                 .phases(request.phases() != null ? request.phases() : List.of())
                 .seed(deriveSeed(scenarioSignature(scenario, incomeSourceSignatures)))
+                .bondTent(params.bondTent())
                 .portfolioFloor(request.portfolioFloor() != null ? request.portfolioFloor() : BigDecimal.ZERO)
                 .maxAnnualAdjustmentRate(request.maxAnnualAdjustmentRate() != null
                         ? request.maxAnnualAdjustmentRate() : DEFAULT_MAX_ADJUSTMENT_RATE)
