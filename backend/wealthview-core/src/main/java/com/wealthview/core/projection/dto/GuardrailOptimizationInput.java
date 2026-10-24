@@ -165,7 +165,6 @@ public record GuardrailOptimizationInput(
                 longevityConditionalAge, mortalityTable, birthMonth, null);
     }
 
-
     /**
      * Back-compat convenience for callers that predate {@link #baseYear} (audit C7 / T7-M3) AND
      * {@link #includeDepressionYears} (audit C10). Defaults {@code baseYear} to
