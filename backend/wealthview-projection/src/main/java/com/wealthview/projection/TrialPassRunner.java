@@ -31,7 +31,16 @@ final class TrialPassRunner {
      * layout) and {@code null} unless {@code trackYearBalances} was requested.
      */
     record PassResult(double[] finalBalances, double[] minBalances, boolean[] successFlags,
-                       boolean[] traditionalExhaustedFlags, double[][] yearBalances) {
+                       boolean[] traditionalExhaustedFlags, double[][] yearBalances,
+                       double[] tentYearsCovered) {
+
+        // UseVarargs: yearBalances is a year-major grid, not a variable-length argument list.
+        @SuppressWarnings("PMD.UseVarargs")
+        PassResult(double[] finalBalances, double[] minBalances, boolean[] successFlags,
+                   boolean[] traditionalExhaustedFlags, double[][] yearBalances) {
+            this(finalBalances, minBalances, successFlags, traditionalExhaustedFlags, yearBalances,
+                    new double[0]);
+        }
 
         int successCount() {
             int count = 0;
@@ -71,23 +80,26 @@ final class TrialPassRunner {
         boolean[] traditionalExhaustedFlags = new boolean[trialCount];
         double[][] yearBalances = trackYearBalances ? new double[years][trialCount] : null;
 
-        double tentTarget = configFactory.tentTargetFor(floors, discretionary, income, surplusTax);
+        double[] tentYearsCovered = new double[trialCount];
+        var tentSizing = configFactory.tentSizingFor(floors, discretionary, income, surplusTax);
 
         for (int t = 0; t < trialCount; t++) {
             TrialSimulator.HouseholdSim override = householdOverrideFn != null
                     ? householdOverrideFn.apply(t) : null;
-            var config = configFactory.configFor(t, adaptation, trackYearBalances, override, tentTarget);
+            var config = configFactory.configFor(t, adaptation, trackYearBalances, override, tentSizing);
             var result = trialSimulator.simulateTrial(income, surplusTax, floors, discretionary, years, config);
             finalBalances[t] = result.finalBalance();
             minBalances[t] = result.minBalance();
             successFlags[t] = result.success();
             traditionalExhaustedFlags[t] = result.traditionalExhausted();
+            tentYearsCovered[t] = result.tentYearsCovered();
             if (trackYearBalances) {
                 for (int y = 0; y < years; y++) {
                     yearBalances[y][t] = result.yearBalances()[y];
                 }
             }
         }
-        return new PassResult(finalBalances, minBalances, successFlags, traditionalExhaustedFlags, yearBalances);
+        return new PassResult(finalBalances, minBalances, successFlags, traditionalExhaustedFlags, yearBalances,
+                tentYearsCovered);
     }
 }

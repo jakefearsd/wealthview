@@ -229,4 +229,25 @@ class TrialTentTest {
 
         assertThat(new TrialTent(plan, new double[4]).yearsBeforeRetirement()).isEqualTo(7);
     }
+
+    @Test
+    void yearsCovered_partialDrawThenWindowEnds() {
+        var tent = tent();
+        tent.topUp(50_000, 300_000, 0, 0, 1e12);
+        tent.trackCoverage(new double[] {40_000, 40_000});
+        double before = tent.total();
+        tent.spend(20_000);
+        tent.recordCoverageYear(0, before);
+        before = tent.total();
+        tent.spend(0);
+        tent.recordCoverageYear(1, before);
+        tent.spend(0);
+
+        assertThat(tent.yearsCovered()).isCloseTo(0.5 + 30_000.0 / 40_000.0, EPS);
+    }
+
+    @Test
+    void yearsCovered_notTracked_isNaN() {
+        assertThat(reserved100kInTaxable().yearsCovered()).isNaN();
+    }
 }

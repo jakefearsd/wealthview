@@ -68,8 +68,14 @@ final class TrialSimulator {
             double minBalance,
             double[] yearBalances,       // null when trackYearBalances is false
             boolean traditionalExhausted,
-            boolean success
-    ) {}
+            boolean success,
+            double tentYearsCovered      // NaN without a tent
+    ) {
+        TrialResult(double finalBalance, double minBalance, double[] yearBalances, boolean traditionalExhausted,
+                    boolean success) {
+            this(finalBalance, minBalance, yearBalances, traditionalExhausted, success, Double.NaN);
+        }
+    }
 
     /**
      * Simulated guardrail-adaptation rule inputs (audit C9). When a
@@ -640,7 +646,7 @@ final class TrialSimulator {
                     aux.rentalIncome());
 
             tp.clampNonNegative();
-            settleTent(tent, tp, expectedAfterGrowth);
+            settleTent(tent, tp, expectedAfterGrowth, y);
 
             double totalBalance = tp.poolTotal();
             minBalance = Math.min(minBalance, totalBalance);
@@ -661,7 +667,9 @@ final class TrialSimulator {
         boolean traditionalExhausted = config.conversionByYear() != null
                 && tp.traditionalTotal() <= 0;
 
-        return new TrialResult(finalBalance, minBalance, yearBalances, traditionalExhausted, essentialFloorMet);
+        double tentYearsCovered = yearsCovered(config.tent());
+        return new TrialResult(finalBalance, minBalance, yearBalances, traditionalExhausted, essentialFloorMet,
+                tentYearsCovered);
     }
 
     /** Household task 6: a truncated household trial (loopYears &lt; years) carries its final bequest
@@ -886,6 +894,11 @@ final class TrialSimulator {
         return tent == null || tent.isEmpty() ? null : tent;
     }
 
+    /** The tent's coverage count, or {@code NaN} without a tent. */
+    private static double yearsCovered(@Nullable TrialTent tent) {
+        return tent == null ? Double.NaN : tent.yearsCovered();
+    }
+
     /** A pool's return once its tent sleeves earn their own: {@code grown / balance - 1}, or the raw
      * {@code poolReturn} when the pool is empty. */
     private static double effectiveReturn(TrialTent tent, PoolType pool, double balance, double poolReturn) {
@@ -919,17 +932,19 @@ final class TrialSimulator {
     /**
      * Year-end tent settlement, after the pools are floored at zero. Below the growth index's previous high
      * the tent pays the year's net outflow (what the pools would hold after growth, less what they hold now)
-     * shortest maturity first; then every pool's reservation is clamped to its balance. A no-op without a
-     * tent.
+     * shortest maturity first; then every pool's reservation is clamped to its balance, and the year's draw is
+     * recorded for the coverage count of retired year {@code y}. A no-op without a tent.
      */
-    private static void settleTent(@Nullable TrialTent tent, TrialPools tp, double expectedAfterGrowth) {
+    private static void settleTent(@Nullable TrialTent tent, TrialPools tp, double expectedAfterGrowth, int y) {
         if (tent == null) {
             return;
         }
+        double before = tent.total();
         if (tent.isBelowPeak()) {
             tent.spend(Math.max(0, expectedAfterGrowth - tp.poolTotal()));
         }
         tent.clampAll(tp.taxable(), tp.traditionalTotal(), tp.rothTotal());
+        tent.recordCoverageYear(y, before);
     }
 
     /**

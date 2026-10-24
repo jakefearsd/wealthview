@@ -102,7 +102,7 @@ class TrialSimulatorTentTest {
         var withEmpty = run(base(1_000_000, returns, emptyTent).trackYearBalances(true).build(), 40_000, 3);
         var noTent = run(base(1_000_000, returns, null).trackYearBalances(true).build(), 40_000, 3);
 
-        assertThat(withEmpty).usingRecursiveComparison().isEqualTo(noTent);
+        assertThat(withEmpty).usingRecursiveComparison().ignoringFields("tentYearsCovered").isEqualTo(noTent);
     }
 
     @Test
@@ -117,5 +117,34 @@ class TrialSimulatorTentTest {
         double expected = (669_000 * 1.1 - 40_000) * 1.1 - 40_000;
         assertThat(tent.total()).isZero();
         assertThat(result.finalBalance()).isCloseTo(expected, within(EPS));
+    }
+
+    private static TrialTent trackedTent() {
+        var tent = tent(80_000, 1_000_000, 0, 5);
+        tent.trackCoverage(new double[] {40_000, 40_000});
+        return tent;
+    }
+
+    @Test
+    void simulateTrial_crashInFirstYear_tentCoversTwoYears() {
+        double[] returns = {-0.30, 0.10, 0.10, 0.10, 0.10};
+
+        var result = run(base(1_000_000, returns, trackedTent()).build(), 40_000, 5);
+
+        assertThat(result.tentYearsCovered()).isCloseTo(2.0, within(1e-9));
+    }
+
+    @Test
+    void simulateTrial_risingMarket_unusedTentCountsAsCoverage() {
+        var result = run(base(1_000_000, filled(5, 0.05), trackedTent()).build(), 40_000, 5);
+
+        assertThat(result.tentYearsCovered()).isCloseTo(2.0, within(1e-9));
+    }
+
+    @Test
+    void simulateTrial_noTent_tentYearsCoveredIsNaN() {
+        var result = run(base(1_000_000, filled(5, 0.05), null).build(), 40_000, 5);
+
+        assertThat(result.tentYearsCovered()).isNaN();
     }
 }

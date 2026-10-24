@@ -168,6 +168,20 @@ class TrialConfigFactoryTest {
     }
 
     @Test
+    void tentSizingFor_matchesTentTargetFor() {
+        var paths = new TentPaths(new double[][] {new double[4 * 4]}, null, null);
+        var factory = minimal(new PoolSimSetup(50_000, 500_000, 0, "taxable_first", true))
+                .tent(tentPlan(0, 0, 5.0), paths).build();
+        double[] floors = {40_000, 40_000, 40_000, 40_000, 40_000, 40_000};
+        double[] zero = new double[6];
+
+        var sizing = factory.tentSizingFor(floors, zero, zero, zero);
+
+        assertThat(sizing.target()).isEqualTo(factory.tentTargetFor(floors, zero, zero, zero));
+        assertThat(sizing.withdrawals()).hasSize(5);
+    }
+
+    @Test
     void configFor_noPlan_hasNoTent() {
         var factory = minimal(new PoolSimSetup(50_000, 500_000, 0, "taxable_first", true)).build();
 

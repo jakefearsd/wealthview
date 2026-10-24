@@ -23,6 +23,10 @@ final class TrialTentSizer {
                   WithdrawalOrder order, int retirementAge, int earlyAccessAge) {
     }
 
+    /** The tent target and the covered years' gross withdrawals it was sized from. */
+    record Sizing(double target, double[] withdrawals) {
+    }
+
     private TrialTentSizer() {
     }
 
@@ -31,8 +35,17 @@ final class TrialTentSizer {
     @SuppressWarnings("PMD.UseVarargs")
     static double target(TrialTentPlan plan, Inputs in, double[] floors, double[] discretionary, double[] income,
                          double[] surplusTax) {
-        return BondTentSizer.target(withdrawals(plan, in, floors, discretionary, income, surplusTax),
-                plan.coverageYears(), plan.sizingRealYield());
+        return sizing(plan, in, floors, discretionary, income, surplusTax).target();
+    }
+
+    /** The target together with the withdrawals behind it. */
+    // UseVarargs: the schedules are per-year arrays, not variable arguments.
+    @SuppressWarnings("PMD.UseVarargs")
+    static Sizing sizing(TrialTentPlan plan, Inputs in, double[] floors, double[] discretionary, double[] income,
+                         double[] surplusTax) {
+        double[] withdrawals = withdrawals(plan, in, floors, discretionary, income, surplusTax);
+        return new Sizing(BondTentSizer.target(withdrawals, plan.coverageYears(), plan.sizingRealYield()),
+                withdrawals);
     }
 
     /** The gross withdrawal for each covered year, from the expected-path walk. */

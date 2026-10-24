@@ -119,6 +119,20 @@ final class TrialConfigFactory {
                                               boolean trackYearBalances,
                                               @Nullable TrialSimulator.HouseholdSim householdOverride,
                                               double tentTarget) {
+        return configFor(t, adaptation, trackYearBalances, householdOverride,
+                new TrialTentSizer.Sizing(tentTarget, new double[0]));
+    }
+
+    /**
+     * {@link #configFor(int, TrialSimulator.GuardrailAdaptation, boolean, TrialSimulator.HouseholdSim, double)}
+     * from the pass's whole {@link #tentSizingFor} result: the tent is built from its target, and its coverage
+     * is counted against the sizing's withdrawals (shared across trials, not copied).
+     */
+    TrialSimulator.SimulationConfig configFor(int t, @Nullable TrialSimulator.GuardrailAdaptation adaptation,
+                                              boolean trackYearBalances,
+                                              @Nullable TrialSimulator.HouseholdSim householdOverride,
+                                              TrialTentSizer.Sizing tentSizing) {
+        double tentTarget = tentSizing.target();
         double initTaxable = poolSetup.simPools() || initialPortfolioPaths == null
                 ? poolSetup.initTaxable() : initialPortfolioPaths[t][0];
         double initTraditional = poolSetup.initTraditional();
@@ -174,8 +188,19 @@ final class TrialConfigFactory {
                 .taxableEquityShare(taxableEquityShare)
                 .household(trialHousehold)
                 .survivorRegimes(survivorRegimes, survivorFactor)
-                .tent(tent)
+                .tent(trackingCoverage(tent, tentSizing.withdrawals()))
                 .build();
+    }
+
+    /** {@code tent} counting its coverage against {@code planned}; {@code null} stays {@code null}. */
+    // UseVarargs: the schedule is a per-year array, not variable arguments.
+    @SuppressWarnings("PMD.UseVarargs")
+    @Nullable
+    private static TrialTent trackingCoverage(@Nullable TrialTent tent, double[] planned) {
+        if (tent != null) {
+            tent.trackCoverage(planned);
+        }
+        return tent;
     }
 
     /**
@@ -185,14 +210,22 @@ final class TrialConfigFactory {
     // UseVarargs: the schedules are per-year arrays, not variable arguments.
     @SuppressWarnings("PMD.UseVarargs")
     double tentTargetFor(double[] floors, double[] discretionary, double[] income, double[] surplusTax) {
+        return tentSizingFor(floors, discretionary, income, surplusTax).target();
+    }
+
+    /** {@link #tentTargetFor} together with the withdrawals it covers; a zero target and none without a plan. */
+    // UseVarargs: the schedules are per-year arrays, not variable arguments.
+    @SuppressWarnings("PMD.UseVarargs")
+    TrialTentSizer.Sizing tentSizingFor(double[] floors, double[] discretionary, double[] income,
+                                        double[] surplusTax) {
         if (tentPlan == null) {
-            return 0;
+            return new TrialTentSizer.Sizing(0, new double[0]);
         }
         var inputs = new TrialTentSizer.Inputs(ordinaryTaxTableByYear, ordinaryBaseIncomeByYear, conversionByYear,
                 conversionTaxByYear, dsBracketCeilingByYear, poolSetup.initTaxable(), poolSetup.initTraditional(),
                 poolSetup.initRoth(), WithdrawalOrder.fromString(poolSetup.order()), retirementAge,
                 earlyAccessAge);
-        return TrialTentSizer.target(tentPlan, inputs, floors, discretionary, income, surplusTax);
+        return TrialTentSizer.sizing(tentPlan, inputs, floors, discretionary, income, surplusTax);
     }
 
     /**

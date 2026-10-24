@@ -34,6 +34,9 @@ final class TrialTent {
     private final double[] grown = new double[POOLS];
     private double index = 1.0;
     private double peak = 1.0;
+    private double[] planned;
+    private double drawnSum;
+    private double left;
 
     // ArrayIsStoredDirectly: sleeveReturns is the trial's own read-only return grid, handed off for this
     // trial's exclusive use (see TrialPools' constructor for the same contract). UseVarargs: it is a grid,
@@ -42,6 +45,33 @@ final class TrialTent {
     TrialTent(TrialTentPlan plan, double[] sleeveReturns) {
         this.plan = plan;
         this.sleeveReturns = sleeveReturns;
+    }
+
+    /**
+     * Starts counting how many years of planned withdrawals the tent covers. The array is the pass's shared,
+     * read-only sizing schedule and is held, not copied.
+     */
+    // ArrayIsStoredDirectly: shared read-only schedule, one per pass; copying it per trial would allocate.
+    // UseVarargs: it is a per-year schedule, not a variable argument list.
+    @SuppressWarnings({"PMD.ArrayIsStoredDirectly", "PMD.UseVarargs"})
+    void trackCoverage(double[] plannedWithdrawals) {
+        this.planned = plannedWithdrawals;
+        this.left = total();
+    }
+
+    /** Records retired year {@code retiredYear}'s tent draw: {@code totalBefore} less what the tent holds now. */
+    void recordCoverageYear(int retiredYear, double totalBefore) {
+        if (planned == null || retiredYear >= planned.length) {
+            return;
+        }
+        double after = total();
+        drawnSum += TentCoverage.drawnShare(totalBefore - after, planned[retiredYear]);
+        left = after;
+    }
+
+    /** Years of planned withdrawals the tent covered, or {@code NaN} when coverage is not tracked. */
+    double yearsCovered() {
+        return planned == null ? Double.NaN : drawnSum + TentCoverage.unusedYears(left, planned);
     }
 
     int yearsBeforeRetirement() {
