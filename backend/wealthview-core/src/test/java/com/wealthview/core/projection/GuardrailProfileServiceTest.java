@@ -293,7 +293,8 @@ class GuardrailProfileServiceTest {
         // Recorded from the pre-tent code: a scenario without a tent must keep its hash (and so its seed).
         var fixed = ScenarioMother.guardrailScenario(tenant, "Pinned", "{\"birth_year\":1968}");
 
-        assertThat(GuardrailProfileService.computeScenarioHash(fixed, List.of())).isEqualTo("9eb4af14b10891f85199d423729ba988643ff6704a6c13c92e1e15b2ef7f1912");
+        assertThat(GuardrailProfileService.computeScenarioHash(fixed, List.of()))
+                .isEqualTo("9eb4af14b10891f85199d423729ba988643ff6704a6c13c92e1e15b2ef7f1912");
     }
 
     @Test
