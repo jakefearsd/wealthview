@@ -88,19 +88,7 @@ public class GuardrailProfileService {
             var projectionInput = projectionInputBuilder.build(scenario, tenantId);
 
             var params = ScenarioParams.parseOrEmpty(MAPPER, scenario.getParamsJson());
-            int birthYear = params.birthYear() != null
-                    ? params.birthYear() : java.time.LocalDate.now().getYear() - 35;
-            String withdrawalOrder = params.withdrawalOrder() != null
-                    ? params.withdrawalOrder() : "taxable_first";
-            // Audit C7 / T7-M3: same default the deterministic engine applies
-            // (DeterministicProjectionEngine.resolveProjectionParams) when the scenario has no
-            // explicit reference year, so both engines anchor their calendar-year deflation clocks
-            // identically.
-            int baseYear = projectionInput.referenceYear() != null
-                    ? projectionInput.referenceYear() : java.time.LocalDate.now().getYear();
-
-            var resolved = new ResolvedDefaults(
-                    birthYear, baseYear, resolveConfidence(request), withdrawalOrder);
+            var resolved = resolveDefaults(params, projectionInput, request);
 
             var optimizationInput = buildOptimizationInput(
                     scenario, projectionInput, request, params, resolved);
@@ -134,6 +122,33 @@ public class GuardrailProfileService {
             MDC.remove("operation");
             MDC.remove("scenarioId");
         }
+    }
+
+    /**
+     * The optimizer input for evaluating the scenario's current plan: exactly what {@link #optimize} builds for an
+     * empty request, so an evaluation shares the optimizer's seed, accounts, tent and defaults. Persists nothing.
+     */
+    public GuardrailOptimizationInput evaluationInput(ProjectionScenarioEntity scenario,
+                                                      ProjectionInput projectionInput) {
+        var params = ScenarioParams.parseOrEmpty(MAPPER, scenario.getParamsJson());
+        var request = GuardrailOptimizationRequest.builder().build();
+        return buildOptimizationInput(scenario, projectionInput, request, params,
+                resolveDefaults(params, projectionInput, request));
+    }
+
+    private ResolvedDefaults resolveDefaults(ScenarioParams params, ProjectionInput projectionInput,
+                                             GuardrailOptimizationRequest request) {
+        int birthYear = params.birthYear() != null
+                ? params.birthYear() : java.time.LocalDate.now().getYear() - 35;
+        String withdrawalOrder = params.withdrawalOrder() != null
+                ? params.withdrawalOrder() : "taxable_first";
+        // Audit C7 / T7-M3: same default the deterministic engine applies
+        // (DeterministicProjectionEngine.resolveProjectionParams) when the scenario has no
+        // explicit reference year, so both engines anchor their calendar-year deflation clocks
+        // identically.
+        int baseYear = projectionInput.referenceYear() != null
+                ? projectionInput.referenceYear() : java.time.LocalDate.now().getYear();
+        return new ResolvedDefaults(birthYear, baseYear, resolveConfidence(request), withdrawalOrder);
     }
 
     private void validateConversionRequest(GuardrailOptimizationRequest request) {

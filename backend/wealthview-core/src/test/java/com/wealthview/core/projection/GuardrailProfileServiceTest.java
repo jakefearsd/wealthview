@@ -392,6 +392,22 @@ class GuardrailProfileServiceTest {
     }
 
     @Test
+    void evaluationInput_matchesWhatOptimizeBuildsForAnEmptyRequest() {
+        scenario = tentScenario(tentJson("5", "Balanced", "0.2", "0.8"));
+        var optimized = captureOptimizationInput(GuardrailOptimizationRequest.builder().build(), scenario);
+
+        var evaluation = service.evaluationInput(scenario, simpleProjectionInput());
+
+        assertThat(evaluation.seed()).isEqualTo(optimized.seed());
+        assertThat(evaluation.accounts()).isEqualTo(optimized.accounts());
+        assertThat(evaluation.bondTent()).isEqualTo(optimized.bondTent());
+        assertThat(evaluation.trialCount()).isEqualTo(5000);
+        assertThat(evaluation.baseYear()).isEqualTo(optimized.baseYear());
+        assertThat(evaluation.birthYear()).isEqualTo(optimized.birthYear());
+        assertThat(evaluation.confidenceLevel()).isEqualByComparingTo(optimized.confidenceLevel());
+    }
+
+    @Test
     void optimize_persistsTheCertifiedTentTarget() {
         scenario = tentScenario(tentJson("5", "Balanced", "0.2", "0.8"));
         stubOptimizeHappyPath();

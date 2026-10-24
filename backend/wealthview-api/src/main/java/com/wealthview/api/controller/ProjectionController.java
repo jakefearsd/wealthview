@@ -16,13 +16,17 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.wealthview.api.dto.ProjectionRunResponse;
 import com.wealthview.api.security.TenantUserPrincipal;
+import com.wealthview.core.projection.BondTentAnalysisService;
 import com.wealthview.core.projection.ProjectionService;
 import com.wealthview.core.projection.ScenarioCrudService;
 import com.wealthview.core.projection.dto.BondTentConfig;
+import com.wealthview.core.projection.dto.BondTentReplay;
+import com.wealthview.core.projection.dto.BondTentSimulation;
 import com.wealthview.core.projection.dto.BondTentSizing;
 import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.CompareResponse;
@@ -37,11 +41,14 @@ public class ProjectionController {
 
     private final ScenarioCrudService scenarioCrudService;
     private final ProjectionService projectionService;
+    private final BondTentAnalysisService bondTentAnalysisService;
 
     public ProjectionController(ScenarioCrudService scenarioCrudService,
-                                ProjectionService projectionService) {
+                                ProjectionService projectionService,
+                                BondTentAnalysisService bondTentAnalysisService) {
         this.scenarioCrudService = scenarioCrudService;
         this.projectionService = projectionService;
+        this.bondTentAnalysisService = bondTentAnalysisService;
     }
 
     @PostMapping
@@ -104,5 +111,22 @@ public class ProjectionController {
             @PathVariable UUID id,
             @Valid @RequestBody BondTentConfig config) {
         return ResponseEntity.ok(projectionService.sizeBondTent(principal.tenantId(), id, config));
+    }
+
+    @GetMapping("/{id}/bond-tent/simulation")
+    public ResponseEntity<BondTentSimulation> simulateBondTent(
+            @AuthenticationPrincipal TenantUserPrincipal principal,
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(bondTentAnalysisService.simulate(principal.tenantId(), id));
+    }
+
+    @GetMapping("/{id}/bond-tent/replay")
+    public ResponseEntity<BondTentReplay> replayBondTent(
+            @AuthenticationPrincipal TenantUserPrincipal principal,
+            @PathVariable UUID id,
+            @RequestParam(required = false) String crash,
+            @RequestParam(name = "start_year", required = false) Integer startYear,
+            @RequestParam(defaultValue = "0") int offset) {
+        return ResponseEntity.ok(bondTentAnalysisService.replay(principal.tenantId(), id, crash, startYear, offset));
     }
 }

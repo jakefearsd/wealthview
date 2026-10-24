@@ -15,14 +15,20 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.wealthview.api.testutil.WealthViewControllerTest;
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.projection.BondTentAnalysisService;
 import com.wealthview.core.projection.ProjectionService;
 import com.wealthview.core.projection.ScenarioCrudService;
 import com.wealthview.core.projection.dto.BondMaturityValues;
 import com.wealthview.core.projection.dto.BondTentConfig;
 import com.wealthview.core.projection.dto.BondTentCoveredYear;
 import com.wealthview.core.projection.dto.BondTentMixSizing;
+import com.wealthview.core.projection.dto.BondTentReplay;
+import com.wealthview.core.projection.dto.BondTentReplayOutcome;
+import com.wealthview.core.projection.dto.BondTentReplayYear;
 import com.wealthview.core.projection.dto.BondTentResult;
 import com.wealthview.core.projection.dto.BondTentSizing;
+import com.wealthview.core.projection.dto.BondTentSimulation;
+import com.wealthview.core.projection.dto.BondTentSimulationColumn;
 import com.wealthview.core.projection.dto.BondTentSizingReason;
 import com.wealthview.core.projection.dto.BondTentYear;
 import com.wealthview.core.projection.dto.CompareRequest;
@@ -66,6 +72,9 @@ class ProjectionControllerTest {
 
     @MockitoBean
     private ProjectionService projectionService;
+
+    @MockitoBean
+    private BondTentAnalysisService bondTentAnalysisService;
 
     private static final UUID SCENARIO_ID = UUID.randomUUID();
 
@@ -515,6 +524,74 @@ class ProjectionControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(TENT_BODY))
                 .andExpect(status().isNotFound());
+    }
+
+    private static BondTentReplay sampleReplay() {
+        var year = new BondTentReplayYear(2030, 62, new BigDecimal("900000.00"), new BigDecimal("200000.00"),
+                BigDecimal.ZERO, new BigDecimal("12000.00"), true, 2008);
+        var outcome = new BondTentReplayOutcome("No tent", null, new BigDecimal("500000.00"),
+                new BigDecimal("12000.00"), null, null, null, List.of(year));
+        return new BondTentReplay("2007–09", 2008, 2009, 2030, 0, 2030, new BigDecimal("5"), 70,
+                List.of(0, 1, 2, 3), 1954, 2025, List.of(outcome));
+    }
+
+    @Test
+    void bondTentSimulation_returns200WithSnakeCaseColumns() throws Exception {
+        var column = new BondTentSimulationColumn("No tent", null, new BigDecimal("0.8700"), null, null,
+                new BigDecimal("1000000.00"));
+        when(bondTentAnalysisService.simulate(TENANT_ID, SCENARIO_ID))
+                .thenReturn(new BondTentSimulation(5000, new BigDecimal("5"), List.of(column)));
+
+        mockMvc.perform(get("/api/v1/projections/{id}/bond-tent/simulation", SCENARIO_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.planned_years").value(5))
+                .andExpect(jsonPath("$.columns[0].success_rate").value(0.87));
+    }
+
+    @Test
+    void bondTentSimulation_unknownScenario_returns404() throws Exception {
+        when(bondTentAnalysisService.simulate(TENANT_ID, SCENARIO_ID))
+                .thenThrow(new EntityNotFoundException("Scenario not found"));
+
+        mockMvc.perform(get("/api/v1/projections/{id}/bond-tent/simulation", SCENARIO_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void bondTentReplay_crash_returns200() throws Exception {
+        when(bondTentAnalysisService.replay(TENANT_ID, SCENARIO_ID, "financial_crisis_2008", null, 0))
+                .thenReturn(sampleReplay());
+
+        mockMvc.perform(get("/api/v1/projections/{id}/bond-tent/replay", SCENARIO_ID)
+                        .param("crash", "financial_crisis_2008")
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.outcomes[0].years[0].stocks_sold_while_down").value(12000.0))
+                .andExpect(jsonPath("$.available_offsets[1]").value(1))
+                .andExpect(jsonPath("$.crash_label").value("2007–09"));
+    }
+
+    @Test
+    void bondTentReplay_startYearParam_isPassedThrough() throws Exception {
+        when(bondTentAnalysisService.replay(TENANT_ID, SCENARIO_ID, null, 1990, 1)).thenReturn(sampleReplay());
+
+        mockMvc.perform(get("/api/v1/projections/{id}/bond-tent/replay", SCENARIO_ID)
+                        .param("start_year", "1990")
+                        .param("offset", "1")
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void bondTentReplay_invalid_returns400() throws Exception {
+        when(bondTentAnalysisService.replay(TENANT_ID, SCENARIO_ID, null, null, 0))
+                .thenThrow(new IllegalArgumentException("Choose a crash or a start year"));
+
+        mockMvc.perform(get("/api/v1/projections/{id}/bond-tent/replay", SCENARIO_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isBadRequest());
     }
 
     private void assertScenarioRejected(String extraFields) throws Exception {
