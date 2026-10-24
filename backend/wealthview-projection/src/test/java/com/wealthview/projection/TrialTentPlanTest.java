@@ -70,4 +70,19 @@ class TrialTentPlanTest {
         assertThat(plan.lineLevel(2, 90_000)).isZero();
         assertThat(plan.lineLevel(3, 90_000)).isEqualTo(90_000);
     }
+
+    @Test
+    void withMix_usesThatMixsSharesAndRealYield() {
+        var plan = plan(3, 3);
+        var yields = config(3).yields();
+        var cash = new BondTentMix("Cash", new BondMaturityValues(bd("1"), bd("0"), bd("0"), bd("0")));
+
+        var swapped = plan.withMix(cash, yields, 0.025);
+
+        assertThat(swapped.mixShares()).containsExactly(1.0, 0.0, 0.0, 0.0);
+        assertThat(swapped.sizingRealYield()).isEqualTo((1.0394 / 1.025) - 1.0, within(1e-12));
+        assertThat(swapped.coverageYears()).isEqualTo(plan.coverageYears());
+        assertThat(swapped.buildUpStartIndex()).isEqualTo(plan.buildUpStartIndex());
+        assertThat(swapped.nominalYields()).containsExactly(plan.nominalYields());
+    }
 }

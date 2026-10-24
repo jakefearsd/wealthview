@@ -231,6 +231,18 @@ final class GuardrailResponseBuilder {
     @SuppressWarnings("PMD.UseVarargs")
     private static TrialConfigFactory buildConfigFactory(OptimizationSetup ctx, PoolSimSetup poolSetup,
                                                           double[] conversionByYear, double[] conversionTaxByYear) {
+        return configFactoryBuilder(ctx, poolSetup, conversionByYear, conversionTaxByYear).build();
+    }
+
+    /**
+     * The factory builder {@link #buildConfigFactory} finishes: everything the context fixes, with the pass's own
+     * tent already set. Left open so a caller running the same paths with a different tent can replace it.
+     */
+    // UseVarargs: conversionByYear is a per-year indexed array, not a variable argument list --
+    // varargs would change the call contract and invite accidental misuse.
+    @SuppressWarnings("PMD.UseVarargs")
+    static TrialConfigFactory.Builder configFactoryBuilder(OptimizationSetup ctx, PoolSimSetup poolSetup,
+                                                           double[] conversionByYear, double[] conversionTaxByYear) {
         return TrialConfigFactory.builder(poolSetup)
                 .taxTables(poolSetup.simPools() ? ctx.taxIncome().ordinaryTaxTableByYear() : null,
                         poolSetup.simPools() ? ctx.taxIncome().rentalAwareTaxableIncome() : null)
@@ -249,8 +261,7 @@ final class GuardrailResponseBuilder {
                 // Household task 6: the terminal/response passes run the same household economics as
                 // the search (per-owner RMD streams, first-death transition, second-death truncation).
                 .household(ctx.sim().household())
-                .tent(ctx.sim().tentPlan(), ctx.sim().tentPaths())
-                .build();
+                .tent(ctx.sim().tentPlan(), ctx.sim().tentPaths());
     }
 
     /** Household task 6 (dedup): scales {@code values} in place by the survivor spending factor from

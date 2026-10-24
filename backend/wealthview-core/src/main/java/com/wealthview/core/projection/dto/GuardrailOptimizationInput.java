@@ -218,6 +218,19 @@ public record GuardrailOptimizationInput(
                 longevityConditionalAge, mortalityTable, birthMonth, bondTent);
     }
 
+    /** A copy of this input with {@code newEssentialFloor} and every other component unchanged. */
+    public GuardrailOptimizationInput withEssentialFloor(BigDecimal newEssentialFloor) {
+        return new GuardrailOptimizationInput(retirementDate, birthYear, endAge, inflationRate, accounts,
+                incomeSources, newEssentialFloor, terminalBalanceTarget, returnMean, trialCount, confidenceLevel,
+                phases, seed, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears,
+                filingStatus, withdrawalOrder, optimizeConversions, conversionBracketRate,
+                rmdTargetBracketRate, traditionalExhaustionBuffer, rmdBracketHeadroom,
+                dynamicSequencingBracketRate, dividendYield, feeRate, baseYear, includeDepressionYears,
+                interestYield, gateOnAdaptiveRules, spouseBirthYear, primaryDeathAge, spouseDeathAge,
+                survivorSpendingFactor, communityProperty, stochasticMortality, primarySex, spouseSex,
+                longevityConditionalAge, mortalityTable, birthMonth, bondTent);
+    }
+
     /**
      * Entry point for naming components instead of counting positions. Only the components a run
      * actually uses need setting; every unset component defaults to the same no-op anchor the

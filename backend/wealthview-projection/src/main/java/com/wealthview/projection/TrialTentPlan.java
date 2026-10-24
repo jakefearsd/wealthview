@@ -7,6 +7,7 @@ import com.wealthview.core.projection.BondMaturityReturnsProvider.MaturityReturn
 import com.wealthview.core.projection.dto.BondMaturity;
 import com.wealthview.core.projection.dto.BondMaturityValues;
 import com.wealthview.core.projection.dto.BondTentConfig;
+import com.wealthview.core.projection.dto.BondTentMix;
 import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 
@@ -34,6 +35,13 @@ record TrialTentPlan(double coverageYears, double sizingRealYield, double[] mixS
                 BondTentSizer.mixRealYield(yields, shares, inflationRate),
                 valuesOf(shares), valuesOf(yields), order.drawSequence(), yearsBeforeRetirement,
                 Math.max(0, yearsBeforeRetirement - buildUp), contributionCap, maturities);
+    }
+
+    /** The same plan with {@code mix}'s shares and the real yield they earn at {@code yields}. */
+    TrialTentPlan withMix(BondTentMix mix, BondMaturityValues yields, double inflationRate) {
+        return new TrialTentPlan(coverageYears, BondTentSizer.mixRealYield(yields, mix.shares(), inflationRate),
+                valuesOf(mix.shares()), valuesOf(yields), placementOrder, yearsBeforeRetirement,
+                buildUpStartIndex, contributionCap, maturities);
     }
 
     /** Years from the build-up start to retirement. */
