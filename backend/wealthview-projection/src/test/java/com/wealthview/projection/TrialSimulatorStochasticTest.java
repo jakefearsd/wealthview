@@ -41,7 +41,7 @@ class TrialSimulatorStochasticTest {
                 true,
                 taxRet, tradRet, rothRet, rmdStartAge,
                 initTaxableBasis, ltcg, 0.0, null, null, 0.0, 1.0, household,
-                regimes, survivorFactor, AgeMilestones.LEGACY_EARLY_ACCESS_AGE);
+                regimes, survivorFactor, AgeMilestones.LEGACY_EARLY_ACCESS_AGE, null);
     }
 
     /** A survivor regime carrying only per-year income + a flat ordinary table (the LTCG/DS/rental

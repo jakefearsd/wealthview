@@ -1,6 +1,10 @@
 package com.wealthview.projection;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
+
+import com.wealthview.core.projection.dto.PoolType;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
@@ -115,5 +119,57 @@ class TrialConfigFactoryTest {
         double gain = TrialPools.seed(config, null).sellTaxable(80_000);
 
         assertThat(gain).isEqualTo(-20_000.0, within(1e-6));
+    }
+
+    private static TrialTentPlan tentPlan(int pre, int buildUp, double coverage) {
+        return new TrialTentPlan(coverage, 0.0, new double[] {1, 0, 0, 0}, new double[4],
+                List.of(PoolType.TAXABLE, PoolType.TRADITIONAL, PoolType.ROTH), pre, Math.max(0, pre - buildUp),
+                0, null);
+    }
+
+    @Test
+    void configFor_tentWithPreRetirementYears_carriesTheBuildUpIntoStartBalances() {
+        double[] before = {1_000_000, 0, 0, 1_100_000, 0, 0, 770_000, 0, 0};
+        double[] after = {1_100_000, 0, 0, 770_000, 0, 0, 770_000, 0, 0};
+        var paths = new TentPaths(new double[][] {new double[13 * 4]}, new double[][] {before},
+                new double[][] {after});
+        var starts = new TrialStartBalances[] {start(770_000, 0, 0, 0, 0, 770_000, 0, 0)};
+        var factory = minimal(new PoolSimSetup(100_000, 0, 0, "taxable_first", true))
+                .startBalances(starts).tent(tentPlan(3, 3, 5.0), paths).build();
+
+        var config = factory.configFor(0, null, false, null, 90_000);
+
+        assertThat(config.initTaxable()).isCloseTo(779_000, within(1e-6));
+        assertThat(config.tent().total()).isCloseTo(30_000, within(1e-6));
+    }
+
+    @Test
+    void configFor_retiredAlready_fundsFullTargetInYearZero() {
+        var paths = new TentPaths(new double[][] {new double[4 * 4], new double[4 * 4]}, null, null);
+        var factory = minimal(new PoolSimSetup(50_000, 500_000, 0, "taxable_first", true))
+                .tent(tentPlan(0, 0, 5.0), paths).build();
+
+        var config = factory.configFor(0, null, false, null, 200_000);
+
+        assertThat(config.tent().total()).isCloseTo(200_000, within(1e-6));
+        assertThat(config.tent().totalIn(PoolType.TAXABLE)).isCloseTo(50_000, within(1e-6));
+        assertThat(config.tent().totalIn(PoolType.TRADITIONAL)).isCloseTo(150_000, within(1e-6));
+    }
+
+    @Test
+    void tentTargetFor_noPlan_isZero() {
+        var factory = minimal(new PoolSimSetup(50_000, 500_000, 0, "taxable_first", true)).build();
+
+        double target = factory.tentTargetFor(new double[] {40_000}, new double[] {0}, new double[] {0},
+                new double[] {0});
+
+        assertThat(target).isZero();
+    }
+
+    @Test
+    void configFor_noPlan_hasNoTent() {
+        var factory = minimal(new PoolSimSetup(50_000, 500_000, 0, "taxable_first", true)).build();
+
+        assertThat(factory.configFor(0, null, false, null).tent()).isNull();
     }
 }

@@ -2,6 +2,7 @@ package com.wealthview.projection;
 
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.household.AgeMilestones;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 
@@ -234,7 +235,10 @@ final class TrialSimulator {
             @Nullable SurvivorRegime[] survivorRegimes,
             double survivorFactor,
             // Phase 1a: first penalty-free age (AgeMilestones; legacy 60).
-            int earlyAccessAge
+            int earlyAccessAge,
+            // Bond tent: this trial's own tent state, mutated in place by the year loop. null (or an empty
+            // tent) leaves every year on the untented code path.
+            @Nullable TrialTent tent
     ) {
         /**
          * Entry point for building a config fluently. The four arguments are the pool base every
@@ -291,6 +295,7 @@ final class TrialSimulator {
             private SurvivorRegime[] survivorRegimes;
             private double survivorFactor = 1.0;
             private int earlyAccessAge = AgeMilestones.LEGACY_EARLY_ACCESS_AGE;
+            private TrialTent tent;
 
             private Builder(double initTaxable, double initTraditional, double initRoth,
                             String withdrawalOrder) {
@@ -392,6 +397,11 @@ final class TrialSimulator {
                 return this;
             }
 
+            Builder tent(@Nullable TrialTent tent) {
+                this.tent = tent;
+                return this;
+            }
+
             SimulationConfig build() {
                 return new SimulationConfig(initTaxable, initTraditional, initRoth, withdrawalOrder,
                         ordinaryTaxTableByYear, ordinaryBaseIncomeByYear,
@@ -400,7 +410,7 @@ final class TrialSimulator {
                         trackYearBalances, taxableReturns, traditionalReturns, rothReturns,
                         rmdStartAge, initTaxableBasis, ltcgTaxTableByYear, dividendYield,
                         adaptation, rentalIncomeByYear, interestYield, taxableEquityShare,
-                        household, survivorRegimes, survivorFactor, earlyAccessAge);
+                        household, survivorRegimes, survivorFactor, earlyAccessAge, tent);
             }
         }
     }
@@ -472,6 +482,12 @@ final class TrialSimulator {
 
             double preGrowthTotal = tp.poolTotal();
 
+            // Bond tent: an empty or absent tent takes the untented path below, exactly.
+            TrialTent tent = activeTent(config.tent());
+            int tentYear = tent == null ? 0 : tent.yearsBeforeRetirement() + y;
+            double expectedAfterGrowth = tent == null ? 0
+                    : tentExpectedAfterGrowth(tent, tp, taxableReturn, traditionalReturn, rothReturn, tentYear);
+
             // Audit C9: the trial's start-of-year total portfolio (pre-growth pools) — the signal
             // the simulated guardrail rule measures against the no-adaptation median. Captured
             // before this year's growth is applied below.
@@ -506,12 +522,16 @@ final class TrialSimulator {
             // one call to keep this NCSS-capped hot method lean. taxableEquityShare == 1.0 (every
             // pre-C1 caller) makes this byte-identical to the old growTaxableWithDividend
             // (interest income always 0, baseWithInterest == base).
-            var growthResult = applyGrowthAndInterestTax(tp, taxableReturn,
-                    config.dividendYield(), config.interestYield(), config.taxableEquityShare(),
-                    table, view.base());
+            var growthResult = tent == null
+                    ? applyGrowthAndInterestTax(tp, taxableReturn, config.dividendYield(), config.interestYield(),
+                            config.taxableEquityShare(), table, view.base())
+                    : applyTentGrowth(tp, tent, tentYear, taxableReturn, traditionalReturn, rothReturn,
+                            config, table, view.base());
             double dividendIncome = growthResult.dividendIncome();
             double baseWithInterest = growthResult.baseWithInterest();
-            tp.growNonTaxablePools(traditionalReturn, rothReturn);
+            if (tent == null) {
+                tp.growNonTaxablePools(traditionalReturn, rothReturn);
+            }
 
             int age = config.retirementAge() + y;
 
@@ -619,6 +639,7 @@ final class TrialSimulator {
                     aux.rentalIncome());
 
             tp.clampNonNegative();
+            settleTent(tent, tp, expectedAfterGrowth);
 
             double totalBalance = tp.poolTotal();
             minBalance = Math.min(minBalance, totalBalance);
@@ -856,6 +877,69 @@ final class TrialSimulator {
         var split = tp.growTaxable(taxableReturn, dividendYield, interestYield, taxableEquityShare);
         applyInterestTax(tp, split.interestIncome(), table, base);
         return new GrowthYieldResult(split.dividendIncome(), base + split.interestIncome());
+    }
+
+    /** The tent when it still holds anything this year, else {@code null} (the untented path). */
+    @Nullable
+    private static TrialTent activeTent(@Nullable TrialTent tent) {
+        return tent == null || tent.isEmpty() ? null : tent;
+    }
+
+    /** A pool's return once its tent sleeves earn their own: {@code grown / balance - 1}, or the raw
+     * {@code poolReturn} when the pool is empty. */
+    private static double effectiveReturn(TrialTent tent, PoolType pool, double balance, double poolReturn,
+                                          int tentYear) {
+        return balance == 0 ? poolReturn : tent.grownBalance(pool, balance, poolReturn, tentYear) / balance - 1;
+    }
+
+    /** The household total the year's growth alone would produce, from pre-growth balances: what the pools
+     * would hold if nothing were withdrawn or taxed. The year-end settlement measures the net outflow
+     * against it. */
+    private static double tentExpectedAfterGrowth(TrialTent tent, TrialPools tp, double taxableReturn,
+                                                  double traditionalReturn, double rothReturn, int tentYear) {
+        return tent.grownBalance(PoolType.TAXABLE, tp.taxable(), taxableReturn, tentYear)
+                + tent.grownBalance(PoolType.TRADITIONAL, tp.traditionalTotal(), traditionalReturn, tentYear)
+                + tent.grownBalance(PoolType.ROTH, tp.rothTotal(), rothReturn, tentYear);
+    }
+
+    /**
+     * The tent's growth step: every pool grows at its effective return (growth part at the pool return,
+     * sleeves at their own), the taxable pool through the reservation-aware split so the sleeves' typed
+     * interest is taxed as ordinary income. Reads sleeve interest and the growth-index return from the
+     * start-of-year sleeves and balances, then grows the sleeves and advances the index.
+     */
+    private static GrowthYieldResult applyTentGrowth(TrialPools tp, TrialTent tent, int tentYear,
+            double taxableReturn, double traditionalReturn, double rothReturn, SimulationConfig config,
+            OrdinaryTaxTable table, double base) {
+        double taxable = tp.taxable();
+        double traditional = tp.traditionalTotal();
+        double roth = tp.rothTotal();
+        double growth = tent.growthReturn(taxable, traditional, roth, taxableReturn, traditionalReturn, rothReturn);
+        var split = tp.growTaxable(effectiveReturn(tent, PoolType.TAXABLE, taxable, taxableReturn, tentYear),
+                config.dividendYield(), config.interestYield(), config.taxableEquityShare(),
+                tent.totalIn(PoolType.TAXABLE), tent.interestIn(PoolType.TAXABLE));
+        applyInterestTax(tp, split.interestIncome(), table, base);
+        tp.growNonTaxablePools(effectiveReturn(tent, PoolType.TRADITIONAL, traditional, traditionalReturn, tentYear),
+                effectiveReturn(tent, PoolType.ROTH, roth, rothReturn, tentYear));
+        tent.growSleeves(tentYear);
+        tent.advanceIndex(growth);
+        return new GrowthYieldResult(split.dividendIncome(), base + split.interestIncome());
+    }
+
+    /**
+     * Year-end tent settlement, after the pools are floored at zero. Below the growth index's previous high
+     * the tent pays the year's net outflow (what the pools would hold after growth, less what they hold now)
+     * shortest maturity first; then every pool's reservation is clamped to its balance. A no-op without a
+     * tent.
+     */
+    private static void settleTent(@Nullable TrialTent tent, TrialPools tp, double expectedAfterGrowth) {
+        if (tent == null) {
+            return;
+        }
+        if (tent.isBelowPeak()) {
+            tent.spend(Math.max(0, expectedAfterGrowth - tp.poolTotal()));
+        }
+        tent.clampAll(tp.taxable(), tp.traditionalTotal(), tp.rothTotal());
     }
 
     /**

@@ -71,10 +71,12 @@ final class TrialPassRunner {
         boolean[] traditionalExhaustedFlags = new boolean[trialCount];
         double[][] yearBalances = trackYearBalances ? new double[years][trialCount] : null;
 
+        double tentTarget = configFactory.tentTargetFor(floors, discretionary, income, surplusTax);
+
         for (int t = 0; t < trialCount; t++) {
             TrialSimulator.HouseholdSim override = householdOverrideFn != null
                     ? householdOverrideFn.apply(t) : null;
-            var config = configFactory.configFor(t, adaptation, trackYearBalances, override);
+            var config = configFactory.configFor(t, adaptation, trackYearBalances, override, tentTarget);
             var result = trialSimulator.simulateTrial(income, surplusTax, floors, discretionary, years, config);
             finalBalances[t] = result.finalBalance();
             minBalances[t] = result.minBalance();

@@ -295,6 +295,32 @@ final class TrialPools {
     }
 
     /**
+     * {@link #growTaxable(double, double, double, double)} for a pool that holds a bond-tent reservation:
+     * the pool still grows to exactly {@code before × (1 + taxableReturn)}, but the dividend and the
+     * bond-share interest come from the unreserved part only ({@code before − reserved}), and the
+     * reservation's own interest ({@code sleeveInterest}) joins the ordinary interest. The lots appreciate
+     * at {@code taxableReturn − (dividend + interest) / before}, so the distribution is reinvested at cost.
+     * With nothing reserved and no sleeve interest this IS the 4-argument method.
+     */
+    TaxableYieldSplit growTaxable(double taxableReturn, double dividendYield, double interestYield,
+                                  double taxableEquityShare, double reserved, double sleeveInterest) {
+        if (reserved == 0 && sleeveInterest == 0) {
+            return growTaxable(taxableReturn, dividendYield, interestYield, taxableEquityShare);
+        }
+        double before = pools[JOINT_TAXABLE];
+        pools[JOINT_TAXABLE] = before * (1 + taxableReturn);
+        double unreserved = Math.max(0, before - reserved);
+        double dividendIncome = unreserved * taxableEquityShare * dividendYield;
+        double interestIncome = unreserved * (1 - taxableEquityShare) * interestYield + sleeveInterest;
+        if (before <= 0) {
+            return new TaxableYieldSplit(0, 0);
+        }
+        lots.grow(taxableReturn - (dividendIncome + interestIncome) / before);
+        lots.addLot(Math.max(0, pools[JOINT_TAXABLE] - lots.totalValue()));
+        return new TaxableYieldSplit(dividendIncome, interestIncome);
+    }
+
+    /**
      * The owner-aware generalization of {@code PoolTaxCascade}: deducts {@code amount} in the fixed
      * taxable → traditional → roth priority order, the traditional and Roth stages split
      * PROPORTIONALLY across their owner slots (see {@link #debitPair}). No pool is driven negative.

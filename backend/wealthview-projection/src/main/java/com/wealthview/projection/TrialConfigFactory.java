@@ -3,6 +3,7 @@ package com.wealthview.projection;
 import org.springframework.lang.Nullable;
 
 import com.wealthview.core.projection.household.AgeMilestones;
+import com.wealthview.core.projection.strategy.WithdrawalOrder;
 
 /**
  * Assembles each trial's {@link TrialSimulator.SimulationConfig} from the knobs that stay fixed
@@ -47,6 +48,8 @@ final class TrialConfigFactory {
     private final TrialSimulator.HouseholdSim household;
     private final TrialSimulator.SurvivorRegime[] survivorRegimes;
     private final double survivorFactor;
+    private final TrialTentPlan tentPlan;
+    private final TentPaths tentPaths;
 
     private TrialConfigFactory(Builder b) {
         this.poolSetup = b.poolSetup;
@@ -72,6 +75,8 @@ final class TrialConfigFactory {
         this.household = b.household;
         this.survivorRegimes = b.survivorRegimes;
         this.survivorFactor = b.survivorFactor;
+        this.tentPlan = b.tentPlan;
+        this.tentPaths = b.tentPaths;
     }
 
     static Builder builder(PoolSimSetup poolSetup) {
@@ -100,13 +105,34 @@ final class TrialConfigFactory {
     TrialSimulator.SimulationConfig configFor(int t, @Nullable TrialSimulator.GuardrailAdaptation adaptation,
                                               boolean trackYearBalances,
                                               @Nullable TrialSimulator.HouseholdSim householdOverride) {
+        return configFor(t, adaptation, trackYearBalances, householdOverride, 0);
+    }
+
+    /**
+     * {@link #configFor(int, TrialSimulator.GuardrailAdaptation, boolean, TrialSimulator.HouseholdSim)} for a
+     * pass that holds a bond tent: {@code tentTarget} is the pass's {@link #tentTargetFor} result. With
+     * per-trial start balances the tent's build-up is replayed over the trial's recorded paths and the
+     * adjusted balances replace {@code startBalances[t]} everywhere (the household included); without them the
+     * tent is funded in full from the resolved opening balances. A target of 0 builds an empty, inert tent.
+     */
+    TrialSimulator.SimulationConfig configFor(int t, @Nullable TrialSimulator.GuardrailAdaptation adaptation,
+                                              boolean trackYearBalances,
+                                              @Nullable TrialSimulator.HouseholdSim householdOverride,
+                                              double tentTarget) {
         double initTaxable = poolSetup.simPools() || initialPortfolioPaths == null
                 ? poolSetup.initTaxable() : initialPortfolioPaths[t][0];
         double initTraditional = poolSetup.initTraditional();
         double initRoth = poolSetup.initRoth();
         var trialHousehold = householdOverride != null ? householdOverride : household;
+        TrialTent tent = null;
         if (startBalances != null) {
             var start = startBalances[t];
+            if (tentPlan != null) {
+                var tentStart = TentBuildUp.toRetirement(tentPlan, tentPaths, t, tentTarget, start);
+                tent = tentStart.tent();
+                start = start.adjustedBy(tentStart.taxableAdjustment(), tentStart.traditionalAdjustment(),
+                        tentStart.rothAdjustment());
+            }
             if (poolSetup.simPools()) {
                 initTaxable = start.taxable();
                 initTraditional = start.traditional();
@@ -117,6 +143,9 @@ final class TrialConfigFactory {
             if (trialHousehold != null) {
                 trialHousehold = trialHousehold.withStartBalances(start);
             }
+        } else if (tentPlan != null) {
+            tent = TentBuildUp.fundedAtStart(tentPlan, tentPaths.sleeveReturnsOf(t), tentTarget,
+                    initTaxable, initTraditional, initRoth).tent();
         }
         return TrialSimulator.SimulationConfig
                 .builder(initTaxable, initTraditional, initRoth, poolSetup.order())
@@ -137,7 +166,25 @@ final class TrialConfigFactory {
                 .taxableEquityShare(taxableEquityShare)
                 .household(trialHousehold)
                 .survivorRegimes(survivorRegimes, survivorFactor)
+                .tent(tent)
                 .build();
+    }
+
+    /**
+     * The tent target for a pass over this schedule: 0 without a tent plan, else the sizer's target from the
+     * factory's tax tables, conversions, ceilings, opening balances, order and ages.
+     */
+    // UseVarargs: the schedules are per-year arrays, not variable arguments.
+    @SuppressWarnings("PMD.UseVarargs")
+    double tentTargetFor(double[] floors, double[] discretionary, double[] income, double[] surplusTax) {
+        if (tentPlan == null) {
+            return 0;
+        }
+        var inputs = new TrialTentSizer.Inputs(ordinaryTaxTableByYear, ordinaryBaseIncomeByYear, conversionByYear,
+                conversionTaxByYear, dsBracketCeilingByYear, poolSetup.initTaxable(), poolSetup.initTraditional(),
+                poolSetup.initRoth(), WithdrawalOrder.fromString(poolSetup.order()), retirementAge,
+                earlyAccessAge);
+        return TrialTentSizer.target(tentPlan, inputs, floors, discretionary, income, surplusTax);
     }
 
     /**
@@ -175,6 +222,8 @@ final class TrialConfigFactory {
         private TrialSimulator.HouseholdSim household;
         private TrialSimulator.SurvivorRegime[] survivorRegimes;
         private double survivorFactor = 1.0;
+        private TrialTentPlan tentPlan;
+        private TentPaths tentPaths;
 
         private Builder(PoolSimSetup poolSetup) {
             this.poolSetup = poolSetup;
@@ -278,6 +327,13 @@ final class TrialConfigFactory {
         Builder survivorRegimes(@Nullable TrialSimulator.SurvivorRegime[] survivorRegimes, double survivorFactor) {
             this.survivorRegimes = survivorRegimes;
             this.survivorFactor = survivorFactor;
+            return this;
+        }
+
+        /** The pass's bond tent: its plan and the per-trial recorded paths (both null: no tent). */
+        Builder tent(@Nullable TrialTentPlan plan, @Nullable TentPaths paths) {
+            this.tentPlan = plan;
+            this.tentPaths = paths;
             return this;
         }
 

@@ -27,7 +27,8 @@ class TrialSimulatorConfigBuilderTest {
                 100.0, 50.0, 25.0, "taxable_first",
                 null, null, null, null, 62, null, false,
                 taxable, traditional, roth, Integer.MAX_VALUE,
-                0.0, null, 0.0, null, null, 0.0, 1.0, null, null, 1.0, AgeMilestones.LEGACY_EARLY_ACCESS_AGE);
+                0.0, null, 0.0, null, null, 0.0, 1.0, null, null, 1.0, AgeMilestones.LEGACY_EARLY_ACCESS_AGE,
+                null);
 
         assertThat(built).isEqualTo(canonical);
     }
@@ -70,8 +71,17 @@ class TrialSimulatorConfigBuilderTest {
                 100.0, 50.0, 25.0, "traditional_first",
                 taxTables, baseIncome, conversions, conversionTax, 65, dsCeilings,
                 true, taxable, traditional, roth, 73,
-                80.0, ltcgTables, 0.015, null, rental, 0.04, 0.7, null, regimes, 0.75, 59);
+                80.0, ltcgTables, 0.015, null, rental, 0.04, 0.7, null, regimes, 0.75, 59, null);
 
         assertThat(built).isEqualTo(canonical);
+    }
+
+    @Test
+    void builder_default_hasNoTent() {
+        var built = TrialSimulator.SimulationConfig.builder(100.0, 50.0, 25.0, "taxable_first")
+                .returns(new double[] {0.1}, new double[] {0.1}, new double[] {0.1})
+                .build();
+
+        assertThat(built.tent()).isNull();
     }
 }
