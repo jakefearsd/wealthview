@@ -19,7 +19,7 @@ import {
     EXAMPLE_FUNDS,
 } from './bondTentDefaults';
 import {
-    MATURITIES, MAX_MIXES, MAX_NAME_LENGTH, SHARE_TOLERANCE, isTentConfigValid, mixError, shareTotal,
+    MATURITIES, MAX_MIXES, MAX_NAME_LENGTH, SHARE_TOLERANCE, isTentConfigValid, mixError, mixNamesError, shareTotal,
 } from './bondTentValidation';
 
 const SIZING_DEBOUNCE_MS = 500;
@@ -292,6 +292,12 @@ export default function ScenarioTentSection({
                             <button type="button" onClick={addMix}>Add mix</button>
                         )}
                     </div>
+
+                    {mixNamesError(config.mixes) && (
+                        <div role="alert" style={{ fontSize: '0.8rem', color: '#d32f2f', marginBottom: '0.5rem' }}>
+                            {mixNamesError(config.mixes)}
+                        </div>
+                    )}
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
                         {MATURITIES.map(({ key, label }) => (

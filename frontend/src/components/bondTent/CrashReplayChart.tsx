@@ -16,13 +16,14 @@ const COLORS = ['#546e7a', '#1976d2', '#2e7d32', '#ef6c00', '#8e24aa', '#c62828'
 export default function CrashReplayChart({ replay }: Props) {
     const rows = useMemo(() => {
         const byYear = new Map<number, Record<string, number>>();
-        for (const outcome of replay.outcomes) {
+        // Series are keyed by position, so mixes sharing a name (or named "year") cannot collide.
+        replay.outcomes.forEach((outcome, i) => {
             for (const y of outcome.years) {
                 const row = byYear.get(y.year) ?? { year: y.year };
-                row[outcome.name] = y.balance;
+                row[`s${i}`] = y.balance;
                 byYear.set(y.year, row);
             }
-        }
+        });
         return [...byYear.values()].sort((a, b) => a.year - b.year);
     }, [replay]);
 
@@ -38,8 +39,9 @@ export default function CrashReplayChart({ replay }: Props) {
                 <Tooltip formatter={(v: unknown) => formatWholeCurrency(Number(v))} />
                 <Legend />
                 <ReferenceArea
-                    x1={replay.crash_calendar_year}
-                    x2={crashEnd}
+                    x1={replay.crash_calendar_year - 0.5}
+                    x2={crashEnd + 0.5}
+                    ifOverflow="hidden"
                     fill="#ef5350"
                     fillOpacity={0.15}
                     label={{ value: replay.crash_label, position: 'insideTop' }}
@@ -60,9 +62,9 @@ export default function CrashReplayChart({ replay }: Props) {
                 )}
                 {replay.outcomes.map((o, i) => (
                     <Line
-                        key={o.name}
+                        key={i}
                         type="monotone"
-                        dataKey={o.name}
+                        dataKey={`s${i}`}
                         name={o.name}
                         stroke={COLORS[i % COLORS.length]}
                         dot={false}

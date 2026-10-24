@@ -10,6 +10,22 @@ export const MATURITIES: ReadonlyArray<{ key: keyof BondMaturityValues; label: s
 export const MAX_MIXES = 3;
 export const MAX_NAME_LENGTH = 40;
 export const SHARE_TOLERANCE = 1e-6;
+const RESERVED_NAME = 'no tent';
+export const DUPLICATE_NAME_MESSAGE = 'Mix names must be unique';
+export const RESERVED_NAME_MESSAGE = '"No tent" is reserved; choose another mix name';
+
+function normalizedName(mix: BondTentMix): string {
+    return mix.name.trim().toLowerCase();
+}
+
+/** The name problem across a tent's mixes (reserved or repeated names), or null. */
+export function mixNamesError(mixes: BondTentMix[]): string | null {
+    const names = mixes.map(normalizedName);
+    if (names.includes(RESERVED_NAME)) {
+        return RESERVED_NAME_MESSAGE;
+    }
+    return new Set(names).size === names.length ? null : DUPLICATE_NAME_MESSAGE;
+}
 
 export function shareTotal(mix: BondTentMix): number {
     return MATURITIES.reduce((sum, m) => sum + mix.shares[m.key], 0);
@@ -42,6 +58,10 @@ export function tentConfigError(config: BondTentConfig): string | null {
     const mixProblem = config.mixes.map(mixError).find(message => message !== null);
     if (mixProblem) {
         return mixProblem;
+    }
+    const nameProblem = mixNamesError(config.mixes);
+    if (nameProblem) {
+        return nameProblem;
     }
     return MATURITIES.every(m => config.yields[m.key] >= -0.02 && config.yields[m.key] <= 0.2)
         ? null

@@ -29,4 +29,16 @@ describe('TentSimulationStrip', () => {
         const balance = screen.getByRole('row', { name: /Balance at 90, typical/ });
         expect(within(balance).getAllByRole('cell')[1]).toHaveTextContent('—');
     });
+
+    it('renders a column for each of two mixes that share a name', () => {
+        const sim = makeSimulation();
+        sim.columns = [
+            { ...sim.columns[1], name: 'Mix', success_rate: 0.5 },
+            { ...sim.columns[1], name: 'Mix', success_rate: 0.7 },
+        ];
+        render(<TentSimulationStrip simulation={sim} />);
+
+        const success = screen.getByRole('row', { name: /Success rate/ });
+        expect(within(success).getAllByRole('cell').map(c => c.textContent)).toEqual(['50%', '70%']);
+    });
 });

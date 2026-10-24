@@ -55,6 +55,19 @@ describe('tentConfigError', () => {
             .toBe('Each bond mix needs a name of at most 40 characters');
     });
 
+    it('rejects repeated mix names, ignoring case and surrounding spaces', () => {
+        const second = { ...structuredClone(DEFAULT_TENT_MIX), name: `  ${DEFAULT_TENT_MIX.name.toUpperCase()} ` };
+
+        expect(tentConfigError(config({ mixes: [structuredClone(DEFAULT_TENT_MIX), second] })))
+            .toBe('Mix names must be unique');
+    });
+
+    it('rejects the reserved No tent name', () => {
+        const mixes = [{ ...structuredClone(DEFAULT_TENT_MIX), name: ' no TENT' }];
+
+        expect(tentConfigError(config({ mixes }))).toBe('"No tent" is reserved; choose another mix name');
+    });
+
     it.each([
         [{ coverage_years: 2.3 }, 'Bond tent coverage must be between 1 and 10 years, in half-year steps'],
         [{ build_up_start_years: 41 }, 'Bond tent build-up start must be between 0 and 40 years before retirement'],

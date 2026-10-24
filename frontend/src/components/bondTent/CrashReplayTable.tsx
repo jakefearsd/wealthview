@@ -20,8 +20,8 @@ export default function CrashReplayTable({ replay }: Props) {
                 <thead>
                     <tr>
                         <th style={thStyle} />
-                        {replay.outcomes.map(o => (
-                            <th key={o.name} style={{ ...thStyle, textAlign: 'right' }}>{o.name}</th>
+                        {replay.outcomes.map((o, i) => (
+                            <th key={i} style={{ ...thStyle, textAlign: 'right' }}>{o.name}</th>
                         ))}
                     </tr>
                 </thead>
@@ -29,8 +29,8 @@ export default function CrashReplayTable({ replay }: Props) {
                     {rows.map(r => (
                         <tr key={r.label}>
                             <th scope="row" style={{ ...tdStyle, textAlign: 'left', fontWeight: 400 }}>{r.label}</th>
-                            {replay.outcomes.map(o => (
-                                <td key={o.name} style={{ ...tdStyle, textAlign: 'right' }}>{r.value(o)}</td>
+                            {replay.outcomes.map((o, i) => (
+                                <td key={i} style={{ ...tdStyle, textAlign: 'right' }}>{r.value(o)}</td>
                             ))}
                         </tr>
                     ))}

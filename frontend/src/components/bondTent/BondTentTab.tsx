@@ -71,6 +71,7 @@ function CrashReplaySection({ scenarioId }: { scenarioId: string }) {
     const [crash, setCrash] = useState<CrashKey | typeof ANY_START_YEAR>(CRASHES[0].key);
     const [startYear, setStartYear] = useState(DEFAULT_START_YEAR);
     const [startYearDraft, setStartYearDraft] = useState(String(DEFAULT_START_YEAR));
+    const [startYearError, setStartYearError] = useState<string | null>(null);
     const [offset, setOffset] = useState(0);
 
     const replay = useApiQuery(
@@ -88,7 +89,16 @@ function CrashReplaySection({ scenarioId }: { scenarioId: string }) {
 
     function onStartYearChange(text: string) {
         setStartYearDraft(text);
-        if (/^\d{4}$/.test(text)) setStartYear(Number(text));
+        if (!/^\d{4}$/.test(text)) return;
+        const value = Number(text);
+        const first = data?.first_start_year;
+        const last = data?.last_start_year;
+        if (first !== undefined && last !== undefined && (value < first || value > last)) {
+            setStartYearError(`Start year must be between ${first} and ${last}`);
+            return;
+        }
+        setStartYearError(null);
+        setStartYear(value);
     }
 
     return (
@@ -101,7 +111,10 @@ function CrashReplaySection({ scenarioId }: { scenarioId: string }) {
                         id="crash-select"
                         style={selectStyle}
                         value={crash}
-                        onChange={e => setCrash(e.target.value as CrashKey | typeof ANY_START_YEAR)}
+                        onChange={e => {
+                            setCrash(e.target.value as CrashKey | typeof ANY_START_YEAR);
+                            setStartYearError(null);
+                        }}
                     >
                         {CRASHES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
                         <option value={ANY_START_YEAR}>Any start year</option>
@@ -118,7 +131,11 @@ function CrashReplaySection({ scenarioId }: { scenarioId: string }) {
                             max={data?.last_start_year}
                             value={startYearDraft}
                             onChange={e => onStartYearChange(e.target.value)}
+                            aria-invalid={startYearError ? true : undefined}
                         />
+                        {startYearError && (
+                            <div role="alert" style={{ fontSize: '0.8rem', color: '#d32f2f' }}>{startYearError}</div>
+                        )}
                     </div>
                 )}
                 <div>

@@ -83,6 +83,22 @@ describe('BondTentTab', () => {
         await waitFor(() => expect(mockReplay).toHaveBeenLastCalledWith('s1', { start_year: 1987 }, 0));
     });
 
+    it('rejects a start year outside the history without requesting a replay', async () => {
+        const user = userEvent.setup();
+        render(<BondTentTab scenarioId="s1" hasTent />);
+        await screen.findByRole('heading', { name: 'Historical crash replay' });
+        await user.selectOptions(screen.getByLabelText('Crash'), 'any');
+        await waitFor(() => expect(mockReplay).toHaveBeenLastCalledWith('s1', { start_year: 2000 }, 0));
+        mockReplay.mockClear();
+
+        const input = screen.getByLabelText('Start year');
+        await user.clear(input);
+        await user.type(input, '1900');
+
+        expect(await screen.findByText('Start year must be between 1954 and 2025')).toBeInTheDocument();
+        expect(mockReplay).not.toHaveBeenCalled();
+    });
+
     it('says there is nothing to simulate when the plan has no years left', async () => {
         mockSim.mockResolvedValue({ trial_count: 0, planned_years: 0, columns: [] });
         render(<BondTentTab scenarioId="s1" hasTent />);

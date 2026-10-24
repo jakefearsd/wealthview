@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import CrashReplayTable from './CrashReplayTable';
-import { makeReplay } from '../../testutil/builders';
+import { makeReplay, makeReplayOutcome } from '../../testutil/builders';
 
 describe('CrashReplayTable', () => {
     it('renders the five rows with the planned years and checkpoint age', () => {
@@ -25,5 +25,14 @@ describe('CrashReplayTable', () => {
         expect(within(row).getAllByRole('cell')[1]).toHaveTextContent('—');
         const left = screen.getByRole('row', { name: /Tent left over at 70/ });
         expect(within(left).getAllByRole('cell')[1]).toHaveTextContent('—');
+    });
+
+    it('renders a column for each of two mixes that share a name', () => {
+        const a = makeReplayOutcome({ name: 'Mix', lowest_balance: 111 });
+        const b = makeReplayOutcome({ name: 'Mix', lowest_balance: 222 });
+        render(<CrashReplayTable replay={makeReplay({ outcomes: [a, b] })} />);
+
+        const row = screen.getByRole('row', { name: /Lowest balance/ });
+        expect(within(row).getAllByRole('cell').map(c => c.textContent)).toEqual(['$111', '$222']);
     });
 });

@@ -15,10 +15,30 @@ describe('CrashReplayChart', () => {
         const marker = screen.getByTestId('reference-line');
         expect(marker).toHaveAttribute('data-label', 'Retire 2045');
         const area = screen.getByTestId('reference-area');
-        expect(area).toHaveAttribute('data-x1', '2045');
-        expect(area).toHaveAttribute('data-x2', '2047');
+        expect(area).toHaveAttribute('data-x1', '2044.5');
+        expect(area).toHaveAttribute('data-x2', '2047.5');
         expect(area).toHaveAttribute('data-label', '2000–02');
         expect(screen.getAllByTestId('reference-line')).toHaveLength(1);
+    });
+
+    it('gives a one-year crash window a visible width', () => {
+        render(<CrashReplayChart replay={makeReplay({ crash_first_year: 2022, crash_last_year: 2022 })} />);
+
+        const area = screen.getByTestId('reference-area');
+        expect(area).toHaveAttribute('data-x1', '2044.5');
+        expect(area).toHaveAttribute('data-x2', '2045.5');
+    });
+
+    it('keeps two mixes with the same name as distinct series', () => {
+        const same = (balance: number) => makeReplayOutcome({
+            name: 'year',
+            years: [makeReplayYear({ year: 2045, balance }), makeReplayYear({ year: 2046, balance })],
+        });
+        render(<CrashReplayChart replay={makeReplay({ outcomes: [same(100), same(200)] })} />);
+
+        const lines = screen.getAllByTestId('line');
+        expect(lines.map(l => l.getAttribute('data-key'))).toEqual(['s0', 's1']);
+        expect(lines.map(l => l.getAttribute('data-name'))).toEqual(['year', 'year']);
     });
 
     it('marks where history ends', () => {

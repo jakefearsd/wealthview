@@ -19,8 +19,8 @@ export default function TentSimulationStrip({ simulation }: Props) {
                     <thead>
                         <tr>
                             <th style={thStyle} />
-                            {columns.map(c => (
-                                <th key={c.name} style={{ ...thStyle, textAlign: 'right' }}>
+                            {columns.map((c, i) => (
+                                <th key={i} style={{ ...thStyle, textAlign: 'right' }}>
                                     {c.name}
                                     {c.tent_target != null && (
                                         <div style={{ fontWeight: 400, color: '#666' }}>{money(c.tent_target)} tent</div>
@@ -32,22 +32,22 @@ export default function TentSimulationStrip({ simulation }: Props) {
                     <tbody>
                         <tr>
                             <th scope="row" style={{ ...tdStyle, textAlign: 'left', fontWeight: 400 }}>Success rate</th>
-                            {columns.map(c => (
-                                <td key={c.name} style={numeric}>{Math.round(c.success_rate * 100)}%</td>
+                            {columns.map((c, i) => (
+                                <td key={i} style={numeric}>{Math.round(c.success_rate * 100)}%</td>
                             ))}
                         </tr>
                         <tr>
                             <th scope="row" style={{ ...tdStyle, textAlign: 'left', fontWeight: 400 }}>Years covered, typical / worst 10%</th>
-                            {columns.map(c => (
-                                <td key={c.name} style={numeric}>
+                            {columns.map((c, i) => (
+                                <td key={i} style={numeric}>
                                     {years(c.years_covered_median)} / {years(c.years_covered_worst10)}
                                 </td>
                             ))}
                         </tr>
                         <tr>
                             <th scope="row" style={{ ...tdStyle, textAlign: 'left', fontWeight: 400 }}>Balance at 90, typical</th>
-                            {columns.map(c => (
-                                <td key={c.name} style={numeric}>{money(c.balance_at90_median)}</td>
+                            {columns.map((c, i) => (
+                                <td key={i} style={numeric}>{money(c.balance_at90_median)}</td>
                             ))}
                         </tr>
                     </tbody>
