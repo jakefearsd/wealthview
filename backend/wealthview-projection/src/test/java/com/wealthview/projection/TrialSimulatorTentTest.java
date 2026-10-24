@@ -1,5 +1,6 @@
 package com.wealthview.projection;
 
+import java.util.Arrays;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -24,7 +25,7 @@ class TrialSimulatorTentTest {
 
     private static double[] filled(int n, double value) {
         var out = new double[n];
-        java.util.Arrays.fill(out, value);
+        Arrays.fill(out, value);
         return out;
     }
 
@@ -102,5 +103,19 @@ class TrialSimulatorTentTest {
         var noTent = run(base(1_000_000, returns, null).trackYearBalances(true).build(), 40_000, 3);
 
         assertThat(withEmpty).usingRecursiveComparison().isEqualTo(noTent);
+    }
+
+    @Test
+    void simulateTrial_tentEmptiedInEarlyYear_laterYearsFollowTheUntentedArithmetic() {
+        // Tent 30k; crash year 0: 970k*0.7 + 30k = 709k, less 40k = 669k, tent spent in full.
+        // Later years run untented: *1.1 - 40k.
+        double[] returns = {-0.30, 0.10, 0.10};
+        var tent = tent(30_000, 1_000_000, 0, 3);
+
+        var result = run(base(1_000_000, returns, tent).build(), 40_000, 3);
+
+        double expected = (669_000 * 1.1 - 40_000) * 1.1 - 40_000;
+        assertThat(tent.total()).isZero();
+        assertThat(result.finalBalance()).isCloseTo(expected, within(EPS));
     }
 }

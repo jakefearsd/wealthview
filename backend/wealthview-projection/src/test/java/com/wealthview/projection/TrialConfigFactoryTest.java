@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import com.wealthview.core.projection.dto.PoolType;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
 class TrialConfigFactoryTest {
@@ -171,5 +172,30 @@ class TrialConfigFactoryTest {
         var factory = minimal(new PoolSimSetup(50_000, 500_000, 0, "taxable_first", true)).build();
 
         assertThat(factory.configFor(0, null, false, null).tent()).isNull();
+    }
+
+    @Test
+    void configFor_nonPooledTrial_placesTheWholeTentInTaxable() {
+        double[] before = {1_000_000, 0, 0};
+        double[] after = {1_000_000, 0, 0};
+        var paths = new TentPaths(new double[][] {new double[5 * 4]}, new double[][] {before},
+                new double[][] {after});
+        var starts = new TrialStartBalances[] {start(300_000, 600_000, 100_000, 0, 0, 300_000, 0, 0)};
+        var factory = minimal(new PoolSimSetup(0, 0, 0, "taxable_first", false))
+                .startBalances(starts).tent(tentPlan(1, 1, 5.0), paths).build();
+
+        var config = factory.configFor(0, null, false, null, 90_000);
+
+        assertThat(config.initTaxable()).isCloseTo(1_000_000, within(1e-6));
+        assertThat(config.tent().total()).isCloseTo(90_000, within(1e-6));
+        assertThat(config.tent().totalIn(PoolType.TAXABLE)).isCloseTo(90_000, within(1e-6));
+    }
+
+    @Test
+    void tent_onlyOneOfPlanAndPaths_isRejected() {
+        var builder = minimal(new PoolSimSetup(0, 0, 0, "taxable_first", true));
+
+        assertThatThrownBy(() -> builder.tent(tentPlan(0, 0, 5.0), null))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

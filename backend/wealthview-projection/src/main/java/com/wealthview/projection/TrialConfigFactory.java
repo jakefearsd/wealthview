@@ -127,9 +127,16 @@ final class TrialConfigFactory {
         TrialTent tent = null;
         if (startBalances != null) {
             var start = startBalances[t];
+            double nonPoolTaxable = start.total();
             if (tentPlan != null) {
-                var tentStart = TentBuildUp.toRetirement(tentPlan, tentPaths, t, tentTarget, start);
+                boolean pooled = poolSetup.simPools();
+                var noTentStart = pooled ? start
+                        : new TrialStartBalances(start.total(), 0, 0, 0, 0, start.total(), 0, 0);
+                var tentStart = TentBuildUp.toRetirement(tentPlan, tentPaths, t, tentTarget, noTentStart);
                 tent = tentStart.tent();
+                // A non-pooled trial holds everything as taxable, so the pools' adjustments sum into it.
+                nonPoolTaxable = Math.max(0, start.total() + tentStart.taxableAdjustment()
+                        + tentStart.traditionalAdjustment() + tentStart.rothAdjustment());
                 start = start.adjustedBy(tentStart.taxableAdjustment(), tentStart.traditionalAdjustment(),
                         tentStart.rothAdjustment());
             }
@@ -138,14 +145,15 @@ final class TrialConfigFactory {
                 initTraditional = start.traditional();
                 initRoth = start.roth();
             } else {
-                initTaxable = start.total();
+                initTaxable = nonPoolTaxable;
             }
             if (trialHousehold != null) {
                 trialHousehold = trialHousehold.withStartBalances(start);
             }
         } else if (tentPlan != null) {
+            boolean pooled = poolSetup.simPools();
             tent = TentBuildUp.fundedAtStart(tentPlan, tentPaths.sleeveReturnsOf(t), tentTarget,
-                    initTaxable, initTraditional, initRoth).tent();
+                    initTaxable, pooled ? initTraditional : 0, pooled ? initRoth : 0).tent();
         }
         return TrialSimulator.SimulationConfig
                 .builder(initTaxable, initTraditional, initRoth, poolSetup.order())
@@ -332,6 +340,9 @@ final class TrialConfigFactory {
 
         /** The pass's bond tent: its plan and the per-trial recorded paths (both null: no tent). */
         Builder tent(@Nullable TrialTentPlan plan, @Nullable TentPaths paths) {
+            if (plan == null != (paths == null)) {
+                throw new IllegalArgumentException("a bond tent needs both its plan and its recorded paths");
+            }
             this.tentPlan = plan;
             this.tentPaths = paths;
             return this;
