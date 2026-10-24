@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.lang.Nullable;
+
 import com.wealthview.core.projection.dto.BondMaturity;
 import com.wealthview.core.projection.dto.PoolType;
 
@@ -26,8 +28,11 @@ final class TentPools {
     private final OwnerPool roth;
     private TentReservation tent = TentReservation.empty();
     private PoolStrategy.TentSetup setup;
+    /** The pools' current growth returns: the per-pool rates the pools grow at, replaced each replay year. */
+    private PoolStrategy.PoolReturns returns;
 
-    TentPools(TaxableLotsBd lots, OwnerPool traditional, OwnerPool roth) {
+    TentPools(TaxableLotsBd lots, OwnerPool traditional, OwnerPool roth, PoolStrategy.PoolReturns returns) {
+        this.returns = returns;
         this.lots = lots;
         this.traditional = traditional;
         this.roth = roth;
@@ -58,10 +63,69 @@ final class TentPools {
     }
 
     void topUp(BigDecimal target) {
+        topUp(target, null);
+    }
+
+    /** Reserves up to {@code target} but at most {@code cap} more; a null cap is uncapped. */
+    void topUp(BigDecimal target, @Nullable BigDecimal cap) {
         if (setup != null) {
             clamp();
-            tent.topUp(target, setup.placementOrder(), setup.mixShares(), this::balanceOf);
+            tent.topUp(target, cap, setup.placementOrder(), setup.mixShares(), this::balanceOf);
         }
+    }
+
+    /** The pools' current growth returns; {@link PoolStrategy.MultiPool} grows its pools at these. */
+    PoolStrategy.PoolReturns returns() {
+        return returns;
+    }
+
+    /** Records the pools' new growth returns and re-points the sleeves at {@code sleeveReturns}. */
+    void useYearReturns(PoolStrategy.PoolReturns newReturns, Map<BondMaturity, BigDecimal> sleeveReturns) {
+        this.returns = newReturns;
+        useSleeveReturns(sleeveReturns);
+    }
+
+    /** Replaces the sleeves' returns (already net of fee); does nothing without a setup. */
+    void useSleeveReturns(Map<BondMaturity, BigDecimal> sleeveReturns) {
+        if (setup != null) {
+            setup = new PoolStrategy.TentSetup(setup.placementOrder(), setup.mixShares(), sleeveReturns,
+                    setup.nominalYields());
+        }
+    }
+
+    /** Spends {@code min(amount, tent)}, shortest maturity first; returns what was spent (0 without a tent). */
+    BigDecimal spend(BigDecimal amount) {
+        if (setup == null) {
+            return BigDecimal.ZERO;
+        }
+        clamp();
+        return tent.spend(amount, setup.placementOrder());
+    }
+
+    /**
+     * The balance-weighted return of the unreserved (growth) part, {@code sum (V-T) r / sum (V-T)}, from
+     * current balances and reservations; zero when no growth part is left.
+     */
+    BigDecimal growthPartReturn() {
+        return growthPartReturn(returns.taxable(), returns.traditional(), returns.roth());
+    }
+
+    BigDecimal growthPartReturn(BigDecimal taxableReturn, BigDecimal traditionalReturn, BigDecimal rothReturn) {
+        clamp();
+        BigDecimal taxable = growthPart(PoolType.TAXABLE);
+        BigDecimal trad = growthPart(PoolType.TRADITIONAL);
+        BigDecimal rothPart = growthPart(PoolType.ROTH);
+        BigDecimal base = taxable.add(trad).add(rothPart);
+        if (base.signum() <= 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal growth = taxable.multiply(taxableReturn).add(trad.multiply(traditionalReturn))
+                .add(rothPart.multiply(rothReturn));
+        return growth.divide(base, PoolStrategy.SCALE + 4, PoolStrategy.ROUNDING);
+    }
+
+    private BigDecimal growthPart(PoolType pool) {
+        return balanceOf(pool).subtract(tent.totalIn(pool)).max(BigDecimal.ZERO);
     }
 
     BigDecimal total() {

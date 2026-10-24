@@ -149,4 +149,42 @@ class TentReservationTest {
         assertThat(tent.total()).isEqualByComparingTo("80000");
         assertThat(tent.byMaturity().get(BondMaturity.ULTRASHORT)).isEqualByComparingTo("5000");
     }
+
+    private static final List<PoolType> PLACEMENT = List.of(PoolType.TAXABLE, PoolType.TRADITIONAL, PoolType.ROTH);
+
+    @Test
+    void spend_shortestMaturityFirst() {
+        var tent = reserved100k();
+
+        var spent = tent.spend(bd("35000"), PLACEMENT);
+
+        assertThat(spent).isEqualByComparingTo("35000");
+        assertThat(tent.byMaturity().get(BondMaturity.ULTRASHORT)).isEqualByComparingTo("0");
+        assertThat(tent.byMaturity().get(BondMaturity.SHORT)).isEqualByComparingTo("15000");
+        assertThat(tent.byMaturity().get(BondMaturity.INTERMEDIATE)).isEqualByComparingTo("50000");
+        assertThat(tent.byMaturity().get(BondMaturity.LONG)).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void spend_withinAMaturity_followsPlacementOrder() {
+        var tent = TentReservation.empty();
+        tent.reserve(PoolType.TAXABLE, bd("10000"), shares("1", "0", "0", "0"));
+        tent.reserve(PoolType.TRADITIONAL, bd("10000"), shares("1", "0", "0", "0"));
+
+        var spent = tent.spend(bd("15000"), PLACEMENT);
+
+        assertThat(spent).isEqualByComparingTo("15000");
+        assertThat(tent.totalIn(PoolType.TAXABLE)).isEqualByComparingTo("0");
+        assertThat(tent.totalIn(PoolType.TRADITIONAL)).isEqualByComparingTo("5000");
+    }
+
+    @Test
+    void spend_moreThanTheTent_spendsEverything() {
+        var tent = reserved100k();
+
+        var spent = tent.spend(bd("150000"), PLACEMENT);
+
+        assertThat(spent).isEqualByComparingTo("100000");
+        assertThat(tent.total()).isEqualByComparingTo("0");
+    }
 }

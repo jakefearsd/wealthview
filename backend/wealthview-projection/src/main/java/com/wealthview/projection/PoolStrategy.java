@@ -95,6 +95,33 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
         tentPools().topUp(targetBalance);
     }
 
+    /** Reserves like {@link #topUpTent(BigDecimal)} but at most {@code cap} more; a null cap is uncapped. */
+    default void topUpTent(BigDecimal targetBalance, @Nullable BigDecimal cap) {
+        tentPools().topUp(targetBalance, cap);
+    }
+
+    /** Spends {@code min(amount, tent)}, shortest maturity first; returns what was spent (0 without a tent). */
+    default BigDecimal spendTent(BigDecimal amount) {
+        return tentPools().spend(amount);
+    }
+
+    /** The unreserved part's balance-weighted return at the pools' current returns; 0 when none is left. */
+    default BigDecimal growthPartReturn() {
+        return tentPools().growthPartReturn();
+    }
+
+    /**
+     * Grows later years at {@code returns} (per pool) and the tent's sleeves at {@code sleeveReturns}
+     * (already net of fee). {@link #getWeightedReturn()} is unchanged.
+     */
+    default void useYearReturns(PoolReturns returns, Map<BondMaturity, BigDecimal> sleeveReturns) {
+        tentPools().useYearReturns(returns, sleeveReturns);
+    }
+
+    /** Per-pool and household returns for one set of asset-class returns; see {@link #poolReturnsFor}. */
+    record PoolReturns(BigDecimal taxable, BigDecimal traditional, BigDecimal roth, BigDecimal household) {
+    }
+
     /** The reserved tent balance after clamping each pool's reservation to its balance. */
     default BigDecimal tentTotal() {
         return tentPools().total();
@@ -782,17 +809,29 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                 .collect(Collectors.groupingBy(ProjectionAccountInput::poolType,
                         () -> new EnumMap<>(PoolType.class), Collectors.toList()));
 
-        BigDecimal householdReturn = computeWeightedReturn(accounts, geoMeans, inflationRate, feeRate);
+        var returns = poolReturnsFor(accounts, geoMeans, inflationRate, feeRate);
+        return new MultiPool(grouped, returns.taxable(), returns.traditional(), returns.roth(),
+                returns.household(), config);
+    }
 
-        return new MultiPool(grouped,
-                poolWeightedReturn(grouped.getOrDefault(PoolType.TAXABLE, List.of()), householdReturn,
-                        geoMeans, inflationRate, feeRate),
-                poolWeightedReturn(grouped.getOrDefault(PoolType.TRADITIONAL, List.of()), householdReturn,
-                        geoMeans, inflationRate, feeRate),
-                poolWeightedReturn(grouped.getOrDefault(PoolType.ROTH, List.of()), householdReturn,
-                        geoMeans, inflationRate, feeRate),
-                householdReturn,
-                config);
+    /**
+     * The per-pool and household returns for {@code assetReturns} (the geometric means, or one year's
+     * returns): the same allocation blend, fee and empty-pool fallback {@link #create} builds with.
+     */
+    static PoolReturns poolReturnsFor(List<ProjectionAccountInput> accounts, Map<AssetClass, Double> assetReturns,
+                                      BigDecimal inflationRate, BigDecimal feeRate) {
+        Map<PoolType, List<ProjectionAccountInput>> grouped = accounts.stream()
+                .collect(Collectors.groupingBy(ProjectionAccountInput::poolType,
+                        () -> new EnumMap<>(PoolType.class), Collectors.toList()));
+        BigDecimal household = computeWeightedReturn(accounts, assetReturns, inflationRate, feeRate);
+        return new PoolReturns(
+                poolWeightedReturn(grouped.getOrDefault(PoolType.TAXABLE, List.of()), household,
+                        assetReturns, inflationRate, feeRate),
+                poolWeightedReturn(grouped.getOrDefault(PoolType.TRADITIONAL, List.of()), household,
+                        assetReturns, inflationRate, feeRate),
+                poolWeightedReturn(grouped.getOrDefault(PoolType.ROTH, List.of()), household,
+                        assetReturns, inflationRate, feeRate),
+                household);
     }
 
     private static BigDecimal sumInitialBalances(List<ProjectionAccountInput> accounts) {
@@ -974,9 +1013,6 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
         private final BigDecimal taxableContribJoint;
         private final BigDecimal taxableContribPrimary;
         private final BigDecimal taxableContribSpouse;
-        private final BigDecimal taxableReturn;
-        private final BigDecimal traditionalReturn;
-        private final BigDecimal rothReturn;
         private final BigDecimal weightedReturn;
 
         /**
@@ -1047,7 +1083,8 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             this.taxableEquityShare = taxableEquityShare(taxableAccounts);
             this.traditional = OwnerPool.ofBalances(grouped.getOrDefault(PoolType.TRADITIONAL, List.of()));
             this.roth = OwnerPool.ofBalances(grouped.getOrDefault(PoolType.ROTH, List.of()));
-            this.tents = new TentPools(lots, traditional, roth);
+            this.tents = new TentPools(lots, traditional, roth,
+                    new PoolReturns(taxableReturn, traditionalReturn, rothReturn, weightedReturn));
 
             this.tradContrib = OwnerPool.ofContributions(grouped.getOrDefault(PoolType.TRADITIONAL, List.of()));
             this.rothContrib = OwnerPool.ofContributions(grouped.getOrDefault(PoolType.ROTH, List.of()));
@@ -1056,9 +1093,6 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             this.taxableContribPrimary = sumContribsByOwner(taxableAccounts, LotOwner.PRIMARY);
             this.taxableContribSpouse = sumContribsByOwner(taxableAccounts, LotOwner.SPOUSE);
 
-            this.taxableReturn = taxableReturn;
-            this.traditionalReturn = traditionalReturn;
-            this.rothReturn = rothReturn;
             this.weightedReturn = weightedReturn;
             this.filingStatus = config.filingStatus();
             this.otherIncome = config.otherIncome();
@@ -1129,9 +1163,10 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
         @Override
         public GrowthResult applyGrowth(boolean retired) {
             tents.clamp();
-            BigDecimal tradGrowth = tents.growOwnerPool(traditional, PoolType.TRADITIONAL, traditionalReturn);
-            BigDecimal rothGrowth = tents.growOwnerPool(roth, PoolType.ROTH, rothReturn);
-            BigDecimal taxableGrowth = tents.growTaxable(retired, taxableReturn, taxableEquityShare,
+            var returns = tents.returns();
+            BigDecimal tradGrowth = tents.growOwnerPool(traditional, PoolType.TRADITIONAL, returns.traditional());
+            BigDecimal rothGrowth = tents.growOwnerPool(roth, PoolType.ROTH, returns.roth());
+            BigDecimal taxableGrowth = tents.growTaxable(retired, returns.taxable(), taxableEquityShare,
                             dividendYield, interestYield)
                     .map(this::bookTaxableYear)
                     .orElseGet(() -> growTaxableWithoutTent(retired));
@@ -1144,7 +1179,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
 
         private BigDecimal growTaxableWithoutTent(boolean retired) {
             BigDecimal taxableBefore = lots.totalValue();
-            BigDecimal taxableGrowth = taxableBefore.multiply(taxableReturn).setScale(SCALE, ROUNDING);
+            BigDecimal taxableGrowth = taxableBefore.multiply(tents.returns().taxable()).setScale(SCALE, ROUNDING);
             BigDecimal targetTotal = taxableBefore.add(taxableGrowth);
 
             if (retired) {
@@ -1167,7 +1202,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                 // (taxableGrowth/targetTotal, and therefore the whole projection's BALANCE
                 // trajectory) byte-identical to the pre-C8 split path's own total-preserving
                 // guarantee -- only the lots' internal basis composition differs.
-                lots.growToExactTotal(taxableReturn, targetTotal);
+                lots.growToExactTotal(tents.returns().taxable(), targetTotal);
                 qualifiedDividendIncome = BigDecimal.ZERO;
                 ordinaryInterestIncome = BigDecimal.ZERO;
             }
@@ -1208,7 +1243,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             BigDecimal bondShare = BigDecimal.ONE.subtract(taxableEquityShare);
 
             if (bondShare.signum() == 0) {
-                lots.grow(taxableReturn.subtract(dividendYield));
+                lots.grow(tents.returns().taxable().subtract(dividendYield));
                 BigDecimal dividend = targetTotal.subtract(lots.totalValue());
                 lots.addLot(dividend);
                 qualifiedDividendIncome = dividend.max(BigDecimal.ZERO);
@@ -1216,7 +1251,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             } else {
                 BigDecimal equityYieldRate = taxableEquityShare.multiply(dividendYield);
                 BigDecimal blendedYield = equityYieldRate.add(bondShare.multiply(interestYield));
-                lots.grow(taxableReturn.subtract(blendedYield));
+                lots.grow(tents.returns().taxable().subtract(blendedYield));
                 BigDecimal totalDistribution = targetTotal.subtract(lots.totalValue());
                 lots.addLot(totalDistribution);
 

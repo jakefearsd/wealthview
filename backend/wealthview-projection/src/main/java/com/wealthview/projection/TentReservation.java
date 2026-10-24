@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
+import org.springframework.lang.Nullable;
+
 import com.wealthview.core.projection.dto.BondMaturity;
 import com.wealthview.core.projection.dto.PoolType;
 
@@ -201,13 +203,44 @@ final class TentReservation {
      */
     void topUp(BigDecimal target, List<PoolType> placementOrder, Map<BondMaturity, BigDecimal> mixShares,
                Function<PoolType, BigDecimal> balanceOf) {
+        topUp(target, null, placementOrder, mixShares, balanceOf);
+    }
+
+    /** As {@link #topUp(BigDecimal, List, Map, Function)} but reserving at most {@code cap} more; null is uncapped. */
+    void topUp(BigDecimal target, @Nullable BigDecimal cap, List<PoolType> placementOrder,
+               Map<BondMaturity, BigDecimal> mixShares, Function<PoolType, BigDecimal> balanceOf) {
         BigDecimal needed = target.subtract(total());
+        if (cap != null) {
+            needed = needed.min(cap.max(BigDecimal.ZERO));
+        }
         for (PoolType pool : placementOrder) {
             BigDecimal free = balanceOf.apply(pool).subtract(totalIn(pool)).max(BigDecimal.ZERO);
             BigDecimal taken = needed.min(free);
             reserve(pool, taken, mixShares);
             needed = needed.subtract(taken);
         }
+    }
+
+    /**
+     * Spends {@code min(amount, total)} of the reservation, shortest maturity first and, within a
+     * maturity, from pools in {@code placementOrder}; returns what was spent.
+     */
+    BigDecimal spend(BigDecimal amount, List<PoolType> placementOrder) {
+        BigDecimal remaining = amount.max(BigDecimal.ZERO);
+        BigDecimal spent = BigDecimal.ZERO;
+        for (BondMaturity maturity : BondMaturity.values()) {
+            for (PoolType pool : placementOrder) {
+                if (remaining.signum() <= 0) {
+                    return spent;
+                }
+                var poolSleeves = sleevesOf(pool);
+                BigDecimal taken = remaining.min(poolSleeves.get(maturity));
+                poolSleeves.put(maturity, poolSleeves.get(maturity).subtract(taken));
+                remaining = remaining.subtract(taken);
+                spent = spent.add(taken);
+            }
+        }
+        return spent;
     }
 
     /** Sum of sleeve times typed nominal yield for {@code pool}; no mutation. */
