@@ -37,7 +37,7 @@ regexes = [
     '''TE9BRFRFU1QtT05MWS1GQUtFLU1GQS1LRVktMzJCWVQ=''',
 
     # Historical crash identifiers (CrashKey) tripped the generic-api-key entropy rule; they are enum keys
-    '''(?:oil_shock_1973|dot_com_2000|financial_crisis_2008|inflation_2022)''',
+    '''^(?:oil_shock_1973|dot_com_2000|financial_crisis_2008|inflation_2022)$''',
 
     # Synthetic test emails / role strings used in unit fixtures
     '''@(?:example|test|x)\.(?:com|org)''',
