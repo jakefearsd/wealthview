@@ -25,6 +25,9 @@ final class TentBuildUp {
     static Start toRetirement(TrialTentPlan plan, TentPaths paths, int trial, double target,
                               TrialStartBalances noTentStart) {
         var tent = new TrialTent(plan, paths.sleeveReturnsOf(trial));
+        if (target <= 0) {
+            return new Start(tent, 0, 0, 0);
+        }
         int pre = plan.yearsBeforeRetirement();
         double diffTaxable = 0;
         double diffTraditional = 0;

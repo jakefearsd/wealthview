@@ -24,12 +24,14 @@ import com.wealthview.core.projection.dto.PoolType;
 final class TrialTent {
 
     private static final int MATURITIES = BondMaturity.values().length;
-    private static final int POOLS = PoolType.values().length;
+    private static final PoolType[] POOL_TYPES = PoolType.values();
+    private static final int POOLS = POOL_TYPES.length;
 
     private final TrialTentPlan plan;
     private final double[] sleeveReturns;
     private final double[] sleeves = new double[POOLS * MATURITIES];
     private final double[] displaced = new double[MATURITIES];
+    private final double[] grown = new double[POOLS];
     private double index = 1.0;
     private double peak = 1.0;
 
@@ -112,6 +114,25 @@ final class TrialTent {
         return grown;
     }
 
+    /**
+     * Computes each pool's one-year grown balance once for this year and remembers it, so the expected
+     * after-growth total and the effective pool returns share the figures. Returns the household sum.
+     */
+    double prepareGrowth(double taxable, double traditional, double roth, double taxableReturn,
+                         double traditionalReturn, double rothReturn, int yearFromToday) {
+        grown[PoolType.TAXABLE.ordinal()] = grownBalance(PoolType.TAXABLE, taxable, taxableReturn, yearFromToday);
+        grown[PoolType.TRADITIONAL.ordinal()] =
+                grownBalance(PoolType.TRADITIONAL, traditional, traditionalReturn, yearFromToday);
+        grown[PoolType.ROTH.ordinal()] = grownBalance(PoolType.ROTH, roth, rothReturn, yearFromToday);
+        return grown[PoolType.TAXABLE.ordinal()] + grown[PoolType.TRADITIONAL.ordinal()]
+                + grown[PoolType.ROTH.ordinal()];
+    }
+
+    /** The grown balance remembered by the last {@link #prepareGrowth} call. */
+    double preparedGrowth(PoolType pool) {
+        return grown[pool.ordinal()];
+    }
+
     void growSleeves(int yearFromToday) {
         int row = yearFromToday * MATURITIES;
         for (int p = 0; p < POOLS; p++) {
@@ -176,7 +197,8 @@ final class TrialTent {
     @SuppressWarnings("PMD.ForLoopCanBeForeach")
     void clampAll(double taxable, double traditional, double roth) {
         Arrays.fill(displaced, 0);
-        for (PoolType pool : PoolType.values()) {
+        for (int p = 0; p < POOLS; p++) {
+            PoolType pool = POOL_TYPES[p];
             double excess = totalIn(pool) - Math.max(0, balanceOf(pool, taxable, traditional, roth));
             int base = pool.ordinal() * MATURITIES;
             for (int m = 0; m < MATURITIES && excess > 0; m++) {

@@ -486,7 +486,8 @@ final class TrialSimulator {
             TrialTent tent = activeTent(config.tent());
             int tentYear = tent == null ? 0 : tent.yearsBeforeRetirement() + y;
             double expectedAfterGrowth = tent == null ? 0
-                    : tentExpectedAfterGrowth(tent, tp, taxableReturn, traditionalReturn, rothReturn, tentYear);
+                    : tent.prepareGrowth(tp.taxable(), tp.traditionalTotal(), tp.rothTotal(), taxableReturn,
+                            traditionalReturn, rothReturn, tentYear);
 
             // Audit C9: the trial's start-of-year total portfolio (pre-growth pools) — the signal
             // the simulated guardrail rule measures against the no-adaptation median. Captured
@@ -887,19 +888,8 @@ final class TrialSimulator {
 
     /** A pool's return once its tent sleeves earn their own: {@code grown / balance - 1}, or the raw
      * {@code poolReturn} when the pool is empty. */
-    private static double effectiveReturn(TrialTent tent, PoolType pool, double balance, double poolReturn,
-                                          int tentYear) {
-        return balance == 0 ? poolReturn : tent.grownBalance(pool, balance, poolReturn, tentYear) / balance - 1;
-    }
-
-    /** The household total the year's growth alone would produce, from pre-growth balances: what the pools
-     * would hold if nothing were withdrawn or taxed. The year-end settlement measures the net outflow
-     * against it. */
-    private static double tentExpectedAfterGrowth(TrialTent tent, TrialPools tp, double taxableReturn,
-                                                  double traditionalReturn, double rothReturn, int tentYear) {
-        return tent.grownBalance(PoolType.TAXABLE, tp.taxable(), taxableReturn, tentYear)
-                + tent.grownBalance(PoolType.TRADITIONAL, tp.traditionalTotal(), traditionalReturn, tentYear)
-                + tent.grownBalance(PoolType.ROTH, tp.rothTotal(), rothReturn, tentYear);
+    private static double effectiveReturn(TrialTent tent, PoolType pool, double balance, double poolReturn) {
+        return balance == 0 ? poolReturn : tent.preparedGrowth(pool) / balance - 1;
     }
 
     /**
@@ -915,12 +905,12 @@ final class TrialSimulator {
         double traditional = tp.traditionalTotal();
         double roth = tp.rothTotal();
         double growth = tent.growthReturn(taxable, traditional, roth, taxableReturn, traditionalReturn, rothReturn);
-        var split = tp.growTaxable(effectiveReturn(tent, PoolType.TAXABLE, taxable, taxableReturn, tentYear),
+        var split = tp.growTaxable(effectiveReturn(tent, PoolType.TAXABLE, taxable, taxableReturn),
                 config.dividendYield(), config.interestYield(), config.taxableEquityShare(),
                 tent.totalIn(PoolType.TAXABLE), tent.interestIn(PoolType.TAXABLE));
         applyInterestTax(tp, split.interestIncome(), table, base);
-        tp.growNonTaxablePools(effectiveReturn(tent, PoolType.TRADITIONAL, traditional, traditionalReturn, tentYear),
-                effectiveReturn(tent, PoolType.ROTH, roth, rothReturn, tentYear));
+        tp.growNonTaxablePools(effectiveReturn(tent, PoolType.TRADITIONAL, traditional, traditionalReturn),
+                effectiveReturn(tent, PoolType.ROTH, roth, rothReturn));
         tent.growSleeves(tentYear);
         tent.advanceIndex(growth);
         return new GrowthYieldResult(split.dividendIncome(), base + split.interestIncome());

@@ -68,6 +68,19 @@ class TentBuildUpTest {
     }
 
     @Test
+    void toRetirement_zeroTarget_returnsAnEmptyTentWithNoAdjustments() {
+        var paths = paths(3, new double[] {1_000_000, 1_100_000, 770_000},
+                new double[] {1_100_000, 770_000, 770_000});
+
+        var start = TentBuildUp.toRetirement(plan(3, 3, 10_000), paths, 0, 0, taxableStart(770_000));
+
+        assertThat(start.tent().isEmpty()).isTrue();
+        assertThat(start.taxableAdjustment()).isZero();
+        assertThat(start.traditionalAdjustment()).isZero();
+        assertThat(start.rothAdjustment()).isZero();
+    }
+
+    @Test
     void toRetirement_bondsHoldUpInACrash_raisesTheStartBalance() {
         var paths = paths(3, new double[] {1_000_000, 1_100_000, 770_000},
                 new double[] {1_100_000, 770_000, 770_000});
