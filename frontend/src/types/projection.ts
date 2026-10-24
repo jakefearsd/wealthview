@@ -618,3 +618,65 @@ export interface BondTentResult {
     sizing: BondTentSizing;
     years: BondTentYear[];
 }
+
+export type CrashKey = 'oil_shock_1973' | 'dot_com_2000' | 'financial_crisis_2008' | 'inflation_2022';
+
+export const CRASHES: { key: CrashKey; label: string }[] = [
+    { key: 'oil_shock_1973', label: '1973–74' },
+    { key: 'dot_com_2000', label: '2000–02' },
+    { key: 'financial_crisis_2008', label: '2007–09' },
+    { key: 'inflation_2022', label: '2022' },
+];
+
+export interface BondTentReplayYear {
+    year: number;
+    age: number;
+    balance: number;
+    tent_balance: number;
+    tent_drawn: number;
+    stocks_sold_while_down: number;
+    stocks_below_high: boolean;
+    history_year: number | null;
+}
+
+export interface BondTentReplayOutcome {
+    name: string;
+    tent_target: number | null;
+    lowest_balance: number;
+    stocks_sold_while_down: number;
+    years_covered: number | null;
+    tent_left_at_checkpoint: number | null;
+    balance_at90: number | null;
+    years: BondTentReplayYear[];
+}
+
+export interface BondTentReplay {
+    crash_label: string;
+    crash_first_year: number;
+    crash_last_year: number;
+    crash_calendar_year: number;
+    offset: number;
+    retirement_year: number;
+    planned_years: number;
+    checkpoint_age: number;
+    available_offsets: number[];
+    first_start_year: number;
+    last_start_year: number;
+    outcomes: BondTentReplayOutcome[];
+}
+
+export interface BondTentSimulationColumn {
+    name: string;
+    tent_target: number | null;
+    /** 0-1 fraction of trials that paid every year's planned spending in full. */
+    success_rate: number;
+    years_covered_median: number | null;
+    years_covered_worst10: number | null;
+    balance_at90_median: number | null;
+}
+
+export interface BondTentSimulation {
+    trial_count: number;
+    planned_years: number;
+    columns: BondTentSimulationColumn[];
+}

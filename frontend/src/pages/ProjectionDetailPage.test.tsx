@@ -63,6 +63,10 @@ vi.mock('../components/ProjectionChart', () => ({
     default: ({ mode }: { mode: string }) => <div data-testid={`chart-${mode}`}>Chart: {mode}</div>,
 }));
 
+vi.mock('../components/bondTent/BondTentTab', () => ({
+    default: ({ hasTent }: { hasTent: boolean }) => <div data-testid="bond-tent-tab">tent:{String(hasTent)}</div>,
+}));
+
 vi.mock('../components/MilestoneStrip', () => ({
     default: () => <div data-testid="milestone-strip">Milestones</div>,
 }));
@@ -72,7 +76,7 @@ vi.mock('../components/TaxBreakdownChart', () => ({
 }));
 
 import { useApiQuery } from '../hooks/useApiQuery';
-import { getScenario } from '../api/projections';
+import { getScenario, runProjection } from '../api/projections';
 const mockUseApiQuery = vi.mocked(useApiQuery);
 
 function renderPage() {
@@ -306,6 +310,36 @@ describe('ProjectionDetailPage', () => {
             await waitFor(async () => {
                 await expect(fetchFn!()).rejects.toEqual({ response: { status: 500 } });
             });
+        });
+    });
+
+    describe('Bond tent tab', () => {
+        const withPlan = makeScenario({
+            id: 'abc-123',
+            accounts: [makeAccount()],
+            params_json: '{"bond_tent":{"coverage_years":5}}',
+            guardrail_profile: { id: 'g1', name: 'Plan', stale: false, active: true },
+        });
+
+        it('shows the Bond tent tab for a scenario with a spending plan', async () => {
+            mockUseApiQuery.mockReturnValue({ data: withPlan, loading: false, error: null, refetch: vi.fn() });
+            renderPage();
+            vi.mocked(runProjection).mockResolvedValue(makeResult());
+
+            await userEvent.click(screen.getByRole('button', { name: /run projection/i }));
+            await userEvent.click(screen.getByRole('tab', { name: 'Bond tent' }));
+
+            expect(screen.getByTestId('bond-tent-tab')).toHaveTextContent('tent:true');
+        });
+
+        it('hides the Bond tent tab without a spending plan', async () => {
+            mockUseApiQuery.mockReturnValue({ data: mockScenario, loading: false, error: null, refetch: vi.fn() });
+            renderPage();
+            vi.mocked(runProjection).mockResolvedValue(makeResult());
+
+            await userEvent.click(screen.getByRole('button', { name: /run projection/i }));
+
+            expect(screen.queryByRole('tab', { name: 'Bond tent' })).not.toBeInTheDocument();
         });
     });
 });

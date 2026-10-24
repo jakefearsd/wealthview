@@ -1,5 +1,5 @@
 import client from './client';
-import type { Scenario, ProjectionResult, CreateScenarioRequest, UpdateScenarioRequest, CompareResponse, GuardrailProfileResponse, GuardrailOptimizationRequest, BondTentConfig, BondTentSizing } from '../types/projection';
+import type { Scenario, ProjectionResult, CreateScenarioRequest, UpdateScenarioRequest, CompareResponse, GuardrailProfileResponse, GuardrailOptimizationRequest, BondTentConfig, BondTentSizing, BondTentSimulation, BondTentReplay, CrashKey } from '../types/projection';
 
 export async function listScenarios(): Promise<Scenario[]> {
     const { data } = await client.get<Scenario[]>('/projections');
@@ -60,5 +60,21 @@ export async function reoptimize(scenarioId: string): Promise<GuardrailProfileRe
 
 export async function sizeBondTent(scenarioId: string, config: BondTentConfig): Promise<BondTentSizing> {
     const { data } = await client.post<BondTentSizing>(`/projections/${scenarioId}/bond-tent/sizing`, config);
+    return data;
+}
+
+export async function getBondTentSimulation(scenarioId: string): Promise<BondTentSimulation> {
+    const { data } = await client.get<BondTentSimulation>(`/projections/${scenarioId}/bond-tent/simulation`);
+    return data;
+}
+
+export async function getBondTentReplay(
+    scenarioId: string,
+    choice: { crash: CrashKey } | { start_year: number },
+    offset: number,
+): Promise<BondTentReplay> {
+    const { data } = await client.get<BondTentReplay>(`/projections/${scenarioId}/bond-tent/replay`, {
+        params: { ...choice, offset },
+    });
     return data;
 }

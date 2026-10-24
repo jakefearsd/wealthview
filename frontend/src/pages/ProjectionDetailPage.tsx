@@ -24,6 +24,8 @@ import DataTableTab from '../components/DataTableTab';
 import IncomeTaxTab from '../components/IncomeTaxTab';
 import TaxShieldTab from '../components/TaxShieldTab';
 import TaxSpaceTab from '../components/TaxSpaceTab';
+import BondTentTab from '../components/bondTent/BondTentTab';
+import { parseBondTent } from '../components/scenario/parseBondTent';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
@@ -34,7 +36,7 @@ import Button from '../components/Button';
 import TabBar from '../components/TabBar';
 import { scrollRegionProps } from '../utils/scrollRegion';
 
-type TabId = 'chart' | 'flows' | 'table' | 'spending' | 'income_tax' | 'income_streams' | 'tax_shield' | 'tax_space';
+type TabId = 'chart' | 'flows' | 'table' | 'spending' | 'income_tax' | 'income_streams' | 'tax_shield' | 'tax_space' | 'bond_tent';
 
 export default function ProjectionDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -107,6 +109,14 @@ export default function ProjectionDetailPage() {
         () => (result?.yearly_data ? computeTaxMetrics(result.yearly_data) : null),
         [result],
     );
+
+    const hasTent = useMemo(() => {
+        try {
+            return parseBondTent(scenario?.params_json) !== null;
+        } catch {
+            return false;
+        }
+    }, [scenario]);
 
     if (loading) return <LoadingState message="Loading scenario..." />;
     if (error && !scenario) return <ErrorState message={error} onRetry={refetch} />;
@@ -422,6 +432,8 @@ export default function ProjectionDetailPage() {
                                     ? [{ key: 'income_streams' as TabId, label: 'Income Streams' }] : []),
                                 ...(taxShieldSummary && taxShieldSummary.totalDepreciation > 0
                                     ? [{ key: 'tax_shield' as TabId, label: 'Tax Shield' }] : []),
+                                ...(scenario.spending_profile || scenario.guardrail_profile?.active
+                                    ? [{ key: 'bond_tent' as TabId, label: 'Bond tent' }] : []),
                             ]}
                             active={activeTab}
                             onSelect={setActiveTab}
@@ -459,6 +471,10 @@ export default function ProjectionDetailPage() {
                                 incomeSources={scenario.income_sources}
                                 retirementYear={retirementYear}
                             />
+                        )}
+
+                        {activeTab === 'bond_tent' && (
+                            <BondTentTab scenarioId={scenario.id} hasTent={hasTent} />
                         )}
 
                         {activeTab === 'tax_shield' && taxShieldSummary && (

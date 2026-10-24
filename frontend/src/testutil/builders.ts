@@ -1,4 +1,8 @@
 import type {
+    BondTentReplay,
+    BondTentReplayOutcome,
+    BondTentReplayYear,
+    BondTentSimulation,
     GuardrailProfileResponse,
     ProjectionAccount,
     RothConversionScheduleResponse,
@@ -102,6 +106,81 @@ export function makeProfile(overrides: Partial<GuardrailProfileResponse> = {}): 
         bond_tent_target: null,
         conversion_schedule: null,
         stochastic_mortality: null,
+        ...overrides,
+    };
+}
+
+export function makeReplayYear(overrides: Partial<BondTentReplayYear> = {}): BondTentReplayYear {
+    return {
+        year: 2045,
+        age: 65,
+        balance: 1000000,
+        tent_balance: 200000,
+        tent_drawn: 0,
+        stocks_sold_while_down: 0,
+        stocks_below_high: false,
+        history_year: 2000,
+        ...overrides,
+    };
+}
+
+export function makeReplayOutcome(overrides: Partial<BondTentReplayOutcome> = {}): BondTentReplayOutcome {
+    return {
+        name: 'No tent',
+        tent_target: null,
+        lowest_balance: 800000,
+        stocks_sold_while_down: 50000,
+        years_covered: null,
+        tent_left_at_checkpoint: null,
+        balance_at90: 900000,
+        years: [makeReplayYear({ year: 2045 }), makeReplayYear({ year: 2046, age: 66, balance: 900000 })],
+        ...overrides,
+    };
+}
+
+export function makeReplay(overrides: Partial<BondTentReplay> = {}): BondTentReplay {
+    return {
+        crash_label: '2000–02',
+        crash_first_year: 2000,
+        crash_last_year: 2002,
+        crash_calendar_year: 2045,
+        offset: 0,
+        retirement_year: 2045,
+        planned_years: 25,
+        checkpoint_age: 70,
+        available_offsets: [-3, -2, -1, 0, 1, 2, 3],
+        first_start_year: 1954,
+        last_start_year: 2025,
+        outcomes: [
+            makeReplayOutcome(),
+            makeReplayOutcome({
+                name: 'Plan mix',
+                tent_target: 300000,
+                lowest_balance: 850000,
+                stocks_sold_while_down: 0,
+                years_covered: 4.5,
+                tent_left_at_checkpoint: 120000,
+                balance_at90: 950000,
+            }),
+        ],
+        ...overrides,
+    };
+}
+
+export function makeSimulation(overrides: Partial<BondTentSimulation> = {}): BondTentSimulation {
+    return {
+        trial_count: 5000,
+        planned_years: 30,
+        columns: [
+            {
+                name: 'No tent', tent_target: null, success_rate: 0.82,
+                years_covered_median: null, years_covered_worst10: null, balance_at90_median: 400000,
+            },
+            {
+                name: 'Plan mix', tent_target: 300000, success_rate: 0.9,
+                years_covered_median: 4.25, years_covered_worst10: 2, balance_at90_median: 450000,
+            },
+        ],
         ...overrides,
     };
 }

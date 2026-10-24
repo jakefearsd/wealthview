@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 export interface SegmentedControlOption<T extends string> {
     value: T;
     label: string;
+    disabled?: boolean;
 }
 
 interface SegmentedControlProps<T extends string> {
@@ -72,8 +73,12 @@ export default function SegmentedControl<T extends string>({
                     key={opt.value}
                     type="button"
                     aria-pressed={value === opt.value}
-                    onClick={() => onChange(opt.value)}
-                    style={optionStyle(value === opt.value, variant)}
+                    disabled={opt.disabled}
+                    onClick={() => { if (!opt.disabled) onChange(opt.value); }}
+                    style={{
+                        ...optionStyle(value === opt.value, variant),
+                        ...(opt.disabled ? { opacity: 0.45, cursor: 'not-allowed' } : {}),
+                    }}
                 >
                     {opt.label}
                 </button>

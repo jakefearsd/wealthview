@@ -71,4 +71,17 @@ describe('SegmentedControl', () => {
         expect(screen.getByRole('button', { name: 'Option B' })).toHaveAttribute('aria-pressed', 'true');
         expect(screen.getByRole('button', { name: 'Option C' })).toHaveAttribute('aria-pressed', 'false');
     });
+
+    it('a disabled option cannot be selected', async () => {
+        const user = userEvent.setup();
+        const onChange = vi.fn();
+        const options = [OPTIONS[0], { ...OPTIONS[1], disabled: true }, OPTIONS[2]];
+        render(<SegmentedControl options={options} value="a" onChange={onChange} />);
+
+        const disabled = screen.getByRole('button', { name: 'Option B' });
+        await user.click(disabled);
+
+        expect(disabled).toBeDisabled();
+        expect(onChange).not.toHaveBeenCalled();
+    });
 });
