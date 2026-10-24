@@ -4,7 +4,7 @@
 
 WealthView's data model comprises 43 JPA entities mapped onto 43 PostgreSQL tables across 9 domains. Almost all primary keys are UUID with `DEFAULT gen_random_uuid()`; the exceptions are `prices` (composite `(symbol, date)`), `system_config` (text `key`), and `mobile_app_versions` (text `platform`). Timestamps use `timestamptz`. Monetary amounts use `numeric(19,4)`.
 
-The schema is at **V083**, built from **93 migration files** — 83 versioned (`V001`–`V083`) plus 10 repeatable seeds (`R__…`) — in `backend/wealthview-persistence/src/main/resources/db/migration/`.
+The schema is at **V085**, built from **95 migration files** — 85 versioned (`V001`–`V085`) plus 10 repeatable seeds (`R__…`) — in `backend/wealthview-persistence/src/main/resources/db/migration/`.
 
 ## Entity Relationship Diagram
 
@@ -597,8 +597,9 @@ Monte-Carlo-optimized spending plan bound to exactly one scenario — the `Guard
 | max_annual_adjustment_rate | numeric(5,4) NOT NULL DEFAULT 0.0500 | Smoothing constraint (V039) |
 | phase_blend_years | integer NOT NULL DEFAULT 1 | Smoothing constraint (V039) |
 | risk_tolerance | text | `conservative` / `moderate` / `aggressive` → target success 0.95 / 0.90 / 0.80 |
-| cash_reserve_years | integer NOT NULL DEFAULT 2 | Bucket strategy (V040) |
-| cash_return_rate | numeric(5,4) NOT NULL DEFAULT 0.0400 | Bucket strategy (V040) |
+| cash_reserve_years | integer NOT NULL DEFAULT 0 | Retired: kept but no longer read (bond tent replaced it); default changed from 2 to 0 in V085 |
+| cash_return_rate | numeric(5,4) NOT NULL DEFAULT 0.0400 | Retired: kept but no longer read (V040) |
+| bond_tent_target | numeric(19,4) | Nullable. Bond tent size the plan was certified with; null without a tent (V084) |
 | conversion_schedule | jsonb | Roth conversion optimizer output (V044) |
 | conversion_bracket_rate | numeric(5,4) | Roth conversion target bracket (V044) |
 | rmd_target_bracket_rate | numeric(5,4) | Target bracket for future RMDs (V044) |
@@ -971,7 +972,7 @@ Force-update / version-check data for the React Native client — one row per pl
 
 ## Flyway Migration Inventory
 
-Flyway migrations live in `backend/wealthview-persistence/src/main/resources/db/migration/` and run automatically on application startup. There are **93 files**: 83 versioned (`V001`–`V083`) and 10 repeatable seeds.
+Flyway migrations live in `backend/wealthview-persistence/src/main/resources/db/migration/` and run automatically on application startup. There are **95 files**: 85 versioned (`V001`–`V085`) and 10 repeatable seeds.
 
 ### Versioned Migrations
 
@@ -1060,6 +1061,8 @@ Flyway migrations live in `backend/wealthview-persistence/src/main/resources/db/
 | V081      | Add `optimize_conversions` and `dynamic_sequencing_bracket_rate` to guardrail profiles |
 | V082      | Flag every guardrail profile stale (Monte Carlo trials now start today) |
 | V083      | Create bond_maturity_returns (short/intermediate/long Treasury real returns) |
+| V084      | Add nullable `bond_tent_target` to guardrail profiles (certified tent size) |
+| V085      | Convert existing cash reserves into 100% ultrashort bond tents; set `cash_reserve_years` default to 0 |
 
 ### Repeatable Migrations
 

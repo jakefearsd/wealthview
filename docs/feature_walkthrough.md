@@ -457,7 +457,7 @@ Spouse Social Security is **not** on this form — model it as an Income Source 
    - **Tier 2:** Phase Name `Quiet Years`, Start Age `80`, Essential `30000`, Discretionary `10000`
 5. Click **Create**.
 6. **Verify:** The profile card appears with Essential, Discretionary, Monthly Equivalent and Spending Tiers tiles.
-7. **Verify:** Below the profile list, a **Monte Carlo Guardrail Profiles** section lists any optimizer-generated profiles with Essential Floor, Failure Rate, Median Final Balance, Trials, Cash Buffer and Balance Range (P10-P50) tiles.
+7. **Verify:** Below the profile list, a **Monte Carlo Guardrail Profiles** section lists any optimizer-generated profiles with Essential Floor, Failure Rate, Median Final Balance, Trials, Bond Tent and Balance Range (P10-P50) tiles.
 
 Guardrail profiles are spending profiles — a scenario has **at most one** active spending plan at a time, and the scenario form presents both kinds in a single **Spending Plan** dropdown.
 

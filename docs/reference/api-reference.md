@@ -412,18 +412,21 @@ scenario.
 The optimization request accepts `essential_floor`, `terminal_balance_target`,
 `return_mean`, `trial_count` (100-50000), `confidence_level` (0.5-0.999), `phases`,
 `portfolio_floor`, `max_annual_adjustment_rate`, `phase_blend_years`, `risk_tolerance`,
-`cash_reserve_years`, `cash_return_rate`, `optimize_conversions`,
+`optimize_conversions`,
 `conversion_bracket_rate`, `rmd_target_bracket_rate`, `traditional_exhaustion_buffer`,
 `rmd_bracket_headroom`, `dynamic_sequencing_bracket_rate`, and `gate_on_adaptive_rules`.
-Every field is optional; the service resolves defaults for anything omitted. When `cash_return_rate` is omitted it
-defaults to 1.5% real.
+Every field is optional; the service resolves defaults for anything omitted. The optimizer's cash reserve is
+retired (replaced by the scenario's bond tent), so `cash_reserve_years` and `cash_return_rate` are no longer
+accepted or returned. Clients that still send them are ignored.
 `optimize_conversions` and `dynamic_sequencing_bracket_rate` are stored on the profile
 (migration V081), and `reoptimize` re-uses both as saved, along with the saved phases.
 
 The response includes the resolved settings plus `yearly_spending`, `median_final_balance`,
 `failure_rate`, `success_probability`, `percentile10_final`, `stale`,
-`conversion_schedule`, and `stochastic_mortality`. Each conversion-schedule row's
+`conversion_schedule`, `stochastic_mortality`, and `bond_tent_target`. Each conversion-schedule row's
 `bracket_used` names the bracket the conversion fills (for example `"12%"`).
+`bond_tent_target` is the bond tent size (dollars) the plan was certified with; it is `null` when the scenario
+has no tent.
 
 ## Spending Profiles
 
