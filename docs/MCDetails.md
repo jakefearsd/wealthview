@@ -49,6 +49,30 @@ search uses `seed + 1`, and stochastic mortality
 uses `seed + 0x4D4F5254`. (An engine-level call with no seed at all falls back to unseeded
 randomness, but nothing in the application takes that path.)
 
+## Bond Tent
+
+If the scenario has a bond tent, every trial models it. It adds no randomness of its own: each maturity's
+return comes from the same bootstrapped market year as the rest of that trial.
+
+- **Paths.** The tent is built before retirement along the scenario's build-up line. Contributions always go
+  in; stocks are sold into the tent only in years when stocks are at or above their previous high. During
+  retirement the tent grows at each maturity's own historical return, net of the fee rate. A configured tent
+  forces the 1972-2025 window.
+- **Trigger.** "Stocks" means the growth part of the pools, the non-tent holdings, tracked as a cumulative return
+  index. A retirement year pays from the tent when that index, measured after the year's growth, is below its
+  running peak. Withdrawals never move the index.
+- **Settlement.** A trigger year pays the year's net household outflow (spending draw, taxes and penalty) from
+  the tent, shortest maturity first. Which accounts are drawn and how the withdrawal is taxed do not change; only
+  the asset sold does. In other years the tent is spent only when no pool can hold it any more. It is never
+  refilled, and what is left stays in bonds.
+- **Sizing.** For each spending schedule the search tries, the tent is sized from that schedule's withdrawals over
+  the covered years, including an expected-path estimate of withdrawal tax. The size of the final recommended
+  schedule is stored as the profile's certified tent size.
+
+Some figures ignore the tent's different returns and see only total pool balances: the no-withdrawal balance paths
+behind the essential-floor check and the corridors, the expected-path scalars, and the median start balance used by
+the adaptation baseline. The Roth conversion optimizer ignores a tent held in an IRA.
+
 ## The Confidence Level (Conservative/Moderate/Aggressive)
 
 This is the **target success probability** — the share of simulated market histories in which the plan
@@ -63,7 +87,7 @@ supplied the default is 0.95.)
 
 **"Success" means your essential floor was funded in every single year of that trial.** It is *not*
 "the portfolio never hit zero" and it is *not* "the ending balance beat a target". A trial fails the
-moment income + portfolio draws + cash reserve fall short of that year's floor.
+moment income + portfolio draws (including the bond tent, if the scenario has one) fall short of that year's floor.
 
 This is the **decision input** — it drives how much the optimizer lets you spend. Higher confidence =
 less spending (more margin for bad markets). Lower confidence = more spending (accepting more risk).

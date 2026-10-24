@@ -138,7 +138,20 @@ A **bond tent** is a reserve of bonds that covers the first several years of ret
 
 **1928 to 1971 history.** A bond tent turns off the **Include 1928-1971 market history** option, because bond maturity data starts in 1954. The checkbox is unchecked and disabled while the tent is on.
 
-The Monte Carlo simulation and the spending optimizer do not yet take a tent into account; they ignore a configured tent. That arrives in a later release.
+**In the Monte Carlo simulation and the spending optimizer.** Both now model the tent. On each simulated market path the tent is built up before retirement the same way as in the projection: contributions go in every year, and stocks are sold to add more only in years when stocks are at or above their previous high. In retirement, a year in which stocks are below their previous high is paid from the tent first, shortest bonds first, and the rest of the withdrawal comes from the other holdings as usual. The tent is not refilled. Each maturity earns its own historical return for the simulated year. A configured tent also limits the simulation to the 1972-2025 market window.
+
+The optimizer re-sizes the tent for each spending level it tries, and it records the size it certified the recommended plan with. That size can differ a little from the one the scenario form shows, because the optimizer estimates withdrawal tax along the way. You will see it as "Certified with a $X bond tent." on the results and as the **Bond Tent** tile on the Spending Profiles page.
+
+**Cash reserves became tents.** The optimizer used to have its own cash reserve setting. It is gone. Each existing reserve was converted into a bond tent of the same number of years (up to 10), held entirely in ultrashort Treasuries, with the build-up starting at retirement; those scenarios show a one-time notice in this section until their next save. The conversion changes four things:
+
+1. A spent tent is not refilled, where the old reserve refilled itself.
+2. The tent is drawn when stocks are below their previous high, not in any year with a negative return. The old reserve also topped itself up after any up year; that behavior is gone.
+3. The tent earns historical Treasury bill returns instead of a fixed cash rate.
+4. The reserve now also appears in the main projection, as cash that is held; before, it existed only in the optimizer.
+
+Converted profiles are marked out of date, so re-optimize them to see the new numbers.
+
+**Known gap.** The Roth conversion optimizer ignores a tent held in an IRA.
 
 ### Income Sources
 

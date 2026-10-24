@@ -8,13 +8,24 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 - Bond tent on the scenario form: turn it on, choose how many years of spending to cover, when to start building it and up to three bond-maturity mixes, and see how big the tent needs to be for a saved scenario. A tent turns off the 1928-1971 market history option.
-- The main projection now builds and holds a configured bond tent: it is built up before retirement and held as bonds inside your accounts, which lowers projected growth (the tent's cost). The Monte Carlo simulation and the spending optimizer ignore a configured tent until a later release.
+- The main projection now builds and holds a configured bond tent: it is built up before retirement and held as bonds inside your accounts, which lowers projected growth (the tent's cost).
+- The Monte Carlo simulation and the spending optimizer now model the bond tent: it is built on each market path, drawn when stocks are below their previous high, and re-sized for each spending level. Optimized profiles record the tent size they were certified with, shown as "Certified with a $X bond tent." and as the **Bond Tent** tile on Spending Profiles.
 
 ### Changed
 - Monte Carlo simulations now start today rather than at retirement, for every scenario.
 - Success rates and recommended spending may move, especially when retirement is years away.
 - Existing optimized profiles are marked out of date. Re-optimize to refresh them.
 - Scenarios retiring this year are unaffected.
+- The optimizer's cash reserve (Cash Reserve and Cash Rate) has been replaced by the bond tent. Each existing reserve was converted into a bond tent of the same length, held entirely in ultrashort Treasuries, and shows a one-time notice until the scenario is next saved. Four things differ from the old reserve:
+  - A spent tent is not refilled.
+  - The tent is drawn when stocks are below their previous high, not in any negative year. This also ends the old reserve's habit of refilling after any up year.
+  - It earns historical Treasury bill returns instead of a fixed cash rate.
+  - The reserve now also appears in the main projection, as cash held.
+- Optimized profiles that had a cash reserve are marked out of date. Re-optimize them.
+- Known gap: the Roth conversion optimizer ignores a bond tent held in an IRA.
+
+### Upgrade notes
+- Migrations V084 and V085 apply when the app starts. V084 adds the certified tent size to optimizer profiles. V085 converts existing cash reserves into bond tents; the old cash columns stay in the database but are no longer read.
 
 ## [1.3.0] — 2026-10-17
 
