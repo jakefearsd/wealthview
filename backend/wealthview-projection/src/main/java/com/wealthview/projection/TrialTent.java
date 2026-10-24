@@ -71,6 +71,11 @@ final class TrialTent {
         return sum;
     }
 
+    /** One sleeve: {@code pool}'s reservation at {@code maturity}. */
+    double sleeve(PoolType pool, BondMaturity maturity) {
+        return sleeves[pool.ordinal() * MATURITIES + maturity.ordinal()];
+    }
+
     boolean isEmpty() {
         return total() <= 0;
     }
