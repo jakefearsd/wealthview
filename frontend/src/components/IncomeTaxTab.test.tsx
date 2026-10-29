@@ -158,10 +158,14 @@ describe('IncomeTaxTab', () => {
         render(<IncomeTaxTab yearlyData={data} {...commonProps} />);
 
         expect(screen.getByText('Tax Breakdown: Federal + State')).toBeInTheDocument();
-        expect(screen.getByText('Itemized')).toBeInTheDocument();
-        expect(screen.getByText('Standard')).toBeInTheDocument();
-        expect(screen.getByText('$6,000')).toBeInTheDocument();
-        expect(screen.getByText('$2,500')).toBeInTheDocument();
+        const row = (year: string) => screen.getByText(year).closest('tr') as HTMLElement;
+        expect(row('2040')).toHaveTextContent('Itemized');
+        expect(row('2040')).toHaveTextContent('$6,000');
+        expect(row('2040')).toHaveTextContent('$3,000');
+        expect(row('2041')).toHaveTextContent('Standard');
+        expect(row('2041')).toHaveTextContent('$5,500');
+        expect(row('2041')).toHaveTextContent('$2,500');
+        expect(row('2042')).not.toHaveTextContent(/Itemized|Standard/);
     });
 
     it('titles the table "Tax Burden Over Time" when no year has a state tax', () => {

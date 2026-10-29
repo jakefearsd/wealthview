@@ -77,7 +77,8 @@ class ReplayOutcomesTest {
 
     @Test
     void of_rowsReachCheckpointAndAge90_readsTentAtAge70AndBalanceAtAge89() {
-        var rows = List.of(row(2031, 950, 250, 50, 0), row(BIRTH_YEAR + 70, 800, 75, 0, 0), row(BIRTH_YEAR + 89, 640, 0, 0, 0));
+        var rows = List.of(row(2031, 950, 250, 50, 0), row(BIRTH_YEAR + 70, 800, 75, 0, 0),
+                row(BIRTH_YEAR + 89, 640, 0, 0, 0));
 
         var outcome = ReplayOutcomes.of("mix", BigDecimal.valueOf(300), rows, sizing(1, 2031, 100), BIRTH_YEAR);
 

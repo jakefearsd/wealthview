@@ -37,4 +37,19 @@ class TrialPoolsTest {
         assertThat(actualSplit).isEqualTo(expectedSplit);
         assertThat(actual.taxable()).isEqualTo(expected.taxable());
     }
+
+    @Test
+    void growTaxable_noYieldsAtAll_growsPoolWithNoIncomeAndNoNewBasis() {
+        var lots = new TaxableLots();
+        lots.addLot(1_000_000, 1_000_000);
+        var tp = new TrialPools(new double[] {1_000_000, 0, 0, 0, 0}, lots);
+
+        var split = tp.growTaxable(0.05, 0.0, 0.0, 0.6);
+
+        assertThat(tp.taxable()).isCloseTo(1_050_000, within(EPS));
+        assertThat(split.dividendIncome()).isZero();
+        assertThat(split.interestIncome()).isZero();
+        assertThat(lots.totalValue()).isCloseTo(1_050_000, within(EPS));
+        assertThat(lots.totalBasis()).isCloseTo(1_000_000, within(EPS));
+    }
 }

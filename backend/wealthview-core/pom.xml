@@ -14,8 +14,8 @@
     <name>WealthView Core</name>
 
     <properties>
-        <!-- JaCoCo gate: CLAUDE.md line target 0.90; branch floor just below
-             the measured 0.8579 reached in the coverage-hardening pass. -->
+        <!-- JaCoCo gate: floors ratcheted to the levels measured in the Task 9 coverage pass
+             (line 0.96+, branch 0.9022 measured); round down, never lower. -->
         <jacoco.check.skip>false</jacoco.check.skip>
         <jacoco.line.minimum>0.96</jacoco.line.minimum>
         <jacoco.branch.minimum>0.90</jacoco.branch.minimum>
