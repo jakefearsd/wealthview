@@ -375,8 +375,8 @@ final class WithdrawalTaxBillSolver {
          * slice's realized gain is priced by {@link #settleTaxSaleGain} (D5) -- this method only ever
          * grows the TRADITIONAL slice.
          *
-         * <p>The physical drain happens once, afterward, via the caller's own {@link
-         * MultiPool#deductFromPools} call on the returned {@code tax} -- this method never mutates a pool.
+         * <p>The physical drain happens once, afterward, via the caller's own
+         * {@code MultiPool#deductFromPools} call on the returned {@code tax} -- this method never mutates a pool.
          */
         private GrossUpResult growTraditionalGrossUp(BigDecimal baseTaxableIncome, int year,
                 BigDecimal effectiveOtherIncome, BigDecimal conversionAmount, BigDecimal alreadyChargedBaseTax,
@@ -494,8 +494,8 @@ final class WithdrawalTaxBillSolver {
 
     /**
      * The traditional-sourced dollars of a hypothetical {@code tax} payment cascading
-     * taxable-first against FROZEN (pre-drain) pool balances -- mirrors {@link
-     * MultiPool#deductFromPools}'s cascade order without mutating anything, so {@link
+     * taxable-first against FROZEN (pre-drain) pool balances -- mirrors
+     * {@code MultiPool#deductFromPools}'s cascade order without mutating anything, so {@link
      * BillRun#growTraditionalGrossUp}'s fixed-point search can explore candidate bills before the real
      * drain happens.
      */

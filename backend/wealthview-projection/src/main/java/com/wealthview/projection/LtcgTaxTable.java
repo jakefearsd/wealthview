@@ -79,7 +79,7 @@ final class LtcgTaxTable {
      * BRACKET tax (it is ordinary income, already priced via {@link OrdinaryTaxTable} elsewhere in
      * the trial loop) -- only the NIIT surtax's NII pot. The bracket walk nets
      * {@code grossOrdinaryFloor} by the year's standard deduction (cross-engine parity with
-     * {@code MultiPool#computeLtcgTax}); MAGI (for the NIIT threshold comparison)
+     * {@code WithdrawalTaxBillSolver#computeLtcgTax}); MAGI (for the NIIT threshold comparison)
      * stays GROSS and is UNAFFECTED by rental income -- {@code grossOrdinaryFloor} already includes
      * it (via {@code ordinaryBaseIncomeByYear}, which is rental-aware -- see
      * {@code OptimizationContextBuilder}), matching {@code CapitalGainsTaxCalculator}'s convention

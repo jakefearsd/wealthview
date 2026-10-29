@@ -270,7 +270,7 @@ sealed interface PoolStrategy permits MultiPool {
      * ordinary income, so it must fund its own tax too. That extra draw is debited from traditional
      * like any other distribution, folded into the returned ordinary-income reporting (so the
      * Social Security provisional-income convergence and the tax-liability/DTO breakdown all agree),
-     * and counts toward RMD satisfaction. See {@code MultiPool#growTraditionalGrossUp}
+     * and counts toward RMD satisfaction. See {@code WithdrawalTaxBillSolver#growTraditionalGrossUp}
      * for the fixed-point search.
      *
      * <p>{@code inputs.}{@link WithdrawalCycleInputs#netRentalIncome() netRentalIncome} (T18a-3) is

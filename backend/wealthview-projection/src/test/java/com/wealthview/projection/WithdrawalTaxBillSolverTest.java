@@ -17,6 +17,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -112,5 +113,24 @@ class WithdrawalTaxBillSolverTest {
 
         assertThat(peeks.get()).isEqualTo(1);
         assertThat(bill.total()).isEqualByComparingTo(bd("1500"));
+    }
+
+    @Test
+    void settle_multipleEvaluations_recordsLastBreakdown() {
+        var first = new CombinedTaxResult(bd("1000"), ZERO, bd("1000"), ZERO, ZERO, false);
+        var second = new CombinedTaxResult(bd("1250"), ZERO, bd("1250"), ZERO, ZERO, false);
+        var last = new CombinedTaxResult(bd("1333"), ZERO, bd("1333"), ZERO, ZERO, false);
+        var tax = mock(TaxCalculationStrategy.class);
+        when(tax.computeDetailedTax(any(), anyInt(), any(), any(), any())).thenReturn(first, second, last);
+        var solver = solver(tax);
+        // No taxable pool: the 1000 base bill is paid from traditional, so the gross-up search
+        // re-evaluates the ordinary tax at 1000 (pass 1) and at the warm jump 1333.33 (pass 2).
+        var in = new BillInputs(YEAR, ZERO, ZERO, bd("20000"), ZERO, ZERO, ZERO, ZERO, ZERO, 65,
+                ZERO, bd("100000"), FilingStatus.SINGLE, ZERO, ZERO);
+
+        var bill = solver.settle(in, x -> ZERO);
+
+        verify(tax, times(3)).computeDetailedTax(any(), anyInt(), any(), any(), any());
+        assertThat(bill.recordedBreakdown()).contains(last);
     }
 }
