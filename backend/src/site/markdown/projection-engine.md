@@ -60,7 +60,7 @@ important thing to know before reading any number in the engine:
   provisional-income thresholds (`SocialSecurityTaxCalculator`) and the NIIT thresholds
   ($200k single / $250k MFJ, `CapitalGainsTaxCalculator`).
 * A user-supplied per-account expected-return override is a **nominal** wire value and is converted
-  to real via `(1 + nominal) / (1 + inflation) − 1` before use (`PoolStrategy.realReturnFor`).
+  to real via `(1 + nominal) / (1 + inflation) − 1` before use (`PoolReturnBlender.realReturnFor`).
 
 ---
 
@@ -74,7 +74,7 @@ optional `allocation` (jsonb weights over `us_stock`, `intl_stock`, `bond`, `cas
   `RealReturnMatrix` (year x asset class) and caches it, plus the per-class geometric means. The
   default window is **1972–2025**; a scenario can opt into the full **1928–2025** seed (the
   Depression-era tail) via `params_json.include_depression_years`.
-* `PoolStrategy.realReturnFor` resolves one account's real return: the override path Fisher-converts
+* `PoolReturnBlender.realReturnFor` resolves one account's real return: the override path Fisher-converts
   the nominal value; otherwise the account's allocation weights are blended against the geometric
   means. Either way the scenario's annual all-in fee rate is then subtracted at that single choke
   point.

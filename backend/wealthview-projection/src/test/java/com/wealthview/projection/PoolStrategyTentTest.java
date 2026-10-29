@@ -63,7 +63,7 @@ class PoolStrategyTentTest {
 
     @Test
     void poolReturnsFor_sameInputs_matchesCreate() {
-        var returns = PoolStrategy.poolReturnsFor(ACCOUNTS, CMA, BigDecimal.ZERO, BigDecimal.ZERO);
+        var returns = PoolReturnBlender.poolReturnsFor(ACCOUNTS, CMA, BigDecimal.ZERO, BigDecimal.ZERO);
 
         assertThat(returns.taxable()).isEqualByComparingTo(PoolStrategy.create(ACCOUNTS, config())
                 .getWeightedReturn());
@@ -73,7 +73,7 @@ class PoolStrategyTentTest {
     void useYearReturns_growsPoolsAtTheYearsReturns() {
         var pool = PoolStrategy.create(ACCOUNTS, config());
 
-        pool.useYearReturns(PoolStrategy.poolReturnsFor(ACCOUNTS, year(-0.30), BigDecimal.ZERO, BigDecimal.ZERO),
+        pool.useYearReturns(PoolReturnBlender.poolReturnsFor(ACCOUNTS, year(-0.30), BigDecimal.ZERO, BigDecimal.ZERO),
                 Map.of());
         pool.applyGrowth(false);
 
@@ -87,7 +87,7 @@ class PoolStrategyTentTest {
 
         var sleeves = flat("0");
         sleeves.put(BondMaturity.LONG, bd("0.20"));
-        pool.useYearReturns(PoolStrategy.poolReturnsFor(ACCOUNTS, year(-0.30), BigDecimal.ZERO, BigDecimal.ZERO),
+        pool.useYearReturns(PoolReturnBlender.poolReturnsFor(ACCOUNTS, year(-0.30), BigDecimal.ZERO, BigDecimal.ZERO),
                 sleeves);
         pool.applyGrowth(false);
 
@@ -99,7 +99,7 @@ class PoolStrategyTentTest {
         var pool = PoolStrategy.create(ACCOUNTS, config());
         var before = pool.getWeightedReturn();
 
-        pool.useYearReturns(PoolStrategy.poolReturnsFor(ACCOUNTS, year(-0.30), BigDecimal.ZERO, BigDecimal.ZERO),
+        pool.useYearReturns(PoolReturnBlender.poolReturnsFor(ACCOUNTS, year(-0.30), BigDecimal.ZERO, BigDecimal.ZERO),
                 Map.of());
 
         assertThat(pool.getWeightedReturn()).isEqualByComparingTo(before);

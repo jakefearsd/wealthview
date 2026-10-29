@@ -30,7 +30,7 @@ class PoolStrategyReturnTest {
                 AssetAllocation.fromDoubles(Map.of(AssetClass.US_STOCK, 0.5, AssetClass.BOND, 0.5)),
                 Optional.empty(), "taxable");
 
-        BigDecimal r = PoolStrategy.realReturnFor(acct, GEO, new BigDecimal("0.025"), BigDecimal.ZERO);
+        BigDecimal r = PoolReturnBlender.realReturnFor(acct, GEO, new BigDecimal("0.025"), BigDecimal.ZERO);
 
         assertThat(r.doubleValue()).isCloseTo(0.045, org.assertj.core.data.Offset.offset(1e-6)); // .5*.07+.5*.02
     }
@@ -41,7 +41,7 @@ class PoolStrategyReturnTest {
                 new BigDecimal("1000"), BigDecimal.ZERO,
                 AssetAllocation.ALL_US, Optional.of(new BigDecimal("0.07")), "taxable");
 
-        BigDecimal r = PoolStrategy.realReturnFor(acct, GEO, new BigDecimal("0.025"), BigDecimal.ZERO);
+        BigDecimal r = PoolReturnBlender.realReturnFor(acct, GEO, new BigDecimal("0.025"), BigDecimal.ZERO);
 
         // (1.07/1.025)-1 = 0.043902...
         assertThat(r.doubleValue()).isCloseTo(0.0439024, org.assertj.core.data.Offset.offset(1e-6));
@@ -53,7 +53,7 @@ class PoolStrategyReturnTest {
                 new BigDecimal("1000"), BigDecimal.ZERO,
                 AssetAllocation.ALL_US, Optional.of(new BigDecimal("0.06")), "taxable");
 
-        BigDecimal r = PoolStrategy.realReturnFor(acct, GEO, BigDecimal.ZERO, BigDecimal.ZERO);
+        BigDecimal r = PoolReturnBlender.realReturnFor(acct, GEO, BigDecimal.ZERO, BigDecimal.ZERO);
 
         assertThat(r).isEqualByComparingTo(new BigDecimal("0.06"));
     }
@@ -68,7 +68,7 @@ class PoolStrategyReturnTest {
                 AssetAllocation.fromDoubles(Map.of(AssetClass.US_STOCK, 0.5, AssetClass.BOND, 0.5)),
                 Optional.empty(), "taxable");
 
-        BigDecimal r = PoolStrategy.realReturnFor(acct, GEO, new BigDecimal("0.025"), new BigDecimal("0.0025"));
+        BigDecimal r = PoolReturnBlender.realReturnFor(acct, GEO, new BigDecimal("0.025"), new BigDecimal("0.0025"));
 
         // .5*.07+.5*.02 - .0025 = .045 - .0025 = .0425 -- blended real return reduced by exactly the fee.
         assertThat(r.doubleValue()).isCloseTo(0.0425, org.assertj.core.data.Offset.offset(1e-6));
@@ -80,7 +80,7 @@ class PoolStrategyReturnTest {
                 new BigDecimal("1000"), BigDecimal.ZERO,
                 AssetAllocation.ALL_US, Optional.of(new BigDecimal("0.07")), "taxable");
 
-        BigDecimal r = PoolStrategy.realReturnFor(acct, GEO, new BigDecimal("0.025"), new BigDecimal("0.0025"));
+        BigDecimal r = PoolReturnBlender.realReturnFor(acct, GEO, new BigDecimal("0.025"), new BigDecimal("0.0025"));
 
         // (1.07/1.025)-1-0.0025 = 0.043902439... - 0.0025 = 0.041402439...
         assertThat(r.doubleValue()).isCloseTo(0.0414024390, org.assertj.core.data.Offset.offset(1e-6));
@@ -92,7 +92,7 @@ class PoolStrategyReturnTest {
                 new BigDecimal("1000"), BigDecimal.ZERO,
                 AssetAllocation.ALL_US, Optional.of(new BigDecimal("0.07")), "taxable");
 
-        BigDecimal r = PoolStrategy.realReturnFor(acct, GEO, new BigDecimal("0.025"), BigDecimal.ZERO);
+        BigDecimal r = PoolReturnBlender.realReturnFor(acct, GEO, new BigDecimal("0.025"), BigDecimal.ZERO);
 
         assertThat(r.doubleValue()).isCloseTo(0.0439024390, org.assertj.core.data.Offset.offset(1e-6));
     }

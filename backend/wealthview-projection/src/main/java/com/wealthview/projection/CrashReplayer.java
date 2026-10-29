@@ -83,7 +83,7 @@ final class CrashReplayer {
             sleeves.put(maturity, BigDecimal.valueOf(yearReturns.maturities().getOrDefault(maturity, 0.0))
                     .subtract(feeRate));
         }
-        pool.useYearReturns(PoolStrategy.poolReturnsFor(accounts, yearReturns.assets(), inflationRate, feeRate),
+        pool.useYearReturns(PoolReturnBlender.poolReturnsFor(accounts, yearReturns.assets(), inflationRate, feeRate),
                 sleeves);
         growthReturn = pool.growthPartReturn();
     }

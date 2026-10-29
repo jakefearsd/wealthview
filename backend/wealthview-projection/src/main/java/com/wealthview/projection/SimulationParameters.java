@@ -23,7 +23,7 @@ import com.wealthview.core.projection.household.AgeMilestones;
  * <p>{@code interestYield} (audit C1) is the scenario's bond/cash-sleeve nominal interest-yield
  * proxy, resolved once (falling back to {@code ScenarioParamsParser.DEFAULT_INTEREST_YIELD} when
  * unset) exactly like {@code dividendYield}. {@code taxableEquityShare} is the taxable pool's
- * balance-weighted equity share ({@link PoolStrategy#taxableEquityShare}), used to split the
+ * balance-weighted equity share ({@link PoolReturnBlender#taxableEquityShare}), used to split the
  * taxable pool's annual yield between qualified-dividend treatment (the equity share, at {@code
  * dividendYield}) and ordinary-interest treatment (the bond+cash share, at {@code interestYield})
  * in {@link TrialSimulator}, exactly like the deterministic engine's {@code PoolStrategy.MultiPool}.

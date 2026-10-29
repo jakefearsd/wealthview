@@ -44,7 +44,7 @@ class DeterministicProjectionEngineBackCompatTest extends DeterministicProjectio
 
         var result = engine.run(input);
 
-        // Real-terms conversion, mirroring PoolStrategy.realReturnFor: (1+X)/(1+i) - 1 minus the
+        // Real-terms conversion, mirroring PoolReturnBlender.realReturnFor: (1+X)/(1+i) - 1 minus the
         // scenario's fee rate (audit B1; unset here, so the ScenarioParamsParser default 0.25%
         // applies), computed independently here (not by calling production code) so this is a
         // true pinning check.

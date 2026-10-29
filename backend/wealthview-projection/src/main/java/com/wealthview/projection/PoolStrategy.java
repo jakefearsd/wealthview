@@ -2,15 +2,12 @@ package com.wealthview.projection;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import org.springframework.lang.Nullable;
 
-import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.BondMaturity;
 import com.wealthview.core.projection.dto.LotOwner;
 import com.wealthview.core.projection.dto.PoolType;
@@ -30,10 +27,11 @@ import com.wealthview.core.projection.tax.TaxCalculationStrategy;
  * account type absent from the scenario (audit C11 -- an all-taxable scenario is simply a MultiPool
  * with zero traditional and zero roth, not a distinct untaxed code path; see {@link #create}).
  */
-// PMD.ExcessivePublicCount: still 45 methods plus 3 constants against PMD's default threshold of 45 (checked by
-// removing this suppression: the rule fires). An interface's members are implicitly public, so none can be narrowed
-// to package-private; the interface IS the single seam between the year loop and the pools, and 8 of the members
-// are the bond-tent hooks, so the count is the seam's width rather than leaked internals.
+// PMD.ExcessivePublicCount: still 41 methods plus 3 constants (checked by removing this suppression after the
+// account-return statics moved to PoolReturnBlender: the rule still fires). An interface's members are implicitly
+// public, so none can be narrowed to package-private; the interface IS the single seam between the year loop and
+// the pools, and 8 of the members are the bond-tent hooks, so the count is the seam's width rather than leaked
+// internals.
 @SuppressWarnings("PMD.ExcessivePublicCount")
 sealed interface PoolStrategy permits PoolStrategy.MultiPool {
 
@@ -127,7 +125,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
         tentPools().useYearReturns(returns, sleeveReturns);
     }
 
-    /** Per-pool returns for one set of asset-class returns; see {@link #poolReturnsFor}. */
+    /** Per-pool returns for one set of asset-class returns; see {@link PoolReturnBlender#poolReturnsFor}. */
     record PoolReturns(BigDecimal taxable, BigDecimal traditional, BigDecimal roth) {
     }
 
@@ -543,80 +541,6 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
     void restore(Memento memento);
 
     /**
-     * Computes the real (inflation-adjusted), fee-adjusted return for a single account. When a
-     * nominal expected-return override is present it is converted to real via
-     * {@code (1+nominal)/(1+inflation) - 1}; otherwise the account's allocation is blended against
-     * the supplied capital-market geometric means (already real). The scenario's annual all-in
-     * fee/expense-ratio drag (audit B1) is then subtracted uniformly — a fee is a fee, whether the
-     * account's return is allocation-derived or a fixed override — so both paths converge through
-     * this single choke point before returning.
-     */
-    static BigDecimal realReturnFor(ProjectionAccountInput acct,
-                                    Map<AssetClass, Double> geoMeans, BigDecimal inflationRate,
-                                    BigDecimal feeRate) {
-        BigDecimal grossReal;
-        if (acct.expectedReturnOverride().isPresent()) {
-            BigDecimal nominal = acct.expectedReturnOverride().get();
-            grossReal = BigDecimal.ONE.add(nominal)
-                    .divide(BigDecimal.ONE.add(inflationRate), SCALE + 4, ROUNDING)
-                    .subtract(BigDecimal.ONE);
-        } else {
-            double blended = 0.0;
-            for (var e : acct.allocation().weights().entrySet()) {
-                Double g = geoMeans.get(e.getKey());
-                if (g != null) {
-                    blended += e.getValue().doubleValue() * g;
-                }
-            }
-            grossReal = BigDecimal.valueOf(blended).setScale(SCALE + 4, ROUNDING);
-        }
-        return grossReal.subtract(feeRate);
-    }
-
-    /**
-     * Audit C1: the balance-weighted "equity share" (us_stock + intl_stock weight) of a set of
-     * taxable accounts, used to split the taxable pool's annual yield between qualified-dividend
-     * treatment (the equity share, at {@code dividendYield}) and ordinary-interest treatment (the
-     * remaining bond+cash share, at {@code interestYield} — {@link AssetClass#CASH} is treated as
-     * bond-like ordinary interest at the same proxy rate; a distinct money-market yield is not
-     * modeled). Computed ONCE from each account's INITIAL balance/allocation, exactly like {@link
-     * #realReturnFor}'s per-account return — it does not track allocation drift as the pool's
-     * composition or relative balances change over the projection horizon.
-     *
-     * <p>Returns {@link BigDecimal#ONE} (100% equity, 0% bond/cash) when the accounts carry no
-     * balance at all — the split is then moot (there is no taxable value to distribute a yield
-     * against), and defaulting to the ALL_US-equivalent share keeps this degenerate case on the
-     * same code path as the byte-identical backward-compat anchor.
-     */
-    static BigDecimal taxableEquityShare(List<ProjectionAccountInput> taxableAccounts) {
-        BigDecimal totalBalance = sumInitialBalances(taxableAccounts);
-        if (totalBalance.signum() <= 0) {
-            return BigDecimal.ONE;
-        }
-        BigDecimal weighted = BigDecimal.ZERO;
-        for (var acct : taxableAccounts) {
-            BigDecimal weights0 = acct.allocation().weights().getOrDefault(AssetClass.US_STOCK, BigDecimal.ZERO);
-            BigDecimal equityWeight = weights0.add(
-                    acct.allocation().weights().getOrDefault(AssetClass.INTL_STOCK, BigDecimal.ZERO));
-            weighted = weighted.add(acct.initialBalance().multiply(equityWeight));
-        }
-        return weighted.divide(totalBalance, SCALE + 4, ROUNDING);
-    }
-
-    /**
-     * The balance-weighted real, fee-adjusted return across the WHOLE portfolio (every account,
-     * every pool type) — the same aggregate {@link #create} resolves as the deterministic engine's
-     * default growth assumption via {@link #computeWeightedReturn}. Reused by the Roth-conversion
-     * optimizer's guardrail-flow return resolution (audit C4) so the two engines' notion of "the
-     * scenario's expected real return" stays in lockstep instead of drifting apart.
-     */
-    static BigDecimal blendedRealReturn(List<ProjectionAccountInput> accounts,
-                                        Map<AssetClass, Double> geoMeans, BigDecimal inflationRate,
-                                        BigDecimal feeRate) {
-        return computeWeightedReturn(accounts, geoMeans, inflationRate, feeRate);
-    }
-
-    /**
      * Factory method that builds a {@link MultiPool} from the account types present, grouping
      * accounts by type and encapsulating all construction details. Always builds a MultiPool --
      * audit C11: an all-taxable (or all-any-single-type, or empty) account list used to dispatch to
@@ -627,129 +551,14 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
      * real-taxation fix for the all-taxable ones.
      */
     static PoolStrategy create(List<ProjectionAccountInput> accounts, PoolConfig config) {
-        Map<PoolType, List<ProjectionAccountInput>> grouped = groupByPool(accounts);
-        BigDecimal household = computeWeightedReturn(accounts, config.geoMeans(), config.inflationRate(),
+        Map<PoolType, List<ProjectionAccountInput>> grouped = PoolReturnBlender.groupByPool(accounts);
+        BigDecimal household = PoolReturnBlender.blendedRealReturn(accounts, config.geoMeans(),
+                config.inflationRate(), config.feeRate());
+        var returns = PoolReturnBlender.poolReturns(grouped, household, config.geoMeans(), config.inflationRate(),
                 config.feeRate());
-        var returns = poolReturns(grouped, household, config.geoMeans(), config.inflationRate(), config.feeRate());
         return new MultiPool(grouped, returns.taxable(), returns.traditional(), returns.roth(), household, config);
     }
 
-    /**
-     * The per-pool returns for {@code assetReturns} (the geometric means, or one year's returns): the same
-     * allocation blend, fee and empty-pool fallback {@link #create} builds with.
-     */
-    static PoolReturns poolReturnsFor(List<ProjectionAccountInput> accounts, Map<AssetClass, Double> assetReturns,
-                                      BigDecimal inflationRate, BigDecimal feeRate) {
-        BigDecimal household = computeWeightedReturn(accounts, assetReturns, inflationRate, feeRate);
-        return poolReturns(groupByPool(accounts), household, assetReturns, inflationRate, feeRate);
-    }
-
-    private static Map<PoolType, List<ProjectionAccountInput>> groupByPool(List<ProjectionAccountInput> accounts) {
-        return accounts.stream()
-                .collect(Collectors.groupingBy(ProjectionAccountInput::poolType,
-                        () -> new EnumMap<>(PoolType.class), Collectors.toList()));
-    }
-
-    private static PoolReturns poolReturns(Map<PoolType, List<ProjectionAccountInput>> grouped, BigDecimal household,
-                                           Map<AssetClass, Double> assetReturns, BigDecimal inflationRate,
-                                           BigDecimal feeRate) {
-        return new PoolReturns(
-                poolWeightedReturn(grouped.getOrDefault(PoolType.TAXABLE, List.of()), household,
-                        assetReturns, inflationRate, feeRate),
-                poolWeightedReturn(grouped.getOrDefault(PoolType.TRADITIONAL, List.of()), household,
-                        assetReturns, inflationRate, feeRate),
-                poolWeightedReturn(grouped.getOrDefault(PoolType.ROTH, List.of()), household,
-                        assetReturns, inflationRate, feeRate));
-    }
-
-    private static BigDecimal sumInitialBalances(List<ProjectionAccountInput> accounts) {
-        return accounts.stream()
-                .map(ProjectionAccountInput::initialBalance)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    /** HP1: annual taxable contribution summed over the accounts owned by one {@link LotOwner}
-     * category, so each year's contribution enters the commingled lots tagged by its owner. Lives
-     * on the interface (like {@link #sumInitialBalances}) to keep {@link MultiPool}'s own
-     * complexity down. */
-    private static BigDecimal sumContribsByOwner(List<ProjectionAccountInput> accounts, LotOwner owner) {
-        return accounts.stream()
-                .filter(account -> account.ownerType() == owner)
-                .map(ProjectionAccountInput::annualContribution)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    /**
-     * The weighted real return across the given accounts. Each account's real return is resolved
-     * via {@link #realReturnFor}; the result is the aggregate the pool grows at (or, for a single
-     * account-type group, that pool's own return).
-     *
-     * <p>Weights are the accounts' opening balances. When every opening balance is zero (a
-     * brand-new account, the classic young accumulator) the weights fall back to the annual
-     * contributions, and when those are zero too, to an equal-weight mean -- a zero-balance pool
-     * used to weight every account by zero and grow at 0% for the entire horizon (API #23), even
-     * as contributions poured in. An empty account list returns zero (nothing to blend); see
-     * {@link #poolWeightedReturn} for the pool-level fallback.
-     */
-    private static BigDecimal computeWeightedReturn(List<ProjectionAccountInput> accounts,
-                                                     Map<AssetClass, Double> geoMeans,
-                                                     BigDecimal inflationRate,
-                                                     BigDecimal feeRate) {
-        if (accounts.isEmpty()) {
-            return BigDecimal.ZERO;
-        }
-        List<BigDecimal> weights = blendWeights(accounts);
-        BigDecimal weightedSum = BigDecimal.ZERO;
-        BigDecimal totalWeight = BigDecimal.ZERO;
-        for (int i = 0; i < accounts.size(); i++) {
-            BigDecimal weight = weights.get(i);
-            weightedSum = weightedSum.add(
-                    weight.multiply(realReturnFor(accounts.get(i), geoMeans, inflationRate, feeRate)));
-            totalWeight = totalWeight.add(weight);
-        }
-        return weightedSum.divide(totalWeight, SCALE + 4, ROUNDING);
-    }
-
-    /**
-     * Per-account blend weights for {@link #computeWeightedReturn}: opening balances when any is
-     * positive, else positive annual contributions when any is positive, else one each (equal
-     * weight). A negative contribution (a planned pre-retirement withdrawal) weighs zero: weighting
-     * by it could cancel the positive ones to a zero total (a divide by zero) or extrapolate the
-     * blend past every account's own return. Never all-zero for a non-empty list, so the blend is
-     * always defined.
-     */
-    private static List<BigDecimal> blendWeights(List<ProjectionAccountInput> accounts) {
-        if (sumInitialBalances(accounts).signum() > 0) {
-            return accounts.stream().map(ProjectionAccountInput::initialBalance).toList();
-        }
-        List<BigDecimal> contributionWeights = accounts.stream()
-                .map(account -> account.annualContribution().max(BigDecimal.ZERO))
-                .toList();
-        if (contributionWeights.stream().anyMatch(weight -> weight.signum() > 0)) {
-            return contributionWeights;
-        }
-        return accounts.stream().map(account -> BigDecimal.ONE).toList();
-    }
-
-    /**
-     * The real return one account-type pool grows at: its accounts' weighted return (see
-     * {@link #computeWeightedReturn}), or -- for a pool with NO accounts at all, such as the Roth
-     * pool that Roth conversions create in a scenario with no Roth account, or the taxable pool
-     * that receives reinvested RMD/surplus cash with no taxable account -- {@code householdReturn},
-     * the whole portfolio's weighted return. Money that lands in an account-less pool is the
-     * household's money, so it earns the household's blended return rather than 0% (API #5: a
-     * traditional-only converter's Roth used to sit at 0% for decades).
-     */
-    private static BigDecimal poolWeightedReturn(List<ProjectionAccountInput> accounts,
-                                                  BigDecimal householdReturn,
-                                                  Map<AssetClass, Double> geoMeans,
-                                                  BigDecimal inflationRate,
-                                                  BigDecimal feeRate) {
-        if (accounts.isEmpty()) {
-            return householdReturn;
-        }
-        return computeWeightedReturn(accounts, geoMeans, inflationRate, feeRate);
-    }
 
     // --- MultiPool ---
 
@@ -868,7 +677,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
         private final BigDecimal interestYield;
         /**
          * Audit C1: the taxable pool's balance-weighted equity share (us_stock + intl_stock),
-         * computed once at construction via {@link PoolStrategy#taxableEquityShare} — {@code 1.0}
+         * computed once at construction via {@link PoolReturnBlender#taxableEquityShare} — {@code 1.0}
          * (bond share {@code 0.0}) for every ALL_US or no-allocation account, the byte-identical
          * backward-compat anchor for {@link #applyGrowth(boolean)}'s yield split.
          */
@@ -908,7 +717,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             }
             // Audit C1: the taxable pool's own allocation-derived equity share, computed once from
             // the same account list the lots above were seeded from.
-            this.taxableEquityShare = taxableEquityShare(taxableAccounts);
+            this.taxableEquityShare = PoolReturnBlender.taxableEquityShare(taxableAccounts);
             this.traditional = OwnerPool.ofBalances(grouped.getOrDefault(PoolType.TRADITIONAL, List.of()));
             this.roth = OwnerPool.ofBalances(grouped.getOrDefault(PoolType.ROTH, List.of()));
             this.tents = new TentPools(lots, traditional, roth,
@@ -938,6 +747,15 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             this.baseYear = config.baseYear();
             this.earlyAccessAge = config.earlyAccessAge();
             this.federalTaxCalculator = config.federalTaxCalculator();
+        }
+
+        /** HP1: annual taxable contribution summed over the accounts owned by one {@link LotOwner}
+         * category, so each year's contribution enters the commingled lots tagged by its owner. */
+        private static BigDecimal sumContribsByOwner(List<ProjectionAccountInput> accounts, LotOwner owner) {
+            return accounts.stream()
+                    .filter(account -> account.ownerType() == owner)
+                    .map(ProjectionAccountInput::annualContribution)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
         }
 
         @Override

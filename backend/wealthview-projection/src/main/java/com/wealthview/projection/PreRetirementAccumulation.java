@@ -23,9 +23,9 @@ import com.wealthview.core.projection.dto.ProjectionAccountInput;
  * ~$30,000 portfolio while the deterministic projection had $3.87M at retirement. This rolls every account forward
  * from {@link GuardrailOptimizationInput#baseYear()} to the retirement year in the same order as the deterministic
  * engine's accumulation years: each year the annual contribution is added, then the balance grows at the account's
- * real, fee-adjusted return ({@link PoolStrategy#realReturnFor}, the per-account rate the deterministic engine blends
- * into its pool returns). Taxable contributions enter at cost and accumulation growth stays unrealized (audit C8), so
- * cost basis rises by the contributions only.
+ * real, fee-adjusted return ({@link PoolReturnBlender#realReturnFor}, the per-account rate the deterministic engine
+ * blends into its pool returns). Taxable contributions enter at cost and accumulation growth stays unrealized
+ * (audit C8), so cost basis rises by the contributions only.
  *
  * <p>This is not an exact replay of the deterministic balances. Each account grows here at its OWN
  * return, while the deterministic engine grows each pool at one return fixed at the start, weighted
@@ -61,7 +61,7 @@ final class PreRetirementAccumulation {
         List<ProjectionAccountInput> seeded = new ArrayList<>(input.accounts().size());
         for (var account : input.accounts()) {
             BigDecimal growthFactor = BigDecimal.ONE.add(
-                    PoolStrategy.realReturnFor(account, geoMeans, inflationRate, feeRate));
+                    PoolReturnBlender.realReturnFor(account, geoMeans, inflationRate, feeRate));
             BigDecimal contribution = account.annualContribution();
             BigDecimal balance = account.initialBalance();
             for (int y = 0; y < years; y++) {

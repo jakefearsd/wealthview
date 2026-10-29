@@ -227,7 +227,7 @@ final class OptimizationContextBuilder {
         // computed once from the taxable accounts' own allocation, falling back to 1.0 (100%
         // equity, ALL_US-equivalent -- byte-identical to pre-C1) when there are none.
         double interestYield = resolveInterestYield(input);
-        double taxableEquityShare = PoolStrategy.taxableEquityShare(
+        double taxableEquityShare = PoolReturnBlender.taxableEquityShare(
                 taxableAccounts(input.accounts())).doubleValue();
 
         // Sub-project B (stochastic mortality), task 6: when this run opted into stochastic mortality
@@ -658,14 +658,14 @@ final class OptimizationContextBuilder {
      *
      * <p><strong>Default</strong> (the request's {@code returnMean} is absent — the normal case;
      * the frontend never sends {@code return_mean}): the scenario's own fee-adjusted,
-     * allocation-blended REAL return — {@link PoolStrategy#blendedRealReturn}, the same
+     * allocation-blended REAL return — {@link PoolReturnBlender#blendedRealReturn}, the same
      * balance-weighted quantity the deterministic engine resolves as its default growth
      * assumption, computed here from this run's accounts and capital-market matrix so both
      * engines' notion of "the scenario's expected return" stay in lockstep.
      *
      * <p><strong>Explicit</strong> {@code returnMean} (wire contract: NOMINAL, the DTO's legacy
      * meaning): Fisher-converted to real via {@code (1+returnMean)/(1+inflation)-1}, then the
-     * scenario fee is subtracted — mirroring {@link PoolStrategy#realReturnFor}'s override-account
+     * scenario fee is subtracted — mirroring {@link PoolReturnBlender#realReturnFor}'s override-account
      * handling, so an explicit override and the allocation-derived default land in the same frame.
      */
     static double resolveReturnMean(GuardrailOptimizationInput input, double inflationRate,
@@ -675,7 +675,7 @@ final class OptimizationContextBuilder {
             return (1 + nominal) / (1 + inflationRate) - 1 - feeRate;
         }
         var geoMeans = CapitalMarketAssumptionsProvider.geometricMeansOf(matrix);
-        return PoolStrategy.blendedRealReturn(input.accounts(), geoMeans,
+        return PoolReturnBlender.blendedRealReturn(input.accounts(), geoMeans,
                 BigDecimal.valueOf(inflationRate), BigDecimal.valueOf(feeRate)).doubleValue();
     }
 

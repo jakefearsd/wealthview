@@ -26,7 +26,7 @@ import static org.assertj.core.data.Offset.offset;
  * one value, closing the double-Fisher trap.
  *
  * <p>Pins the two resolution branches directly against the underlying production resolvers
- * ({@link PoolStrategy#blendedRealReturn}, {@link CapitalMarketAssumptionsProvider#geometricMeansOf})
+ * ({@link PoolReturnBlender#blendedRealReturn}, {@link CapitalMarketAssumptionsProvider#geometricMeansOf})
  * rather than a re-derived literal, so this test fails only if {@code resolveReturnMean} actually
  * diverges from "the engine's own resolver output" — not if the CMA fixture data or blend algorithm
  * changes for unrelated reasons.
@@ -70,7 +70,7 @@ class OptimizationContextBuilderReturnFrameTest {
         // own default growth assumption -- this is "the engine's own resolver output", not a
         // hand-derived literal.
         var geoMeans = CapitalMarketAssumptionsProvider.geometricMeansOf(matrix);
-        double expected = PoolStrategy.blendedRealReturn(accounts, geoMeans,
+        double expected = PoolReturnBlender.blendedRealReturn(accounts, geoMeans,
                 BigDecimal.valueOf(INFLATION_RATE), BigDecimal.valueOf(FEE_RATE)).doubleValue();
 
         assertThat(resolved).isEqualTo(expected, offset(1e-12));
