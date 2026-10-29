@@ -2,6 +2,7 @@ package com.wealthview.app.it.projection;
 
 import java.math.BigDecimal;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.UUID;
 
@@ -10,6 +11,7 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
 
@@ -26,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 class CashReserveConversionIT extends AbstractApiIntegrationTest {
 
     private static final String V085 = "db/migration/V085__convert_cash_reserves_to_bond_tents.sql";
+    private static final String V086 = "db/migration/V086__mark_cash_reserve_guardrail_profiles_stale.sql";
     private static final String EXISTING_TENT = """
             {"birth_year":1990,"bond_tent":{"coverage_years":3,"build_up_start_years":2,"mixes":[{"name":"Mine",
             "shares":{"ultrashort":0,"short":1,"intermediate":0,"long":0}}],"yields":{"ultrashort":0.03,
@@ -62,8 +65,12 @@ class CashReserveConversionIT extends AbstractApiIntegrationTest {
     }
 
     private void runConversion() throws SQLException {
+        runScript(V085);
+    }
+
+    private void runScript(String resource) throws SQLException {
         try (var connection = dataSource.getConnection()) {
-            ScriptUtils.executeSqlScript(connection, new ClassPathResource(V085));
+            ScriptUtils.executeSqlScript(connection, new ClassPathResource(resource));
         }
     }
 
@@ -181,12 +188,71 @@ class CashReserveConversionIT extends AbstractApiIntegrationTest {
     }
 
     @Test
-    void migration_defaultCashReserveYears_isZero() {
-        var scenarioId = scenarioWithProfile("Default", 5, false, null);
+    void markStale_reserveProfileWithoutActivePlan_becomesStale() throws SQLException {
+        var id = scenarioWithProfile("Skipped by V085", 2, false, null);
+
+        runScript(V086);
+
+        assertThat(isStale(id)).isTrue();
+    }
+
+    @Test
+    void markStale_noReserveProfile_staysFresh() throws SQLException {
+        var id = scenarioWithProfile("No reserve", 0, false, null);
+
+        runScript(V086);
+
+        assertThat(isStale(id)).isFalse();
+    }
+
+    @Test
+    void markStale_alreadyStaleProfile_isLeftUntouched() throws SQLException {
+        var id = scenarioWithProfile("Already stale", 2, false, null);
+        jdbc.update("UPDATE guardrail_spending_profiles SET is_stale = true WHERE scenario_id = ?", id);
+        var updatedAt = jdbc.queryForObject(
+                "SELECT updated_at FROM guardrail_spending_profiles WHERE scenario_id = ?",
+                Timestamp.class, id);
+
+        runScript(V086);
+
+        assertThat(jdbc.queryForObject(
+                "SELECT updated_at FROM guardrail_spending_profiles WHERE scenario_id = ?",
+                Timestamp.class, id)).isEqualTo(updatedAt);
+    }
+
+    @Test
+    void markStale_doesNotTouchScenarioParams() throws SQLException {
+        var id = scenarioWithProfile("Params stay", 2, false, null);
+        var before = paramsJson(id);
+
+        runScript(V086);
+
+        assertThat(paramsJson(id)).isEqualTo(before);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void optimize_convertedScenario_succeedsAndReturnsBondTentTarget() throws SQLException {
+        var id = scenarioWithProfile("Converted", 2, true, null);
+        runConversion();
+        var body = new HashMap<String, Object>();
+        body.put("name", "Re-certified");
+        body.put("trial_count", 100);
+        body.put("confidence_level", 0.90);
+        body.put("risk_tolerance", "moderate");
+
+        var response = api.postForEntity("/api/v1/projections/" + id + "/optimize", body);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody().get("bond_tent_target")).isNotNull();
+        assertThat(((Number) response.getBody().get("bond_tent_target")).doubleValue()).isPositive();
+    }
+
+    @Test
+    void insertWithoutCashReserveYears_newGuardrailProfile_defaultsToZero() {
+        var secondId = UUID.fromString((String) data.createScenario("Fresh").get("id"));
         var tenantId = jdbc.queryForObject("SELECT tenant_id FROM projection_scenarios WHERE id = ?",
-                UUID.class, scenarioId);
-        var other = new HashMap<String, Object>(data.scenarioBody("Second"));
-        var secondId = UUID.fromString((String) api.postForEntity("/api/v1/projections", other).getBody().get("id"));
+                UUID.class, secondId);
         jdbc.update("""
                 INSERT INTO guardrail_spending_profiles (tenant_id, scenario_id, name, essential_floor, scenario_hash)
                 VALUES (?, ?, 'Fresh', 1, 'h')""", tenantId, secondId);
