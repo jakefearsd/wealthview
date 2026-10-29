@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('../utils/format', () => ({
@@ -140,5 +140,71 @@ describe('IncomeTaxTab', () => {
         expect(marker('2040').style.width).toBe('1.25em');
         expect(marker('2041').style.width).toBe('1.25em');
         expect(marker('2041').textContent).toBe('');
+    });
+
+    it('shows the federal and state breakdown with an Itemized or Standard badge per year', () => {
+        const data = [
+            makeYear({
+                year: 2040, age: 65, tax_liability: 9000, federal_tax: 6000, state_tax: 3000,
+                salt_deduction: 10000, used_itemized_deduction: true,
+            }),
+            makeYear({
+                year: 2041, age: 66, tax_liability: 8000, federal_tax: 5500, state_tax: 2500,
+                salt_deduction: 9000, used_itemized_deduction: false,
+            }),
+            makeYear({ year: 2042, age: 67, tax_liability: 7000 }),
+        ];
+
+        render(<IncomeTaxTab yearlyData={data} {...commonProps} />);
+
+        expect(screen.getByText('Tax Breakdown: Federal + State')).toBeInTheDocument();
+        expect(screen.getByText('Itemized')).toBeInTheDocument();
+        expect(screen.getByText('Standard')).toBeInTheDocument();
+        expect(screen.getByText('$6,000')).toBeInTheDocument();
+        expect(screen.getByText('$2,500')).toBeInTheDocument();
+    });
+
+    it('titles the table "Tax Burden Over Time" when no year has a state tax', () => {
+        render(<IncomeTaxTab yearlyData={[makeYear({ year: 2040, age: 65, tax_liability: 5000 })]} {...commonProps} />);
+
+        expect(screen.getByText('Tax Burden Over Time')).toBeInTheDocument();
+    });
+
+    it('toggles a year only when it has rental property details', () => {
+        const onToggle = vi.fn();
+        const detail = {
+            income_source_id: 'is-1', property_name: 'Rental', tax_treatment: 'rental_passive', gross_rent: 1000,
+            operating_expenses: 0, mortgage_interest: 0, property_tax: 0, depreciation: 0,
+            loss_applied_to_income: 0, suspended_loss_carryforward: 0, net_income: 1000,
+        } as unknown as NonNullable<ProjectionYear['rental_property_details']>[number];
+        const data = [
+            makeYear({ year: 2040, age: 65, tax_liability: 5000, rental_property_details: [detail] }),
+            makeYear({ year: 2041, age: 66, tax_liability: 5000 }),
+        ];
+        render(<IncomeTaxTab yearlyData={data} {...commonProps} onToggleTaxYear={onToggle} />);
+
+        fireEvent.click(screen.getByText('2041'));
+        fireEvent.click(screen.getByText('2040'));
+
+        expect(onToggle).toHaveBeenCalledTimes(1);
+        expect(onToggle).toHaveBeenCalledWith(2040);
+    });
+
+    it.each([
+        ['rental_passive', 'Passive'],
+        ['rental_active_reps', 'REPS'],
+        ['rental_active_str', 'STR'],
+    ])('labels an expanded %s property as %s', (treatment, label) => {
+        const detail = {
+            income_source_id: 'is-1', property_name: 'Rental', tax_treatment: treatment, gross_rent: 1000,
+            operating_expenses: 0, mortgage_interest: 0, property_tax: 0, depreciation: 0,
+            loss_applied_to_income: 700, suspended_loss_carryforward: 0, net_income: 1000,
+        } as unknown as NonNullable<ProjectionYear['rental_property_details']>[number];
+        const data = [makeYear({ year: 2040, age: 65, tax_liability: 5000, rental_property_details: [detail] })];
+
+        render(<IncomeTaxTab yearlyData={data} {...commonProps} expandedTaxYears={new Set([2040])} />);
+
+        expect(screen.getByText(label)).toBeInTheDocument();
+        expect(screen.getByText('$700')).toBeInTheDocument();
     });
 });

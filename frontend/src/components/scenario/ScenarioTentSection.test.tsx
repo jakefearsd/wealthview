@@ -113,6 +113,57 @@ describe('ScenarioTentSection', () => {
         )).toBeInTheDocument();
     });
 
+    it('reports an edited coverage and build-up start as numbers', () => {
+        const onChange = renderSection(defaultConfig());
+
+        fireEvent.change(screen.getByLabelText('Years of spending to cover'), { target: { value: '7.5' } });
+        fireEvent.change(screen.getByLabelText('Start building this many years before retirement'),
+            { target: { value: '8' } });
+
+        expect(onChange.mock.calls[0][0].coverage_years).toBe(7.5);
+        expect(onChange.mock.calls[1][0].build_up_start_years).toBe(8);
+    });
+
+    it('reports an edited yield as a fraction', () => {
+        const onChange = renderSection(defaultConfig());
+
+        fireEvent.change(screen.getByLabelText('Long yield (%)'), { target: { value: '5.5' } });
+
+        expect(onChange.mock.calls[0][0].yields.long).toBeCloseTo(0.055, 6);
+    });
+
+    it('renames only the edited mix', () => {
+        const config = defaultConfig();
+        config.mixes.push({ name: 'Second', shares: { ...DEFAULT_TENT_MIX.shares } });
+        const onChange = renderSection(config);
+
+        fireEvent.change(screen.getByLabelText('Mix 2 name'), { target: { value: 'Renamed' } });
+
+        expect(onChange.mock.calls[0][0].mixes.map((m: { name: string }) => m.name))
+            .toEqual([config.mixes[0].name, 'Renamed']);
+    });
+
+    it('edits the shares of the mix whose name was focused', () => {
+        const config = defaultConfig();
+        config.mixes.push({ name: 'Second', shares: { ...DEFAULT_TENT_MIX.shares } });
+        const onChange = renderSection(config);
+
+        fireEvent.focus(screen.getByLabelText('Mix 2 name'));
+        fireEvent.change(screen.getByLabelText('Long (TLT)'), { target: { value: '10' } });
+
+        const mixes = onChange.mock.calls[0][0].mixes;
+        expect(mixes[1].shares.long).toBeCloseTo(0.1, 6);
+        expect(mixes[0].shares.long).toBe(config.mixes[0].shares.long);
+    });
+
+    it('turns the tent off with null', () => {
+        const onChange = renderSection(defaultConfig());
+
+        fireEvent.click(screen.getByLabelText('Use a bond tent'));
+
+        expect(onChange).toHaveBeenCalledWith(null);
+    });
+
     it('flags shares that do not add up to 100%', () => {
         const config = defaultConfig();
         config.mixes[0].shares.long = 0.1;
