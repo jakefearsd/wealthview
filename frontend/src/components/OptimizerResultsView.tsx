@@ -1,4 +1,5 @@
 import type { GuardrailProfileResponse } from '../types/projection';
+import DisclaimerBox from './DisclaimerBox';
 import { computePlanDiagnostics } from '../pages/SpendingOptimizerPage';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
 import {
@@ -234,16 +235,12 @@ export default function OptimizerResultsView({
                 </div>
             )}
 
-            <div data-testid="tax-disclaimer" style={{
-                padding: '0.75rem 1rem', marginBottom: '1.5rem',
-                background: '#fff3e0', border: '1px solid #ffe0b2', borderRadius: '6px',
-                fontSize: '0.8rem', color: '#bf360c',
-            }}>
+            <DisclaimerBox testId="tax-disclaimer" margin="0 0 1.5rem">
                 <strong>Note:</strong> Spending recommendations account for income tax on
                 traditional account withdrawals using your scenario&apos;s filing status and
                 withdrawal ordering. Actual tax liability may vary based on deductions,
                 credits, and state taxes not fully modeled in the Monte Carlo simulation.
-            </div>
+            </DisclaimerBox>
 
             {diagnostics.phases.length > 0 && (
                 <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
