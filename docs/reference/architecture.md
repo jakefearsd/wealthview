@@ -192,7 +192,7 @@ brackets and NIIT to taxable-account withdrawals. `IrmaaSurchargeCalculator` ann
 from the Medicare age of 65.
 
 **Pools.** `PoolStrategy` is a sealed interface permitting a single implementation,
-`PoolStrategy.MultiPool`, which tracks taxable / traditional / Roth sub-pools separately.
+`MultiPool`, which tracks taxable / traditional / Roth sub-pools separately.
 `WithdrawalOrderStrategy` (sealed; `DynamicSequencingOrder`, `ProRataOrder`,
 `OrderedWithdrawalOrder`) allocates each withdrawal across them.
 

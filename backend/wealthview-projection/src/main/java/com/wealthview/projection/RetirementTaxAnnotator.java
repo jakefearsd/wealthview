@@ -37,7 +37,7 @@ final class RetirementTaxAnnotator {
      * <p>{@code ordinaryInterestIncome} (audit C1) is the year's ordinary-interest income (the
      * taxable pool's bond+cash sleeve) -- UNLIKE the other two additive components above, it is NOT
      * added on top of the recompute below; it is folded INTO {@code totalTaxableIncome} (the base
-     * the recompute itself taxes), matching exactly how {@link PoolStrategy.MultiPool#executeWithdrawals}
+     * the recompute itself taxes), matching exactly how {@link MultiPool#executeWithdrawals}
      * folds it into its own {@code taxableIncome} bundle -- see that method's javadoc. Omitting it
      * here would make the DISPLAYED federal/state breakdown silently disagree with the actually-
      * funded {@code taxLiability} whenever a bond-allocated taxable account realizes interest.

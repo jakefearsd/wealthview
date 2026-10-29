@@ -41,18 +41,18 @@ class MultiPoolTentReservationTest {
                 bd(balance), type, owner);
     }
 
-    private static PoolStrategy.MultiPool pool(Map<PoolType, List<ProjectionAccountInput>> accounts, String rate) {
+    private static MultiPool pool(Map<PoolType, List<ProjectionAccountInput>> accounts, String rate) {
         BigDecimal r = bd(rate);
-        return new PoolStrategy.MultiPool(accounts, r, r, r, r,
+        return new MultiPool(accounts, r, r, r, r,
                 PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST));
     }
 
-    private static PoolStrategy.MultiPool rothPool(String roth, String rate) {
+    private static MultiPool rothPool(String roth, String rate) {
         return pool(Map.of(PoolType.ROTH, List.of(account(roth, "roth", "primary"))), rate);
     }
 
     /** Traditional held by two owners (60k primary, 40k spouse) with an 80k tent: 25% ultrashort, 75% short. */
-    private static PoolStrategy.MultiPool coupleTent() {
+    private static MultiPool coupleTent() {
         var pool = pool(Map.of(PoolType.TRADITIONAL, List.of(
                 account("60000", "traditional", "primary"), account("40000", "traditional", "spouse"))), "0");
         pool.configureTent(setup(TRADITIONAL_FIRST, by("0.25", "0.75", "0", "0"), by("0", "0", "0", "0")));

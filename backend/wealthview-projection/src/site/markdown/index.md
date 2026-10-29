@@ -88,7 +88,7 @@ MFJ→single filing flip). The survivor spending factor defaults to **0.75** and
 ## PoolStrategy — Sealed Interface
 
 ```java
-sealed interface PoolStrategy permits PoolStrategy.MultiPool
+sealed interface PoolStrategy permits MultiPool
 ```
 
 `MultiPool` is the **sole** implementation. It tracks `taxable`, `traditional`, and `Roth`

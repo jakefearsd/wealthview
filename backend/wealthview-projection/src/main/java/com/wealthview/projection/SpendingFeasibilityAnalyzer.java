@@ -148,7 +148,7 @@ final class SpendingFeasibilityAnalyzer {
      * its traditional gross-up). That draw is separate from {@code withdrawals} (the spending draw),
      * yet the full {@code taxLiability} sits on the requirement side, so it must be credited on the
      * available side too or every pool-funded tax dollar reads as a shortfall. The tax sources report
-     * only what was funded (see {@code PoolStrategy.MultiPool#deductFromPools}), so a bill the
+     * only what was funded (see {@code MultiPool#deductFromPools}), so a bill the
      * depleted pools could not pay still leaves a negative surplus.
      */
     private static BigDecimal taxPaidFromPools(ProjectionYearDto year) {

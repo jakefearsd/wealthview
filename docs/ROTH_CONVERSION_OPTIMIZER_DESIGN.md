@@ -244,7 +244,7 @@ The optimizer's output can feed back into the deterministic engine as a
 conversion schedule.
 
 > **What shipped — exactly as designed, and this is the integration seam.** The deterministic
-> engine's `fill_bracket` / `fixed_amount` strategies live in `PoolStrategy.MultiPool`, driven by
+> engine's `fill_bracket` / `fixed_amount` strategies live in `MultiPool`, driven by
 > `params_json` (`roth_conversion_strategy`, `target_bracket_rate`, `annual_roth_conversion`,
 > `roth_conversion_start_year`). `SpendingPlan.conversionSchedule()` is the feedback channel:
 > `GuardrailSpendingInput` is the only implementation that returns a non-empty schedule, and

@@ -26,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 /**
- * Capital-gains behavior of {@link PoolStrategy.MultiPool}: FIFO realized-gain LTCG tax and the
+ * Capital-gains behavior of {@link MultiPool}: FIFO realized-gain LTCG tax and the
  * annual dividend drag. Mirrors {@link MultiPoolDeepTest} construction but wires a real
  * {@link CapitalGainsTaxCalculator} (single filer, 2025 LTCG brackets: 0% ≤ $48,350, then 15%).
  */
@@ -76,22 +76,22 @@ class MultiPoolCapitalGainsTest {
     }
 
     /** Per-pool returns: taxable grows at {@code taxableReturn}; traditional/roth flat. */
-    private static PoolStrategy.MultiPool pool(HypotheticalAccountInput taxable,
-                                                HypotheticalAccountInput traditional,
-                                                HypotheticalAccountInput roth,
-                                                String taxableReturn, String dividendYield,
-                                                WithdrawalOrder order, CapitalGainsTaxCalculator cg) {
+    private static MultiPool pool(HypotheticalAccountInput taxable,
+                                   HypotheticalAccountInput traditional,
+                                   HypotheticalAccountInput roth,
+                                   String taxableReturn, String dividendYield,
+                                   WithdrawalOrder order, CapitalGainsTaxCalculator cg) {
         return pool(taxable, traditional, roth, taxableReturn, dividendYield, order, cg, null);
     }
 
     /** Overload that also threads a standard-deduction source for the LTCG-floor netting fix. */
-    private static PoolStrategy.MultiPool pool(HypotheticalAccountInput taxable,
-                                                HypotheticalAccountInput traditional,
-                                                HypotheticalAccountInput roth,
-                                                String taxableReturn, String dividendYield,
-                                                WithdrawalOrder order, CapitalGainsTaxCalculator cg,
-                                                FederalTaxCalculator federalTaxCalculator) {
-        return new PoolStrategy.MultiPool(
+    private static MultiPool pool(HypotheticalAccountInput taxable,
+                                   HypotheticalAccountInput traditional,
+                                   HypotheticalAccountInput roth,
+                                   String taxableReturn, String dividendYield,
+                                   WithdrawalOrder order, CapitalGainsTaxCalculator cg,
+                                   FederalTaxCalculator federalTaxCalculator) {
+        return new MultiPool(
                 PoolFixtures.grouped(taxable, traditional, roth),
                 bd(taxableReturn), ZERO, ZERO, bd(taxableReturn),
                 config(dividendYield, order, cg, federalTaxCalculator));
@@ -152,7 +152,7 @@ class MultiPoolCapitalGainsTest {
                 FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST,
                 combinedTaxCalc, null, Map.of(), ZERO, capitalGainsCalc(), ZERO, ZERO, ZERO, BASE_YEAR,
                 federal);
-        var p = new PoolStrategy.MultiPool(
+        var p = new MultiPool(
                 PoolFixtures.grouped(taxableAcct("500000", "300000"), acct("0", "traditional"), acct("0", "roth")),
                 ZERO, config);
 
@@ -183,7 +183,7 @@ class MultiPoolCapitalGainsTest {
                 FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST,
                 combinedAge66, null, Map.of(), ZERO, capitalGainsCalc(), ZERO, ZERO, ZERO, BASE_YEAR,
                 federal);
-        var p = new PoolStrategy.MultiPool(
+        var p = new MultiPool(
                 PoolFixtures.grouped(taxableAcct("500000", "300000"), acct("0", "traditional"), acct("0", "roth")),
                 ZERO, config);
 
@@ -208,7 +208,7 @@ class MultiPoolCapitalGainsTest {
         var config = new PoolConfig(
                 FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST,
                 combined, null, Map.of(), ZERO, capitalGainsCalc(), ZERO, ZERO, ZERO, BASE_YEAR, federal);
-        var p = new PoolStrategy.MultiPool(
+        var p = new MultiPool(
                 PoolFixtures.grouped(taxableAcct("100000", "60000"), acct("500000", "traditional"),
                         acct("0", "roth")),
                 ZERO, config);
@@ -322,7 +322,7 @@ class MultiPoolCapitalGainsTest {
 
     @Test
     void executeWithdrawals_baseYearBeforeWithdrawalYear_niitThresholdDeflatedByCalendarYears() {
-        // D16 (Phase 1a) regression guard: PoolStrategy.MultiPool feeds year - baseYear (2025 - 2015 =
+        // D16 (Phase 1a) regression guard: MultiPool feeds year - baseYear (2025 - 2015 =
         // 10) to CapitalGainsTaxCalculator, which deflates the fixed-nominal $200k single NIIT
         // threshold by 1/(1 + inflation)^10. Inflation MUST be nonzero here (RealTermsDeflator returns
         // 1 at zero inflation, which would make baseYear irrelevant).
@@ -345,7 +345,7 @@ class MultiPoolCapitalGainsTest {
                 null, null, Map.of(), bd("0.025"), capitalGainsCalc(), bd("0"), ZERO, ZERO,
                 2015,  // D16: baseYear BEFORE withdrawal year
                 federalTaxCalc());
-        var pool = new PoolStrategy.MultiPool(
+        var pool = new MultiPool(
                 PoolFixtures.grouped(taxableAcct("500000", "300000"), acct("0", "traditional"), acct("0", "roth")),
                 ZERO, poolConfig);
 

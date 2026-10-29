@@ -10,7 +10,7 @@ import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Direct unit tests for PoolStrategy.MultiPool.executeWithdrawals withdrawal ordering logic.
+ * Direct unit tests for MultiPool.executeWithdrawals withdrawal ordering logic.
  * MultiPool is package-private, so this test lives in the same package.
  */
 class PoolStrategyTest {
@@ -28,8 +28,8 @@ class PoolStrategyTest {
      * Contributions and return are zeroed out so tests are isolated to withdrawal math.
      * Byte-identical to {@link PoolFixtures#multiPool} -- see that method's javadoc.
      */
-    private PoolStrategy.MultiPool multiPool(String taxable, String traditional, String roth,
-                                              WithdrawalOrder order) {
+    private MultiPool multiPool(String taxable, String traditional, String roth,
+                                 WithdrawalOrder order) {
         return PoolFixtures.multiPool(taxable, traditional, roth, order);
     }
 

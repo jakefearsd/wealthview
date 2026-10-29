@@ -10,7 +10,7 @@ import com.wealthview.core.projection.dto.BondMaturity;
 import com.wealthview.core.projection.dto.PoolType;
 
 /**
- * The bond-tent wiring for {@link PoolStrategy.MultiPool}: owns the {@link TentReservation} and its
+ * The bond-tent wiring for {@link MultiPool}: owns the {@link TentReservation} and its
  * setup, and applies them to the pools' growth and clamping. Every entry point is inert (touches no
  * pool, allocates nothing) until a tent is configured and holds a reservation, so a scenario without
  * a tent runs exactly the pre-tent code paths.
@@ -74,7 +74,7 @@ final class TentPools {
         }
     }
 
-    /** The pools' current growth returns; {@link PoolStrategy.MultiPool} grows its pools at these. */
+    /** The pools' current growth returns; {@link MultiPool} grows its pools at these. */
     PoolStrategy.PoolReturns returns() {
         return returns;
     }

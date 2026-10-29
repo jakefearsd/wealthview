@@ -52,8 +52,8 @@ class MultiPoolTaxSaleGainTest {
                 Optional.empty(), bd(basis), "taxable");
     }
 
-    private static PoolStrategy.MultiPool pool(String taxableBalance, String taxableBasis,
-                                               WithdrawalOrder order, String annualConversion) {
+    private static MultiPool pool(String taxableBalance, String taxableBasis,
+                                  WithdrawalOrder order, String annualConversion) {
         var federal = federal();
         var config = PoolConfig.builder(FilingStatus.SINGLE, ZERO, bd(annualConversion), "fixed",
                         null, null, order, new FederalOnlyTaxStrategy(federal), null)
@@ -61,7 +61,7 @@ class MultiPoolTaxSaleGainTest {
                 .federalTaxCalculator(federal)
                 .baseYear(YEAR)
                 .build();
-        return new PoolStrategy.MultiPool(
+        return new MultiPool(
                 PoolFixtures.grouped(taxable(taxableBalance, taxableBasis),
                         new HypotheticalAccountInput(bd("500000"), ZERO, ZERO, "traditional"),
                         new HypotheticalAccountInput(ZERO, ZERO, ZERO, "roth")),

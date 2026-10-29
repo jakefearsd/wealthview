@@ -425,7 +425,7 @@ final class TrialPools {
 
     /**
      * The first-death transition on the MC pools, mirroring the deterministic
-     * {@code PoolStrategy.MultiPool.applyFirstDeathTransition}: the deceased owner's traditional and
+     * {@code MultiPool.applyFirstDeathTransition}: the deceased owner's traditional and
      * Roth balances roll into the survivor's own pools (conservation-preserving), then the
      * joint-taxable lots step up EXACTLY per owner (HP1) — each lot by its own owner's statutory rate
      * (joint at {@code jointStepUpFactor}, the decedent's own lots fully, the survivor's not at all),

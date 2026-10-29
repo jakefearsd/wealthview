@@ -138,7 +138,7 @@ final class TaxableLotsBd {
      * -- absorbing the sub-cent drift independent per-lot rounding can otherwise introduce over many
      * lots/years. Unlike {@link #addLot(BigDecimal)}, the residual is folded into an EXISTING lot's
      * value: it creates NO new lot and touches NO lot's basis, so accumulation-year growth (which
-     * must not book a phantom at-cost distribution lot -- see {@code PoolStrategy.MultiPool
+     * must not book a phantom at-cost distribution lot -- see {@code MultiPool
      * #applyGrowth(boolean)}) still reproduces the exact same total-return trajectory the pre-C8
      * split path guaranteed by construction. No-op when there are no lots ({@code exactTotal} must
      * be zero too in that case).
@@ -220,7 +220,7 @@ final class TaxableLotsBd {
     }
 
     /** D5: the realized gain {@link #sellFifo} WOULD return for {@code amount}, without mutating any
-     * lot -- lets the tax-funding fixed point in {@code PoolStrategy.MultiPool} price the gain of the
+     * lot -- lets the tax-funding fixed point in {@code MultiPool} price the gain of the
      * sale that pays a bill before the sale happens. Negative for loss lots. */
     BigDecimal peekFifoGain(BigDecimal amount) {
         BigDecimal remaining = amount.min(totalValue()).max(BigDecimal.ZERO);

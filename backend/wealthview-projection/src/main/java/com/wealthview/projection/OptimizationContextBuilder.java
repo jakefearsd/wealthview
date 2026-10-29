@@ -223,7 +223,7 @@ final class OptimizationContextBuilder {
         double initTaxableBasis = sumBasisByType(input.accounts(), PoolType.TAXABLE);
         double dividendYield = resolveDividendYield(input);
         double returnMean = resolveReturnMean(input, inflationRate, feeRate, matrix);
-        // Audit C1: splits the MC taxable pool's yield the same way PoolStrategy.MultiPool does --
+        // Audit C1: splits the MC taxable pool's yield the same way MultiPool does --
         // computed once from the taxable accounts' own allocation, falling back to 1.0 (100%
         // equity, ALL_US-equivalent -- byte-identical to pre-C1) when there are none.
         double interestYield = resolveInterestYield(input);

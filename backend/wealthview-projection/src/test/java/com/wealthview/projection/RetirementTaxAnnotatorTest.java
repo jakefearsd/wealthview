@@ -42,7 +42,7 @@ class RetirementTaxAnnotatorTest {
      */
     private static PoolStrategy filingStatusOnlyPool() {
         var config = PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST);
-        return new PoolStrategy.MultiPool(Map.of(), BigDecimal.ZERO, config);
+        return new MultiPool(Map.of(), BigDecimal.ZERO, config);
     }
 
     @Test
@@ -254,7 +254,7 @@ class RetirementTaxAnnotatorTest {
         // Mirrors the LTCG/SS seam test above, but for audit C1's ordinaryInterestIncome: it must
         // land INSIDE totalTaxableIncome (the base the mock's computeDetailedTax stub is keyed on)
         // rather than being ignored or double-added on top -- exactly matching how
-        // PoolStrategy.MultiPool#executeWithdrawals folds it into ITS OWN taxableIncome bundle. A
+        // MultiPool#executeWithdrawals folds it into ITS OWN taxableIncome bundle. A
         // wrong wiring here (interest omitted, or the mock invoked with a different base) fails the
         // eq(...) match below and the stub returns Mockito's default CombinedTaxResult, tripping
         // the federalTax assertion.

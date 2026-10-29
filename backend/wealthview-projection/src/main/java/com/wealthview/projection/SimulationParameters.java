@@ -26,7 +26,7 @@ import com.wealthview.core.projection.household.AgeMilestones;
  * balance-weighted equity share ({@link PoolReturnBlender#taxableEquityShare}), used to split the
  * taxable pool's annual yield between qualified-dividend treatment (the equity share, at {@code
  * dividendYield}) and ordinary-interest treatment (the bond+cash share, at {@code interestYield})
- * in {@link TrialSimulator}, exactly like the deterministic engine's {@code PoolStrategy.MultiPool}.
+ * in {@link TrialSimulator}, exactly like the deterministic engine's {@code MultiPool}.
  */
 record SimulationParameters(
         int retirementYear, int retirementAge, int endAge, int years,

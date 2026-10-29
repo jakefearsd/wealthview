@@ -15,7 +15,7 @@ import com.wealthview.core.projection.household.PersonId;
 /**
  * Household task 4: an owner-keyed (PRIMARY/SPOUSE) BigDecimal balance pool — the internal shape of
  * the deterministic engine's traditional and Roth pools once accounts became individually owned.
- * Extracted from {@link PoolStrategy.MultiPool} so the tax cascade stays there while the pool
+ * Extracted from {@link MultiPool} so the tax cascade stays there while the pool
  * mechanics (owner routing, proportional draws, per-owner RMD forcing) live in one focused type.
  *
  * <p>Every quantity the tax cascade needs is the SUM across owners ({@link #total()}); the per-owner

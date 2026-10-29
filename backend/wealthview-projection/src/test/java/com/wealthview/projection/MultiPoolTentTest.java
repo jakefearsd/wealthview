@@ -34,13 +34,13 @@ class MultiPoolTentTest {
                 by("0.04", "0.04", "0.04", "0.04"));
     }
 
-    private static PoolStrategy.MultiPool pool(String taxable, String trad, String roth, String rate) {
+    private static MultiPool pool(String taxable, String trad, String roth, String rate) {
         Map<PoolType, List<ProjectionAccountInput>> accounts = Map.of(
                 PoolType.TAXABLE, List.of(new HypotheticalAccountInput(bd(taxable), ZERO, ZERO, "taxable")),
                 PoolType.TRADITIONAL, List.of(new HypotheticalAccountInput(bd(trad), ZERO, ZERO, "traditional")),
                 PoolType.ROTH, List.of(new HypotheticalAccountInput(bd(roth), ZERO, ZERO, "roth")));
         BigDecimal r = bd(rate);
-        return new PoolStrategy.MultiPool(accounts, r, r, r, r,
+        return new MultiPool(accounts, r, r, r, r,
                 PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST));
     }
 
@@ -187,14 +187,14 @@ class MultiPoolTentTest {
         assertThat(pool.tentByMaturity().get(BondMaturity.SHORT)).isEqualByComparingTo("50000");
     }
 
-    private static PoolStrategy.MultiPool debitedIntoSleeves(String taxableContribution, String rate) {
+    private static MultiPool debitedIntoSleeves(String taxableContribution, String rate) {
         Map<PoolType, List<ProjectionAccountInput>> accounts = Map.of(
                 PoolType.TAXABLE, List.of(new HypotheticalAccountInput(
                         bd("100000"), bd(taxableContribution), ZERO, "taxable")),
                 PoolType.TRADITIONAL, List.of(new HypotheticalAccountInput(ZERO, ZERO, ZERO, "traditional")),
                 PoolType.ROTH, List.of(new HypotheticalAccountInput(ZERO, ZERO, ZERO, "roth")));
         BigDecimal r = bd(rate);
-        var pool = new PoolStrategy.MultiPool(accounts, r, r, r, r,
+        var pool = new MultiPool(accounts, r, r, r, r,
                 PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST));
         pool.configureTent(setup(TAXABLE_FIRST, by("0.25", "0.75", "0", "0"), by("0.01", "0.01", "0.01", "0.01"),
                 by("0", "0", "0", "0")));
@@ -264,7 +264,7 @@ class MultiPoolTentTest {
             List.of(PoolType.TRADITIONAL, PoolType.TAXABLE, PoolType.ROTH);
 
     /** Traditional 100k holding an 80k tent (25% ultrashort, 75% short); taxable and Roth empty. */
-    private static PoolStrategy.MultiPool tentInTraditional() {
+    private static MultiPool tentInTraditional() {
         var pool = pool("0", "100000", "0", "0");
         pool.configureTent(setup(TRADITIONAL_FIRST, by("0.25", "0.75", "0", "0"), by("0", "0", "0", "0"),
                 by("0", "0", "0", "0")));

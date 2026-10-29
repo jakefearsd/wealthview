@@ -186,7 +186,7 @@ Additional obligations layered on top of the ordinary brackets:
 | Rental passive losses | `RentalLossCalculator` | $25k allowance with MAGI phase-out, suspended-loss carryforward |
 | Early withdrawal penalty | 10% (IRC 72(t)) | Pre-59½ traditional distributions; the year you reach 59½ (from birth year + optional birth month, `AgeMilestones`) is penalty-free, age 60 when no month is given |
 | IRMAA | `IrmaaSurchargeCalculator`, `irmaa_tiers` (V075) | Part B + Part D monthly surcharge x12; keyed on MAGI from **two calendar years prior**; multiplied by the count of Medicare-enrolled (65+, alive) household members |
-| Tax-funding sale gains (D5) | `PoolStrategy.MultiPool#settleTaxSaleGain`, `TrialPools#sellTaxableForTax` / `TrialSimulator#ltcgTaxForYear` | Gain realized by selling taxable lots to pay tax (or to seed/refill the Monte Carlo cash reserve) is LTCG income that year; the paying sale's own gain is solved by a closed-form warm start plus polish passes |
+| Tax-funding sale gains (D5) | `MultiPool#settleTaxSaleGain`, `TrialPools#sellTaxableForTax` / `TrialSimulator#ltcgTaxForYear` | Gain realized by selling taxable lots to pay tax (or to seed/refill the Monte Carlo cash reserve) is LTCG income that year; the paying sale's own gain is solved by a closed-form warm start plus polish passes |
 
 **Scope limits, stated plainly.** The MAGI used for IRMAA and the Social Security convergence is a
 proxy (effective other income + conversion + traditional draw + realized LTCG + ordinary interest);

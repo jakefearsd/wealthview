@@ -36,16 +36,16 @@ class TentPoolsTest {
         return map;
     }
 
-    private static PoolStrategy.MultiPool pool(String taxable, String trad, String roth) {
+    private static MultiPool pool(String taxable, String trad, String roth) {
         Map<PoolType, List<ProjectionAccountInput>> accounts = Map.of(
                 PoolType.TAXABLE, List.of(new HypotheticalAccountInput(bd(taxable), ZERO, ZERO, "taxable")),
                 PoolType.TRADITIONAL, List.of(new HypotheticalAccountInput(bd(trad), ZERO, ZERO, "traditional")),
                 PoolType.ROTH, List.of(new HypotheticalAccountInput(bd(roth), ZERO, ZERO, "roth")));
-        return new PoolStrategy.MultiPool(accounts, ZERO, ZERO, ZERO, ZERO,
+        return new MultiPool(accounts, ZERO, ZERO, ZERO, ZERO,
                 PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST));
     }
 
-    private static PoolStrategy.MultiPool tentPool(String taxable, String trad, String roth) {
+    private static MultiPool tentPool(String taxable, String trad, String roth) {
         var pool = pool(taxable, trad, roth);
         pool.configureTent(new PoolStrategy.TentSetup(
                 List.of(PoolType.TAXABLE, PoolType.TRADITIONAL, PoolType.ROTH), ultrashortOnly(), flat("0"),

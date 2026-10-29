@@ -9,9 +9,9 @@ import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.tax.CombinedTaxResult;
 
 /**
- * Assembles the per-year {@link ProjectionYearDto} for a {@link PoolStrategy.MultiPool}.
+ * Assembles the per-year {@link ProjectionYearDto} for a {@link MultiPool}.
  *
- * <p>Extracted from {@code PoolStrategy.MultiPool.buildYearDto} during the Phase 3
+ * <p>Extracted from {@code MultiPool.buildYearDto} during the Phase 3
  * decomposition. The DTO assembly (including the "positive value or null" conventions used by
  * the front end) is unchanged; only the long argument list is collapsed into the
  * {@link YearDtoInputs} parameter object.

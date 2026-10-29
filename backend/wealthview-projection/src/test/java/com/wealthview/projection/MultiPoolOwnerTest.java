@@ -19,7 +19,7 @@ import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Household task 4: owner-aware traditional/Roth pools in {@link PoolStrategy.MultiPool}. Verifies
+ * Household task 4: owner-aware traditional/Roth pools in {@link MultiPool}. Verifies
  * contributions route by owner, within-type draws split proportionally (documented remainder
  * rounding), per-owner RMD forcing, sum accessors, and memento round-trip of the owner-keyed state.
  */
@@ -38,16 +38,16 @@ class MultiPoolOwnerTest {
     }
 
     /** A MultiPool with the given traditional accounts, zero growth and no tax calculator. */
-    private static PoolStrategy.MultiPool tradPool(List<ProjectionAccountInput> traditionalAccounts) {
+    private static MultiPool tradPool(List<ProjectionAccountInput> traditionalAccounts) {
         var config = PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST);
-        return new PoolStrategy.MultiPool(
+        return new MultiPool(
                 Map.of(PoolType.TRADITIONAL, traditionalAccounts), ZERO, config);
     }
 
     /** A MultiPool over the given type-grouped accounts, MFJ, zero growth, no tax calculator. */
-    private static PoolStrategy.MultiPool pool(Map<PoolType, List<ProjectionAccountInput>> grouped) {
+    private static MultiPool pool(Map<PoolType, List<ProjectionAccountInput>> grouped) {
         var config = PoolFixtures.mfjConfig(WithdrawalOrder.TAXABLE_FIRST);
-        return new PoolStrategy.MultiPool(grouped, ZERO, config);
+        return new MultiPool(grouped, ZERO, config);
     }
 
     // === Household task 5: first-death transition on the pools ===

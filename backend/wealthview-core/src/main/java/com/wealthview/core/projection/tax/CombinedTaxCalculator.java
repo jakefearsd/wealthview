@@ -133,7 +133,7 @@ public class CombinedTaxCalculator implements TaxCalculationStrategy {
      * either figure -- both remain the pre-existing federal treatment (LTCG taxed separately; SS
      * taxed via the federal worksheet's own inclusion, already baked into {@code grossIncome}).
      *
-     * <p><b>Callers:</b> both the pool-FUNDING computations ({@code PoolStrategy.MultiPool}'s
+     * <p><b>Callers:</b> both the pool-FUNDING computations ({@code MultiPool}'s
      * withdrawal/conversion tax bundles and {@code RetirementWithdrawalProcessor}'s surplus branch)
      * and the DISPLAYED breakdown recompute ({@code RetirementTaxAnnotator}) call this overload with
      * the same per-year figures, so the state adjustment both drains the pools and shows in the

@@ -75,7 +75,7 @@ class PoolStrategyCharacterizationTest {
     void allTaxablePool_applyContributionsThenGrowth_pinsBalances() {
         // Bit-identical to the pre-C11 SinglePool numbers: with dividendYield=0 and feeRate=0
         // (fixedConfig's 9-arg PoolConfig), MultiPool's taxable-lot growth is designed to reproduce
-        // the scalar-balance growth exactly (see PoolStrategy.MultiPool#applyGrowth javadoc).
+        // the scalar-balance growth exactly (see MultiPool#applyGrowth javadoc).
         var pool = allTaxablePool();
 
         BigDecimal contributions = pool.applyContributions();

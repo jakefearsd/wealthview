@@ -23,7 +23,7 @@ import static org.mockito.Mockito.mock;
 
 /**
  * Audit C8 (2026-07-12): during ACCUMULATION years the taxable pool's yield distribution is
- * never taxed (it is only ever consumed by {@link PoolStrategy.MultiPool#executeWithdrawals} in
+ * never taxed (it is only ever consumed by {@link MultiPool#executeWithdrawals} in
  * a retired or RMD-forced year) -- pre-fix the growth split in {@code applyGrowth} ran every
  * single year regardless of retirement status, reinvesting the untaxed distribution as a fresh
  * AT-COST lot and thereby granting a real basis step-up a taxed investor would never get for
@@ -75,8 +75,8 @@ class MultiPoolAccumulationBasisTest {
     }
 
     /** 100k taxable account, no embedded gain, 5% taxable return, 2% dividend yield. */
-    private static PoolStrategy.MultiPool freshPool() {
-        return new PoolStrategy.MultiPool(
+    private static MultiPool freshPool() {
+        return new MultiPool(
                 grouped(taxableAcct("100000", "100000")),
                 bd("0.05"), ZERO, ZERO, bd("0.05"),
                 config(capitalGainsCalc()));
@@ -186,7 +186,7 @@ class MultiPoolAccumulationBasisTest {
                 FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null, WithdrawalOrder.ROTH_FIRST,
                 null, null, Map.of(), ZERO, capitalGainsCalc(), bd("0.02"), bd("0.10"), ZERO,
                 BASE_YEAR, null);
-        var pool = new PoolStrategy.MultiPool(
+        var pool = new MultiPool(
                 Map.of(
                         PoolType.TAXABLE, List.of(taxableAcct("100000", "100000")),
                         PoolType.TRADITIONAL, List.of(),

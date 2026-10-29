@@ -11,9 +11,9 @@ import com.wealthview.core.projection.tax.TaxCalculationStrategy;
 
 /**
  * Allocates a retirement withdrawal across the taxable / traditional / roth sub-pools of a
- * {@link PoolStrategy.MultiPool}. Each {@link WithdrawalOrder} maps to one implementation.
+ * {@link MultiPool}. Each {@link WithdrawalOrder} maps to one implementation.
  *
- * <p>Extracted from {@code PoolStrategy.MultiPool} during the Phase 3 decomposition; the
+ * <p>Extracted from {@code MultiPool} during the Phase 3 decomposition; the
  * allocation arithmetic is unchanged.
  */
 sealed interface WithdrawalOrderStrategy

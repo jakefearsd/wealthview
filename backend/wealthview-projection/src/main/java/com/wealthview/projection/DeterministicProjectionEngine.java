@@ -418,7 +418,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         // snapshots so an age-gap couple runs one independent RMD stream per spouse.
         Map<PersonId, BigDecimal> priorTraditionalByOwner = pool.getTraditionalByOwner();
         // Audit C8: `retired` (already resolved above) gates the taxable pool's yield-distribution
-        // split -- see PoolStrategy.MultiPool#applyGrowth(boolean)'s javadoc.
+        // split -- see MultiPool#applyGrowth(boolean)'s javadoc.
         CrashReplayer.beforeGrowth(ctx.replay(), pool, year);
         var growthResult = pool.applyGrowth(retired);
         CrashReplayer.afterGrowth(ctx.replay(), pool);

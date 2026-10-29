@@ -79,12 +79,12 @@ class MultiPoolInterestYieldTest {
                 BASE_YEAR, federalTaxCalculator);
     }
 
-    private static PoolStrategy.MultiPool pool(HypotheticalAccountInput taxable, String taxableReturn,
-                                                String dividendYield, String interestYield,
-                                                CapitalGainsTaxCalculator cg,
-                                                FederalTaxCalculator federalTaxCalculator,
-                                                com.wealthview.core.projection.tax.TaxCalculationStrategy taxCalculator) {
-        return new PoolStrategy.MultiPool(
+    private static MultiPool pool(HypotheticalAccountInput taxable, String taxableReturn,
+                                   String dividendYield, String interestYield,
+                                   CapitalGainsTaxCalculator cg,
+                                   FederalTaxCalculator federalTaxCalculator,
+                                   com.wealthview.core.projection.tax.TaxCalculationStrategy taxCalculator) {
+        return new MultiPool(
                 PoolFixtures.grouped(taxable, acct("0", "traditional"), acct("200000", "roth")),
                 bd(taxableReturn), ZERO, ZERO, bd(taxableReturn),
                 config(dividendYield, interestYield, cg, federalTaxCalculator, taxCalculator));

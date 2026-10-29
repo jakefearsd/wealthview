@@ -14,7 +14,7 @@ import com.wealthview.core.projection.tax.TaxCalculationStrategy;
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 
 /**
- * Shared {@code PoolConfig} / {@code PoolStrategy.MultiPool} fixtures, extracted from
+ * Shared {@code PoolConfig} / {@code MultiPool} fixtures, extracted from
  * near-identical private helpers duplicated across {@code MultiPoolDeepTest}, {@code
  * PoolStrategyTest}, {@code MultiPoolOwnerTest}, {@code MultiPoolCapitalGainsTest}, {@code
  * MultiPoolInterestYieldTest}, {@code PoolStrategyCharacterizationTest}, and {@code
@@ -82,7 +82,7 @@ final class PoolFixtures {
      * verbatim from the byte-identical clone in {@code MultiPoolDeepTest.pool(...)} and {@code
      * PoolStrategyTest.multiPool(...)}.
      */
-    static PoolStrategy.MultiPool multiPool(String taxable, String traditional, String roth, WithdrawalOrder order) {
+    static MultiPool multiPool(String taxable, String traditional, String roth, WithdrawalOrder order) {
         Map<PoolType, List<ProjectionAccountInput>> accounts = Map.of(
                 PoolType.TAXABLE, List.of(new HypotheticalAccountInput(
                         bd(taxable), BigDecimal.ZERO, BigDecimal.ZERO, "taxable")),
@@ -90,6 +90,6 @@ final class PoolFixtures {
                         bd(traditional), BigDecimal.ZERO, BigDecimal.ZERO, "traditional")),
                 PoolType.ROTH, List.of(new HypotheticalAccountInput(
                         bd(roth), BigDecimal.ZERO, BigDecimal.ZERO, "roth")));
-        return new PoolStrategy.MultiPool(accounts, BigDecimal.ZERO, singleFilerConfig(order));
+        return new MultiPool(accounts, BigDecimal.ZERO, singleFilerConfig(order));
     }
 }

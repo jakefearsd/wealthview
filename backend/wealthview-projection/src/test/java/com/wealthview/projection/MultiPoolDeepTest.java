@@ -26,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 /**
- * Deep coverage of PoolStrategy.MultiPool — Roth conversions, dynamic sequencing,
+ * Deep coverage of MultiPool — Roth conversions, dynamic sequencing,
  * pro-rata withdrawals, tax-aware withdrawal math, and buildYearDto's tax-detail path.
  */
 class MultiPoolDeepTest {
@@ -51,20 +51,20 @@ class MultiPoolDeepTest {
     }
 
     /** Byte-identical to {@link PoolFixtures#multiPool} -- see that method's javadoc. */
-    private PoolStrategy.MultiPool pool(String taxable, String traditional, String roth,
-                                         WithdrawalOrder order) {
+    private MultiPool pool(String taxable, String traditional, String roth,
+                            WithdrawalOrder order) {
         return PoolFixtures.multiPool(taxable, traditional, roth, order);
     }
 
-    private PoolStrategy.MultiPool poolWithConversion(String taxable, String traditional, String roth,
-                                                        String annualConv, String rothStrategy,
-                                                        String targetRate, Integer startYear,
-                                                        TaxCalculationStrategy taxCalc) {
+    private MultiPool poolWithConversion(String taxable, String traditional, String roth,
+                                           String annualConv, String rothStrategy,
+                                           String targetRate, Integer startYear,
+                                           TaxCalculationStrategy taxCalc) {
         var config = new PoolConfig(
                 FilingStatus.SINGLE, ZERO, bd(annualConv), rothStrategy,
                 targetRate != null ? bd(targetRate) : null,
                 startYear, WithdrawalOrder.TAXABLE_FIRST, taxCalc, null);
-        return new PoolStrategy.MultiPool(
+        return new MultiPool(
                 grouped(taxable, traditional, roth, "0", "0", "0"),
                 ZERO, config);
     }
@@ -75,9 +75,9 @@ class MultiPoolDeepTest {
      * gross-up test needs (audit C2: the spend draw's own ordering matters for isolating "does the
      * TAX payment touch traditional" from "does the SPEND draw touch traditional").
      */
-    private PoolStrategy.MultiPool poolWithOrderAndTax(String taxable, String traditional, String roth,
-                                                         WithdrawalOrder order, TaxCalculationStrategy taxCalc) {
-        return new PoolStrategy.MultiPool(
+    private MultiPool poolWithOrderAndTax(String taxable, String traditional, String roth,
+                                            WithdrawalOrder order, TaxCalculationStrategy taxCalc) {
+        return new MultiPool(
                 grouped(taxable, traditional, roth, "0", "0", "0"),
                 ZERO, PoolFixtures.singleFilerConfig(order, taxCalc));
     }
@@ -86,15 +86,15 @@ class MultiPoolDeepTest {
      * Builds a MultiPool wired with a real FederalTaxCalculator (single filer, 2025 bracket
      * fixtures) rather than a flat-rate fake, for tests that need genuine progressive tax math.
      */
-    private PoolStrategy.MultiPool poolWithRealTax(String taxable, String traditional, String roth,
-                                                     WithdrawalOrder order) {
+    private MultiPool poolWithRealTax(String taxable, String traditional, String roth,
+                                        WithdrawalOrder order) {
         var taxBracketRepository = mock(TaxBracketRepository.class);
         var standardDeductionRepository = mock(StandardDeductionRepository.class);
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
         TaxCalculationStrategy realTaxCalc = new FederalOnlyTaxStrategy(
                 new FederalTaxCalculator(taxBracketRepository, standardDeductionRepository));
 
-        return new PoolStrategy.MultiPool(
+        return new MultiPool(
                 grouped(taxable, traditional, roth, "0", "0", "0"),
                 ZERO, PoolFixtures.singleFilerConfig(order, realTaxCalc));
     }
@@ -115,7 +115,7 @@ class MultiPoolDeepTest {
 
         var strategy = PoolStrategy.create(accounts, config);
 
-        assertThat(strategy).isInstanceOf(PoolStrategy.MultiPool.class);
+        assertThat(strategy).isInstanceOf(MultiPool.class);
         assertThat(strategy.getTraditional()).isEqualByComparingTo(ZERO);
         assertThat(strategy.getTotal()).isEqualByComparingTo(bd("100000"));
         assertThat(strategy.getFilingStatus()).isEqualTo(FilingStatus.SINGLE);
@@ -135,7 +135,7 @@ class MultiPoolDeepTest {
 
         var strategy = PoolStrategy.create(accounts, config);
 
-        assertThat(strategy).isInstanceOf(PoolStrategy.MultiPool.class);
+        assertThat(strategy).isInstanceOf(MultiPool.class);
         assertThat(strategy.getTotal()).isEqualByComparingTo(bd("300000"));
         assertThat(strategy.getFilingStatus()).isEqualTo(FilingStatus.MARRIED_FILING_JOINTLY);
         assertThat(strategy.processIncomeSourcesEveryYear()).isTrue();
@@ -151,7 +151,7 @@ class MultiPoolDeepTest {
 
         var strategy = PoolStrategy.create(accounts, config);
 
-        assertThat(strategy).isInstanceOf(PoolStrategy.MultiPool.class);
+        assertThat(strategy).isInstanceOf(MultiPool.class);
     }
 
     @Test
@@ -293,7 +293,7 @@ class MultiPoolDeepTest {
 
     @Test
     void getWeightedReturn_returnsConfiguredRate() {
-        var p = new PoolStrategy.MultiPool(
+        var p = new MultiPool(
                 grouped("100", "100", "100", "0", "0", "0"),
                 bd("0.075"), PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST));
 
@@ -304,7 +304,7 @@ class MultiPoolDeepTest {
 
     @Test
     void executeWithdrawals_dynamicSequencingEarlyAge_drawsTaxableOnly() {
-        var p = new PoolStrategy.MultiPool(
+        var p = new MultiPool(
                 grouped("100", "500", "300", "0", "0", "0"),
                 ZERO, PoolFixtures.singleFilerConfig(WithdrawalOrder.DYNAMIC_SEQUENCING, null, bd("0.22")));
 
@@ -317,7 +317,7 @@ class MultiPoolDeepTest {
 
     @Test
     void executeWithdrawals_dynamicSequencingFillsBracketFromTraditional() {
-        var p = new PoolStrategy.MultiPool(
+        var p = new MultiPool(
                 grouped("200", "500", "100", "0", "0", "0"),
                 ZERO, PoolFixtures.singleFilerConfig(
                         WithdrawalOrder.DYNAMIC_SEQUENCING, FlatTaxStubs.flatTaxStrategy("0.22"), bd("0.22")));
@@ -332,7 +332,7 @@ class MultiPoolDeepTest {
 
     @Test
     void executeWithdrawals_dynamicSequencingNoBracketRate_fallsBackToOrderedStrategy() {
-        var p = new PoolStrategy.MultiPool(
+        var p = new MultiPool(
                 grouped("100", "200", "300", "0", "0", "0"),
                 ZERO, PoolFixtures.singleFilerConfig(WithdrawalOrder.DYNAMIC_SEQUENCING));
 
@@ -348,7 +348,7 @@ class MultiPoolDeepTest {
 
     @Test
     void executeWithdrawals_traditionalOnlyWithTaxCalc_computesTaxAndDeductsFromPools() {
-        var p = new PoolStrategy.MultiPool(
+        var p = new MultiPool(
                 grouped("0", "1000", "500", "0", "0", "0"),
                 ZERO, PoolFixtures.singleFilerConfig(
                         WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.20")));
@@ -367,7 +367,7 @@ class MultiPoolDeepTest {
 
     @Test
     void executeWithdrawals_withConversionAmount_computesMarginalTaxOnly() {
-        var p = new PoolStrategy.MultiPool(
+        var p = new MultiPool(
                 grouped("0", "1000", "500", "0", "0", "0"),
                 ZERO, PoolFixtures.singleFilerConfig(
                         WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.20")));
@@ -396,7 +396,7 @@ class MultiPoolDeepTest {
     @Test
     void executeWithdrawals_taxDeductionCascadesAcrossPoolsWhenFirstEmpty() {
         // taxable empty → tax deduction cascades to traditional, then roth
-        var p = new PoolStrategy.MultiPool(
+        var p = new MultiPool(
                 grouped("0", "10", "1000", "0", "0", "0"),
                 ZERO, PoolFixtures.singleFilerConfig(
                         WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("1.0")));
@@ -416,7 +416,7 @@ class MultiPoolDeepTest {
         // The spend draw empties the only pool, so the 10 tax bill has nowhere to be paid from. The
         // Roth catch-all still debits (floorAtZero clears it at year end), but the REPORTED source
         // must be what was actually funded -- an unfunded bill is not "tax paid from Roth".
-        var p = new PoolStrategy.MultiPool(
+        var p = new MultiPool(
                 grouped("0", "10", "0", "0", "0", "0"),
                 ZERO, PoolFixtures.singleFilerConfig(
                         WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("1.0")));
@@ -429,7 +429,7 @@ class MultiPoolDeepTest {
 
     @Test
     void executeWithdrawals_rothCoversPartOfTax_reportsOnlyFundedRothSlice() {
-        var p = new PoolStrategy.MultiPool(
+        var p = new MultiPool(
                 grouped("0", "10", "4", "0", "0", "0"),
                 ZERO, PoolFixtures.singleFilerConfig(
                         WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("1.0")));
@@ -556,7 +556,7 @@ class MultiPoolDeepTest {
 
     @Test
     void applyContributions_addsToEachPool() {
-        var p = new PoolStrategy.MultiPool(
+        var p = new MultiPool(
                 grouped("100", "200", "50", "10", "20", "5"),
                 ZERO, PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST));
 
@@ -568,7 +568,7 @@ class MultiPoolDeepTest {
 
     @Test
     void applyGrowth_producesGrowthPerPool() {
-        var p = new PoolStrategy.MultiPool(
+        var p = new MultiPool(
                 grouped("100", "200", "100", "0", "0", "0"),
                 bd("0.10"), PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST));
 
@@ -606,7 +606,7 @@ class MultiPoolDeepTest {
 
     @Test
     void computeEffectiveOtherIncome_sumsAllComponents() {
-        var p = new PoolStrategy.MultiPool(
+        var p = new MultiPool(
                 grouped("0", "100", "0", "0", "0", "0"),
                 ZERO, new PoolConfig(FilingStatus.SINGLE, bd("10000"), ZERO, "fixed", null, null,
                         WithdrawalOrder.TAXABLE_FIRST, null, null));
@@ -618,7 +618,7 @@ class MultiPoolDeepTest {
 
     @Test
     void getMagi_returnsOtherIncome() {
-        var p = new PoolStrategy.MultiPool(
+        var p = new MultiPool(
                 grouped("0", "100", "0", "0", "0", "0"),
                 ZERO, new PoolConfig(FilingStatus.MARRIED_FILING_JOINTLY, bd("55000"), ZERO, "fixed", null, null,
                         WithdrawalOrder.TAXABLE_FIRST, null, null));
@@ -629,7 +629,7 @@ class MultiPoolDeepTest {
 
     @Test
     void getLastTaxBreakdown_exposesBreakdownAfterWithdrawalWithTaxCalc() {
-        var p = new PoolStrategy.MultiPool(
+        var p = new MultiPool(
                 grouped("0", "1000", "100", "0", "0", "0"),
                 ZERO, PoolFixtures.singleFilerConfig(
                         WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.20")));
@@ -647,7 +647,7 @@ class MultiPoolDeepTest {
 
     @Test
     void buildYearDto_withTaxBreakdown_populatesFederalAndStateTaxFields() {
-        var p = new PoolStrategy.MultiPool(
+        var p = new MultiPool(
                 grouped("0", "1000", "100", "0", "0", "0"),
                 ZERO, PoolFixtures.singleFilerConfig(WithdrawalOrder.TRADITIONAL_FIRST,
                 new TaxCalculationStrategy() {
@@ -698,7 +698,7 @@ class MultiPoolDeepTest {
 
     @Test
     void buildYearDto_stateTaxZero_leavesStateTaxNull() {
-        var p = new PoolStrategy.MultiPool(
+        var p = new MultiPool(
                 grouped("0", "1000", "100", "0", "0", "0"),
                 ZERO, PoolFixtures.singleFilerConfig(
                         WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.20")));
@@ -731,7 +731,7 @@ class MultiPoolDeepTest {
      */
     @Test
     void buildYearDto_taxLiabilityDisagreesWithStoredBreakdown_suppressesStaleFederalTax() {
-        var p = new PoolStrategy.MultiPool(
+        var p = new MultiPool(
                 grouped("0", "1000", "100", "0", "0", "0"),
                 ZERO, PoolFixtures.singleFilerConfig(
                         WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.20")));
@@ -760,7 +760,7 @@ class MultiPoolDeepTest {
                 List.<ProjectionAccountInput>of(
                         new HypotheticalAccountInput(bd("1000"), bd("100"), bd("0.10"), "taxable")),
                 config);
-        assertThat(pool).isInstanceOf(PoolStrategy.MultiPool.class);
+        assertThat(pool).isInstanceOf(MultiPool.class);
 
         pool.applyContributions();
         assertThat(pool.getTotal()).isEqualByComparingTo(bd("1100"));
@@ -855,13 +855,13 @@ class MultiPoolDeepTest {
 
     // Phase 1a: birth month moves the first penalty-free year to the 59 1/2 calendar year.
 
-    private PoolStrategy.MultiPool poolWithEarlyAccessAge(WithdrawalOrder order, int earlyAccessAge,
-                                                         BigDecimal dsBracketRate) {
+    private MultiPool poolWithEarlyAccessAge(WithdrawalOrder order, int earlyAccessAge,
+                                            BigDecimal dsBracketRate) {
         var config = PoolConfig.builder(FilingStatus.SINGLE, ZERO, ZERO, "fixed",
                         null, null, order, FlatTaxStubs.flatTaxStrategy("0.10"), dsBracketRate)
                 .earlyAccessAge(earlyAccessAge)
                 .build();
-        return new PoolStrategy.MultiPool(grouped("50000", "100000", "0", "0", "0", "0"), ZERO, config);
+        return new MultiPool(grouped("50000", "100000", "0", "0", "0", "0"), ZERO, config);
     }
 
     @Test
