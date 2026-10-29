@@ -177,6 +177,36 @@ class DeterministicProjectionEngineBondTentTest {
     }
 
     @Test
+    void runDetailed_tentRun_secondPassStartsFromTheInputBalancesNotPassOnesEnd() {
+        var withTent = engine.runDetailed(tentInput("3", 3, 2029));
+        var without = engine.runDetailed(input("", 2029, spending()));
+
+        assertThat(withTent.result().yearlyData().getFirst().startBalance())
+                .isEqualByComparingTo(without.result().yearlyData().getFirst().startBalance())
+                .isEqualByComparingTo("1000000");
+    }
+
+    @Test
+    void runDetailed_sameTentInputTwice_isIdenticalSoPassOneLeavesNothingBehind() {
+        var input = tentInput("3", 3, 2029);
+
+        var first = engine.runDetailed(input);
+        var second = engine.runDetailed(input);
+
+        assertThat(second.result().yearlyData()).isEqualTo(first.result().yearlyData());
+        assertThat(second.bondTent()).isEqualTo(first.bondTent());
+    }
+
+    @Test
+    void runDetailed_tentRun_hasNoTentBalanceBeforeTheBuildUpStarts() {
+        var detail = engine.runDetailed(tentInput("3", 1, 2029));
+
+        // pass one is tent-free; none of pass two's reservation exists before the build-up window opens
+        assertThat(yearOf(detail, 2027).total()).isEqualByComparingTo("0");
+        assertThat(yearOf(detail, 2027).buildUpTarget()).isNull();
+    }
+
+    @Test
     void runDetailed_tentCostsGrowth() {
         var withTent = engine.runDetailed(tentInput("3", 3, 2029));
         var without = engine.runDetailed(input("", 2029, spending()));
