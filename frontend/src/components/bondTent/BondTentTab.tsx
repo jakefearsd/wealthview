@@ -4,10 +4,12 @@ import { useApiQuery } from '../../hooks/useApiQuery';
 import { CRASHES } from '../../types/projection';
 import type { CrashKey } from '../../types/projection';
 import { cardStyle, inputStyle, labelStyle, selectStyle } from '../../utils/styles';
+import DisclaimerBox from '../DisclaimerBox';
 import ErrorState from '../ErrorState';
 import LoadingState from '../LoadingState';
 import SegmentedControl from '../SegmentedControl';
 import CrashReplayChart from './CrashReplayChart';
+import { replayAnchorIsToday } from './format';
 import CrashReplayTable from './CrashReplayTable';
 import TentSimulationStrip from './TentSimulationStrip';
 
@@ -28,12 +30,6 @@ const TIMINGS: { value: string; offset: number; label: string }[] = [
 
 const DEFAULT_START_YEAR = 2000;
 const ANY_START_YEAR = 'any';
-
-const disclaimerStyle = {
-    padding: '0.75rem 1rem', marginTop: '1rem',
-    background: '#fff3e0', border: '1px solid #ffe0b2', borderRadius: '6px',
-    fontSize: '0.8rem', color: '#bf360c',
-} as const;
 
 export default function BondTentTab({ scenarioId, hasTent }: Props) {
     if (!hasTent) {
@@ -80,6 +76,7 @@ function CrashReplaySection({ scenarioId }: { scenarioId: string }) {
     );
     const data = replay.data;
     const available = data?.available_offsets;
+    const anchorIsToday = data != null && replayAnchorIsToday(data);
 
     useEffect(() => {
         if (available && available.length > 0 && !available.includes(offset)) {
@@ -89,7 +86,11 @@ function CrashReplaySection({ scenarioId }: { scenarioId: string }) {
 
     function onStartYearChange(text: string) {
         setStartYearDraft(text);
-        if (!/^\d{4}$/.test(text)) return;
+        if (!/^\d{4}$/.test(text)) {
+            // An incomplete year is not an out-of-range one; don't leave the old complaint on screen.
+            setStartYearError(null);
+            return;
+        }
         const value = Number(text);
         const first = data?.first_start_year;
         const last = data?.last_start_year;
@@ -144,7 +145,7 @@ function CrashReplaySection({ scenarioId }: { scenarioId: string }) {
                         <SegmentedControl
                             options={TIMINGS.map(t => ({
                                 value: t.value,
-                                label: t.label,
+                                label: t.offset === 0 && anchorIsToday ? 'Today' : t.label,
                                 disabled: available !== undefined && !available.includes(t.offset),
                             }))}
                             value={String(offset)}
@@ -161,11 +162,11 @@ function CrashReplaySection({ scenarioId }: { scenarioId: string }) {
                     <CrashReplayTable replay={data} />
                 </>
             )}
-            <div data-testid="replay-disclaimer" style={disclaimerStyle}>
+            <DisclaimerBox testId="replay-disclaimer" margin="1rem 0 0">
                 Replays use actual inflation-adjusted returns for 1954–2025 and long-run averages outside those
                 years. Accounts with a fixed expected return keep it in every replay. Bond yields are the assumptions
                 you entered, and taxes are estimates. This is a model, not a forecast.
-            </div>
+            </DisclaimerBox>
         </div>
     );
 }

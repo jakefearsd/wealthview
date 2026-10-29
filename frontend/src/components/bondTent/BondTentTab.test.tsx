@@ -43,6 +43,7 @@ describe('BondTentTab', () => {
 
         await user.selectOptions(screen.getByLabelText('Crash'), 'financial_crisis_2008');
         await waitFor(() => expect(mockReplay).toHaveBeenLastCalledWith('s1', { crash: 'financial_crisis_2008' }, 0));
+        expect(screen.getByText('Crash hits')).toBeInTheDocument();
         await user.click(screen.getByRole('button', { name: '+2' }));
         await waitFor(() => expect(mockReplay).toHaveBeenLastCalledWith('s1', { crash: 'financial_crisis_2008' }, 2));
 
@@ -122,5 +123,31 @@ describe('BondTentTab', () => {
         render(<BondTentTab scenarioId="s1" hasTent />);
 
         expect(await screen.findByText('boom')).toBeInTheDocument();
+    });
+
+    it('clearsStartYearError_inputBecomesValid_immediately', async () => {
+        const user = userEvent.setup();
+        render(<BondTentTab scenarioId="s1" hasTent />);
+        await screen.findByRole('heading', { name: 'Historical crash replay' });
+        await user.selectOptions(screen.getByLabelText('Crash'), 'any');
+        const input = screen.getByLabelText('Start year');
+        await user.clear(input);
+        await user.type(input, '1900');
+        expect(await screen.findByText('Start year must be between 1954 and 2025')).toBeInTheDocument();
+
+        await user.clear(input);
+
+        expect(screen.queryByText(/Start year must be between/)).not.toBeInTheDocument();
+    });
+
+    it('offsetLabel_anchorIsToday_saysToday', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-06-01'));
+        mockReplay.mockResolvedValue(makeReplay({ retirement_year: 2026, available_offsets: [0, 1, 2, 3] }));
+        render(<BondTentTab scenarioId="s1" hasTent />);
+
+        expect(await screen.findByRole('button', { name: 'Today' })).toBeEnabled();
+        expect(screen.queryByRole('button', { name: 'At retirement' })).not.toBeInTheDocument();
+        vi.useRealTimers();
     });
 });

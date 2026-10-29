@@ -6,6 +6,7 @@ import {
 import type { BondTentReplay } from '../../types/projection';
 import { formatDollarAxis } from '../../utils/chartFormatters';
 import { formatWholeCurrency } from '../../utils/format';
+import { replayAnchorIsToday } from './format';
 
 interface Props {
     replay: BondTentReplay;
@@ -30,6 +31,12 @@ export default function CrashReplayChart({ replay }: Props) {
     const crashEnd = replay.crash_calendar_year + replay.crash_last_year - replay.crash_first_year;
     const historyEnds = replay.outcomes[0]?.years.find(y => y.year > crashEnd && y.history_year === null)?.year;
 
+    // Replay years before the first year of real history run on long-run averages: shade that leading stretch.
+    const firstOutcomeYears = replay.outcomes[0]?.years ?? [];
+    const firstHistoryIndex = firstOutcomeYears.findIndex(y => y.history_year !== null);
+    const preHistoryYears = firstHistoryIndex > 0 ? firstOutcomeYears.slice(0, firstHistoryIndex) : [];
+    const anchorLabel = replayAnchorIsToday(replay) ? 'Today' : 'Retire';
+
     return (
         <ResponsiveContainer width="100%" height={340}>
             <LineChart data={rows} margin={{ top: 20, right: 20, left: 10, bottom: 0 }}>
@@ -46,11 +53,21 @@ export default function CrashReplayChart({ replay }: Props) {
                     fillOpacity={0.15}
                     label={{ value: replay.crash_label, position: 'insideTop' }}
                 />
+                {preHistoryYears.length > 0 && (
+                    <ReferenceArea
+                        x1={preHistoryYears[0].year - 0.5}
+                        x2={preHistoryYears[preHistoryYears.length - 1].year + 0.5}
+                        ifOverflow="hidden"
+                        fill="#9e9e9e"
+                        fillOpacity={0.15}
+                        label={{ value: 'Long-run averages', position: 'insideTop' }}
+                    />
+                )}
                 <ReferenceLine
                     x={replay.retirement_year}
                     stroke="#555"
                     strokeDasharray="4 4"
-                    label={{ value: `Retire ${replay.retirement_year}`, position: 'top' }}
+                    label={{ value: `${anchorLabel} ${replay.retirement_year}`, position: 'top' }}
                 />
                 {historyEnds !== undefined && (
                     <ReferenceLine
