@@ -1,5 +1,6 @@
 package com.wealthview.app.it.security;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Random;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -102,7 +103,7 @@ class ImportBoundaryFuzzIT extends AbstractApiIntegrationTest {
                 2024-01-17,buy,GOOG,3,300,+1+1+cmd|'/c calc.exe'!A1
                 """;
 
-        var resp = postMultipart("/api/v1/import/csv", formulaCsv.getBytes(),
+        var resp = postMultipart("/api/v1/import/csv", formulaCsv.getBytes(StandardCharsets.UTF_8),
                 "formula.csv", MediaType.parseMediaType("text/csv"), "generic");
 
         // Either the import succeeds (text is stored verbatim) or it fails
@@ -118,9 +119,9 @@ class ImportBoundaryFuzzIT extends AbstractApiIntegrationTest {
             case 1 -> randomBytes(r, 100);                          // tiny random
             case 2 -> randomBytes(r, 10_000);                       // 10KB random
             case 3 -> ("date,type,symbol,quantity,amount\n"
-                    + ",,,,\n".repeat(1000)).getBytes();             // 1k blank rows
+                    + ",,,,\n".repeat(1000)).getBytes(StandardCharsets.UTF_8);             // 1k blank rows
             case 4 -> ("date,type,symbol,quantity,amount\n"
-                    + "x".repeat(50_000)).getBytes();                // huge single field
+                    + "x".repeat(50_000)).getBytes(StandardCharsets.UTF_8);                // huge single field
             case 5 -> headerOnly();                                  // only header
             default -> randomCsvRows(r, 50);
         };
@@ -130,14 +131,14 @@ class ImportBoundaryFuzzIT extends AbstractApiIntegrationTest {
         return switch (r.nextInt(6)) {
             case 0 -> new byte[0];
             case 1 -> randomBytes(r, 1_000);
-            case 2 -> "<OFX>not<closed>".getBytes();
+            case 2 -> "<OFX>not<closed>".getBytes(StandardCharsets.UTF_8);
             case 3 -> ("<?xml version=\"1.0\"?>"
                     + "<!DOCTYPE foo [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]>"
                     + "<OFX><BANKMSGSRSV1><STMTRS><BANKACCTFROM>&xxe;</BANKACCTFROM>"
-                    + "</STMTRS></BANKMSGSRSV1></OFX>").getBytes();
-            case 4 -> ("<OFX>" + "x".repeat(50_000) + "</OFX>").getBytes();
+                    + "</STMTRS></BANKMSGSRSV1></OFX>").getBytes(StandardCharsets.UTF_8);
+            case 4 -> ("<OFX>" + "x".repeat(50_000) + "</OFX>").getBytes(StandardCharsets.UTF_8);
             default -> ("<OFX><BANKMSGSRSV1>" + "<DUMMY/>".repeat(1000)
-                    + "</BANKMSGSRSV1></OFX>").getBytes();
+                    + "</BANKMSGSRSV1></OFX>").getBytes(StandardCharsets.UTF_8);
         };
     }
 
@@ -149,7 +150,7 @@ class ImportBoundaryFuzzIT extends AbstractApiIntegrationTest {
     }
 
     private byte[] headerOnly() {
-        return "date,type,symbol,quantity,amount\n".getBytes();
+        return "date,type,symbol,quantity,amount\n".getBytes(StandardCharsets.UTF_8);
     }
 
     private byte[] randomCsvRows(Random r, int maxRows) {
@@ -162,7 +163,7 @@ class ImportBoundaryFuzzIT extends AbstractApiIntegrationTest {
                     .append(r.nextInt(1000)).append(',')
                     .append(r.nextInt(10_000)).append('\n');
         }
-        return sb.toString().getBytes();
+        return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
 
     private org.springframework.http.ResponseEntity<java.util.Map<String, Object>>

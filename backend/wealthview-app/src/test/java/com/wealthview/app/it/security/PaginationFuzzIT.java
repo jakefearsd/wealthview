@@ -77,12 +77,12 @@ class PaginationFuzzIT extends AbstractApiIntegrationTest {
                 "?page=abc",
                 "?size=xyz",
                 "?page=0&size=0",
-                "?size=" + ("x".repeat(2048)),
+                "?size=" + "x".repeat(2048),
                 "?page=1';DROP TABLE accounts;--",
                 "?sort=password",
                 "?sort=tenant_id,desc",
                 "?sort=password,desc",
-                "?sort=" + ("a".repeat(2048))
+                "?sort=" + "a".repeat(2048)
         };
 
         for (var query : payloads) {

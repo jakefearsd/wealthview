@@ -3,6 +3,7 @@ package com.wealthview.app.it;
 import java.net.HttpCookie;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -103,7 +104,7 @@ public class AuthHelper {
     public String createInviteCode() {
         var tenant = tenantRepository.findById(cachedTenantId).orElseThrow();
         var admin = userRepository.findById(cachedAdminUserId).orElseThrow();
-        var code = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        var code = UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT);
         var invite = new InviteCodeEntity(tenant, code, admin,
                 OffsetDateTime.now().plusDays(7));
         inviteCodeRepository.save(invite);
@@ -114,7 +115,7 @@ public class AuthHelper {
     public String createExpiredInviteCode() {
         var tenant = tenantRepository.findById(cachedTenantId).orElseThrow();
         var admin = userRepository.findById(cachedAdminUserId).orElseThrow();
-        var code = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        var code = UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT);
         var invite = new InviteCodeEntity(tenant, code, admin,
                 OffsetDateTime.now().minusDays(1));
         inviteCodeRepository.save(invite);
@@ -276,8 +277,7 @@ public class AuthHelper {
         var resp = restTemplate.exchange("/api/v1/auth/me",
                 HttpMethod.GET, new HttpEntity<>(headers),
                 new ParameterizedTypeReference<Map<String, Object>>() {});
-        var primed = parseSessionMerge(resp.getHeaders(), session);
-        return primed;
+        return parseSessionMerge(resp.getHeaders(), session);
     }
 
     private Session parseSessionMerge(HttpHeaders headers, Session existing) {

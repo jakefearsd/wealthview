@@ -14,7 +14,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
-import com.wealthview.app.it.AuthHelper;
 import com.wealthview.app.it.testutil.QueueingSplitDetectionClient;
 import com.wealthview.app.it.testutil.QueueingSplitDetectionClientConfig;
 import com.wealthview.app.it.testutil.SplitTestSupport;

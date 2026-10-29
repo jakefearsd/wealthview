@@ -94,7 +94,7 @@ class ExchangeRateControllerIT extends AbstractApiIntegrationTest {
     @Test
     void createAccount_currencyWithoutRate_returns400AndDashboardStillLoads() {
         var response = api.postForEntity("/api/v1/accounts",
-                java.util.Map.of("name", "Euro Cash", "type", "bank", "currency", "EUR"));
+                Map.of("name", "Euro Cash", "type", "bank", "currency", "EUR"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(api.getForEntity("/api/v1/dashboard/summary").getStatusCode()).isEqualTo(HttpStatus.OK);

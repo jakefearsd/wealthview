@@ -24,8 +24,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class BearerCookiePrecedenceIT extends AbstractApiIntegrationTest {
 
-    private static final String ADMIN_EMAIL = "it-admin@wealthview.test";
-    private static final String ADMIN_PASSWORD = "testpass123";
     private static final String MEMBER_EMAIL = "precedence-member@test.com";
     private static final String MEMBER_PASSWORD = "memberpass1";
 
