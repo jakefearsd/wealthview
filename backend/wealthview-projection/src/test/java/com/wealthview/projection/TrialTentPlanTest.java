@@ -12,6 +12,7 @@ import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
 class TrialTentPlanTest {
@@ -42,6 +43,15 @@ class TrialTentPlanTest {
         assertThat(plan.sizingRealYield()).isEqualTo(0.0203219512, within(1e-9));
         assertThat(plan.buildUpStartIndex()).isEqualTo(7);
         assertThat(plan.contributionCap()).isEqualTo(12_000);
+    }
+
+    @Test
+    void of_configWithoutMixes_failsNamingTheMissingPlanMix() {
+        var noMixes = new BondTentConfig(bd("5"), 3, List.of(), config(3).yields());
+
+        assertThatThrownBy(() -> TrialTentPlan.of(noMixes, WithdrawalOrder.TAXABLE_FIRST, 0.025, 10, 0, null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("plan mix");
     }
 
     @Test

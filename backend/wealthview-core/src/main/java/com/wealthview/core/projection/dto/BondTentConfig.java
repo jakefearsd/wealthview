@@ -39,6 +39,10 @@ public record BondTentConfig(
 
     /** The mix the projection runs: the first one. */
     public BondTentMix planMix() {
+        if (mixes == null || mixes.isEmpty()) {
+            throw new IllegalStateException("Bond tent has no plan mix: mixes is "
+                    + (mixes == null ? "null" : "empty") + ", but the first mix is the one the projection runs");
+        }
         return mixes.getFirst();
     }
 }
