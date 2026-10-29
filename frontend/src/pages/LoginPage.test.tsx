@@ -166,4 +166,112 @@ describe('LoginPage', () => {
 
         expect(screen.getByLabelText('Password')).toBeInTheDocument();
     });
+
+    it('rejects a malformed code without calling the server', async () => {
+        vi.mocked(login).mockResolvedValue({ type: 'mfa_required', mfa_token: 'mfa-jwt' });
+        renderLoginPage();
+        const user = userEvent.setup();
+        await submitCredentials(user);
+
+        await user.type(await screen.findByLabelText(/authentication code/i), '12345');
+        await user.click(screen.getByRole('button', { name: /verify/i }));
+
+        expect(await screen.findByRole('alert')).toHaveTextContent(/6-digit code.*8-character recovery code/i);
+        expect(completeMfaChallenge).not.toHaveBeenCalled();
+    });
+
+    it('lets the user retry with the same sign-in after a mistyped code', async () => {
+        vi.mocked(login).mockResolvedValue({ type: 'mfa_required', mfa_token: 'mfa-jwt' });
+        vi.mocked(completeMfaChallenge)
+            .mockRejectedValueOnce({ response: { data: { message: 'Invalid MFA code' } } })
+            .mockResolvedValueOnce(SAMPLE_AUTH);
+        renderLoginPage();
+        const user = userEvent.setup();
+        await submitCredentials(user);
+        const codeField = await screen.findByLabelText(/authentication code/i);
+        await user.type(codeField, '000000');
+        await user.click(screen.getByRole('button', { name: /verify/i }));
+        await screen.findByRole('alert');
+
+        await user.clear(codeField);
+        await user.type(codeField, '123456');
+        await user.click(screen.getByRole('button', { name: /verify/i }));
+
+        expect(completeMfaChallenge).toHaveBeenNthCalledWith(2, 'mfa-jwt', '123456');
+        expect(navigate).toHaveBeenCalledWith('/');
+    });
+
+    it('returns to the password form when the sign-in step has expired', async () => {
+        vi.mocked(login).mockResolvedValue({ type: 'mfa_required', mfa_token: 'mfa-jwt' });
+        vi.mocked(completeMfaChallenge).mockRejectedValue({
+            response: { status: 401, data: { message: 'Invalid MFA challenge' } },
+        });
+        renderLoginPage();
+        const user = userEvent.setup();
+        await submitCredentials(user);
+
+        await user.type(await screen.findByLabelText(/authentication code/i), '123456');
+        await user.click(screen.getByRole('button', { name: /verify/i }));
+
+        expect(await screen.findByLabelText('Password')).toHaveValue('');
+        expect(screen.queryByLabelText(/authentication code/i)).not.toBeInTheDocument();
+        expect(screen.getByRole('alert')).toHaveTextContent(/expired.*password again/i);
+        expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('shows a generic message when verification fails without a server message', async () => {
+        vi.mocked(login).mockResolvedValue({ type: 'mfa_required', mfa_token: 'mfa-jwt' });
+        vi.mocked(completeMfaChallenge).mockRejectedValue(new Error('Network Error'));
+        renderLoginPage();
+        const user = userEvent.setup();
+        await submitCredentials(user);
+
+        await user.type(await screen.findByLabelText(/authentication code/i), '123456');
+        await user.click(screen.getByRole('button', { name: /verify/i }));
+
+        expect(await screen.findByRole('alert')).toHaveTextContent('Verification failed');
+    });
+
+    it('accepts a recovery code typed in lower case', async () => {
+        vi.mocked(login).mockResolvedValue({ type: 'mfa_required', mfa_token: 'mfa-jwt' });
+        vi.mocked(completeMfaChallenge).mockResolvedValue(SAMPLE_AUTH);
+        renderLoginPage();
+        const user = userEvent.setup();
+        await submitCredentials(user);
+
+        await user.type(await screen.findByLabelText(/authentication code/i), 'abcd-2345');
+        await user.click(screen.getByRole('button', { name: /verify/i }));
+
+        expect(completeMfaChallenge).toHaveBeenCalledWith('mfa-jwt', 'abcd-2345');
+        expect(navigate).toHaveBeenCalledWith('/');
+    });
+
+    it('clears the password and uses a fresh challenge after going back to sign in', async () => {
+        vi.mocked(login)
+            .mockResolvedValueOnce({ type: 'mfa_required', mfa_token: 'first-token' })
+            .mockResolvedValueOnce({ type: 'mfa_required', mfa_token: 'second-token' });
+        vi.mocked(completeMfaChallenge).mockResolvedValue(SAMPLE_AUTH);
+        renderLoginPage();
+        const user = userEvent.setup();
+        await submitCredentials(user);
+        await user.click(await screen.findByRole('button', { name: /back to sign in/i }));
+        expect(screen.getByLabelText('Password')).toHaveValue('');
+
+        await user.type(screen.getByLabelText('Password'), 'password123');
+        await user.click(screen.getByRole('button', { name: /sign in/i }));
+        await user.type(await screen.findByLabelText(/authentication code/i), '123456');
+        await user.click(screen.getByRole('button', { name: /verify/i }));
+
+        expect(completeMfaChallenge).toHaveBeenCalledWith('second-token', '123456');
+    });
+
+    it('moves focus to the code field when the code step appears', async () => {
+        vi.mocked(login).mockResolvedValue({ type: 'mfa_required', mfa_token: 'mfa-jwt' });
+        renderLoginPage();
+        const user = userEvent.setup();
+
+        await submitCredentials(user);
+
+        expect(await screen.findByLabelText(/authentication code/i)).toHaveFocus();
+    });
 });

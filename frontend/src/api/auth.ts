@@ -1,5 +1,6 @@
 import axios from 'axios';
 import client from './client';
+import { MFA_CODE_FORMAT_MESSAGE, parseMfaCode } from '../utils/mfaCode';
 import type { AuthResponse, CurrentUserResponse, LoginRequest, LoginResult, RegisterRequest } from '../types/auth';
 
 const authClient = axios.create({
@@ -7,8 +8,6 @@ const authClient = axios.create({
     headers: { 'Content-Type': 'application/json' },
     withCredentials: true,
 });
-
-const TOTP_CODE = /^\d{6}$/;
 
 interface MfaRequiredBody {
     mfa_required: true;
@@ -28,14 +27,18 @@ export async function login(request: LoginRequest): Promise<LoginResult> {
 }
 
 /**
- * Finishes an MFA login. A six-digit code is sent as a TOTP code; anything
- * else is treated as a one-time recovery code (8 upper-case characters).
+ * Finishes an MFA login with an authenticator code (six digits) or a one-time recovery
+ * code (eight characters); see {@link parseMfaCode}. Rejects a code in neither shape
+ * without calling the server.
  */
 export async function completeMfaChallenge(mfaToken: string, code: string): Promise<AuthResponse> {
-    const normalized = code.replace(/[\s-]/g, '');
-    const body = TOTP_CODE.test(normalized)
-        ? { mfa_token: mfaToken, totp_code: normalized }
-        : { mfa_token: mfaToken, recovery_code: normalized.toUpperCase() };
+    const parsed = parseMfaCode(code);
+    if (!parsed) {
+        throw new Error(MFA_CODE_FORMAT_MESSAGE);
+    }
+    const body = parsed.kind === 'totp'
+        ? { mfa_token: mfaToken, totp_code: parsed.value }
+        : { mfa_token: mfaToken, recovery_code: parsed.value };
     const { data } = await authClient.post<AuthResponse>('/mfa/challenge', body);
     return data;
 }

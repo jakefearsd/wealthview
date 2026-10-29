@@ -1,8 +1,16 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { completeMfaChallenge, login } from '../api/auth';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/Button';
+import { MFA_CODE_FORMAT_MESSAGE, parseMfaCode } from '../utils/mfaCode';
+
+/**
+ * The server's 401 message when the MFA challenge itself is no longer usable (expired after
+ * five minutes, already used, or tampered with). Retrying a code cannot succeed then, so the
+ * page sends the user back to the password step. Pinned by MfaIT on the backend.
+ */
+const DEAD_CHALLENGE_MESSAGE = 'Invalid MFA challenge';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
@@ -12,8 +20,15 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [mfaToken, setMfaToken] = useState<string | null>(null);
     const [mfaCode, setMfaCode] = useState('');
+    const mfaCodeInput = useRef<HTMLInputElement>(null);
     const navigate = useNavigate();
     const { loginSuccess } = useAuth();
+
+    useEffect(() => {
+        if (mfaToken) {
+            mfaCodeInput.current?.focus();
+        }
+    }, [mfaToken]);
 
     function errorMessage(err: unknown, fallback: string) {
         return (err as { response?: { data?: { message?: string } } })
@@ -45,6 +60,10 @@ export default function LoginPage() {
         if (!mfaToken) {
             return;
         }
+        if (!parseMfaCode(mfaCode)) {
+            setError(MFA_CODE_FORMAT_MESSAGE);
+            return;
+        }
         setError('');
         setLoading(true);
         try {
@@ -52,7 +71,13 @@ export default function LoginPage() {
             loginSuccess(auth);
             navigate('/');
         } catch (err: unknown) {
-            setError(errorMessage(err, 'Verification failed'));
+            const message = errorMessage(err, 'Verification failed');
+            if (message === DEAD_CHALLENGE_MESSAGE) {
+                backToSignIn();
+                setError('Your sign-in step expired. Enter your password again.');
+            } else {
+                setError(message);
+            }
         } finally {
             setLoading(false);
         }
@@ -76,7 +101,7 @@ export default function LoginPage() {
                     {errorBox}
                     <div style={{ marginBottom: '1.5rem' }}>
                         <label htmlFor="mfa-code" style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>Authentication code</label>
-                        <input id="mfa-code" type="text" inputMode="text" autoComplete="one-time-code" autoFocus
+                        <input id="mfa-code" ref={mfaCodeInput} type="text" inputMode="text" autoComplete="one-time-code"
                             value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} required
                             style={{ width: '100%', padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
                         <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#666' }}>

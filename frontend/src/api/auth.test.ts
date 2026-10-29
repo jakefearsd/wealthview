@@ -97,7 +97,7 @@ describe('api/auth', () => {
             });
         });
 
-        it('sends any other code upper-cased as recovery_code', async () => {
+        it('sends an eight-character code upper-cased as recovery_code', async () => {
             mocks.authPost.mockResolvedValue({ data: SAMPLE_AUTH });
 
             await completeMfaChallenge('mfa-jwt', 'abcd-2345');
@@ -106,6 +106,17 @@ describe('api/auth', () => {
                 mfa_token: 'mfa-jwt',
                 recovery_code: 'ABCD2345',
             });
+        });
+        it('rejects a malformed code without calling the server', async () => {
+            await expect(completeMfaChallenge('mfa-jwt', '12345')).rejects.toThrow(/code/i);
+
+            expect(mocks.authPost).not.toHaveBeenCalled();
+        });
+
+        it('propagates a rejected code from the server', async () => {
+            mocks.authPost.mockRejectedValue(new Error('Invalid MFA code'));
+
+            await expect(completeMfaChallenge('mfa-jwt', '123456')).rejects.toThrow('Invalid MFA code');
         });
     });
 
