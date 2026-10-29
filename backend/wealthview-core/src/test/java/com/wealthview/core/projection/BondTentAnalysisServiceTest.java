@@ -21,6 +21,7 @@ import com.wealthview.core.projection.dto.ProjectionInputResult;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.testutil.ScenarioMother;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
+import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 import com.wealthview.persistence.entity.SpendingProfileEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
@@ -204,6 +205,35 @@ class BondTentAnalysisServiceTest {
         assertThatThrownBy(() -> service.replay(tenantId, scenarioId, "dot_com_2000", null, 4))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Crash timing must be between 3 years before and 3 years after retirement");
+    }
+
+    @Test
+    void replay_offsetBelowRange_throws() {
+        var retirement = LocalDate.of(2030, 1, 1);
+        stubScenario(planned(TENT_PARAMS, retirement), retirement, 2026);
+        stubPathsRange();
+
+        assertThatThrownBy(() -> service.replay(tenantId, scenarioId, "dot_com_2000", null, -4))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Crash timing must be between 3 years before and 3 years after retirement");
+    }
+
+    @Test
+    void replay_guardrailOnlyScenario_passesThePlanGate() {
+        var retirement = LocalDate.of(2030, 1, 1);
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", retirement, 90, new BigDecimal("0.03"), TENT_PARAMS);
+        scenario.setGuardrailProfile(new GuardrailSpendingProfileEntity(
+                tenant, scenario, "Guardrail", new BigDecimal("30000")));
+        var input = stubScenario(scenario, retirement, 2026);
+        var path = mock(HistoricalReturnPath.class);
+        stubPaths(2000, 2030, 2026, 2058, path);
+        var outcomes = List.<BondTentReplayOutcome>of();
+        when(projectionEngine.replayBondTent(input, path)).thenReturn(outcomes);
+
+        var replay = service.replay(tenantId, scenarioId, "dot_com_2000", null, 0);
+
+        assertThat(replay.outcomes()).isSameAs(outcomes);
     }
 
     @Test

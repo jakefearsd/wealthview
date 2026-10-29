@@ -33,6 +33,7 @@ import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.ScenarioIncomeSourceEntity;
+import com.wealthview.persistence.entity.SpendingProfileEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
 import com.wealthview.persistence.repository.IncomeSourceRepository;
@@ -113,9 +114,7 @@ public class ScenarioCrudService {
                 request.endAge(), request.inflationRate(), paramsJson);
 
         if (request.spendingProfileId() != null) {
-            var profile = spendingProfileRepository.findByTenant_IdAndId(tenantId, request.spendingProfileId())
-                    .orElse(null);
-            scenario.setSpendingProfile(profile);
+            scenario.setSpendingProfile(requireSpendingProfile(tenantId, request.spendingProfileId()));
         }
 
         addAccountsToScenario(scenario, tenantId, request.accounts());
@@ -129,6 +128,11 @@ public class ScenarioCrudService {
                 request.name(), request.accounts() != null ? request.accounts().size() : 0, tenantId);
         return toScenarioResponse(saved, tenantId,
                 scenarioIncomeSourceRepository.findWithIncomeSourceByScenarioId(saved.getId()));
+    }
+
+    private SpendingProfileEntity requireSpendingProfile(UUID tenantId, UUID spendingProfileId) {
+        return spendingProfileRepository.findByTenant_IdAndId(tenantId, spendingProfileId)
+                .orElseThrow(Entities.notFound("Spending profile", spendingProfileId));
     }
 
     private static void requireSpendingPlanForTent(ScenarioRequest request, boolean hasSpendingPlan) {
@@ -176,9 +180,7 @@ public class ScenarioCrudService {
         scenario.setParamsJson(ScenarioParams.from(request).toJson(objectMapper));
 
         if (request.spendingProfileId() != null) {
-            var profile = spendingProfileRepository.findByTenant_IdAndId(tenantId, request.spendingProfileId())
-                    .orElse(null);
-            scenario.activateSpendingProfile(profile);
+            scenario.activateSpendingProfile(requireSpendingProfile(tenantId, request.spendingProfileId()));
         } else {
             // No spending profile selected — clear it. Preserve any existing guardrail
             // profile unless a new spending profile was explicitly chosen (handled above).

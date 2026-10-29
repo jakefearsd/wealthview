@@ -186,6 +186,36 @@ class ScenarioCrudServiceTest {
     }
 
     @Test
+    void createScenario_tentWithUnknownSpendingProfile_throwsNotFound() {
+        var badId = UUID.randomUUID();
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(spendingProfileRepository.findByTenant_IdAndId(tenantId, badId)).thenReturn(Optional.empty());
+        var request = ScenarioRequestBuilder.builder()
+                .withBondTent(sampleTent()).withSpendingProfileId(badId).build();
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(EntityNotFoundException.class)
+                .hasMessageContaining(badId.toString());
+        verify(scenarioRepository, never()).save(any(ProjectionScenarioEntity.class));
+    }
+
+    @Test
+    void updateScenario_tentWithUnknownSpendingProfile_throwsNotFound() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90, new BigDecimal("0.03"), null);
+        var badId = UUID.randomUUID();
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)).thenReturn(Optional.of(scenario));
+        when(spendingProfileRepository.findByTenant_IdAndId(tenantId, badId)).thenReturn(Optional.empty());
+        var request = ScenarioRequestBuilder.builder()
+                .withBondTent(sampleTent()).withSpendingProfileId(badId).build();
+
+        assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
+                .isInstanceOf(EntityNotFoundException.class)
+                .hasMessageContaining(badId.toString());
+        verify(scenarioRepository, never()).save(any(ProjectionScenarioEntity.class));
+    }
+
+    @Test
     void createScenario_tentWithDepressionYears_throws() {
         var request = ScenarioRequestBuilder.builder()
                 .withBondTent(sampleTent()).withIncludeDepressionYears(true).build();
