@@ -1,17 +1,23 @@
 package com.wealthview.core.projection;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.junit.jupiter.api.Test;
 import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.BondMaturity;
 import com.wealthview.core.projection.dto.HistoricalReturnPath;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -120,5 +126,44 @@ class CrashReplayPathsTest {
         paths.build(1955, 2030, 2026, 2034);
 
         verify(maturityReturns, never()).alignedTo(argThat(m -> !Arrays.equals(m.years(), SLICE_YEARS)));
+    }
+
+    @Test
+    void build_seriesShareNoYear_failsNamingTheMissingOverlap() {
+        when(capitalMarket.matrix(true)).thenReturn(fullMatrix());
+        when(maturityReturns.firstYear()).thenReturn(2000);
+        when(maturityReturns.lastYear()).thenReturn(2010);
+
+        assertThatThrownBy(() -> paths.build(1955, 2030, 2026, 2034))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no common year")
+                .hasMessageContaining("1950-1956")
+                .hasMessageContaining("2000-2010");
+    }
+
+    @Test
+    void firstYear_calledFromManyThreads_buildsTheSliceOnce() throws Exception {
+        stubHistory();
+        when(capitalMarket.matrix(true)).thenAnswer(invocation -> {
+            Thread.sleep(50);
+            return fullMatrix();
+        });
+        int threads = 8;
+        var start = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(threads)) {
+            var results = new ArrayList<Future<Integer>>();
+            for (int i = 0; i < threads; i++) {
+                results.add(pool.submit(() -> {
+                    start.await();
+                    return paths.firstYear();
+                }));
+            }
+            start.countDown();
+            for (var result : results) {
+                assertThat(result.get()).isEqualTo(1954);
+            }
+        }
+
+        verify(capitalMarket, times(1)).matrix(true);
     }
 }

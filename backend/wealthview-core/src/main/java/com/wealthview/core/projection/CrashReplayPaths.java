@@ -3,7 +3,6 @@ package com.wealthview.core.projection;
 import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.HashMap;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 
 import org.springframework.stereotype.Component;
@@ -27,7 +26,8 @@ public class CrashReplayPaths {
     private final CapitalMarketAssumptionsProvider capitalMarket;
     private final BondMaturityReturnsProvider maturityReturns;
     private final BondTentAssumptions tentAssumptions;
-    private final AtomicReference<HistorySlice> cachedSlice = new AtomicReference<>();
+    private final Object sliceLock = new Object();
+    private volatile HistorySlice cachedSlice;
 
     public CrashReplayPaths(CapitalMarketAssumptionsProvider capitalMarket,
                             BondMaturityReturnsProvider maturityReturns,
@@ -82,14 +82,18 @@ public class CrashReplayPaths {
         return new YearReturns(historyYear, assets, maturities);
     }
 
+    /** The history window, built once: concurrent first callers wait for one build instead of racing to repeat it. */
     private HistorySlice slice() {
-        var existing = cachedSlice.get();
+        var existing = cachedSlice;
         if (existing != null) {
             return existing;
         }
-        var built = buildSlice();
-        cachedSlice.set(built);
-        return built;
+        synchronized (sliceLock) {
+            if (cachedSlice == null) {
+                cachedSlice = buildSlice();
+            }
+            return cachedSlice;
+        }
     }
 
     /**
@@ -98,10 +102,15 @@ public class CrashReplayPaths {
      */
     private HistorySlice buildSlice() {
         var full = capitalMarket.matrix(true);
-        int low = Math.max(full.years()[0], maturityReturns.firstYear());
-        int high = Math.min(full.years()[full.years().length - 1], maturityReturns.lastYear());
+        int[] fullYears = full.years();
+        int low = fullYears.length == 0 ? Integer.MAX_VALUE : Math.max(fullYears[0], maturityReturns.firstYear());
+        int high = fullYears.length == 0 ? Integer.MIN_VALUE
+                : Math.min(fullYears[fullYears.length - 1], maturityReturns.lastYear());
         if (low > high) {
-            throw new IllegalStateException("No year has both asset class and bond maturity returns");
+            throw new IllegalStateException("The asset class returns ("
+                    + (fullYears.length == 0 ? "none" : fullYears[0] + "-" + fullYears[fullYears.length - 1])
+                    + ") and the bond maturity returns (" + maturityReturns.firstYear() + "-"
+                    + maturityReturns.lastYear() + ") have no common year, so a crash cannot be replayed");
         }
         var sliced = sliceTo(full, low, high);
         return new HistorySlice(sliced, maturityReturns.alignedTo(sliced));
