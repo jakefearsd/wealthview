@@ -2,7 +2,6 @@ package com.wealthview.app.it.projection;
 
 import java.math.BigDecimal;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.UUID;
 
@@ -209,15 +208,18 @@ class CashReserveConversionIT extends AbstractApiIntegrationTest {
     void markStale_alreadyStaleProfile_isLeftUntouched() throws SQLException {
         var id = scenarioWithProfile("Already stale", 2, false, null);
         jdbc.update("UPDATE guardrail_spending_profiles SET is_stale = true WHERE scenario_id = ?", id);
-        var updatedAt = jdbc.queryForObject(
-                "SELECT updated_at FROM guardrail_spending_profiles WHERE scenario_id = ?",
-                Timestamp.class, id);
+        // No updated_at trigger exists, so compare the row's xmin: any rewrite of the row changes it.
+        var xminBefore = rowXmin(id);
 
         runScript(V086);
 
-        assertThat(jdbc.queryForObject(
-                "SELECT updated_at FROM guardrail_spending_profiles WHERE scenario_id = ?",
-                Timestamp.class, id)).isEqualTo(updatedAt);
+        assertThat(rowXmin(id)).isEqualTo(xminBefore);
+    }
+
+    private String rowXmin(UUID scenarioId) {
+        return jdbc.queryForObject(
+                "SELECT xmin::text FROM guardrail_spending_profiles WHERE scenario_id = ?",
+                String.class, scenarioId);
     }
 
     @Test
