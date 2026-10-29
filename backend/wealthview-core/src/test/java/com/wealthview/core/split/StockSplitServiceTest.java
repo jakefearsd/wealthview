@@ -36,7 +36,6 @@ import static com.wealthview.persistence.entity.TransactionType.BUY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -312,8 +311,8 @@ class StockSplitServiceTest {
         var aaplSplit = new StockSplitEntity("AAPL", LocalDate.of(2020, 8, 31), 4, 1, "finnhub");
         when(stockSplitRepository.findBySymbolsInAndDateRange(
                 org.mockito.ArgumentMatchers.argThat(l -> l.contains("AAPL")),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any()))
+                any(),
+                any()))
                 .thenReturn(List.of(aaplSplit));
 
         var result = service.listForTenant(tenantId, null, null, null);

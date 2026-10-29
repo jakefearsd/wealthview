@@ -6,7 +6,6 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -22,17 +21,14 @@ import com.wealthview.core.importservice.dto.ImportParseResult;
 import com.wealthview.core.importservice.dto.ParsedTransaction;
 import com.wealthview.core.testutil.TestEntityHelper;
 import com.wealthview.persistence.entity.AccountEntity;
-import com.wealthview.persistence.entity.ImportJobEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.HoldingRepository;
-import com.wealthview.persistence.repository.ImportJobRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 
 import static com.wealthview.persistence.entity.TransactionType.DEPOSIT;
 import static com.wealthview.persistence.entity.TransactionType.OPENING_BALANCE;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 

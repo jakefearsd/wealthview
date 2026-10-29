@@ -23,7 +23,6 @@ import com.wealthview.core.projection.dto.AssetAllocation;
 import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.LinkedAccountInput;
-import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.core.projection.household.LifeExpectancy;
 import com.wealthview.core.projection.mortality.MortalityTable;
@@ -89,7 +88,7 @@ class ProjectionInputBuilderTest {
     void setUp() {
         tenantId = UUID.randomUUID();
         tenant = new TenantEntity("Test");
-        lenient().when(depreciationCalculator.computeSchedule(org.mockito.ArgumentMatchers.any()))
+        lenient().when(depreciationCalculator.computeSchedule(any()))
                 .thenReturn(Map.of());
         lenient().when(exchangeRateService.convertToUsd(any(BigDecimal.class), eq("USD"), any(UUID.class)))
                 .thenAnswer(inv -> inv.getArgument(0));

@@ -16,7 +16,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.property.dto.PropertyValuationResponse;
 import com.wealthview.core.property.dto.PropertyValuationResult;
-import com.wealthview.core.property.dto.ValuationRefreshResponse;
 import com.wealthview.core.property.dto.ZillowSearchResult;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.TenantEntity;

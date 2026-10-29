@@ -74,7 +74,7 @@ class PropertyAnalyticsServiceTest {
         var property = createProperty("primary_residence", "350000", "300000");
         property.setPurchaseDate(LocalDate.of(2024, 1, 1));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         var result = analyticsService.getAnalytics(tenantId, property.getId(), null);
 
@@ -89,7 +89,7 @@ class PropertyAnalyticsServiceTest {
         var property = createProperty("primary_residence", "350000", "300000");
         property.setPurchaseDate(LocalDate.of(2024, 6, 1));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         var result = analyticsService.getAnalytics(tenantId, property.getId(), null);
 
@@ -109,7 +109,7 @@ class PropertyAnalyticsServiceTest {
         property.setLoanTermMonths(360);
         property.setLoanStartDate(LocalDate.of(2020, 1, 1));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         var result = analyticsService.getAnalytics(tenantId, property.getId(), null);
 
@@ -127,7 +127,7 @@ class PropertyAnalyticsServiceTest {
         var property = createProperty("primary_residence", "350000", "300000");
         property.setPurchaseDate(LocalDate.of(2024, 6, 1));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         var result = analyticsService.getAnalytics(tenantId, property.getId(), null);
 
@@ -144,7 +144,7 @@ class PropertyAnalyticsServiceTest {
         property.setLoanStartDate(LocalDate.of(2023, 1, 1));
         property.setMortgageBalance(new BigDecimal("270000"));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         // Linked income source: $30,000/year rental income
         mockLinkedIncomeSources(property, new BigDecimal("30000"));
@@ -183,7 +183,7 @@ class PropertyAnalyticsServiceTest {
         var property = createProperty("investment", "400000", "350000");
         property.setPurchaseDate(LocalDate.of(2024, 6, 1));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         mockNoLinkedIncomeSources(property);
         when(expenseRepository.findOverlappingExcludingCategory(
@@ -203,7 +203,7 @@ class PropertyAnalyticsServiceTest {
         var property = createProperty("investment", "400000", "350000");
         property.setPurchaseDate(LocalDate.of(2023, 1, 1));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         mockNoLinkedIncomeSources(property);
         when(expenseRepository.findOverlappingExcludingCategory(
@@ -223,7 +223,7 @@ class PropertyAnalyticsServiceTest {
         var property = createProperty("vacation", "500000", "450000");
         property.setPurchaseDate(LocalDate.of(2024, 6, 1));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         var result = analyticsService.getAnalytics(tenantId, property.getId(), null);
 
@@ -272,7 +272,7 @@ class PropertyAnalyticsServiceTest {
         var property = createProperty("investment", "400000", "350000");
         property.setPurchaseDate(LocalDate.of(2024, 6, 1));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         mockNoLinkedIncomeSources(property);
         when(expenseRepository.findOverlappingExcludingCategory(
@@ -292,7 +292,7 @@ class PropertyAnalyticsServiceTest {
         var property = createProperty("primary_residence", "360000", "300000");
         property.setPurchaseDate(LocalDate.of(2024, 6, 1));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         var result = analyticsService.getAnalytics(tenantId, property.getId(), null);
 
@@ -306,7 +306,7 @@ class PropertyAnalyticsServiceTest {
         var property = createProperty("primary_residence", "250000", "300000");
         property.setPurchaseDate(LocalDate.of(2024, 6, 1));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         var result = analyticsService.getAnalytics(tenantId, property.getId(), null);
 
@@ -319,7 +319,7 @@ class PropertyAnalyticsServiceTest {
         var property = createProperty("investment", "400000", "350000");
         property.setPurchaseDate(LocalDate.of(2023, 1, 1));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         // Annual rent from linked income source = 24000
         // Operating expenses = 6000 (tax)
@@ -348,7 +348,7 @@ class PropertyAnalyticsServiceTest {
         property.setPurchaseDate(LocalDate.of(2024, 10, 1));
         property.setMortgageBalance(new BigDecimal("200000"));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         var result = analyticsService.getAnalytics(tenantId, property.getId(), null);
 
@@ -367,7 +367,7 @@ class PropertyAnalyticsServiceTest {
         property.setLoanTermMonths(360);
         property.setLoanStartDate(LocalDate.of(2018, 7, 1));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         var result = analyticsService.getAnalytics(tenantId, property.getId(), null);
 
@@ -389,7 +389,7 @@ class PropertyAnalyticsServiceTest {
         property.setLoanTermMonths(360);
         property.setLoanStartDate(LocalDate.of(1990, 1, 1));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         var result = analyticsService.getAnalytics(tenantId, property.getId(), null);
 
@@ -415,7 +415,7 @@ class PropertyAnalyticsServiceTest {
         property.setLoanTermMonths(360);
         property.setLoanStartDate(LocalDate.of(2023, 1, 1));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         mockLinkedIncomeSources(property, new BigDecimal("30000"));
 
@@ -443,7 +443,7 @@ class PropertyAnalyticsServiceTest {
         var property = createProperty("investment", "400000", "350000");
         property.setPurchaseDate(LocalDate.of(2022, 1, 1));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         mockNoLinkedIncomeSources(property);
         when(expenseRepository.findOverlappingExcludingCategory(
@@ -475,7 +475,7 @@ class PropertyAnalyticsServiceTest {
         var property = createProperty("investment", "400000", "350000");
         property.setPurchaseDate(LocalDate.of(2023, 1, 1));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         // Income from linked income source: $30,000/year
         mockLinkedIncomeSources(property, new BigDecimal("30000"));
@@ -502,7 +502,7 @@ class PropertyAnalyticsServiceTest {
         var property = createProperty("investment", "400000", "350000");
         property.setPurchaseDate(LocalDate.of(2023, 1, 1));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         mockNoLinkedIncomeSources(property);
 
@@ -530,7 +530,7 @@ class PropertyAnalyticsServiceTest {
         var property = createProperty("investment", "400000", "350000");
         property.setPurchaseDate(LocalDate.of(2023, 1, 1));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         // Two linked income sources: $24000 + $6000 = $30000 total annual rent
         var source1 = new IncomeSourceEntity(tenant, "Unit A Rent", "rental_property",
@@ -562,7 +562,7 @@ class PropertyAnalyticsServiceTest {
         property.setAnnualInsuranceCost(new BigDecimal("2400"));
         property.setAnnualMaintenanceCost(new BigDecimal("1200"));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         mockLinkedIncomeSources(property, new BigDecimal("30000"));
 
@@ -586,7 +586,7 @@ class PropertyAnalyticsServiceTest {
         property.setLoanTermMonths(360);
         property.setLoanStartDate(LocalDate.of(2023, 1, 1));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         mockLinkedIncomeSources(property, new BigDecimal("30000"));
 
@@ -619,7 +619,7 @@ class PropertyAnalyticsServiceTest {
         property.setLoanTermMonths(360);
         property.setLoanStartDate(LocalDate.of(1990, 1, 1));
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
         mockLinkedIncomeSources(property, new BigDecimal("30000"));
 
         var result = analyticsService.getAnalytics(tenantId, property.getId(), null);
@@ -635,7 +635,7 @@ class PropertyAnalyticsServiceTest {
         property.setPurchaseDate(LocalDate.of(2023, 1, 1));
         // No entity fields set (all null)
         mockProperty(property);
-        mockEmptyValuations(property);
+        mockEmptyValuations();
 
         mockLinkedIncomeSources(property, new BigDecimal("30000"));
 
@@ -669,7 +669,7 @@ class PropertyAnalyticsServiceTest {
                 .thenReturn(Optional.of(property));
     }
 
-    private void mockEmptyValuations(PropertyEntity property) {
+    private void mockEmptyValuations() {
         when(valuationRepository.findByProperty_IdAndTenant_IdOrderByValuationDateDesc(any(), eq(tenantId)))
                 .thenReturn(Collections.emptyList());
     }

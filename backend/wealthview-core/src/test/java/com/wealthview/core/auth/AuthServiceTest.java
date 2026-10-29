@@ -32,7 +32,6 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -111,7 +110,7 @@ class AuthServiceTest {
         org.mockito.Mockito.lenient().when(userSessionRepository.save(any(com.wealthview.persistence.entity.UserSessionEntity.class)))
                 .thenAnswer(inv -> {
                     var s = (com.wealthview.persistence.entity.UserSessionEntity) inv.getArgument(0);
-                    com.wealthview.core.testutil.TestEntityHelper.setId(s, java.util.UUID.randomUUID());
+                    TestEntityHelper.setId(s, UUID.randomUUID());
                     return s;
                 });
 

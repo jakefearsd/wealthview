@@ -198,9 +198,9 @@ class CaliforniaStateTaxCalculatorTest {
         // Test with $100K of income above the $1M threshold
         // The marginal tax on that $100K should be $13,300 (13.3%), not $14,300 (14.3%)
         BigDecimal taxAt1M = calculator.computeTax(bd("1005722"), 2025, FilingStatus.SINGLE);
-        BigDecimal taxAt1_1M = calculator.computeTax(bd("1105722"), 2025, FilingStatus.SINGLE);
+        BigDecimal taxAtOnePointOneM = calculator.computeTax(bd("1105722"), 2025, FilingStatus.SINGLE);
 
-        BigDecimal marginalTax = taxAt1_1M.subtract(taxAt1M);
+        BigDecimal marginalTax = taxAtOnePointOneM.subtract(taxAt1M);
         // $100K at 13.3% = $13,300 (correct: 12.3% bracket + 1% surcharge)
         // $100K at 14.3% = $14,300 (wrong: 13.3% bracket + 1% surcharge)
         assertThat(marginalTax).isEqualByComparingTo(bd("13300.0000"));

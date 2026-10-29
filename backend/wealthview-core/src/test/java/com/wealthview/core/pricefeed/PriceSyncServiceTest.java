@@ -11,12 +11,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import com.wealthview.core.pricefeed.dto.CandleResponse;
 import com.wealthview.core.pricefeed.dto.CandleResponse.CandleEntry;
-import com.wealthview.core.pricefeed.dto.FinnhubSyncResult;
 import com.wealthview.core.pricefeed.dto.QuoteResponse;
 import com.wealthview.core.pricefeed.dto.QuoteResult;
 import com.wealthview.persistence.entity.PriceEntity;
@@ -70,7 +68,7 @@ class PriceSyncServiceTest {
         assertThat(result.failures()).isEmpty();
 
         var captor = ArgumentCaptor.forClass(PriceEntity.class);
-        verify(priceRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+        verify(priceRepository, times(2)).save(captor.capture());
 
         var saved = captor.getAllValues();
         assertThat(saved).hasSize(2);
@@ -151,7 +149,7 @@ class PriceSyncServiceTest {
         service.backfillHistoricalPrices("AAPL");
 
         var captor = ArgumentCaptor.forClass(PriceEntity.class);
-        verify(priceRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+        verify(priceRepository, times(2)).save(captor.capture());
 
         var saved = captor.getAllValues();
         assertThat(saved.get(0).getDate()).isEqualTo(LocalDate.of(2024, 1, 2));

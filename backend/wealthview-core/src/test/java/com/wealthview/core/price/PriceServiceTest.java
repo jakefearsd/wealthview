@@ -1,6 +1,7 @@
 package com.wealthview.core.price;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -16,7 +17,6 @@ import com.wealthview.core.exception.ServiceUnavailableException;
 import com.wealthview.core.price.dto.BulkPriceRequest;
 import com.wealthview.core.price.dto.PriceRequest;
 import com.wealthview.core.price.dto.YahooFetchRequest;
-import com.wealthview.core.price.dto.YahooSyncResult;
 import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.entity.PriceId;
 import com.wealthview.persistence.repository.HoldingRepository;
@@ -148,7 +148,7 @@ class PriceServiceTest {
         priceService.bulkUpsertPrices(List.of(entry), "manual");
 
         var captor = org.mockito.ArgumentCaptor.forClass(PriceEntity.class);
-        org.mockito.Mockito.verify(priceRepository).save(captor.capture());
+        verify(priceRepository).save(captor.capture());
         assertThat(captor.getValue().getSymbol()).isEqualTo("VTI");
     }
 
@@ -362,7 +362,7 @@ class PriceServiceTest {
                 AAPL,2024-01-02,185.50
                 MSFT,2024-01-02,370.25
                 """;
-        var stream = new java.io.ByteArrayInputStream(csv.getBytes());
+        var stream = new java.io.ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8));
         when(priceRepository.findById(any(PriceId.class))).thenReturn(Optional.empty());
         when(priceRepository.save(any(PriceEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -380,7 +380,7 @@ class PriceServiceTest {
                 AAPL,2024-01-02,185.50
                 MSFT,bad-date,370.25
                 """;
-        var stream = new java.io.ByteArrayInputStream(csv.getBytes());
+        var stream = new java.io.ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8));
         when(priceRepository.findById(any(PriceId.class))).thenReturn(Optional.empty());
         when(priceRepository.save(any(PriceEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 

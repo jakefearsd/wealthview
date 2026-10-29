@@ -5,7 +5,6 @@ import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 
 import com.wealthview.persistence.entity.SpendingProfileEntity;
-import com.wealthview.persistence.entity.TenantEntity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;

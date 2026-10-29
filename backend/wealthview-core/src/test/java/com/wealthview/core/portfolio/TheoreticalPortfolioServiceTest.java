@@ -16,7 +16,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exchangerate.ExchangeRateService;
-import com.wealthview.core.portfolio.dto.PortfolioDataPointDto;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
 import com.wealthview.persistence.entity.PriceEntity;

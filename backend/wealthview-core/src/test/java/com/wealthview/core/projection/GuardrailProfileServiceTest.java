@@ -3,7 +3,6 @@ package com.wealthview.core.projection;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -1197,7 +1196,7 @@ class GuardrailProfileServiceTest {
     void optimize_paramsJsonNull_birthYearDefaultsFromCurrentYear() {
         var scenarioSansParams = ScenarioMother.guardrailScenario(tenant, "None", null);
         var input = captureOptimizationInput(buildRequest(req -> req), scenarioSansParams);
-        assertThat(input.birthYear()).isEqualTo(java.time.LocalDate.now().getYear() - 35);
+        assertThat(input.birthYear()).isEqualTo(LocalDate.now().getYear() - 35);
         assertThat(input.withdrawalOrder()).isEqualTo("taxable_first");
         assertThat(input.filingStatus()).isNull();
     }
@@ -1206,21 +1205,21 @@ class GuardrailProfileServiceTest {
     void optimize_paramsJsonBlank_birthYearDefaultsFromCurrentYear() {
         var scenarioBlank = ScenarioMother.guardrailScenario(tenant, "Blank", " ");
         var input = captureOptimizationInput(buildRequest(req -> req), scenarioBlank);
-        assertThat(input.birthYear()).isEqualTo(java.time.LocalDate.now().getYear() - 35);
+        assertThat(input.birthYear()).isEqualTo(LocalDate.now().getYear() - 35);
     }
 
     @Test
     void optimize_paramsJsonMissingBirthYear_fallsBack() {
         var scenarioNoBy = ScenarioMother.guardrailScenario(tenant, "NoBy", "{\"filing_status\":\"single\"}");
         var input = captureOptimizationInput(buildRequest(req -> req), scenarioNoBy);
-        assertThat(input.birthYear()).isEqualTo(java.time.LocalDate.now().getYear() - 35);
+        assertThat(input.birthYear()).isEqualTo(LocalDate.now().getYear() - 35);
     }
 
     @Test
     void optimize_paramsJsonMalformed_fallsBackQuietly() {
         var scenarioBad = ScenarioMother.guardrailScenario(tenant, "Bad", "{not-json");
         var input = captureOptimizationInput(buildRequest(req -> req), scenarioBad);
-        assertThat(input.birthYear()).isEqualTo(java.time.LocalDate.now().getYear() - 35);
+        assertThat(input.birthYear()).isEqualTo(LocalDate.now().getYear() - 35);
         assertThat(input.filingStatus()).isNull();
     }
 
@@ -1276,11 +1275,11 @@ class GuardrailProfileServiceTest {
     @Test
     void computeScenarioHash_includesAccountDetails() {
         var scenarioWithAccount = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968}");
-        scenarioWithAccount.addAccount(new com.wealthview.persistence.entity.ProjectionAccountEntity(
+        scenarioWithAccount.addAccount(new ProjectionAccountEntity(
                 scenarioWithAccount, null, new BigDecimal("100000"),
                 new BigDecimal("5000"), new BigDecimal("0.07"), "traditional"));
         var scenarioWithDifferentAccount = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968}");
-        scenarioWithDifferentAccount.addAccount(new com.wealthview.persistence.entity.ProjectionAccountEntity(
+        scenarioWithDifferentAccount.addAccount(new ProjectionAccountEntity(
                 scenarioWithDifferentAccount, null, new BigDecimal("200000"),
                 new BigDecimal("5000"), new BigDecimal("0.07"), "traditional"));
 

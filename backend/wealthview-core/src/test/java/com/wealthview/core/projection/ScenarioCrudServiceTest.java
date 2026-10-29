@@ -2,7 +2,6 @@ package com.wealthview.core.projection;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -53,7 +52,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -470,7 +468,7 @@ class ScenarioCrudServiceTest {
                 .thenReturn(new BigDecimal("120000"));
         when(classificationService.deriveAllocation(tenantId, linkedAccount.getId()))
                 .thenReturn(new SecurityClassificationService.AllocationResult(
-                        AssetAllocation.fromDoubles(java.util.Map.of(
+                        AssetAllocation.fromDoubles(Map.of(
                                 AssetClass.US_STOCK, 0.5, AssetClass.BOND, 0.5)), Set.of()));
 
         var result = service.getScenario(tenantId, scenarioId);
@@ -572,7 +570,7 @@ class ScenarioCrudServiceTest {
                 .thenReturn(new BigDecimal("120000"));
         when(classificationService.deriveAllocation(tenantId, linkedAccount.getId()))
                 .thenReturn(new SecurityClassificationService.AllocationResult(
-                        AssetAllocation.fromDoubles(java.util.Map.of(
+                        AssetAllocation.fromDoubles(Map.of(
                                 AssetClass.US_STOCK, 0.5, AssetClass.BOND, 0.5)), Set.of()));
 
         var result = service.getScenario(tenantId, scenarioId);

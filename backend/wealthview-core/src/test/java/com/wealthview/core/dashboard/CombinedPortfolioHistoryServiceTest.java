@@ -15,15 +15,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
-import com.wealthview.core.dashboard.dto.CombinedPortfolioDataPointDto;
-import com.wealthview.core.dashboard.dto.CombinedPortfolioHistoryResponse;
 import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
 import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.PropertyValuationEntity;
-import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;

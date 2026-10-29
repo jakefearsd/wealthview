@@ -572,7 +572,7 @@ class CombinedTaxCalculatorTest {
         @Override
         public BigDecimal computeTax(BigDecimal grossIncome, int taxYear, FilingStatus status) {
             return grossIncome.compareTo(BigDecimal.ZERO) > 0
-                    ? grossIncome.multiply(rate).setScale(4, java.math.RoundingMode.HALF_UP)
+                    ? grossIncome.multiply(rate).setScale(4, RoundingMode.HALF_UP)
                     : BigDecimal.ZERO;
         }
 

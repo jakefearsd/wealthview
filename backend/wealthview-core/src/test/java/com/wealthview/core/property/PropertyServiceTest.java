@@ -15,7 +15,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.property.dto.CostSegAllocation;
 import com.wealthview.core.property.dto.PropertyExpenseRequest;
-import com.wealthview.core.property.dto.PropertyExpenseResponse;
 import com.wealthview.core.property.dto.PropertyIncomeRequest;
 import com.wealthview.core.property.dto.PropertyRequest;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
