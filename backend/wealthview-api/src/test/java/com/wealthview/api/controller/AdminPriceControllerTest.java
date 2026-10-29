@@ -1,6 +1,7 @@
 package com.wealthview.api.controller;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -144,7 +145,7 @@ class AdminPriceControllerTest {
         when(priceService.importCsv(any())).thenReturn(new CsvImportResult(3, List.of()));
 
         var file = new MockMultipartFile("file", "prices.csv", "text/csv",
-                "symbol,date,close_price\nAAPL,2024-01-02,185.50".getBytes());
+                "symbol,date,close_price\nAAPL,2024-01-02,185.50".getBytes(StandardCharsets.UTF_8));
 
         mockMvc.perform(multipart("/api/v1/admin/prices/csv")
                         .file(file)
@@ -159,7 +160,7 @@ class AdminPriceControllerTest {
         when(priceService.importCsv(any())).thenReturn(new CsvImportResult(0, List.of()));
 
         var file = new MockMultipartFile("file", "prices.csv", "text/csv",
-                "symbol,date,close_price\nAAPL,2024-01-02,185.50".getBytes());
+                "symbol,date,close_price\nAAPL,2024-01-02,185.50".getBytes(StandardCharsets.UTF_8));
 
         mockMvc.perform(multipart("/api/v1/admin/prices/csv")
                         .file(file)

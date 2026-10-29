@@ -1,7 +1,6 @@
 package com.wealthview.api.controller;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -15,9 +14,6 @@ import com.wealthview.api.testutil.WealthViewControllerTest;
 import com.wealthview.core.account.dto.AccountResponse;
 import com.wealthview.core.export.DataExportService;
 import com.wealthview.core.export.dto.TenantExportDto;
-import com.wealthview.core.holding.dto.HoldingResponse;
-import com.wealthview.core.property.dto.PropertyResponse;
-import com.wealthview.core.transaction.dto.TransactionResponse;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.TENANT_ID;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;

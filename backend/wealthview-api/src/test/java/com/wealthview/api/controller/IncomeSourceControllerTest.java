@@ -97,7 +97,7 @@ class IncomeSourceControllerTest {
     }
 
     @Test
-    void get_nonexistent_returns404() throws Exception {
+    void get_nonExistent_returns404() throws Exception {
         when(incomeSourceService.get(TENANT_ID, SOURCE_ID))
                 .thenThrow(new EntityNotFoundException("Income source not found"));
 

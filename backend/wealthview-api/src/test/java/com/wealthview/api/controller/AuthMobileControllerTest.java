@@ -15,7 +15,6 @@ import com.wealthview.core.auth.AuthService;
 import com.wealthview.core.auth.dto.AuthResult;
 import com.wealthview.core.auth.dto.LoginOutcome;
 import com.wealthview.core.auth.dto.LoginRequest;
-import com.wealthview.core.auth.dto.MobileAuthResponse;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
 import static com.wealthview.api.testutil.ControllerTestUtils.errorEnvelope;

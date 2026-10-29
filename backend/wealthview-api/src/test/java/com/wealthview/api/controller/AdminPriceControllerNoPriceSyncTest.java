@@ -12,8 +12,6 @@ import com.wealthview.core.price.PriceService;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedSuperAdmin;
 import static com.wealthview.api.testutil.ControllerTestUtils.errorEnvelope;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Tests the AdminPriceController.triggerPriceSync() 503 branch: when

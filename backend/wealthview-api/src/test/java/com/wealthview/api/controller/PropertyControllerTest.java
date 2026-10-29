@@ -5,7 +5,6 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -393,7 +392,7 @@ class PropertyControllerTest {
 
     @Test
     void refreshValuation_multipleMatches_returnsCandidates() throws Exception {
-        var candidates = java.util.List.of(
+        var candidates = List.of(
                 new ZillowSearchResult("111", "123 Main St Unit A", new BigDecimal("350000")),
                 new ZillowSearchResult("222", "123 Main St Unit B", new BigDecimal("375000"))
         );

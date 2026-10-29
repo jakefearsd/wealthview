@@ -315,9 +315,9 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void handleTypeMismatch_requiredTypeNotNull_returns400WithTypeName() {
-        var ex = org.mockito.Mockito.mock(MethodArgumentTypeMismatchException.class);
-        org.mockito.Mockito.when(ex.getName()).thenReturn("size");
-        org.mockito.Mockito.when(ex.getRequiredType()).thenReturn((Class) Integer.class);
+        var ex = mock(MethodArgumentTypeMismatchException.class);
+        when(ex.getName()).thenReturn("size");
+        when(ex.getRequiredType()).thenReturn((Class) Integer.class);
 
         var response = handler.handleTypeMismatch(ex, request);
 
@@ -329,9 +329,9 @@ class GlobalExceptionHandlerTest {
     @Test
     void handleTypeMismatch_requiredTypeNull_usesGenericValueLabel() {
         // Covers the `requiredType != null ? ... : "value"` null branch
-        var ex = org.mockito.Mockito.mock(MethodArgumentTypeMismatchException.class);
-        org.mockito.Mockito.when(ex.getName()).thenReturn("accountId");
-        org.mockito.Mockito.when(ex.getRequiredType()).thenReturn(null);
+        var ex = mock(MethodArgumentTypeMismatchException.class);
+        when(ex.getName()).thenReturn("accountId");
+        when(ex.getRequiredType()).thenReturn(null);
 
         var response = handler.handleTypeMismatch(ex, request);
 

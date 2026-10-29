@@ -1,5 +1,6 @@
 package com.wealthview.api.controller;
 
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -50,7 +51,8 @@ class ImportControllerTest {
                 .thenReturn(jobResponse);
 
         var file = new MockMultipartFile("file", "transactions.csv",
-                "text/csv", "date,type,symbol,quantity,amount\n2025-01-15,buy,AAPL,10,1500".getBytes());
+                "text/csv",
+                "date,type,symbol,quantity,amount\n2025-01-15,buy,AAPL,10,1500".getBytes(StandardCharsets.UTF_8));
 
         mockMvc.perform(multipart("/api/v1/import/csv")
                         .file(file)
@@ -68,7 +70,7 @@ class ImportControllerTest {
                 .thenReturn(jobResponse);
 
         var file = new MockMultipartFile("file", "transactions.ofx",
-                "application/x-ofx", "<OFX>test</OFX>".getBytes());
+                "application/x-ofx", "<OFX>test</OFX>".getBytes(StandardCharsets.UTF_8));
 
         mockMvc.perform(multipart("/api/v1/import/ofx")
                         .file(file)
@@ -87,7 +89,7 @@ class ImportControllerTest {
                 .thenReturn(jobResponse);
 
         var file = new MockMultipartFile("file", "positions.csv",
-                "text/csv", "Account Number,Symbol\nX123,AMZN".getBytes());
+                "text/csv", "Account Number,Symbol\nX123,AMZN".getBytes(StandardCharsets.UTF_8));
 
         mockMvc.perform(multipart("/api/v1/import/positions")
                         .file(file)
@@ -119,7 +121,8 @@ class ImportControllerTest {
                 .thenReturn(jobResponse);
 
         var file = new MockMultipartFile("file", "schwab.csv",
-                "text/csv", "date,action,symbol,qty,amount\n2025-01-15,Buy,AAPL,10,1500".getBytes());
+                "text/csv",
+                "date,action,symbol,qty,amount\n2025-01-15,Buy,AAPL,10,1500".getBytes(StandardCharsets.UTF_8));
 
         mockMvc.perform(multipart("/api/v1/import/csv")
                         .file(file)
@@ -140,7 +143,7 @@ class ImportControllerTest {
                 .thenReturn(jobResponse);
 
         var file = new MockMultipartFile("file", "txns.csv",
-                "text/csv", "date,type\n2025-01-15,buy".getBytes());
+                "text/csv", "date,type\n2025-01-15,buy".getBytes(StandardCharsets.UTF_8));
 
         mockMvc.perform(multipart("/api/v1/import/csv")
                         .file(file)
@@ -158,7 +161,7 @@ class ImportControllerTest {
                 .thenReturn(jobResponse);
 
         var file = new MockMultipartFile("file", "positions.csv",
-                "text/csv", "Account Number,Symbol\nX123,AMZN".getBytes());
+                "text/csv", "Account Number,Symbol\nX123,AMZN".getBytes(StandardCharsets.UTF_8));
 
         mockMvc.perform(multipart("/api/v1/import/positions")
                         .file(file)
@@ -172,7 +175,7 @@ class ImportControllerTest {
     @Test
     void importCsv_disallowedContentType_returns400() throws Exception {
         var file = new MockMultipartFile("file", "malware.exe",
-                "application/x-msdownload", "MZ".getBytes());
+                "application/x-msdownload", "MZ".getBytes(StandardCharsets.UTF_8));
 
         mockMvc.perform(multipart("/api/v1/import/csv")
                         .file(file)
@@ -191,7 +194,7 @@ class ImportControllerTest {
 
         // MockMultipartFile with no content type → getContentType() returns null
         var file = new MockMultipartFile("file", "transactions.csv",
-                null, "date,type\n2025-01-15,buy".getBytes());
+                null, "date,type\n2025-01-15,buy".getBytes(StandardCharsets.UTF_8));
 
         mockMvc.perform(multipart("/api/v1/import/csv")
                         .file(file)
@@ -205,7 +208,7 @@ class ImportControllerTest {
         // POST without a CSRF token is denied by the CSRF filter (403) before
         // the auth check, which is the correct layered security behavior.
         var file = new MockMultipartFile("file", "transactions.csv",
-                "text/csv", "date,type\n2025-01-15,buy".getBytes());
+                "text/csv", "date,type\n2025-01-15,buy".getBytes(StandardCharsets.UTF_8));
 
         mockMvc.perform(multipart("/api/v1/import/csv")
                         .file(file)

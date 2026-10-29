@@ -2,7 +2,6 @@ package com.wealthview.api.controller;
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
