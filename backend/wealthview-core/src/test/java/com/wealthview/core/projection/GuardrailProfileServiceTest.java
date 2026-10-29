@@ -617,6 +617,64 @@ class GuardrailProfileServiceTest {
     }
 
     @Test
+    void reoptimize_storedProfile_carriesEveryStoredRequestFieldAndTheScenarioTent() {
+        scenario = tentScenario(tentJson("5", "Balanced", "0.2", "0.8"));
+        var entity = storedProfile();
+        entity.setName("Kept Name");
+        entity.setEssentialFloor(new BigDecimal("41000"));
+        entity.setTerminalBalanceTarget(new BigDecimal("25000"));
+        entity.setTrialCount(2500);
+        entity.setConfidenceLevel(new BigDecimal("0.85"));
+        entity.setPhases("[{\"name\":\"Only\",\"startAge\":62,\"endAge\":null,\"priorityWeight\":2}]");
+        entity.setPortfolioFloor(new BigDecimal("5000"));
+        entity.setMaxAnnualAdjustmentRate(new BigDecimal("0.07"));
+        entity.setPhaseBlendYears(4);
+        entity.setRiskTolerance("aggressive");
+        entity.setOptimizeConversions(true);
+        entity.setConversionBracketRate(new BigDecimal("0.24"));
+        entity.setRmdTargetBracketRate(new BigDecimal("0.12"));
+        entity.setTraditionalExhaustionBuffer(7);
+        entity.setRmdBracketHeadroom(new BigDecimal("0.15"));
+        entity.setDynamicSequencingBracketRate(new BigDecimal("0.10"));
+        entity.setGateOnAdaptiveRules(true);
+        entity.setBondTentTarget(new BigDecimal("700000.0000"));
+        stubReoptimizeHappyPath(entity);
+        var inputCaptor = ArgumentCaptor.forClass(GuardrailOptimizationInput.class);
+        when(spendingOptimizer.optimize(inputCaptor.capture()))
+                .thenReturn(withTentTarget(baseOptimizerResponse(), new BigDecimal("812345.67")));
+        var savedCaptor = ArgumentCaptor.forClass(GuardrailSpendingProfileEntity.class);
+        when(guardrailRepository.save(savedCaptor.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+        var result = service.reoptimize(tenantId, scenarioId);
+
+        var input = inputCaptor.getValue();
+        assertThat(input.essentialFloor()).isEqualByComparingTo("41000");
+        assertThat(input.terminalBalanceTarget()).isEqualByComparingTo("25000");
+        assertThat(input.trialCount()).isEqualTo(2500);
+        assertThat(input.confidenceLevel()).isEqualByComparingTo("0.85");
+        assertThat(input.phases()).containsExactly(new GuardrailPhaseInput("Only", 62, null, 2));
+        assertThat(input.portfolioFloor()).isEqualByComparingTo("5000");
+        assertThat(input.maxAnnualAdjustmentRate()).isEqualByComparingTo("0.07");
+        assertThat(input.phaseBlendYears()).isEqualTo(4);
+        assertThat(input.optimizeConversions()).isTrue();
+        assertThat(input.conversionBracketRate()).isEqualByComparingTo("0.24");
+        assertThat(input.rmdTargetBracketRate()).isEqualByComparingTo("0.12");
+        assertThat(input.traditionalExhaustionBuffer()).isEqualTo(7);
+        assertThat(input.rmdBracketHeadroom()).isEqualByComparingTo("0.15");
+        assertThat(input.dynamicSequencingBracketRate()).isEqualByComparingTo("0.10");
+        assertThat(input.gateOnAdaptiveRules()).isTrue();
+        // The tent config is the scenario's current one; the stored target is recomputed by the new run.
+        assertThat(input.bondTent()).isNotNull();
+        assertThat(input.bondTent().coverageYears()).isEqualByComparingTo("5");
+        assertThat(input.bondTent().planMix().name()).isEqualTo("Balanced");
+        var saved = savedCaptor.getValue();
+        assertThat(saved.getName()).isEqualTo("Kept Name");
+        assertThat(saved.getRiskTolerance()).isEqualTo("aggressive");
+        assertThat(saved.getBondTentTarget()).isEqualByComparingTo("812345.67");
+        assertThat(result.bondTentTarget()).isEqualByComparingTo("812345.67");
+    }
+
+    @Test
     void reoptimize_profileSavedWithConversions_echoesConversionsAndDynamicSequencingRate() {
         var entity = storedProfile();
         entity.setOptimizeConversions(true);

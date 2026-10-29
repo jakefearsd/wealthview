@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class BondTentConfigTest {
 
@@ -79,6 +80,20 @@ class BondTentConfigTest {
         var config = new BondTentConfig(BigDecimal.ONE, 0, List.of(tent().mixes().getFirst(), second), null);
 
         assertThat(config.planMix().name()).isEqualTo("Balanced");
+    }
+
+    @Test
+    void planMix_nullMixes_throwsIllegalState() {
+        var config = new BondTentConfig(BigDecimal.ONE, 0, null, null);
+
+        assertThatThrownBy(config::planMix).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void planMix_emptyMixes_throwsIllegalState() {
+        var config = new BondTentConfig(BigDecimal.ONE, 0, List.of(), null);
+
+        assertThatThrownBy(config::planMix).isInstanceOf(IllegalStateException.class);
     }
 
     @Test
