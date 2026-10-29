@@ -261,6 +261,7 @@ describe('AuthContext', () => {
         await waitFor(() => {
             expect(getByTestId('error').props.children).toContain('MFA');
         });
+        expect(getByTestId('error').props.children).toContain('Sign in on the web app');
         expect(getByTestId('status').props.children).toBe('unauthenticated');
     });
 

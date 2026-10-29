@@ -93,8 +93,8 @@ describe('LoginScreen', () => {
 
     it('shows the MFA-not-supported note when AuthContext signals MFA was required', async () => {
         mockAuthState.error =
-            'MFA is enabled on this account but mobile MFA is not yet supported in this build. Disable MFA on the web client to sign in here.';
+            'This account uses two-step verification (MFA), which the mobile app does not support yet. Sign in on the web app instead.';
         const { queryByText } = await render(<LoginScreen />);
-        expect(queryByText(/MFA is enabled/i)).toBeTruthy();
+        expect(queryByText(/two-step verification.*Sign in on the web app instead/i)).toBeTruthy();
     });
 });

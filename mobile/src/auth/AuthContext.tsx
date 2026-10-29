@@ -229,7 +229,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
                     dispatch({
                         type: 'login_failure',
                         error:
-                            'MFA is enabled on this account but mobile MFA is not yet supported in this build. Disable MFA on the web client to sign in here.',
+                            'This account uses two-step verification (MFA), which the mobile app does not support yet. Sign in on the web app instead.',
                     });
                     return;
                 }
