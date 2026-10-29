@@ -206,6 +206,38 @@ class TrialConfigFactoryTest {
     }
 
     @Test
+    void configFor_nonPooledWithoutStartBalances_fundsTheTentFromTaxableOnly() {
+        var paths = new TentPaths(new double[][] {new double[4 * 4]}, null, null);
+        var factory = minimal(new PoolSimSetup(100_000, 50_000, 25_000, "taxable_first", false))
+                .tent(tentPlan(0, 0, 5.0), paths).build();
+
+        var config = factory.configFor(0, null, false, null, 200_000);
+
+        // A non-pooled run holds everything as taxable, so the tent can take only the 100k taxable balance even
+        // though the pool setup's traditional and Roth scalars (50k, 25k) would otherwise absorb the rest.
+        assertThat(config.tent().total()).isCloseTo(100_000, within(1e-6));
+        assertThat(config.tent().totalIn(PoolType.TAXABLE)).isCloseTo(100_000, within(1e-6));
+        assertThat(config.tent().totalIn(PoolType.TRADITIONAL)).isZero();
+        assertThat(config.tent().totalIn(PoolType.ROTH)).isZero();
+        assertThat(config.initTaxable()).isEqualTo(100_000);
+    }
+
+    @Test
+    void configFor_legacyDoubleTargetOnAnEmptyPlan_coversZeroYearsNotNaN() {
+        var paths = new TentPaths(new double[][] {new double[4 * 4]}, null, null);
+        var factory = minimal(new PoolSimSetup(50_000, 500_000, 0, "taxable_first", true))
+                .tent(tentPlan(0, 0, 5.0), paths).build();
+
+        var empty = factory.configFor(0, null, false, null, 0.0);
+        var funded = factory.configFor(0, null, false, null, 50_000);
+
+        // The double overload carries no withdrawal schedule, so there is nothing to measure coverage against:
+        // 0.0 (a defined "no coverage"), never NaN, which the Monte Carlo coverage percentiles filter out.
+        assertThat(empty.tent().yearsCovered()).isEqualTo(0.0);
+        assertThat(funded.tent().yearsCovered()).isEqualTo(0.0);
+    }
+
+    @Test
     void tent_onlyOneOfPlanAndPaths_isRejected() {
         var builder = minimal(new PoolSimSetup(0, 0, 0, "taxable_first", true));
 

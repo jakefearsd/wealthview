@@ -18,10 +18,13 @@ import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.tax.BracketPoint;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.persistence.repository.StandardDeductionRepository;
+import com.wealthview.persistence.repository.TaxBracketRepository;
 import com.wealthview.projection.testutil.FlatTaxStubs;
 import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
+import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.levelSchedule;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -2094,6 +2097,57 @@ class MonteCarloSpendingOptimizerTest {
         assertThat(result.yearlySpending().getFirst().recommended().doubleValue()).isGreaterThan(0);
         // With conversions enabled, should produce a conversion schedule
         assertThat(result.conversionSchedule()).isNotNull();
+    }
+
+    private static MonteCarloSpendingOptimizer realBracketOptimizer() {
+        var brackets = mock(TaxBracketRepository.class);
+        var deductions = mock(StandardDeductionRepository.class);
+        stubSingle2025(brackets, deductions);
+        return new MonteCarloSpendingOptimizer(new FederalTaxCalculator(brackets, deductions),
+                ProjectionTestFixtures.TEST_CMA_MATRIX);
+    }
+
+    private static GuardrailOptimizationInput noReserveConversionInput() {
+        // A traditional-heavy household under real 2025 single brackets, where converting in a low bracket beats
+        // withdrawing the same dollars at RMD age. No cash reserve and no tent: the plain joint search.
+        return GuardrailOptimizationInputBuilder.builder()
+                .withEndAge(92)
+                .withAccounts(List.of(
+                        new HypotheticalAccountInput(new BigDecimal("300000"),
+                                BigDecimal.ZERO, null, "taxable"),
+                        new HypotheticalAccountInput(new BigDecimal("1800000"),
+                                BigDecimal.ZERO, null, "traditional"),
+                        new HypotheticalAccountInput(new BigDecimal("100000"),
+                                BigDecimal.ZERO, null, "roth")))
+                .withEssentialFloor(new BigDecimal("40000"))
+                .withReturnMean(new BigDecimal("0.06"))
+                .withPhases(List.of(new GuardrailPhaseInput("All", 62, null, 1)))
+                .withFilingStatus("single")
+                .withWithdrawalOrder("taxable_first")
+                .withOptimizeConversions(true)
+                .withConversionBracketRate(new BigDecimal("0.22"))
+                .withRmdTargetBracketRate(new BigDecimal("0.12"))
+                .withTrialCount(300)
+                .withConfidenceLevel(new BigDecimal("0.90"))
+                .withSeed(20261028L)
+                .build();
+    }
+
+    @Test
+    void optimize_multiPoolWithConversionsAndNoReserve_runsConversionsAndIsReproducible() {
+        // Replaces the all-branches test that went with the cash reserve: taxable + traditional + Roth, tax
+        // modeling and a conversion search, with no reserve and no tent.
+        var first = realBracketOptimizer().optimize(noReserveConversionInput());
+        var second = realBracketOptimizer().optimize(noReserveConversionInput());
+
+        assertThat(first.conversionSchedule()).isNotNull();
+        assertThat(first.conversionSchedule().years())
+                .as("the joint search must actually convert, not return an empty schedule")
+                .anySatisfy(year -> assertThat(year.conversionAmount()).isPositive());
+        assertThat(first.yearlySpending().getFirst().recommended()).isPositive();
+        assertThat(second.yearlySpending()).isEqualTo(first.yearlySpending());
+        assertThat(second.conversionSchedule()).isEqualTo(first.conversionSchedule());
+        assertThat(second.medianFinalBalance()).isEqualByComparingTo(first.medianFinalBalance());
     }
 
     // === Tax pool deduction ordering ===

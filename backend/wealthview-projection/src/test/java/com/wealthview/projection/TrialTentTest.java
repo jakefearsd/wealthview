@@ -247,6 +247,18 @@ class TrialTentTest {
     }
 
     @Test
+    void trackCoverage_noYearRecorded_seedsLeftWithTheTotalAtTrackingTime() {
+        var tent = reserved100kInTaxable();
+
+        tent.trackCoverage(new double[] {50_000, 50_000});
+        tent.spend(30_000);
+
+        // left is a snapshot of total() when tracking starts (100k), not a live read: an unrecorded draw leaves it
+        // alone, so the whole 100k counts as two unused years. A left seeded at zero would report 0.
+        assertThat(tent.yearsCovered()).isCloseTo(2.0, EPS);
+    }
+
+    @Test
     void yearsCovered_notTracked_isNaN() {
         assertThat(reserved100kInTaxable().yearsCovered()).isNaN();
     }

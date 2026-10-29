@@ -5,10 +5,12 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import com.wealthview.core.projection.BondMaturityReturnsProvider.MaturityReturnMatrix;
 import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealReturnMatrix;
@@ -25,9 +27,13 @@ import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
+import com.wealthview.core.projection.tax.FederalTaxCalculator;
+import com.wealthview.persistence.repository.StandardDeductionRepository;
+import com.wealthview.persistence.repository.TaxBracketRepository;
 import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
+import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -159,6 +165,74 @@ class FixedSpendingTentSimulatorTest {
             assertThat(c.balanceAt90Median()).isEqualByComparingTo("500000.00");
         });
         assertThat(result.columns().get(1).tentTarget()).isEqualByComparingTo("40000.00");
+    }
+
+    private static FederalTaxCalculator realCalc() {
+        var brackets = Mockito.mock(TaxBracketRepository.class);
+        var deductions = Mockito.mock(StandardDeductionRepository.class);
+        stubSingle2025(brackets, deductions);
+        return new FederalTaxCalculator(brackets, deductions);
+    }
+
+    private static ProjectionInput guardrailProjection(GuardrailOptimizationInput input,
+                                                       Map<Integer, BigDecimal> conversions) {
+        var yearly = new ArrayList<GuardrailYearlySpending>();
+        for (int year = 2030; year < 2060; year++) {
+            yearly.add(new GuardrailYearlySpending(year, year - 1965, bd("60000"), bd("0"), bd("0"), bd("60000"),
+                    bd("0"), bd("0"), bd("60000"), "Core"));
+        }
+        return new ProjectionInput(UUID.nameUUIDFromBytes("m7".getBytes()), "Sim", input.retirementDate(),
+                input.endAge(), input.inflationRate(), "{}", input.accounts(),
+                new SpendingProfileInput(bd("0"), bd("0"), "[]"), 2030, List.of(),
+                new GuardrailSpendingInput(yearly, conversions), List.of(), null);
+    }
+
+    @Test
+    void simulate_guardrailConversionSchedule_changesTheOutcomeWhenTaxedOnMovingMarkets() {
+        var tent = balancedTent();
+        var accounts = List.<ProjectionAccountInput>of(
+                new HypotheticalAccountInput(bd("300000"), BigDecimal.ZERO, AssetAllocation.ALL_US,
+                        Optional.empty(), "taxable"),
+                new HypotheticalAccountInput(bd("1500000"), BigDecimal.ZERO, AssetAllocation.ALL_US,
+                        Optional.empty(), "traditional"),
+                new HypotheticalAccountInput(bd("200000"), BigDecimal.ZERO, AssetAllocation.ALL_US,
+                        Optional.empty(), "roth"));
+        var input = GuardrailOptimizationInputBuilder.builder()
+                .withRetirementDate(LocalDate.of(2030, 1, 1)).withBirthYear(1965).withBaseYear(2030)
+                .withEndAge(90).withAccounts(accounts).withEssentialFloor(bd("60000"))
+                .withFilingStatus("single").withWithdrawalOrder("taxable_first")
+                .withTrialCount(200).withSeed(SEED).withBondTent(tent).build();
+        var conversions = new HashMap<Integer, BigDecimal>();
+        for (int year = 2030; year < 2038; year++) {
+            conversions.put(year, bd("120000"));
+        }
+        var simulator = new FixedSpendingTentSimulator(realCalc(), ProjectionTestFixtures.TEST_CMA_MATRIX,
+                ProjectionTestFixtures.TEST_MATURITY_MATRIX);
+
+        var converting = simulator.simulate(input, guardrailProjection(input, conversions));
+        var notConverting = simulator.simulate(input, guardrailProjection(input, new HashMap<>()));
+
+        // The same plan, markets, seed and taxes; only the stored conversion schedule differs. Converting moves
+        // 960,000 into the Roth at a taxed cost, so the end balances must differ in every column. If the
+        // simulator dropped the schedule (FixedSpendingSchedule.conversionByYear) the two runs would be equal.
+        assertThat(converting.columns()).hasSameSizeAs(notConverting.columns());
+        for (int i = 0; i < converting.columns().size(); i++) {
+            assertThat(converting.columns().get(i).balanceAt90Median())
+                    .as("column %s", converting.columns().get(i).name())
+                    .isNotEqualByComparingTo(notConverting.columns().get(i).balanceAt90Median());
+        }
+    }
+
+    @Test
+    void simulate_retirementAlreadyEnded_returnsNoTrialsAndNoColumns() {
+        // Retirement in 2030 at age 65 with a horizon of 65: no years to simulate.
+        var input = flatInput(65, cashTent());
+
+        var result = flatSimulator().simulate(input, projectionOf(input, "30000", "0"));
+
+        assertThat(result.trialCount()).isZero();
+        assertThat(result.columns()).isEmpty();
+        assertThat(result.plannedYears()).isEqualByComparingTo("2.00");
     }
 
     @Test

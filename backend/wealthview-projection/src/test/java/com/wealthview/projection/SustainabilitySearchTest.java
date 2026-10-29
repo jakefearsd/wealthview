@@ -10,7 +10,9 @@ import org.junit.jupiter.api.Test;
 import com.wealthview.core.projection.dto.BondMaturityValues;
 import com.wealthview.core.projection.dto.BondTentConfig;
 import com.wealthview.core.projection.dto.BondTentMix;
+import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
+import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.household.AgeMilestones;
 import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
@@ -357,20 +359,17 @@ class SustainabilitySearchTest {
                 setup.taxIncome().taxCtx(), null, null, false, 0.0);
     }
 
-    @Test
-    void isSustainable_withTent_isMonotoneInDiscretionary() {
+    private static BondTentConfig balancedTent(int buildUpYears) {
         var shares = new BondMaturityValues(new BigDecimal("0.2"), new BigDecimal("0.3"),
                 new BigDecimal("0.5"), BigDecimal.ZERO);
         var yields = new BondMaturityValues(new BigDecimal("0.0394"), new BigDecimal("0.0465"),
                 new BigDecimal("0.048"), new BigDecimal("0.0539"));
-        var tent = new BondTentConfig(new BigDecimal("5"), 0, List.of(new BondTentMix("Balanced", shares)), yields);
-        var input = GuardrailOptimizationInputBuilder.builder()
-                .withBondTent(tent)
-                .withAccounts(List.of(new HypotheticalAccountInput(
-                        new BigDecimal("1000000"), BigDecimal.ZERO, null, "taxable")))
-                .withTrialCount(300)
-                .withConfidenceLevel(new BigDecimal("0.90"))
-                .build();
+        return new BondTentConfig(new BigDecimal("5"), buildUpYears,
+                List.of(new BondTentMix("Balanced", shares)), yields);
+    }
+
+    /** Sweeps the uniform discretionary level 0..200k and returns how many times sustainability flips to false. */
+    private static int sweepTransitions(GuardrailOptimizationInput input) {
         var setup = new OptimizationContextBuilder(null).build(
                 input, input.accounts(), ProjectionTestFixtures.TEST_CMA_MATRIX,
                 ProjectionTestFixtures.TEST_MATURITY_MATRIX);
@@ -393,7 +392,55 @@ class SustainabilitySearchTest {
                     .isFalse();
             previous = sustainable;
         }
+        return transitions;
+    }
 
-        assertThat(transitions).isLessThanOrEqualTo(1);
+    @Test
+    void isSustainable_withTent_isMonotoneInDiscretionary() {
+        var input = GuardrailOptimizationInputBuilder.builder()
+                .withBondTent(balancedTent(0))
+                .withAccounts(List.of(new HypotheticalAccountInput(
+                        new BigDecimal("1000000"), BigDecimal.ZERO, null, "taxable")))
+                .withTrialCount(300)
+                .withConfidenceLevel(new BigDecimal("0.90"))
+                .build();
+
+        assertThat(sweepTransitions(input)).isLessThanOrEqualTo(1);
+    }
+
+    @Test
+    void isSustainable_withTentAndBuildUp_isMonotoneInDiscretionary() {
+        // A three-year build-up draws on the contributions of the years before retirement.
+        var input = GuardrailOptimizationInputBuilder.builder()
+                .withBondTent(balancedTent(3))
+                .withBaseYear(2027)
+                .withAccounts(List.of(new HypotheticalAccountInput(
+                        new BigDecimal("1000000"), new BigDecimal("40000"), null, "taxable")))
+                .withTrialCount(300)
+                .withConfidenceLevel(new BigDecimal("0.90"))
+                .build();
+
+        assertThat(sweepTransitions(input)).isLessThanOrEqualTo(1);
+    }
+
+    @Test
+    void isSustainable_withTentOnTraditionalAndRothHousehold_isMonotoneInDiscretionary() {
+        // Traditional and Roth pools hold the tent too (placement order), with and without a build-up.
+        var accounts = List.<ProjectionAccountInput>of(
+                new HypotheticalAccountInput(new BigDecimal("200000"), BigDecimal.ZERO, null, "taxable"),
+                new HypotheticalAccountInput(new BigDecimal("600000"), new BigDecimal("20000"), null,
+                        "traditional"),
+                new HypotheticalAccountInput(new BigDecimal("300000"), new BigDecimal("10000"), null, "roth"));
+        for (int buildUp : new int[] {0, 3}) {
+            var input = GuardrailOptimizationInputBuilder.builder()
+                    .withBondTent(balancedTent(buildUp))
+                    .withBaseYear(2027)
+                    .withAccounts(accounts)
+                    .withTrialCount(300)
+                    .withConfidenceLevel(new BigDecimal("0.90"))
+                    .build();
+
+            assertThat(sweepTransitions(input)).as("build-up %s", buildUp).isLessThanOrEqualTo(1);
+        }
     }
 }

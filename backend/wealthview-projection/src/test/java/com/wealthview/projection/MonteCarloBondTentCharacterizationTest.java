@@ -15,6 +15,7 @@ import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.GuardrailProfileResponse;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
@@ -89,6 +90,32 @@ class MonteCarloBondTentCharacterizationTest {
             expected += r.yearlySpending().get(k).recommended().doubleValue() / Math.pow(1 + realYield, k + 1);
         }
         assertThat(r.bondTentTarget().doubleValue()).isEqualTo(expected, within(1.00));
+    }
+
+    @Test
+    void optimize_bondTentFixture_targetMatchesTrialTentSizerOnTheRecommendedSchedule() {
+        GuardrailProfileResponse r = run();
+        var input = tentInput();
+        var setup = new OptimizationContextBuilder(null).build(input, input.accounts(),
+                ProjectionTestFixtures.TEST_CMA_MATRIX, ProjectionTestFixtures.TEST_MATURITY_MATRIX);
+        var plan = setup.sim().tentPlan();
+        int years = setup.sim().years();
+        double[] recommended = new double[years];
+        for (int k = 0; k < years; k++) {
+            recommended[k] = r.yearlySpending().get(k).recommended().doubleValue();
+        }
+        // No tax tables, conversions or income: the sizer's expected-path walk draws the whole withdrawal from
+        // the 600k taxable pool (taxable first), so each covered withdrawal is that year's recommended spending.
+        var sizerInputs = new TrialTentSizer.Inputs(null, null, null, null, null, 600_000, 400_000, 0,
+                WithdrawalOrder.TAXABLE_FIRST, 0, 0);
+        double[] zeros = new double[years];
+
+        double sized = TrialTentSizer.target(plan, sizerInputs, recommended, zeros, zeros, zeros);
+
+        // The response target is the pinned 331,916.89 above; the sizer reaches it by its own path (the plan's
+        // sizing yield), not the test's closed-form present value.
+        assertThat(sized).isEqualTo(r.bondTentTarget().doubleValue(), within(0.01));
+        assertThat(sized).isEqualTo(331_916.89, within(0.01));
     }
 
     @Test

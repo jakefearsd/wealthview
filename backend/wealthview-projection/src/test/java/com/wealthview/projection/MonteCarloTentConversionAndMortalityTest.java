@@ -10,7 +10,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import com.wealthview.core.projection.BondMaturityReturnsProvider.MaturityReturnMatrix;
 import com.wealthview.core.projection.dto.AssetAllocation;
+import com.wealthview.core.projection.dto.BondMaturity;
 import com.wealthview.core.projection.dto.BondMaturityValues;
 import com.wealthview.core.projection.dto.BondTentConfig;
 import com.wealthview.core.projection.dto.BondTentMix;
@@ -114,6 +116,68 @@ class MonteCarloTentConversionAndMortalityTest {
         // Scoring the search on the main run's tent paths instead of its own returns 0, so this pins them.
         assertThat(withTent).isCloseTo(5669.6723, within(0.01));
         assertThat(withTent).isNotEqualTo(withoutTent);
+    }
+
+    private static SimulationParameters withTent(SimulationParameters sim, TrialTentPlan plan, TentPaths paths) {
+        return new SimulationParameters(sim.retirementYear(), sim.retirementAge(), sim.endAge(), sim.years(),
+                sim.trialCount(), sim.confidenceLevel(), sim.inflationRate(), sim.portfolioPaths(),
+                sim.taxableReturns(), sim.traditionalReturns(), sim.rothReturns(), sim.rmdStartAge(),
+                sim.dividendYield(), sim.feeRate(), sim.returnMean(), sim.interestYield(),
+                sim.taxableEquityShare(), sim.survivorSpendingFactor(), sim.household(), sim.mortalityDraws(),
+                sim.stochasticEval(), sim.earlyAccessAge(), sim.startBalances(), sim.preRetirementYears(),
+                sim.returnModel(), plan, paths);
+    }
+
+    private static MaturityReturnMatrix flatMaturities(double realReturn) {
+        var base = ProjectionTestFixtures.TEST_MATURITY_MATRIX;
+        var grid = new double[base.years().length][BondMaturity.values().length];
+        for (double[] row : grid) {
+            Arrays.fill(row, realReturn);
+        }
+        return new MaturityReturnMatrix(base.years().clone(), BondMaturity.values(), grid);
+    }
+
+    private static double[] jointConversions(OptimizationSetup ctx, GuardrailOptimizationInput input) {
+        var search = new JointConversionSearch(realCalc(), new SustainabilitySearch(new TrialSimulator()));
+        return search.optimize(ctx, input, ProjectionTestFixtures.TEST_CMA_MATRIX).byYear();
+    }
+
+    @Test
+    void optimize_jointSearch_ignoresTheMainRunsRecordedTentPaths() {
+        var input = conversionsInput(balancedTent());
+        var ctx = contextFor(input);
+        // Main-run tent paths recorded on a different bond market: if the search scored on these, its choice
+        // would move; it must score on paths it generates itself.
+        var otherInput = conversionsInput(balancedTent());
+        var otherCtx = new OptimizationContextBuilder(realCalc()).build(otherInput, otherInput.accounts(),
+                ProjectionTestFixtures.TEST_CMA_MATRIX, flatMaturities(-0.05));
+        var swapped = new OptimizationSetup(ctx.portfolio(),
+                withTent(ctx.sim(), ctx.sim().tentPlan(), otherCtx.sim().tentPaths()), ctx.taxIncome());
+
+        double[] own = jointConversions(ctx, input);
+        double[] withOtherMainPaths = jointConversions(swapped, input);
+
+        assertThat(otherCtx.sim().tentPaths().sleeveReturns()).isNotEqualTo(ctx.sim().tentPaths().sleeveReturns());
+        assertThat(Arrays.stream(own).sum()).isGreaterThan(0);
+        assertThat(withOtherMainPaths).containsExactly(own);
+    }
+
+    @Test
+    void optimize_jointSearch_generatesItsPathsFromThePlansBondMarket() {
+        var input = conversionsInput(balancedTent());
+        var ctx = contextFor(input);
+        var plan = ctx.sim().tentPlan();
+        var otherPlan = new TrialTentPlan(plan.coverageYears(), plan.sizingRealYield(), plan.mixShares(),
+                plan.nominalYields(), plan.placementOrder(), plan.yearsBeforeRetirement(),
+                plan.buildUpStartIndex(), plan.contributionCap(), flatMaturities(-0.05));
+        var otherMarket = new OptimizationSetup(ctx.portfolio(),
+                withTent(ctx.sim(), otherPlan, ctx.sim().tentPaths()), ctx.taxIncome());
+
+        double[] base = jointConversions(ctx, input);
+        double[] onOtherMarket = jointConversions(otherMarket, input);
+
+        // Same main-run paths, same seed; only the bond market the search draws its own sleeve paths from differs.
+        assertThat(Arrays.stream(onOtherMarket).sum()).isNotEqualTo(Arrays.stream(base).sum());
     }
 
     // === stochastic mortality ===
