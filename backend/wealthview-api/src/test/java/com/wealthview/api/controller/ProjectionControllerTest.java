@@ -50,6 +50,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -512,6 +513,28 @@ class ProjectionControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(TENT_BODY))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void sizeBondTent_malformedBody_returns400WithErrorEnvelope() throws Exception {
+        mockMvc.perform(post("/api/v1/projections/{id}/bond-tent/sizing", SCENARIO_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"coverage_years\": \"lots\""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.status").value(400));
+        verifyNoInteractions(projectionService);
+    }
+
+    @Test
+    void sizeBondTent_missingBody_returns400WithErrorEnvelope() throws Exception {
+        mockMvc.perform(post("/api/v1/projections/{id}/bond-tent/sizing", SCENARIO_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+        verifyNoInteractions(projectionService);
     }
 
     @Test
