@@ -39,8 +39,8 @@ export default tseslint.config(
         },
     },
     {
-        // Test files: Vitest globals plus Node globals for fixtures.
-        files: ['**/*.test.{ts,tsx}', 'src/test-setup.ts', 'src/test-utils.tsx'],
+        // Test files and module mocks: Vitest globals plus Node globals for fixtures.
+        files: ['**/*.test.{ts,tsx}', 'src/test-setup.ts', 'src/test-utils.tsx', '__mocks__/**/*.{ts,tsx}'],
         languageOptions: {
             globals: { ...globals.node },
         },

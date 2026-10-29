@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { makeReplay, makeSimulation } from '../../testutil/builders';
 
 vi.mock('recharts');
@@ -20,6 +20,10 @@ describe('BondTentTab', () => {
         vi.clearAllMocks();
         mockSim.mockResolvedValue(makeSimulation());
         mockReplay.mockResolvedValue(makeReplay());
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
     it('prompts to set up a tent when none is configured', () => {
@@ -148,6 +152,5 @@ describe('BondTentTab', () => {
 
         expect(await screen.findByRole('button', { name: 'Today' })).toBeEnabled();
         expect(screen.queryByRole('button', { name: 'At retirement' })).not.toBeInTheDocument();
-        vi.useRealTimers();
     });
 });

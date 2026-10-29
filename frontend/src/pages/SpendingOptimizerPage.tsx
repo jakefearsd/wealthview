@@ -233,7 +233,6 @@ export default function SpendingOptimizerPage() {
         return <LoadingState message="Loading scenario..." />;
     }
 
-
     return (
         <div>
             <div style={{ marginBottom: '1rem' }}>

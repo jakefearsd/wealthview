@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { makeReplay, makeReplayOutcome, makeReplayYear } from '../../testutil/builders';
 
 vi.mock('recharts');
@@ -7,6 +7,13 @@ vi.mock('recharts');
 import CrashReplayChart from './CrashReplayChart';
 
 describe('CrashReplayChart', () => {
+    // Pin "today" so the builder's default retirement_year (2045) stays in the future whatever the real clock says.
+    beforeEach(() => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-06-01'));
+    });
+    afterEach(() => { vi.useRealTimers(); });
+
     it('draws one line per outcome and marks retirement and the crash', () => {
         render(<CrashReplayChart replay={makeReplay()} />);
 
@@ -82,19 +89,13 @@ describe('CrashReplayChart', () => {
     });
 
     describe('anchor label', () => {
-        afterEach(() => { vi.useRealTimers(); });
-
         it('chartLabel_anchorIsToday_saysToday', () => {
-            vi.useFakeTimers({ toFake: ['Date'] });
-            vi.setSystemTime(new Date('2026-06-01'));
             render(<CrashReplayChart replay={makeReplay({ retirement_year: 2026, crash_calendar_year: 2026 })} />);
 
             expect(screen.getByTestId('reference-line')).toHaveAttribute('data-label', 'Today 2026');
         });
 
         it('chartLabel_retirementInFuture_saysRetire', () => {
-            vi.useFakeTimers({ toFake: ['Date'] });
-            vi.setSystemTime(new Date('2026-06-01'));
             render(<CrashReplayChart replay={makeReplay({ retirement_year: 2045 })} />);
 
             expect(screen.getByTestId('reference-line')).toHaveAttribute('data-label', 'Retire 2045');
