@@ -794,6 +794,60 @@ class ProjectionInputBuilderTest {
         assertThat(result.guardrailSpending()).isNull();
     }
 
+    /** A conversion-schedule payload carrying every primitive field the response record requires. */
+    private static String schedule(String yearsJson) {
+        return "{\"exhaustionAge\":80,\"exhaustionTargetMet\":true,\"traditionalExhaustionBuffer\":5,"
+                + "\"years\":" + yearsJson + "}";
+    }
+
+    private ProjectionScenarioEntity scenarioWithGuardrail(String yearlySpending, String conversionSchedule) {
+        var scenario = ScenarioMother.scenario(tenant);
+        var guardrailEntity = new GuardrailSpendingProfileEntity(
+                tenant, scenario, "Guardrail", new BigDecimal("30000"));
+        guardrailEntity.setYearlySpending(yearlySpending);
+        guardrailEntity.setConversionSchedule(conversionSchedule);
+        guardrailEntity.setPhases("[]");
+        scenario.setGuardrailProfile(guardrailEntity);
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId())).thenReturn(List.of());
+        when(guardrailSpendingProfileRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(Optional.of(guardrailEntity));
+        return scenario;
+    }
+
+    @Test
+    void build_guardrailWithConversionSchedule_mapsConversionAmountByCalendarYear() {
+        var scenario = scenarioWithGuardrail("[]", schedule("""
+                [{"calendarYear":2031,"age":62,"conversionAmount":40000},
+                 {"calendarYear":2032,"age":63,"conversionAmount":25000}]
+                """));
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.guardrailSpending().conversionSchedule()).hasValueSatisfying(byYear ->
+                assertThat(byYear).containsOnlyKeys(2031, 2032)
+                        .containsEntry(2031, new BigDecimal("40000"))
+                        .containsEntry(2032, new BigDecimal("25000")));
+    }
+
+    @Test
+    void build_guardrailWithEmptyConversionYears_hasNoConversionSchedule() {
+        var scenario = scenarioWithGuardrail("[]", schedule("[]"));
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.guardrailSpending()).isNotNull();
+        assertThat(result.guardrailSpending().conversionSchedule()).isEmpty();
+    }
+
+    @Test
+    void build_guardrailWithMalformedYearlySpending_dropsGuardrailInsteadOfFailing() {
+        var scenario = scenarioWithGuardrail("not json", null);
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.guardrailSpending()).isNull();
+    }
+
     // ── Property Resolution Tests ──
 
     @Test

@@ -315,6 +315,26 @@ class GuardrailProfileServiceTest {
     }
 
     @Test
+    void computeScenarioHash_tentBuildUpStartChange_changesHash() {
+        var before = tentScenario(tentJson("5", "Balanced", "0.2", "0.8"));
+        var after = tentScenario(tentJson("5", "Balanced", "0.2", "0.8")
+                .replace("\"build_up_start_years\":3", "\"build_up_start_years\":6"));
+
+        assertThat(GuardrailProfileService.computeScenarioHash(after, List.of()))
+                .isNotEqualTo(GuardrailProfileService.computeScenarioHash(before, List.of()));
+    }
+
+    @Test
+    void computeScenarioHash_tentYieldChange_changesHash() {
+        var before = tentScenario(tentJson("5", "Balanced", "0.2", "0.8"));
+        var after = tentScenario(tentJson("5", "Balanced", "0.2", "0.8")
+                .replace("\"intermediate\":0.048", "\"intermediate\":0.051"));
+
+        assertThat(GuardrailProfileService.computeScenarioHash(after, List.of()))
+                .isNotEqualTo(GuardrailProfileService.computeScenarioHash(before, List.of()));
+    }
+
+    @Test
     void computeScenarioHash_comparisonMixEdit_keepsHash() {
         var before = tentScenario(tentJsonWithSecondMix("0.5", "0.5"));
         var after = tentScenario(tentJsonWithSecondMix("0.1", "0.9"));

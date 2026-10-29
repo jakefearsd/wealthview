@@ -816,6 +816,15 @@ class ScenarioCrudServiceTest {
     }
 
     @Test
+    void createScenario_dividendYieldNegative_throwsIllegalArgument() {
+        var request = ScenarioRequestBuilder.builder().withDividendYield(new BigDecimal("-0.01")).build();
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dividend_yield");
+    }
+
+    @Test
     void createScenario_dividendYieldWithinRange_doesNotThrow() {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
