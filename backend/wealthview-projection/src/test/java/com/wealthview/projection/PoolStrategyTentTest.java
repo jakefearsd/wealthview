@@ -65,9 +65,8 @@ class PoolStrategyTentTest {
     void poolReturnsFor_sameInputs_matchesCreate() {
         var returns = PoolStrategy.poolReturnsFor(ACCOUNTS, CMA, BigDecimal.ZERO, BigDecimal.ZERO);
 
-        assertThat(returns.household()).isEqualByComparingTo(PoolStrategy.create(ACCOUNTS, config())
+        assertThat(returns.taxable()).isEqualByComparingTo(PoolStrategy.create(ACCOUNTS, config())
                 .getWeightedReturn());
-        assertThat(returns.taxable()).isEqualByComparingTo(returns.household());
     }
 
     @Test

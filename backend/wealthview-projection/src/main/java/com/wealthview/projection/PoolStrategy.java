@@ -118,8 +118,8 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
         tentPools().useYearReturns(returns, sleeveReturns);
     }
 
-    /** Per-pool and household returns for one set of asset-class returns; see {@link #poolReturnsFor}. */
-    record PoolReturns(BigDecimal taxable, BigDecimal traditional, BigDecimal roth, BigDecimal household) {
+    /** Per-pool returns for one set of asset-class returns; see {@link #poolReturnsFor}. */
+    record PoolReturns(BigDecimal taxable, BigDecimal traditional, BigDecimal roth) {
     }
 
     /** The reserved tent balance after clamping each pool's reservation to its balance. */
@@ -802,36 +802,39 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
      * real-taxation fix for the all-taxable ones.
      */
     static PoolStrategy create(List<ProjectionAccountInput> accounts, PoolConfig config) {
-        Map<AssetClass, Double> geoMeans = config.geoMeans();
-        BigDecimal inflationRate = config.inflationRate();
-        BigDecimal feeRate = config.feeRate();
-        Map<PoolType, List<ProjectionAccountInput>> grouped = accounts.stream()
-                .collect(Collectors.groupingBy(ProjectionAccountInput::poolType,
-                        () -> new EnumMap<>(PoolType.class), Collectors.toList()));
-
-        var returns = poolReturnsFor(accounts, geoMeans, inflationRate, feeRate);
-        return new MultiPool(grouped, returns.taxable(), returns.traditional(), returns.roth(),
-                returns.household(), config);
+        Map<PoolType, List<ProjectionAccountInput>> grouped = groupByPool(accounts);
+        BigDecimal household = computeWeightedReturn(accounts, config.geoMeans(), config.inflationRate(),
+                config.feeRate());
+        var returns = poolReturns(grouped, household, config.geoMeans(), config.inflationRate(), config.feeRate());
+        return new MultiPool(grouped, returns.taxable(), returns.traditional(), returns.roth(), household, config);
     }
 
     /**
-     * The per-pool and household returns for {@code assetReturns} (the geometric means, or one year's
-     * returns): the same allocation blend, fee and empty-pool fallback {@link #create} builds with.
+     * The per-pool returns for {@code assetReturns} (the geometric means, or one year's returns): the same
+     * allocation blend, fee and empty-pool fallback {@link #create} builds with.
      */
     static PoolReturns poolReturnsFor(List<ProjectionAccountInput> accounts, Map<AssetClass, Double> assetReturns,
                                       BigDecimal inflationRate, BigDecimal feeRate) {
-        Map<PoolType, List<ProjectionAccountInput>> grouped = accounts.stream()
+        BigDecimal household = computeWeightedReturn(accounts, assetReturns, inflationRate, feeRate);
+        return poolReturns(groupByPool(accounts), household, assetReturns, inflationRate, feeRate);
+    }
+
+    private static Map<PoolType, List<ProjectionAccountInput>> groupByPool(List<ProjectionAccountInput> accounts) {
+        return accounts.stream()
                 .collect(Collectors.groupingBy(ProjectionAccountInput::poolType,
                         () -> new EnumMap<>(PoolType.class), Collectors.toList()));
-        BigDecimal household = computeWeightedReturn(accounts, assetReturns, inflationRate, feeRate);
+    }
+
+    private static PoolReturns poolReturns(Map<PoolType, List<ProjectionAccountInput>> grouped, BigDecimal household,
+                                           Map<AssetClass, Double> assetReturns, BigDecimal inflationRate,
+                                           BigDecimal feeRate) {
         return new PoolReturns(
                 poolWeightedReturn(grouped.getOrDefault(PoolType.TAXABLE, List.of()), household,
                         assetReturns, inflationRate, feeRate),
                 poolWeightedReturn(grouped.getOrDefault(PoolType.TRADITIONAL, List.of()), household,
                         assetReturns, inflationRate, feeRate),
                 poolWeightedReturn(grouped.getOrDefault(PoolType.ROTH, List.of()), household,
-                        assetReturns, inflationRate, feeRate),
-                household);
+                        assetReturns, inflationRate, feeRate));
     }
 
     private static BigDecimal sumInitialBalances(List<ProjectionAccountInput> accounts) {
@@ -1084,7 +1087,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             this.traditional = OwnerPool.ofBalances(grouped.getOrDefault(PoolType.TRADITIONAL, List.of()));
             this.roth = OwnerPool.ofBalances(grouped.getOrDefault(PoolType.ROTH, List.of()));
             this.tents = new TentPools(lots, traditional, roth,
-                    new PoolReturns(taxableReturn, traditionalReturn, rothReturn, weightedReturn));
+                    new PoolReturns(taxableReturn, traditionalReturn, rothReturn));
 
             this.tradContrib = OwnerPool.ofContributions(grouped.getOrDefault(PoolType.TRADITIONAL, List.of()));
             this.rothContrib = OwnerPool.ofContributions(grouped.getOrDefault(PoolType.ROTH, List.of()));
