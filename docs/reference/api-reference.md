@@ -415,14 +415,16 @@ tent and once with each configured mix. All columns use the same simulated paths
 tent. It takes no parameters.
 
 The response has `trial_count`, `planned_years` (the tent's configured coverage in years) and `columns`. The
-first column is the no-tent column: `name` is "No tent", and `tent_target`, `years_covered_median` and
-`years_covered_worst10` are null. Each following column is one mix, with these fields:
+first column is the no-tent column: `name` is "No tent" and `tent_target` is null. Its `success_rate` and
+`balance_at90_median` are filled in, and its `years_covered_median` and `years_covered_worst10` are null. Each
+following column is one mix, with these fields:
 
 - `name` and `tent_target` (the tent size in dollars)
 - `success_rate`: 0 to 1, the share of trials in which every year's planned spending was paid in full
 - `years_covered_median` and `years_covered_worst10`: the years of spending the tent covered, at the median
-  trial and at the 10th percentile
-- `balance_at90_median`: the median balance at age 90, or null when the horizon ends before age 90
+  trial and at the 10th percentile. Either can be null when no trial has coverage data.
+- `balance_at90_median`: the median balance entering age 90 (the end of the age-89 year), or null when the
+  horizon ends before that year
 
 `simulation` also returns 400 `A bond tent simulation needs a retirement date` when the scenario has no
 retirement date. The spending-plan and bond-tent check runs first, so a scenario missing both gets the
