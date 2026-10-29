@@ -110,13 +110,7 @@ export default function ProjectionDetailPage() {
         [result],
     );
 
-    const hasTent = useMemo(() => {
-        try {
-            return parseBondTent(scenario?.params_json) !== null;
-        } catch {
-            return false;
-        }
-    }, [scenario]);
+    const hasTent = useMemo(() => parseBondTent(scenario?.params_json) !== null, [scenario]);
 
     if (loading) return <LoadingState message="Loading scenario..." />;
     if (error && !scenario) return <ErrorState message={error} onRetry={refetch} />;

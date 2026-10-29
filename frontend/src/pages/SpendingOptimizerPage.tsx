@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import toast from 'react-hot-toast';
 import { getScenario, optimizeSpending, getGuardrailProfile, reoptimize } from '../api/projections';
@@ -223,6 +223,8 @@ export default function SpendingOptimizerPage() {
         await reoptimizeMutation.mutate(undefined);
     };
 
+    const tent = useMemo(() => parseBondTent(scenario?.params_json), [scenario?.params_json]);
+
     if (loadError) {
         return <ErrorState message={loadError} onRetry={() => setLoadAttempt(n => n + 1)} />;
     }
@@ -231,7 +233,6 @@ export default function SpendingOptimizerPage() {
         return <LoadingState message="Loading scenario..." />;
     }
 
-    const tent = parseBondTent(scenario.params_json);
 
     return (
         <div>

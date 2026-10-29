@@ -308,6 +308,22 @@ describe('ScenarioForm', () => {
             expect(sent).toEqual(tent);
         });
 
+        it('renders the form with the tent off when params_json is malformed', () => {
+            setupMocks();
+            const scenario = { ...tentScenario(null), params_json: '{not json' };
+            render(<ScenarioForm initialValues={scenario} onSubmit={vi.fn()} submitLabel="Save" />);
+
+            expect(screen.getByLabelText('Use a bond tent')).not.toBeChecked();
+        });
+
+        it('shows the converted notice without expanding anything', () => {
+            setupMocks();
+            const converted = { ...tent, converted_from_cash_reserve: true };
+            render(<ScenarioForm initialValues={tentScenario(converted)} onSubmit={vi.fn()} submitLabel="Save" />);
+
+            expect(screen.getByRole('status')).toHaveTextContent(/cash reserve is now a 6.5-year bond tent/);
+        });
+
         it('omits bond_tent when the tent is off', async () => {
             setupMocks();
             const onSubmit = vi.fn().mockResolvedValue(undefined);

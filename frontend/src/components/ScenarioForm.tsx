@@ -13,7 +13,7 @@ import ScenarioHouseholdSection from './scenario/ScenarioHouseholdSection';
 import ScenarioAccountsSection from './scenario/ScenarioAccountsSection';
 import ScenarioTentSection from './scenario/ScenarioTentSection';
 import { tentConfigError } from './scenario/bondTentValidation';
-import { parseBondTent } from './scenario/parseBondTent';
+import { parseBondTent, parseParamsJson } from './scenario/parseBondTent';
 import {
     DEFAULT_SURVIVOR_SPENDING_FACTOR,
     DEFAULT_LONGEVITY_CONDITIONAL_AGE,
@@ -74,7 +74,7 @@ function savedPlanSelection(initialValues: Scenario | null | undefined): string 
 }
 
 function buildInitialFields(initialValues: Scenario | null | undefined): ScenarioFormFields {
-    const parsedParams = initialValues?.params_json ? JSON.parse(initialValues.params_json) : {};
+    const parsedParams = parseParamsJson(initialValues?.params_json);
     const spendingPlanSelection = savedPlanSelection(initialValues);
 
     return {

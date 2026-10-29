@@ -72,13 +72,13 @@ describe('ScenarioTentSection', () => {
     it('shows the converted notice when the tent came from a cash reserve', () => {
         renderSection({ ...defaultConfig(), coverage_years: 2, converted_from_cash_reserve: true });
 
-        expect(screen.getByText(/Your 2-year cash reserve is now a 2-year bond tent/)).toBeInTheDocument();
+        expect(screen.getByRole('status')).toHaveTextContent(/Your 2-year cash reserve is now a 2-year bond tent/);
     });
 
     it('shows no converted notice for an ordinary tent', () => {
         renderSection(defaultConfig());
 
-        expect(screen.queryByText(/cash reserve is now/)).not.toBeInTheDocument();
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
 
     it('turns the tent on with the defaults', () => {
@@ -191,12 +191,31 @@ describe('ScenarioTentSection', () => {
         expect(screen.getByText(
             'Cash: Tent size needed: $250,000 · 12.5% of your projected $2,000,000 at retirement',
         )).toBeInTheDocument();
-        expect(screen.getByText('Why it differs from the rule of thumb ($400,000)')).toBeInTheDocument();
+        expect(screen.getByText('Why Balanced differs from the rule of thumb ($400,000)')).toBeInTheDocument();
         expect(screen.getByText(
             'Income such as Social Security, a pension or rent pays for about $160,000 of these years.',
         )).toBeInTheDocument();
         expect(screen.getByText(/2040/)).toBeInTheDocument();
         expect(screen.getByText(/2041.*partial/)).toBeInTheDocument();
+    });
+
+    it('explainsRuleOfThumb_twoMixes_showsEachMixsOwnReason', async () => {
+        vi.useFakeTimers();
+        const base = sizing();
+        mockSize.mockResolvedValue(sizing({
+            mixes: [
+                { ...base.mixes[0], rule_of_thumb: 400_000 },
+                { ...base.mixes[1], rule_of_thumb: 450_000, reason: 'WITHDRAWAL_TAX', reason_amount: 30_000 },
+            ],
+        }));
+        renderSection(defaultConfig(), { scenarioId: 'sc-1' });
+
+        await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+
+        expect(screen.getByText('Why Balanced differs from the rule of thumb ($400,000)')).toBeInTheDocument();
+        expect(screen.getByText(/pays for about \$160,000 of these years/)).toBeInTheDocument();
+        expect(screen.getByText('Why Cash differs from the rule of thumb ($450,000)')).toBeInTheDocument();
+        expect(screen.getByText('About $30,000 of the withdrawals go to income tax.')).toBeInTheDocument();
     });
 
     it('does not call the api before the debounce elapses', async () => {

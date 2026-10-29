@@ -80,10 +80,14 @@ function SizingResult({ sizing }: { sizing: BondTentSizing }) {
                     {otherMixes.map((mix, i) => (
                         <div key={i}>{sizingLine(mix, portfolio, `${mix.name}: `)}</div>
                     ))}
-                    <div style={{ marginTop: '0.5rem', fontWeight: 600 }}>
-                        {`Why it differs from the rule of thumb (${money(planMix.rule_of_thumb)})`}
-                    </div>
-                    <div>{reasonText(planMix)}</div>
+                    {sizing.mixes.map((mix, i) => (
+                        <div key={i} style={{ marginTop: '0.5rem' }}>
+                            <div style={{ fontWeight: 600 }}>
+                                {`Why ${mix.name} differs from the rule of thumb (${money(mix.rule_of_thumb)})`}
+                            </div>
+                            <div>{reasonText(mix)}</div>
+                        </div>
+                    ))}
                 </>
             )}
             <div style={{ marginTop: '0.5rem', fontWeight: 600 }}>Withdrawals the tent covers</div>
