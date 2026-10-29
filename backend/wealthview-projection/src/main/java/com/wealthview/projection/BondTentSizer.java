@@ -25,10 +25,26 @@ final class BondTentSizer {
      * The mix's real yield: {@code sum(share * ((1 + nominal) / (1 + inflation) - 1))}. A missing value counts as zero.
      */
     static double mixRealYield(BondMaturityValues yields, BondMaturityValues shares, double inflationRate) {
+        if (yields == null) {
+            throw new IllegalArgumentException("Bond tent yields are required to size a mix");
+        }
+        if (shares == null) {
+            throw new IllegalArgumentException("Bond tent mix is required to size it");
+        }
+        if (shares.sum().signum() == 0) {
+            throw new IllegalArgumentException("Bond tent mix has no shares: at least one maturity needs a share");
+        }
+        if (!(inflationRate > -1.0)) {
+            throw new IllegalArgumentException("Inflation rate must be above -100%, got " + inflationRate);
+        }
         double total = 0.0;
         for (var maturity : BondMaturity.values()) {
             double share = toDouble(shares.get(maturity));
             double nominal = toDouble(yields.get(maturity));
+            if (!(nominal > -1.0)) {
+                throw new IllegalArgumentException(
+                        "Bond tent " + maturity + " yield must be above -100%, got " + nominal);
+            }
             total += share * ((1.0 + nominal) / (1.0 + inflationRate) - 1.0);
         }
         return total;
@@ -39,6 +55,7 @@ final class BondTentSizer {
      * each weighted by its fraction of a year.
      */
     static double target(double[] withdrawals, double coverageYears, double realYield) {
+        requireCoverageAndYield(coverageYears, realYield);
         int years = coveredYears(coverageYears, withdrawals.length);
         double total = 0.0;
         for (int k = 0; k < years; k++) {
@@ -54,6 +71,11 @@ final class BondTentSizer {
      */
     static Sizing size(double[] spending, double[] income, double[] tax, double coverageYears, double realYield,
             double portfolioAtRetirement) {
+        if (spending.length != income.length || spending.length != tax.length) {
+            throw new IllegalArgumentException("Spending, income and tax series must have the same length, got "
+                    + spending.length + ", " + income.length + " and " + tax.length);
+        }
+        requireCoverageAndYield(coverageYears, realYield);
         int years = coveredYears(coverageYears, spending.length);
         var fractions = new double[years];
         var withdrawals = new double[years];
@@ -83,6 +105,15 @@ final class BondTentSizer {
         var reason = largestComponent(components);
         return new Sizing(target, withdrawals, fractions, ruleOfThumb, reason,
                 components[reason.ordinal()]);
+    }
+
+    private static void requireCoverageAndYield(double coverageYears, double realYield) {
+        if (!(coverageYears >= 0.0)) {
+            throw new IllegalArgumentException("Bond tent coverage years must not be negative, got " + coverageYears);
+        }
+        if (!(realYield > -1.0)) {
+            throw new IllegalArgumentException("Bond tent real yield must be above -100%, got " + realYield);
+        }
     }
 
     private static BondTentSizingReason largestComponent(double... components) {
