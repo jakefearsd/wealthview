@@ -103,3 +103,6 @@ loadtest/scenarios/dist/
 loadtest/scenarios/node_modules/
 loadtest/observability/pyroscope/pyroscope.jar
 loadtest/__pycache__/
+
+# Local agent scratch (plan ledgers, review diffs, logs)
+.superpowers/
