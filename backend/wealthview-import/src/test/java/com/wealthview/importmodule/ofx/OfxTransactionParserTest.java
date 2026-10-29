@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.Locale;
 
 import org.junit.jupiter.api.Test;
 
@@ -318,7 +319,7 @@ class OfxTransactionParserTest {
         assertThat(result.errors())
                 .as("DOCTYPE declarations must be refused by our own code, "
                         + "not silently accepted and forwarded to the XML parser")
-                .anyMatch(err -> err.message().toLowerCase().contains("doctype"));
+                .anyMatch(err -> err.message().toLowerCase(Locale.ROOT).contains("doctype"));
     }
 
     @Test

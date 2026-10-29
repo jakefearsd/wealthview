@@ -16,7 +16,6 @@ import com.wealthview.persistence.entity.TransactionType;
 import static com.wealthview.persistence.entity.TransactionType.BUY;
 import static com.wealthview.persistence.entity.TransactionType.DEPOSIT;
 import static com.wealthview.persistence.entity.TransactionType.DIVIDEND;
-import static com.wealthview.persistence.entity.TransactionType.SELL;
 import static com.wealthview.persistence.entity.TransactionType.WITHDRAWAL;
 import static org.assertj.core.api.Assertions.assertThat;
 
