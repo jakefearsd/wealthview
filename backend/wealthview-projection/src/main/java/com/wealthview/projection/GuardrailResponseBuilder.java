@@ -406,7 +406,7 @@ final class GuardrailResponseBuilder {
      */
     private static int reportedYears(OptimizationSetup ctx) {
         int years = ctx.sim().years();
-        TrialSimulator.HouseholdSim household = ctx.sim().household();
+        HouseholdSim household = ctx.sim().household();
         return household != null ? Math.min(years, household.truncateYearIndex()) : years;
     }
 

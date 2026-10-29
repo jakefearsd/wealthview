@@ -89,7 +89,7 @@ record PoolConfig(
 
     /**
      * Entry point for building a config fluently, mirroring {@code
-     * TrialSimulator.SimulationConfig.Builder}'s pattern. The nine arguments are the
+     * SimulationConfig.Builder}'s pattern. The nine arguments are the
      * tax/withdrawal-strategy core every pool needs (the same nine the smallest back-compat
      * constructor above takes); the allocation-driven and capital-gains-taxation knobs default to
      * the documented byte-identical no-op values the back-compat constructors already encode

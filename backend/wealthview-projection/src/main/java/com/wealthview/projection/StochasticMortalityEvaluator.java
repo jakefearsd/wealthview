@@ -6,7 +6,7 @@ import java.util.Objects;
  * Sub-project B (stochastic mortality), task 6: the SEPARATE stochastic evaluation pass. It re-runs the
  * Monte Carlo trials over the ALREADY-optimized (fixed-death) spending schedule — the recommendation is
  * NOT re-derived — but with per-trial sampled deaths ({@link MortalityDraws}) spliced in via the task-6
- * three-regime mechanism ({@link TrialSimulator.SurvivorRegime} + {@link TrialSimulator.HouseholdSim#
+ * three-regime mechanism ({@link SurvivorRegime} + {@link HouseholdSim#
  * withTrialMortality}). It produces the longevity-aware success number that sub-project B adds BESIDE
  * the fixed-death result.
  *
@@ -48,7 +48,7 @@ final class StochasticMortalityEvaluator {
                 sim.mortalityDraws(), "stochastic evaluation requires the per-trial mortality draws");
         // The base fixed-death HouseholdSim is withered per trial (transition/truncate/survivor from the
         // draws). Non-null for a stochastic run (always a two-person household); requireNonNull states it.
-        TrialSimulator.HouseholdSim baseHousehold = Objects.requireNonNull(
+        HouseholdSim baseHousehold = Objects.requireNonNull(
                 sim.household(), "stochastic evaluation requires a household");
         PortfolioSetup portfolio = ctx.portfolio();
         int trialCount = sim.trialCount();

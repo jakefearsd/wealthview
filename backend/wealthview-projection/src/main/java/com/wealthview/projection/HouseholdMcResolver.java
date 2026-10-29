@@ -22,9 +22,9 @@ import com.wealthview.core.projection.tax.FilingStatus;
  * double-precision frame.
  *
  * <p>A single-person input ({@code spouseBirthYear == null}) resolves to {@link #single()} — a
- * {@code null} {@link TrialSimulator.HouseholdSim}, factor 1.0, no in-window transition — so the
+ * {@code null} {@link HouseholdSim}, factor 1.0, no in-window transition — so the
  * builder takes its pre-household path bit-for-bit (the byte-identical anchor). A two-person input
- * always produces a {@link TrialSimulator.HouseholdSim} (owner-split pools + two RMD streams run
+ * always produces a {@link HouseholdSim} (owner-split pools + two RMD streams run
  * whether or not the first death falls inside the horizon); the income/tax-status/floor transforms
  * ({@link #inWindowTransitionIdx()} {@code >= 0}) apply only when the first death lands inside the
  * modeled retirement window.
@@ -71,7 +71,7 @@ final class HouseholdMcResolver {
      *        for a single-person input.
      */
     record Resolved(
-            @Nullable TrialSimulator.HouseholdSim sim,
+            @Nullable HouseholdSim sim,
             double survivorFactor,
             int inWindowTransitionIdx,
             @Nullable List<ProjectionIncomeSourceInput> survivorSources,
@@ -136,7 +136,7 @@ final class HouseholdMcResolver {
         // run every modeled year. transitionYearIndex >= years means the rollover/step-up never fire
         // (first death beyond the window). truncateYearIndex ends the trial at the second death.
         int truncateYearIdx = HouseholdIndexMath.truncateIndex(household, retirementYear, years);
-        var sim = new TrialSimulator.HouseholdSim(
+        var sim = new HouseholdSim(
                 sumTraditional(input.accounts(), LotOwner.SPOUSE),
                 sumRoth(input.accounts(), LotOwner.SPOUSE),
                 primaryBirthYear - spouseBirthYear,
@@ -159,8 +159,8 @@ final class HouseholdMcResolver {
      * seed with only that owner's slice, so seeding collapses to one lot — byte-identical to the
      * pre-HP1 single aggregate lot.
      */
-    private static TrialSimulator.TaxableSeed taxableSeed(List<ProjectionAccountInput> accounts) {
-        return new TrialSimulator.TaxableSeed(
+    private static TaxableSeed taxableSeed(List<ProjectionAccountInput> accounts) {
+        return new TaxableSeed(
                 sumTaxableBasis(accounts, LotOwner.JOINT), sumTaxable(accounts, LotOwner.JOINT),
                 sumTaxableBasis(accounts, LotOwner.PRIMARY), sumTaxable(accounts, LotOwner.PRIMARY),
                 sumTaxableBasis(accounts, LotOwner.SPOUSE), sumTaxable(accounts, LotOwner.SPOUSE));
@@ -227,7 +227,7 @@ final class HouseholdMcResolver {
     }
 
     /**
-     * HP2 (dedup): survivor-factor scaling keyed off a resolved {@link TrialSimulator.HouseholdSim}.
+     * HP2 (dedup): survivor-factor scaling keyed off a resolved {@link HouseholdSim}.
      * A {@code null} household (single-person, the byte-identical anchor) is a no-op; otherwise it
      * scales {@code values[y] *= factor} for {@code y >= household.transitionYearIndex()} via the
      * primitive {@link #scaleFromTransition(double[], int, double, int)} — the SAME seam that scales
@@ -236,7 +236,7 @@ final class HouseholdMcResolver {
      * pass simulates exactly the schedule reported to the user) and {@link GuardrailResponseBuilder}'s
      * floor-clamp disclosure, so the two consumers apply the factor identically and exactly once.
      */
-    static void scaleFromTransition(double[] values, @Nullable TrialSimulator.HouseholdSim household,
+    static void scaleFromTransition(double[] values, @Nullable HouseholdSim household,
                                     double factor, int years) {
         if (household == null) {
             return;

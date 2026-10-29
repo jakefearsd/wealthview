@@ -1,7 +1,7 @@
 package com.wealthview.projection;
 
 /**
- * Builds the {@link TrialSimulator.GuardrailAdaptation} rule inputs (audit C9 corridor +
+ * Builds the {@link GuardrailAdaptation} rule inputs (audit C9 corridor +
  * median-proxy derivation) from a candidate discretionary spending schedule.
  *
  * <p>Extracted (T24) so the reporting-only with-rules pass ({@link GuardrailResponseBuilder},
@@ -36,9 +36,9 @@ final class GuardrailRuleInputBuilder {
      *         {@link TrialSimulator}, which this class deliberately does not do (keeps the shared
      *         derivation pure array/corridor math, with no simulation dependency)
      * @param maxAnnualAdjustmentRate the user's year-over-year adjustment-rate knob
-     * @return the {@link TrialSimulator.GuardrailAdaptation} rule inputs for this candidate schedule
+     * @return the {@link GuardrailAdaptation} rule inputs for this candidate schedule
      */
-    static TrialSimulator.GuardrailAdaptation build(double[][] paths, double[] income,
+    static GuardrailAdaptation build(double[][] paths, double[] income,
             double[] floors, double[] discretionary, int years, int trialCount,
             double initTotalBalance, double[] medianBalanceByYear, double maxAnnualAdjustmentRate) {
         double[][] corridors = SpendingCorridorCalculator.computeCorridors(
@@ -60,7 +60,7 @@ final class GuardrailRuleInputBuilder {
             System.arraycopy(medianBalanceByYear, 0, expectedStartBalance, 1, years - 1);
         }
 
-        return new TrialSimulator.GuardrailAdaptation(
+        return new GuardrailAdaptation(
                 corridors[0], corridors[1], expectedStartBalance, maxAnnualAdjustmentRate);
     }
 }

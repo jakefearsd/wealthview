@@ -146,7 +146,7 @@ sealed interface PoolStrategy permits MultiPool {
      * ({@code need}/{@code year}/{@code age}) with the remaining seven defaulted to {@link
      * BigDecimal#ZERO} -- the same zero-fill the old telescoping overloads used one field at a time.
      * The {@code with*} methods let a caller override one field at a time from there, mirroring the
-     * one-field-per-call shape of {@code TrialSimulator.SimulationConfig.Builder} without needing a
+     * one-field-per-call shape of {@code SimulationConfig.Builder} without needing a
      * separate mutable builder class for a 10-component record.
      */
     record WithdrawalCycleInputs(

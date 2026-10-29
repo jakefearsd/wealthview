@@ -18,7 +18,7 @@ class GuardrailAdaptationRuleTest {
 
     private static final int N = 40;
 
-    private static TrialSimulator.GuardrailAdaptation adaptation(
+    private static GuardrailAdaptation adaptation(
             double low, double high, double expected, double rate) {
         double[] lows = new double[N];
         double[] highs = new double[N];
@@ -26,7 +26,7 @@ class GuardrailAdaptationRuleTest {
         Arrays.fill(lows, low);
         Arrays.fill(highs, high);
         Arrays.fill(exp, expected);
-        return new TrialSimulator.GuardrailAdaptation(lows, highs, exp, rate);
+        return new GuardrailAdaptation(lows, highs, exp, rate);
     }
 
     @Test

@@ -506,7 +506,7 @@ final class OptimizationContextBuilder {
         double[] jointFloors = SustainabilitySearch.verifyEssentialFloor(portfolioPaths,
                 joint.pipeline().incomeByYear(), frame.essentialFloor(), confidenceLevel, frame.years(), trialCount);
 
-        var regimes = new TrialSimulator.SurvivorRegime[2];
+        var regimes = new SurvivorRegime[2];
         regimes[TrialSimulator.PRIMARY_SURVIVES] = buildSurvivorRegime(input, PersonId.PRIMARY,
                 spouseBirthYear, frame, withdrawalOrder, horizonEndYear);
         regimes[TrialSimulator.SPOUSE_SURVIVES] = buildSurvivorRegime(input, PersonId.SPOUSE,
@@ -527,7 +527,7 @@ final class OptimizationContextBuilder {
      * survivor's age for every year). {@code frame.birthYear()} stays the primary's — mirroring the
      * fixed-death survivor pipeline's own convention — because the context supplies the per-owner ages.
      */
-    private TrialSimulator.SurvivorRegime buildSurvivorRegime(GuardrailOptimizationInput input,
+    private SurvivorRegime buildSurvivorRegime(GuardrailOptimizationInput input,
             PersonId survivor, int spouseBirthYear, RunFrame frame, String withdrawalOrder,
             int horizonEndYear) {
         int primaryBirthYear = frame.birthYear();
@@ -538,7 +538,7 @@ final class OptimizationContextBuilder {
                 BigDecimal.valueOf(frame.inflationRate()));
         RegimeArrays regime = buildRegime(sources, FilingStatus.SINGLE, ctx, frame, withdrawalOrder,
                 input.dynamicSequencingBracketRate());
-        return new TrialSimulator.SurvivorRegime(regime.pipeline().incomeByYear(),
+        return new SurvivorRegime(regime.pipeline().incomeByYear(),
                 regime.pipeline().surplusTaxByYear(), regime.pipeline().rentalAwareTaxableIncome(),
                 regime.ordinaryTables(), regime.ltcgTables(), regime.dsBracketCeilings(),
                 regime.rentalIncomeByYear());

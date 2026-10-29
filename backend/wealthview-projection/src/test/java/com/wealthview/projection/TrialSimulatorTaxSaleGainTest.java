@@ -91,7 +91,7 @@ class TrialSimulatorTaxSaleGainTest {
     /** One retired year, no growth/returns: a 40,000 spend drawn from traditional, taxed 20% ordinary
      * (8,000 bill, paid from taxable first), flat 15% LTCG. Taxable holds 200,000 with {@code basis}. */
     private static double finalBalanceOfTaxFundedFromTaxable(double basis) {
-        var config = TrialSimulator.SimulationConfig.builder(200_000.0, 500_000.0, 0.0, "traditional_first")
+        var config = SimulationConfig.builder(200_000.0, 500_000.0, 0.0, "traditional_first")
                 .taxTables(new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0})
                 .retirementAge(62)
                 .returns(new double[]{0.0}, new double[]{0.0}, new double[]{0.0})

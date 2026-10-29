@@ -624,7 +624,7 @@ class HouseholdTransitionTest extends DeterministicProjectionEngineTestSupport {
         assertThat(yearOf(det.yearlyData(), 2044).withdrawals()).isEqualByComparingTo(bd("15000"));
 
         var simulator = new TrialSimulator();
-        var config = TrialSimulator.SimulationConfig.builder(3_000_000.0, 0.0, 0.0, "taxable_first")
+        var config = SimulationConfig.builder(3_000_000.0, 0.0, 0.0, "taxable_first")
                 .retirementAge(78)
                 .returns(new double[]{0.0}, new double[]{0.0}, new double[]{0.0})
                 .taxableBasis(3_000_000.0)

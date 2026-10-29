@@ -6,7 +6,7 @@ import com.wealthview.core.projection.household.AgeMilestones;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 
 /**
- * Assembles each trial's {@link TrialSimulator.SimulationConfig} from the knobs that stay fixed
+ * Assembles each trial's {@link SimulationConfig} from the knobs that stay fixed
  * for one Monte Carlo pass (all {@code trialCount} trials sharing the same pool setup, tax
  * tables, conversion schedule, and return-path arrays) plus the few knobs that are the genuine
  * per-call deltas: the adaptation rule, whether to track per-year balances, and (for {@link
@@ -45,8 +45,8 @@ final class TrialConfigFactory {
     private final double[] rentalIncomeByYear;
     private final double interestYield;
     private final double taxableEquityShare;
-    private final TrialSimulator.HouseholdSim household;
-    private final TrialSimulator.SurvivorRegime[] survivorRegimes;
+    private final HouseholdSim household;
+    private final SurvivorRegime[] survivorRegimes;
     private final double survivorFactor;
     private final TrialTentPlan tentPlan;
     private final TentPaths tentPaths;
@@ -84,7 +84,7 @@ final class TrialConfigFactory {
     }
 
     /**
-     * Assembles trial {@code t}'s {@link TrialSimulator.SimulationConfig}.
+     * Assembles trial {@code t}'s {@link SimulationConfig}.
      *
      * <p>{@code trackYearBalances} is always threaded through explicitly, so a caller that never
      * varies it (mirroring {@link StochasticMortalityEvaluator}'s original chain, which never
@@ -102,36 +102,36 @@ final class TrialConfigFactory {
      * splice in each trial's own sampled first/second death. Every other caller passes {@code
      * null} and every trial uses the one household fixed for the whole pass.
      */
-    TrialSimulator.SimulationConfig configFor(int t, @Nullable TrialSimulator.GuardrailAdaptation adaptation,
-                                              boolean trackYearBalances,
-                                              @Nullable TrialSimulator.HouseholdSim householdOverride) {
+    SimulationConfig configFor(int t, @Nullable GuardrailAdaptation adaptation,
+                               boolean trackYearBalances,
+                               @Nullable HouseholdSim householdOverride) {
         return configFor(t, adaptation, trackYearBalances, householdOverride, 0);
     }
 
     /**
-     * {@link #configFor(int, TrialSimulator.GuardrailAdaptation, boolean, TrialSimulator.HouseholdSim)} for a
+     * {@link #configFor(int, GuardrailAdaptation, boolean, HouseholdSim)} for a
      * pass that holds a bond tent: {@code tentTarget} is the pass's {@link #tentTargetFor} result. With
      * per-trial start balances the tent's build-up is replayed over the trial's recorded paths and the
      * adjusted balances replace {@code startBalances[t]} everywhere (the household included); without them the
      * tent is funded in full from the resolved opening balances. A target of 0 builds an empty, inert tent.
      */
-    TrialSimulator.SimulationConfig configFor(int t, @Nullable TrialSimulator.GuardrailAdaptation adaptation,
-                                              boolean trackYearBalances,
-                                              @Nullable TrialSimulator.HouseholdSim householdOverride,
-                                              double tentTarget) {
+    SimulationConfig configFor(int t, @Nullable GuardrailAdaptation adaptation,
+                               boolean trackYearBalances,
+                               @Nullable HouseholdSim householdOverride,
+                               double tentTarget) {
         return configFor(t, adaptation, trackYearBalances, householdOverride,
                 new TrialTentSizer.Sizing(tentTarget, new double[0]));
     }
 
     /**
-     * {@link #configFor(int, TrialSimulator.GuardrailAdaptation, boolean, TrialSimulator.HouseholdSim, double)}
+     * {@link #configFor(int, GuardrailAdaptation, boolean, HouseholdSim, double)}
      * from the pass's whole {@link #tentSizingFor} result: the tent is built from its target, and its coverage
      * is counted against the sizing's withdrawals (shared across trials, not copied).
      */
-    TrialSimulator.SimulationConfig configFor(int t, @Nullable TrialSimulator.GuardrailAdaptation adaptation,
-                                              boolean trackYearBalances,
-                                              @Nullable TrialSimulator.HouseholdSim householdOverride,
-                                              TrialTentSizer.Sizing tentSizing) {
+    SimulationConfig configFor(int t, @Nullable GuardrailAdaptation adaptation,
+                               boolean trackYearBalances,
+                               @Nullable HouseholdSim householdOverride,
+                               TrialTentSizer.Sizing tentSizing) {
         double tentTarget = tentSizing.target();
         double initTaxable = poolSetup.simPools() || initialPortfolioPaths == null
                 ? poolSetup.initTaxable() : initialPortfolioPaths[t][0];
@@ -169,7 +169,7 @@ final class TrialConfigFactory {
             tent = TentBuildUp.fundedAtStart(tentPlan, tentPaths.sleeveReturnsOf(t), tentTarget,
                     initTaxable, pooled ? initTraditional : 0, pooled ? initRoth : 0).tent();
         }
-        return TrialSimulator.SimulationConfig
+        return SimulationConfig
                 .builder(initTaxable, initTraditional, initRoth, poolSetup.order())
                 .taxTables(ordinaryTaxTableByYear, ordinaryBaseIncomeByYear)
                 .conversions(conversionByYear, conversionTaxByYear)
@@ -229,8 +229,8 @@ final class TrialConfigFactory {
     }
 
     /**
-     * Fluent builder -- one field per {@link TrialSimulator.SimulationConfig} knob this factory
-     * caches for the whole pass, mirroring {@link TrialSimulator.SimulationConfig.Builder}'s own
+     * Fluent builder -- one field per {@link SimulationConfig} knob this factory
+     * caches for the whole pass, mirroring {@link SimulationConfig.Builder}'s own
      * shape and its suppressions' justifications: splitting this builder would defeat its purpose
      * of being the ONE place each of the three call sites states its knobs (TooManyFields); the
      * per-year arrays are engine-internal schedules shared by design across trials, same contract
@@ -260,8 +260,8 @@ final class TrialConfigFactory {
         private double[] rentalIncomeByYear;
         private double interestYield;
         private double taxableEquityShare = 1.0;
-        private TrialSimulator.HouseholdSim household;
-        private TrialSimulator.SurvivorRegime[] survivorRegimes;
+        private HouseholdSim household;
+        private SurvivorRegime[] survivorRegimes;
         private double survivorFactor = 1.0;
         private TrialTentPlan tentPlan;
         private TentPaths tentPaths;
@@ -309,7 +309,7 @@ final class TrialConfigFactory {
 
         /** Combined setter (task 12 / CPD): every one of the three call sites sets these age knobs
          * together, so one call replaces the separate {@code retirementAge}/{@code rmdStartAge}/
-         * {@code earlyAccessAge} setters {@link TrialSimulator.SimulationConfig.Builder} carries --
+         * {@code earlyAccessAge} setters {@link SimulationConfig.Builder} carries --
          * this also keeps the two builders' method shapes from lining up token-for-token. */
         Builder ages(int retirementAge, int rmdStartAge, int earlyAccessAge) {
             this.retirementAge = retirementAge;
@@ -360,12 +360,12 @@ final class TrialConfigFactory {
             return this;
         }
 
-        Builder household(@Nullable TrialSimulator.HouseholdSim household) {
+        Builder household(@Nullable HouseholdSim household) {
             this.household = household;
             return this;
         }
 
-        Builder survivorRegimes(@Nullable TrialSimulator.SurvivorRegime[] survivorRegimes, double survivorFactor) {
+        Builder survivorRegimes(@Nullable SurvivorRegime[] survivorRegimes, double survivorFactor) {
             this.survivorRegimes = survivorRegimes;
             this.survivorFactor = survivorFactor;
             return this;

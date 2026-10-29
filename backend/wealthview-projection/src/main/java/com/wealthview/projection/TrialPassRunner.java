@@ -72,8 +72,8 @@ final class TrialPassRunner {
      */
     PassResult run(int trialCount, int years, TrialConfigFactory configFactory,
                    double[] income, double[] surplusTax, double[] floors, double[] discretionary,
-                   @Nullable TrialSimulator.GuardrailAdaptation adaptation, boolean trackYearBalances,
-                   @Nullable IntFunction<TrialSimulator.HouseholdSim> householdOverrideFn) {
+                   @Nullable GuardrailAdaptation adaptation, boolean trackYearBalances,
+                   @Nullable IntFunction<HouseholdSim> householdOverrideFn) {
         double[] finalBalances = new double[trialCount];
         double[] minBalances = new double[trialCount];
         boolean[] successFlags = new boolean[trialCount];
@@ -84,7 +84,7 @@ final class TrialPassRunner {
         var tentSizing = configFactory.tentSizingFor(floors, discretionary, income, surplusTax);
 
         for (int t = 0; t < trialCount; t++) {
-            TrialSimulator.HouseholdSim override = householdOverrideFn != null
+            HouseholdSim override = householdOverrideFn != null
                     ? householdOverrideFn.apply(t) : null;
             var config = configFactory.configFor(t, adaptation, trackYearBalances, override, tentSizing);
             var result = trialSimulator.simulateTrial(income, surplusTax, floors, discretionary, years, config);

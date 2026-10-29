@@ -76,7 +76,7 @@ final class SustainabilitySearch {
      *         {@code JointConversionSearchGatedObjectiveTest}.)
      * @param maxAnnualAdjustmentRate the user's year-over-year adjustment-rate knob, resolved to a
      *         primitive {@code double} (0 when the request omitted it) -- needed here (not just on
-     *         {@link TrialSimulator.GuardrailAdaptation}) because a non-positive rate makes the rule
+     *         {@link GuardrailAdaptation}) because a non-positive rate makes the rule
      *         a no-op, in which case {@link #isSustainable} silently falls back to the no-adaptation
      *         gate even when {@code gateOnAdaptiveRules} is {@code true}.
      */
@@ -162,8 +162,8 @@ final class SustainabilitySearch {
         }
 
         // Household task 6: first-death transition params, threaded into each trial config
-        // ({@code null} ⇒ single-person). See {@link TrialSimulator.HouseholdSim}.
-        @Nullable TrialSimulator.HouseholdSim household() {
+        // ({@code null} ⇒ single-person). See {@link HouseholdSim}.
+        @Nullable HouseholdSim household() {
             return setup.sim().household();
         }
     }
@@ -419,7 +419,7 @@ final class SustainabilitySearch {
         var poolSetup = PoolSimSetup.resolve(ctx.taxCtx());
         var configFactory = buildConfigFactory(ctx, poolSetup);
 
-        TrialSimulator.GuardrailAdaptation adaptation = null;
+        GuardrailAdaptation adaptation = null;
         if (ctx.gateOnAdaptiveRules() && ctx.maxAnnualAdjustmentRate() > 0) {
             adaptation = buildCandidateAdaptation(ctx, floors, discretionary, poolSetup, configFactory);
         }
@@ -495,14 +495,14 @@ final class SustainabilitySearch {
      */
     private TrialPassRunner.PassResult runTrials(SearchContext ctx, double[] floors, double[] discretionary,
                                                   TrialConfigFactory configFactory,
-                                                  @Nullable TrialSimulator.GuardrailAdaptation adaptation,
+                                                  @Nullable GuardrailAdaptation adaptation,
                                                   boolean trackYearBalances) {
         return trialPassRunner.run(ctx.trialCount(), ctx.years(), configFactory,
                 ctx.income(), ctx.surplusTax(), floors, discretionary, adaptation, trackYearBalances, null);
     }
 
     /**
-     * T24: builds this candidate schedule's {@link TrialSimulator.GuardrailAdaptation} rule inputs
+     * T24: builds this candidate schedule's {@link GuardrailAdaptation} rule inputs
      * so {@link #isSustainable} can gate on the with-rules success rate. Runs an extra no-adaptation
      * TRACKED reference pass (mirroring {@link GuardrailResponseBuilder}'s headline terminal pass)
      * to get the median-per-year balance the rule's {@code expectedStartBalance} needs, then
@@ -511,7 +511,7 @@ final class SustainabilitySearch {
      */
     // Task 12: UseVarargs no longer applies -- the last parameter is now TrialConfigFactory, not
     // an array, since the trial-config assembly moved into the shared factory/runner.
-    private TrialSimulator.GuardrailAdaptation buildCandidateAdaptation(SearchContext ctx, double[] floors,
+    private GuardrailAdaptation buildCandidateAdaptation(SearchContext ctx, double[] floors,
                                                                           double[] discretionary,
                                                                           PoolSimSetup poolSetup,
                                                                           TrialConfigFactory configFactory) {

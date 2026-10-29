@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.within;
  * Sub-project B (stochastic mortality), task 6: the per-trial three-regime splice in
  * {@link TrialSimulator#simulateTrial}. Under stochastic mortality EITHER spouse can be the survivor
  * and the first death lands at a per-trial year, so each trial's config carries the JOINT phase in the
- * base arrays plus TWO precomputed {@link TrialSimulator.SurvivorRegime}s (income + tax tables built
+ * base arrays plus TWO precomputed {@link SurvivorRegime}s (income + tax tables built
  * SINGLE for each survivor identity). {@code household.transitionYearIndex()}/{@code
  * survivorIsPrimary()}/{@code truncateYearIndex()} are the per-trial mortality draw; the trial splices
  * in the matching survivor regime from the transition index forward and scales spending by the survivor
@@ -28,14 +28,14 @@ class TrialSimulatorStochasticTest {
     /** Builds a stochastic SimulationConfig (tracked) with survivor regimes + factor. */
     // ExcessiveParameterList mirrors the SimulationConfig canonical shape for readable test call sites.
     @SuppressWarnings("PMD.ExcessiveParameterList")
-    private static TrialSimulator.SimulationConfig cfg(
+    private static SimulationConfig cfg(
             double initTaxable, double initTraditional, double initRoth,
             String order, OrdinaryTaxTable[] tables, double[] base,
             double[] conv, double[] convTax, int retirementAge,
             double[] taxRet, double[] tradRet, double[] rothRet, int rmdStartAge,
-            double initTaxableBasis, LtcgTaxTable[] ltcg, TrialSimulator.HouseholdSim household,
-            TrialSimulator.SurvivorRegime[] regimes, double survivorFactor) {
-        return new TrialSimulator.SimulationConfig(
+            double initTaxableBasis, LtcgTaxTable[] ltcg, HouseholdSim household,
+            SurvivorRegime[] regimes, double survivorFactor) {
+        return new SimulationConfig(
                 initTaxable, initTraditional, initRoth, order,
                 tables, base, conv, convTax, retirementAge, null,
                 true,
@@ -46,9 +46,9 @@ class TrialSimulatorStochasticTest {
 
     /** A survivor regime carrying only per-year income + a flat ordinary table (the LTCG/DS/rental
      * arrays are inactive for these pool-draw oracles). */
-    private static TrialSimulator.SurvivorRegime regime(double[] income, OrdinaryTaxTable[] tables,
-                                                        double[] base) {
-        return new TrialSimulator.SurvivorRegime(
+    private static SurvivorRegime regime(double[] income, OrdinaryTaxTable[] tables,
+                                         double[] base) {
+        return new SurvivorRegime(
                 income, new double[income.length], base, tables, null, null, null);
     }
 
@@ -69,14 +69,14 @@ class TrialSimulatorStochasticTest {
         var primaryDecoy = regime(new double[]{0.0, 50_000.0},
                 new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.40), OrdinaryTaxTable.flat(0.40)},
                 new double[]{0.0, 0.0});
-        var regimes = new TrialSimulator.SurvivorRegime[2];
+        var regimes = new SurvivorRegime[2];
         regimes[TrialSimulator.PRIMARY_SURVIVES] = primaryDecoy;
         regimes[TrialSimulator.SPOUSE_SURVIVES] = spouseRegime;
 
-        var household = new TrialSimulator.HouseholdSim(
+        var household = new HouseholdSim(
                 0.0, 0.0, /*spouseAgeOffset=*/0, /*spouseRmdStartAge=*/99,
                 /*transitionYearIndex=*/1, /*survivorIsPrimary=*/false,
-                /*jointStepUpFactor=*/0.5, /*truncateYearIndex=*/2, TrialSimulator.TaxableSeed.EMPTY);
+                /*jointStepUpFactor=*/0.5, /*truncateYearIndex=*/2, TaxableSeed.EMPTY);
         var config = cfg(0.0, 1_000_000.0, 0.0, "traditional_first",
                 joint, new double[]{0.0, 0.0}, null, null, /*retirementAge=*/65,
                 new double[]{0.0, 0.0}, new double[]{0.0, 0.0}, new double[]{0.0, 0.0}, /*rmdStartAge=*/99,
@@ -110,13 +110,13 @@ class TrialSimulatorStochasticTest {
         var spouseDecoy = regime(new double[]{0.0, 50_000.0},
                 new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.40), OrdinaryTaxTable.flat(0.40)},
                 new double[]{0.0, 0.0});
-        var regimes = new TrialSimulator.SurvivorRegime[2];
+        var regimes = new SurvivorRegime[2];
         regimes[TrialSimulator.PRIMARY_SURVIVES] = primaryRegime;
         regimes[TrialSimulator.SPOUSE_SURVIVES] = spouseDecoy;
 
-        var household = new TrialSimulator.HouseholdSim(
+        var household = new HouseholdSim(
                 0.0, 0.0, 0, 99, /*transitionYearIndex=*/1, /*survivorIsPrimary=*/true,
-                0.5, /*truncateYearIndex=*/2, TrialSimulator.TaxableSeed.EMPTY);
+                0.5, /*truncateYearIndex=*/2, TaxableSeed.EMPTY);
         var config = cfg(0.0, 1_000_000.0, 0.0, "traditional_first",
                 joint, new double[]{0.0, 0.0}, null, null, 65,
                 new double[]{0.0, 0.0}, new double[]{0.0, 0.0}, new double[]{0.0, 0.0}, 99,
@@ -141,13 +141,13 @@ class TrialSimulatorStochasticTest {
         // truncates after 3 simulated years (truncateYearIndex = 3). Taxable-only, no tax tables.
         var spouseRegime = regime(new double[]{0.0, 5_000.0, 5_000.0, 5_000.0, 5_000.0}, null,
                 new double[5]);
-        var regimes = new TrialSimulator.SurvivorRegime[2];
+        var regimes = new SurvivorRegime[2];
         regimes[TrialSimulator.PRIMARY_SURVIVES] = spouseRegime; // unused (survivorIsPrimary == false)
         regimes[TrialSimulator.SPOUSE_SURVIVES] = spouseRegime;
 
-        var household = new TrialSimulator.HouseholdSim(
+        var household = new HouseholdSim(
                 0.0, 0.0, 0, 99, /*transitionYearIndex=*/1, /*survivorIsPrimary=*/false,
-                0.5, /*truncateYearIndex=*/3, TrialSimulator.TaxableSeed.EMPTY);
+                0.5, /*truncateYearIndex=*/3, TaxableSeed.EMPTY);
         double[] zero5 = {0.0, 0.0, 0.0, 0.0, 0.0};
         double[] floors5 = {30_000.0, 30_000.0, 30_000.0, 30_000.0, 30_000.0};
         var config = cfg(100_000.0, 0.0, 0.0, "taxable_first",
@@ -179,14 +179,14 @@ class TrialSimulatorStochasticTest {
         var primaryRegime = regime(new double[]{0.0, 0.0},
                 new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20), OrdinaryTaxTable.flat(0.20)},
                 new double[]{0.0, 0.0});
-        var regimes = new TrialSimulator.SurvivorRegime[2];
+        var regimes = new SurvivorRegime[2];
         regimes[TrialSimulator.PRIMARY_SURVIVES] = primaryRegime;
         regimes[TrialSimulator.SPOUSE_SURVIVES] = primaryRegime; // unused (survivorIsPrimary == true)
 
-        var household = new TrialSimulator.HouseholdSim(
+        var household = new HouseholdSim(
                 /*initTraditionalSpouse=*/100_000.0, 0.0, /*spouseAgeOffset=*/0, /*spouseRmdStartAge=*/73,
                 /*transitionYearIndex=*/1, /*survivorIsPrimary=*/true,
-                /*jointStepUpFactor=*/0.5, /*truncateYearIndex=*/2, TrialSimulator.TaxableSeed.EMPTY);
+                /*jointStepUpFactor=*/0.5, /*truncateYearIndex=*/2, TaxableSeed.EMPTY);
         var config = cfg(1_000_000.0, 300_000.0, 0.0, "traditional_first",
                 joint, new double[]{0.0, 0.0}, null, null, /*retirementAge=*/75,
                 new double[]{0.0, 0.0}, new double[]{0.0, 0.0}, new double[]{0.0, 0.0}, /*rmdStartAge=*/73,

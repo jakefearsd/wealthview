@@ -42,7 +42,7 @@ class TrialPassRunnerTest {
 
         new TrialPassRunner(simulator).run(trials, years, factory, zero, zero, floors, zero, null, false, null);
 
-        var captor = ArgumentCaptor.forClass(TrialSimulator.SimulationConfig.class);
+        var captor = ArgumentCaptor.forClass(SimulationConfig.class);
         verify(simulator, times(trials)).simulateTrial(any(), any(), any(), any(), anyInt(), captor.capture());
         List<Double> totals = new ArrayList<>();
         captor.getAllValues().forEach(config -> totals.add(config.tent().total()));

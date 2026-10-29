@@ -156,7 +156,7 @@ class GuardrailRulesTaxDynamicsMonotonicityTest {
             Arrays.sort(sorted);
             expectedStart[y] = PercentileCalculator.percentile(sorted, 0.50);
         }
-        var adaptation = new TrialSimulator.GuardrailAdaptation(
+        var adaptation = new GuardrailAdaptation(
                 corridors[0], corridors[1], expectedStart, MAX_ADJ_RATE);
 
         // Pass 2 (with rules): same trial indices, same return sequences — pairwise comparison.
@@ -193,9 +193,9 @@ class GuardrailRulesTaxDynamicsMonotonicityTest {
     }
 
     /** Mirrors {@code GuardrailResponseBuilder.buildSimConfig} for the pool-bearing case. */
-    private static TrialSimulator.SimulationConfig config(OptimizationSetup ctx, int t,
-                                                          TrialSimulator.GuardrailAdaptation adaptation) {
-        return TrialSimulator.SimulationConfig.builder(
+    private static SimulationConfig config(OptimizationSetup ctx, int t,
+                                           GuardrailAdaptation adaptation) {
+        return SimulationConfig.builder(
                         ctx.portfolio().initTaxable(), ctx.portfolio().initTraditional(),
                         ctx.portfolio().initRoth(), ctx.portfolio().withdrawalOrder())
                 .taxTables(ctx.taxIncome().ordinaryTaxTableByYear(), ctx.taxIncome().rentalAwareTaxableIncome())

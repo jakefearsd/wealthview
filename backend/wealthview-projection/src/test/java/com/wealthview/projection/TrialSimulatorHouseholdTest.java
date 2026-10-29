@@ -11,20 +11,20 @@ import static org.assertj.core.api.Assertions.within;
  * first-death transition (spousal rollover + joint-taxable basis step-up, once, at the year
  * boundary), the two-stream ordinary-stack composition identity, and second-death truncation.
  * Single-person byte-identity is the anchor pinned by {@link TrialSimulatorReturnTest}; here every
- * config carries a {@link TrialSimulator.HouseholdSim}.
+ * config carries a {@link HouseholdSim}.
  */
 class TrialSimulatorHouseholdTest {
 
     private final TrialSimulator simulator = new TrialSimulator();
 
     /** Builds a household SimulationConfig (taxable_first, tracked). */
-    private static TrialSimulator.SimulationConfig cfg(
+    private static SimulationConfig cfg(
             double initTaxable, double initTraditional, double initRoth,
             String order, OrdinaryTaxTable[] tables, double[] base,
             double[] conv, double[] convTax, int retirementAge,
             double[] taxRet, double[] tradRet, double[] rothRet, int rmdStartAge,
-            double initTaxableBasis, LtcgTaxTable[] ltcg, TrialSimulator.HouseholdSim household) {
-        return TrialSimulator.SimulationConfig.builder(initTaxable, initTraditional, initRoth, order)
+            double initTaxableBasis, LtcgTaxTable[] ltcg, HouseholdSim household) {
+        return SimulationConfig.builder(initTaxable, initTraditional, initRoth, order)
                 .taxTables(tables, base)
                 .conversions(conv, convTax)
                 .retirementAge(retirementAge)
@@ -51,10 +51,10 @@ class TrialSimulatorHouseholdTest {
         // Each stream keys off its OWN balance and OWN Uniform-Lifetime divisor -- the age-gap
         // correctness the feature exists for. Flat 20% ordinary table, no growth/spending/conversion:
         // the only outflow is each forced RMD's own tax.
-        var household = new TrialSimulator.HouseholdSim(
+        var household = new HouseholdSim(
                 50_000.0, 0.0, /*spouseAgeOffset=*/-5, /*spouseRmdStartAge=*/73,
                 /*transitionYearIndex=*/-1, /*survivorIsPrimary=*/true,
-                /*jointStepUpFactor=*/0.0, /*truncateYearIndex=*/1, TrialSimulator.TaxableSeed.EMPTY);
+                /*jointStepUpFactor=*/0.0, /*truncateYearIndex=*/1, TaxableSeed.EMPTY);
         var config = cfg(0.0, 150_000.0, 0.0, "taxable_first",
                 new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0},
                 null, null, /*retirementAge=*/80,
@@ -74,9 +74,9 @@ class TrialSimulatorHouseholdTest {
     void simulateTrial_twoRmdStreams_spouseBelowStartAge_onlyPrimaryStreamFires() {
         // Same primary (age 80) but the spouse is age 70 -- below the RMD start age (73), so the
         // spouse stream contributes nothing. Only the primary RMD's tax leaves the portfolio.
-        var household = new TrialSimulator.HouseholdSim(
+        var household = new HouseholdSim(
                 50_000.0, 0.0, /*spouseAgeOffset=*/-10, /*spouseRmdStartAge=*/73,
-                -1, true, 0.0, 1, TrialSimulator.TaxableSeed.EMPTY);
+                -1, true, 0.0, 1, TaxableSeed.EMPTY);
         var config = cfg(0.0, 150_000.0, 0.0, "taxable_first",
                 new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0},
                 null, null, 80,
@@ -101,9 +101,9 @@ class TrialSimulatorHouseholdTest {
         // (crosses 100k mid-conversion), draw 5k. conversionTaxByYear is 0 (deliberately WRONG) to
         // prove the engine reprices the conversion from the table.
         var table = twoBracketTable();
-        var household = new TrialSimulator.HouseholdSim(
+        var household = new HouseholdSim(
                 100_000.0, 0.0, /*spouseAgeOffset=*/0, /*spouseRmdStartAge=*/73,
-                -1, true, 0.0, 1, TrialSimulator.TaxableSeed.EMPTY);
+                -1, true, 0.0, 1, TaxableSeed.EMPTY);
         var config = cfg(500_000.0, 300_000.0, 0.0, "traditional_first",
                 new OrdinaryTaxTable[]{table}, new double[]{60_000.0},
                 new double[]{50_000.0}, new double[]{0.0}, 75,
@@ -131,10 +131,10 @@ class TrialSimulatorHouseholdTest {
         // and RMDs off the FULL rolled-up 150k -- provable only if the rollover routed to the
         // primary. The spouse is below RMD age at year 1 (and its pool is 0 anyway), so the sole
         // outflow is the primary's RMD tax.
-        var household = new TrialSimulator.HouseholdSim(
+        var household = new HouseholdSim(
                 50_000.0, 0.0, /*spouseAgeOffset=*/-10, /*spouseRmdStartAge=*/80,
                 /*transitionYearIndex=*/0, /*survivorIsPrimary=*/true,
-                /*jointStepUpFactor=*/0.0, /*truncateYearIndex=*/2, TrialSimulator.TaxableSeed.EMPTY);
+                /*jointStepUpFactor=*/0.0, /*truncateYearIndex=*/2, TaxableSeed.EMPTY);
         var config = cfg(0.0, 150_000.0, 0.0, "taxable_first",
                 new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20), OrdinaryTaxTable.flat(0.20)},
                 new double[]{0.0, 0.0}, null, null, /*retirementAge=*/79,
@@ -154,10 +154,10 @@ class TrialSimulatorHouseholdTest {
     void simulateTrial_firstDeathTransition_survivorSpouse_rollsIntoSpousePools() {
         // Mirror image: survivor = spouse. The primary's traditional (100k) rolls into the spouse's
         // (50k); the spouse RMDs off the full 150k at year 1, the primary contributes nothing.
-        var household = new TrialSimulator.HouseholdSim(
+        var household = new HouseholdSim(
                 50_000.0, 0.0, /*spouseAgeOffset=*/0, /*spouseRmdStartAge=*/80,
                 /*transitionYearIndex=*/0, /*survivorIsPrimary=*/false,
-                0.0, /*truncateYearIndex=*/2, TrialSimulator.TaxableSeed.EMPTY);
+                0.0, /*truncateYearIndex=*/2, TaxableSeed.EMPTY);
         // Primary below its own RMD start (99) at both years so it never RMDs; spouse age == primary
         // age here (offset 0), reaching its start (80) at year 1.
         var config = cfg(0.0, 150_000.0, 0.0, "taxable_first",
@@ -178,9 +178,9 @@ class TrialSimulatorHouseholdTest {
     void simulateTrial_firstDeathTransition_conservesTotalWhenNoTaxOrSpending() {
         // Rollover is conservation-preserving: with no tax table, no spending, no RMD, the transition
         // only shuffles trad/roth between owner slots -- the total is untouched.
-        var household = new TrialSimulator.HouseholdSim(
+        var household = new HouseholdSim(
                 50_000.0, 20_000.0, 0, 99, /*transitionYearIndex=*/0, true, 0.0, 1,
-                TrialSimulator.TaxableSeed.EMPTY);
+                TaxableSeed.EMPTY);
         var config = cfg(0.0, 150_000.0, 50_000.0, "taxable_first",
                 null, null, null, null, 60,
                 new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, 99,
@@ -211,9 +211,9 @@ class TrialSimulatorHouseholdTest {
         var ltcg = new LtcgTaxTable(0,
                 new double[]{0}, new double[]{Double.POSITIVE_INFINITY},
                 new double[]{0.15}, Double.POSITIVE_INFINITY);
-        var seed = new TrialSimulator.TaxableSeed(
+        var seed = new TaxableSeed(
                 /*joint*/ 20_000.0, 100_000.0, /*primary*/ 0.0, 0.0, /*spouse*/ 90_000.0, 100_000.0);
-        TrialSimulator.HouseholdSim household = new TrialSimulator.HouseholdSim(
+        HouseholdSim household = new HouseholdSim(
                 0.0, 0.0, 0, 99, /*transitionYearIndex=*/0, /*survivorIsPrimary=*/true,
                 /*jointStepUpFactor=*/0.5, 1, seed);
 
@@ -237,9 +237,9 @@ class TrialSimulatorHouseholdTest {
         // (truncateYearIndex = 2). Each simulated year draws 30k from a 100k taxable pool, so a
         // truncated run ends at 40k; a full 5-year run would deplete to 0. Tracked year-balances
         // carry the 40k bequest forward across the unsimulated tail.
-        var household = new TrialSimulator.HouseholdSim(
+        var household = new HouseholdSim(
                 0.0, 0.0, 0, 99, /*transitionYearIndex=*/-1, true, 0.0, /*truncateYearIndex=*/2,
-                TrialSimulator.TaxableSeed.EMPTY);
+                TaxableSeed.EMPTY);
         double[] zero5 = {0.0, 0.0, 0.0, 0.0, 0.0};
         double[] floors5 = {30_000.0, 30_000.0, 30_000.0, 30_000.0, 30_000.0};
         var config = cfg(100_000.0, 0.0, 0.0, "taxable_first",
@@ -260,12 +260,12 @@ class TrialSimulatorHouseholdTest {
     @Test
     void simulateTrial_nullHousehold_matchesPreHouseholdThreePoolRunExactly() {
         double[] r = {0.10};
-        var preHousehold = TrialSimulator.SimulationConfig.builder(100.0, 200.0, 50.0, "taxable_first")
+        var preHousehold = SimulationConfig.builder(100.0, 200.0, 50.0, "taxable_first")
                 .retirementAge(62)
                 .returns(r, new double[]{0.02}, new double[]{0.08})
                 .taxableBasis(100.0)
                 .build();
-        var canonicalNull = TrialSimulator.SimulationConfig.builder(100.0, 200.0, 50.0, "taxable_first")
+        var canonicalNull = SimulationConfig.builder(100.0, 200.0, 50.0, "taxable_first")
                 .retirementAge(62)
                 .returns(r, new double[]{0.02}, new double[]{0.08})
                 .taxableBasis(100.0)

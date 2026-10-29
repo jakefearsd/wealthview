@@ -27,9 +27,9 @@ class TrialConfigFactoryTest {
         return new TrialStartBalances(taxable, traditional, roth, tradSpouse, rothSpouse, joint, primary, spouse);
     }
 
-    private static TrialSimulator.HouseholdSim household() {
-        return new TrialSimulator.HouseholdSim(1, 2, 3, 75, 4, true, 0.5, 20,
-                new TrialSimulator.TaxableSeed(10, 20, 30, 40, 50, 60));
+    private static HouseholdSim household() {
+        return new HouseholdSim(1, 2, 3, 75, 4, true, 0.5, 20,
+                new TaxableSeed(10, 20, 30, 40, 50, 60));
     }
 
     @Test
@@ -87,7 +87,7 @@ class TrialConfigFactoryTest {
 
         assertThat(hh.initTraditionalSpouse()).isEqualTo(17);
         assertThat(hh.initRothSpouse()).isEqualTo(18);
-        assertThat(hh.taxableSeed()).isEqualTo(new TrialSimulator.TaxableSeed(10, 21, 30, 22, 50, 23));
+        assertThat(hh.taxableSeed()).isEqualTo(new TaxableSeed(10, 21, 30, 22, 50, 23));
         assertThat(hh.transitionYearIndex()).isEqualTo(4);
     }
 
@@ -105,7 +105,7 @@ class TrialConfigFactoryTest {
         assertThat(hh.initTraditionalSpouse()).isEqualTo(7);
         assertThat(hh.initRothSpouse()).isEqualTo(8);
         assertThat(hh.transitionYearIndex()).isEqualTo(9);
-        assertThat(hh.taxableSeed()).isEqualTo(new TrialSimulator.TaxableSeed(10, 11, 30, 12, 50, 13));
+        assertThat(hh.taxableSeed()).isEqualTo(new TaxableSeed(10, 11, 30, 12, 50, 13));
     }
 
     @Test

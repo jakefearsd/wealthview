@@ -29,16 +29,16 @@ class TrialSimulatorTentTest {
         return out;
     }
 
-    private static TrialSimulator.SimulationConfig.Builder base(double opening, double[] returns, TrialTent tent) {
+    private static SimulationConfig.Builder base(double opening, double[] returns, TrialTent tent) {
         double[] zeros = new double[returns.length];
-        return TrialSimulator.SimulationConfig.builder(opening, 0, 0, "taxable_first")
+        return SimulationConfig.builder(opening, 0, 0, "taxable_first")
                 .retirementAge(62)
                 .returns(returns, zeros, zeros)
                 .taxableBasis(opening)
                 .tent(tent);
     }
 
-    private TrialSimulator.TrialResult run(TrialSimulator.SimulationConfig config, double floor, int years) {
+    private TrialSimulator.TrialResult run(SimulationConfig config, double floor, int years) {
         double[] zeros = new double[years];
         return simulator.simulateTrial(zeros, zeros, filled(years, floor), zeros, years, config);
     }

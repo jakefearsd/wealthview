@@ -18,12 +18,12 @@ class TrialSimulatorConfigBuilderTest {
         double[] traditional = {0.02};
         double[] roth = {0.08};
 
-        var built = TrialSimulator.SimulationConfig.builder(100.0, 50.0, 25.0, "taxable_first")
+        var built = SimulationConfig.builder(100.0, 50.0, 25.0, "taxable_first")
                 .returns(taxable, traditional, roth)
                 .retirementAge(62)
                 .build();
 
-        var canonical = new TrialSimulator.SimulationConfig(
+        var canonical = new SimulationConfig(
                 100.0, 50.0, 25.0, "taxable_first",
                 null, null, null, null, 62, null, false,
                 taxable, traditional, roth, Integer.MAX_VALUE,
@@ -45,9 +45,9 @@ class TrialSimulatorConfigBuilderTest {
         double[] dsCeilings = {90000.0};
         var ltcgTables = new LtcgTaxTable[]{null};
         double[] rental = {3000.0};
-        var regimes = new TrialSimulator.SurvivorRegime[2];
+        var regimes = new SurvivorRegime[2];
 
-        var built = TrialSimulator.SimulationConfig.builder(100.0, 50.0, 25.0, "traditional_first")
+        var built = SimulationConfig.builder(100.0, 50.0, 25.0, "traditional_first")
                 .taxTables(taxTables, baseIncome)
                 .conversions(conversions, conversionTax)
                 .retirementAge(65)
@@ -67,7 +67,7 @@ class TrialSimulatorConfigBuilderTest {
                 .earlyAccessAge(59)
                 .build();
 
-        var canonical = new TrialSimulator.SimulationConfig(
+        var canonical = new SimulationConfig(
                 100.0, 50.0, 25.0, "traditional_first",
                 taxTables, baseIncome, conversions, conversionTax, 65, dsCeilings,
                 true, taxable, traditional, roth, 73,
@@ -78,7 +78,7 @@ class TrialSimulatorConfigBuilderTest {
 
     @Test
     void builder_default_hasNoTent() {
-        var built = TrialSimulator.SimulationConfig.builder(100.0, 50.0, 25.0, "taxable_first")
+        var built = SimulationConfig.builder(100.0, 50.0, 25.0, "taxable_first")
                 .returns(new double[] {0.1}, new double[] {0.1}, new double[] {0.1})
                 .build();
 

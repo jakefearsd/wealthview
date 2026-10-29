@@ -26,9 +26,9 @@ class FixedSpendingScheduleTest {
                 new TierBasedSpendingPlan.SpendingTierData("late", 75, null, bd("45000"), bd("0"))));
     }
 
-    private static TrialSimulator.HouseholdSim householdAt(int transitionIdx) {
-        return new TrialSimulator.HouseholdSim(0, 0, 0, 75, transitionIdx, true, 1.0, 100,
-                new TrialSimulator.TaxableSeed(0, 0, 0, 0, 0, 0));
+    private static HouseholdSim householdAt(int transitionIdx) {
+        return new HouseholdSim(0, 0, 0, 75, transitionIdx, true, 1.0, 100,
+                new TaxableSeed(0, 0, 0, 0, 0, 0));
     }
 
     private static GuardrailSpendingInput guardrailPlan(Map<Integer, BigDecimal> conversions) {

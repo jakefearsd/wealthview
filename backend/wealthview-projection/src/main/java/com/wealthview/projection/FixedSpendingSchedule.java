@@ -22,7 +22,7 @@ record FixedSpendingSchedule(double[] spending, @Nullable double[] conversionByY
     // ShortMethodName: 'of' is the conventional JDK-style static factory method name.
     @SuppressWarnings("PMD.ShortMethodName")
     static FixedSpendingSchedule of(SpendingPlan plan, int retirementYear, int retirementAge, int years,
-                                    BigDecimal inflationRate, @Nullable TrialSimulator.HouseholdSim household,
+                                    BigDecimal inflationRate, @Nullable HouseholdSim household,
                                     double survivorFactor) {
         double[] spending = new double[years];
         for (int y = 0; y < years; y++) {

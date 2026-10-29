@@ -12,7 +12,7 @@ import com.wealthview.core.projection.household.AgeMilestones;
  * real return sequences the trial simulator grows each pool at. {@code rmdStartAge} (derived from
  * the account owner's birth year via {@link RmdCalculator#rmdStartAge}) is carried here so both
  * {@link SustainabilitySearch} and {@link GuardrailResponseBuilder} build every
- * {@link TrialSimulator.SimulationConfig} from the same value.
+ * {@link SimulationConfig} from the same value.
  *
  * <p>{@code returnMean} is the RESOLVED effective growth assumption for the Roth-conversion
  * simulator — a real, fee-adjusted rate produced once by
@@ -46,9 +46,9 @@ record SimulationParameters(
         double survivorSpendingFactor,
         // Household task 6: the first-death transition params for the MC trials ({@code null} ⇒
         // single-person, the byte-identical anchor). Threaded into every
-        // {@link TrialSimulator.SimulationConfig} so the search and the terminal/response passes run
+        // {@link SimulationConfig} so the search and the terminal/response passes run
         // the identical household economics.
-        @Nullable TrialSimulator.HouseholdSim household,
+        @Nullable HouseholdSim household,
         // Sub-project B (stochastic mortality), task 5: the per-trial sampled death-age draws
         // ({@code null} ⇒ toggle off / single-person, the byte-identical anchor — the fixed-death
         // {@code household} transition indices above drive every trial then). Precomputed on a

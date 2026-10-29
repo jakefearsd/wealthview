@@ -3,8 +3,6 @@ package com.wealthview.projection;
 import org.springframework.lang.Nullable;
 
 import com.wealthview.core.projection.dto.LotOwner;
-import com.wealthview.projection.TrialSimulator.HouseholdSim;
-import com.wealthview.projection.TrialSimulator.SimulationConfig;
 
 /**
  * Task 17: the mutable per-trial pool state -- the double-land analog of the deterministic

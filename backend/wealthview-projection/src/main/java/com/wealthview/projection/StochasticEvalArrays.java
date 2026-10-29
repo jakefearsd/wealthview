@@ -25,4 +25,4 @@ record StochasticEvalArrays(
         @Nullable double[] jointOrdinaryBase, @Nullable OrdinaryTaxTable[] jointOrdinaryTables,
         @Nullable LtcgTaxTable[] jointLtcg, @Nullable double[] jointDsCeiling,
         @Nullable double[] jointRental,
-        TrialSimulator.SurvivorRegime[] survivorRegimes) {}
+        SurvivorRegime[] survivorRegimes) {}
