@@ -532,8 +532,8 @@ final class TrialSimulator {
             var growthResult = tent == null
                     ? applyGrowthAndInterestTax(tp, taxableReturn, config.dividendYield(), config.interestYield(),
                             config.taxableEquityShare(), table, view.base())
-                    : applyTentGrowth(tp, tent, tentYear, taxableReturn, traditionalReturn, rothReturn,
-                            config, table, view.base());
+                    : applyTentGrowth(tp, tent, config, new TentGrowthYear(tentYear, taxableReturn,
+                            traditionalReturn, rothReturn, table, view.base()));
             double dividendIncome = growthResult.dividendIncome();
             double baseWithInterest = growthResult.baseWithInterest();
             if (tent == null) {
@@ -899,6 +899,12 @@ final class TrialSimulator {
         return tent == null ? Double.NaN : tent.yearsCovered();
     }
 
+    /** The per-year inputs of {@link #applyTentGrowth}: the tent year index, the three pool returns, and the
+     * year's ordinary tax table and base income. */
+    private record TentGrowthYear(int tentYear, double taxableReturn, double traditionalReturn, double rothReturn,
+                                  OrdinaryTaxTable table, double base) {
+    }
+
     /** A pool's return once its tent sleeves earn their own: {@code grown / balance - 1}, or the raw
      * {@code poolReturn} when the pool is empty. */
     private static double effectiveReturn(TrialTent tent, PoolType pool, double balance, double poolReturn) {
@@ -911,9 +917,12 @@ final class TrialSimulator {
      * interest is taxed as ordinary income. Reads sleeve interest and the growth-index return from the
      * start-of-year sleeves and balances, then grows the sleeves and advances the index.
      */
-    private static GrowthYieldResult applyTentGrowth(TrialPools tp, TrialTent tent, int tentYear,
-            double taxableReturn, double traditionalReturn, double rothReturn, SimulationConfig config,
-            OrdinaryTaxTable table, double base) {
+    private static GrowthYieldResult applyTentGrowth(TrialPools tp, TrialTent tent, SimulationConfig config,
+            TentGrowthYear year) {
+        double taxableReturn = year.taxableReturn();
+        double traditionalReturn = year.traditionalReturn();
+        double rothReturn = year.rothReturn();
+        double base = year.base();
         double taxable = tp.taxable();
         double traditional = tp.traditionalTotal();
         double roth = tp.rothTotal();
@@ -921,10 +930,10 @@ final class TrialSimulator {
         var split = tp.growTaxable(effectiveReturn(tent, PoolType.TAXABLE, taxable, taxableReturn),
                 config.dividendYield(), config.interestYield(), config.taxableEquityShare(),
                 tent.totalIn(PoolType.TAXABLE), tent.interestIn(PoolType.TAXABLE));
-        applyInterestTax(tp, split.interestIncome(), table, base);
+        applyInterestTax(tp, split.interestIncome(), year.table(), base);
         tp.growNonTaxablePools(effectiveReturn(tent, PoolType.TRADITIONAL, traditional, traditionalReturn),
                 effectiveReturn(tent, PoolType.ROTH, roth, rothReturn));
-        tent.growSleeves(tentYear);
+        tent.growSleeves(year.tentYear());
         tent.advanceIndex(growth);
         return new GrowthYieldResult(split.dividendIncome(), base + split.interestIncome());
     }
