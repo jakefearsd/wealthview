@@ -31,8 +31,10 @@ import com.wealthview.core.projection.tax.TaxCalculationStrategy;
  * account type absent from the scenario (audit C11 -- an all-taxable scenario is simply a MultiPool
  * with zero traditional and zero roth, not a distinct untaxed code path; see {@link #create}).
  */
-// PMD.ExcessivePublicCount: the interface IS the single seam between the year loop and the pools, so
-// each engine-facing operation (including the four bond-tent hooks) is necessarily a public member.
+// PMD.ExcessivePublicCount: still 45 methods plus 3 constants against PMD's default threshold of 45 (checked by
+// removing this suppression: the rule fires). An interface's members are implicitly public, so none can be narrowed
+// to package-private; the interface IS the single seam between the year loop and the pools, and 8 of the members
+// are the bond-tent hooks, so the count is the seam's width rather than leaked internals.
 @SuppressWarnings("PMD.ExcessivePublicCount")
 sealed interface PoolStrategy permits PoolStrategy.MultiPool {
 
@@ -75,6 +77,14 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
      */
     record TentSetup(List<PoolType> placementOrder, Map<BondMaturity, BigDecimal> mixShares,
                      Map<BondMaturity, BigDecimal> realReturns, Map<BondMaturity, BigDecimal> nominalYields) {
+
+        /** Copies the collections, so a caller mutating its own list or maps afterwards cannot change the setup. */
+        public TentSetup {
+            placementOrder = List.copyOf(placementOrder);
+            mixShares = Map.copyOf(mixShares);
+            realReturns = Map.copyOf(realReturns);
+            nominalYields = Map.copyOf(nominalYields);
+        }
 
         /** The tent is placed in the pools' own withdrawal-priority sequence (spec rule 7). */
         static List<PoolType> placementFor(WithdrawalOrder order) {
