@@ -80,10 +80,10 @@ export default defineConfig({
             // reached so the gate locks in progress without flaking. RAISE these when you raise
             // coverage; never lower one to make a build pass.
             thresholds: {
-                statements: 87,
-                branches: 79,
-                functions: 80,
-                lines: 89,
+                statements: 88,
+                branches: 82,
+                functions: 82,
+                lines: 91,
             },
         },
     },

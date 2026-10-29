@@ -17,8 +17,8 @@
         <!-- JaCoCo gate: CLAUDE.md line target 0.90; branch floor just below
              the measured 0.8579 reached in the coverage-hardening pass. -->
         <jacoco.check.skip>false</jacoco.check.skip>
-        <jacoco.line.minimum>0.90</jacoco.line.minimum>
-        <jacoco.branch.minimum>0.83</jacoco.branch.minimum>
+        <jacoco.line.minimum>0.96</jacoco.line.minimum>
+        <jacoco.branch.minimum>0.90</jacoco.branch.minimum>
     </properties>
 
     <dependencies>

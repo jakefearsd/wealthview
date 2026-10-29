@@ -131,8 +131,8 @@ If you catch yourself writing production code first, stop, delete it, write the 
 
 ### Coverage Expectations
 - **Enforced** — `jacoco:check` runs on `mvn verify` and FAILS the build when a module is under target.
-- Line-coverage minimums: `wealthview-core` and `wealthview-projection` 90%; `wealthview-api` and `wealthview-import` 80%.
-- Branch-coverage floors lock in the levels reached during the pre-release quality pass: core 0.83, projection 0.84, api 0.85, import 0.71. Raise a floor when you raise the coverage; never lower one.
+- Line-coverage minimums: `wealthview-core` 96%, `wealthview-projection` 98%, `wealthview-api` and `wealthview-import` 97%.
+- Branch-coverage floors lock in the levels reached during the pre-release quality pass: core 0.90, projection 0.91, api 0.92, import 0.84. Raise a floor when you raise the coverage; never lower one.
 - Do NOT write tests solely to increase coverage numbers. Every test should verify meaningful behavior.
 
 ### Test Organization
@@ -351,7 +351,7 @@ Cross-platform code that mobile also consumes lives in the `shared/` workspace
 - **May skip:** Simple presentational components with no logic.
 - TDD encouraged but not mandatory on the frontend. Focus test energy on the backend.
 - **Coverage is measured and gated** — `npm run test:coverage` enforces ratchet floors in
-  `frontend/vite.config.ts` (statements 87, branches 79, functions 80, lines 89). Raise a
+  `frontend/vite.config.ts` (statements 88, branches 82, functions 82, lines 91). Raise a
   floor when you raise coverage; never lower one to make a build pass. `coverage.include`
   is set deliberately: without it, v8 only counts files a test happened to import, so an
   entirely untested component would be invisible rather than 0%.
@@ -414,7 +414,7 @@ mvn clean test && mvn jacoco:report -pl wealthview-core,wealthview-api,wealthvie
 ```
 - HTML reports: `<module>/target/site/jacoco/index.html`
 - CSV data: `<module>/target/site/jacoco/jacoco.csv`
-- Coverage targets: core 90%+, projection 90%+, api 80%+, import 80%+
+- Coverage targets: core 96%+, projection 98%+, api 97%+, import 97%+
 
 ### Quality Gates — enforced on `mvn verify`
 
