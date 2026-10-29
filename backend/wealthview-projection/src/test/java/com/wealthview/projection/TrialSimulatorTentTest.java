@@ -106,6 +106,17 @@ class TrialSimulatorTentTest {
     }
 
     @Test
+    void simulateTrial_residueTent_isIdenticalToNoTent() {
+        double[] returns = filled(3, 0.05);
+        var residue = tent(1e-11, 1_000_000, 0.04, 3);
+
+        var withResidue = run(base(1_000_000, returns, residue).trackYearBalances(true).build(), 40_000, 3);
+        var noTent = run(base(1_000_000, returns, null).trackYearBalances(true).build(), 40_000, 3);
+
+        assertThat(withResidue).usingRecursiveComparison().ignoringFields("tentYearsCovered").isEqualTo(noTent);
+    }
+
+    @Test
     void simulateTrial_tentEmptiedInEarlyYear_laterYearsFollowTheUntentedArithmetic() {
         // Tent 30k; crash year 0: 970k*0.7 + 30k = 709k, less 40k = 669k, tent spent in full.
         // Later years run untented: *1.1 - 40k.

@@ -250,4 +250,20 @@ class TrialTentTest {
     void yearsCovered_notTracked_isNaN() {
         assertThat(reserved100kInTaxable().yearsCovered()).isNaN();
     }
+
+    @Test
+    void isEmpty_residueBelowTolerance_isEmpty() {
+        var tent = tent();
+        tent.topUp(1e-11, 300_000, 0, 0, 1e12);
+
+        assertThat(tent.isEmpty()).isTrue();
+    }
+
+    @Test
+    void isEmpty_aboveTolerance_isNotEmpty() {
+        var tent = tent();
+        tent.topUp(1e-6, 300_000, 0, 0, 1e12);
+
+        assertThat(tent.isEmpty()).isFalse();
+    }
 }

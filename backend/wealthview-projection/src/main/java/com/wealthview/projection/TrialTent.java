@@ -23,6 +23,9 @@ import com.wealthview.core.projection.dto.PoolType;
  */
 final class TrialTent {
 
+    /** Dollars at or below which a tent counts as empty: float residue from spending and clamping, not a reserve. */
+    static final double EMPTY_TOLERANCE = 1e-9;
+
     private static final int MATURITIES = BondMaturity.values().length;
     private static final PoolType[] POOL_TYPES = PoolType.values();
     private static final int POOLS = POOL_TYPES.length;
@@ -109,7 +112,7 @@ final class TrialTent {
     }
 
     boolean isEmpty() {
-        return total() <= 0;
+        return total() <= EMPTY_TOLERANCE;
     }
 
     /**
