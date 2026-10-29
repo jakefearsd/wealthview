@@ -41,16 +41,16 @@ final class BondTentReplays {
         var realReturns = BondTentPlanner.requireAssumptions(assumptions).realReturns();
         var passOne = pass.run(null, null);
         var sized = BondTentPlanner.size(passOne.result().yearlyData(), config, frame.inflationRate());
-        var buildUp = BondTentPlanner.BuildUp.starting(frame.currentYear(), frame.retirementYear(),
-                config.buildUpStartYears(), sized.planTarget());
 
         var outcomes = new ArrayList<BondTentReplayOutcome>();
         outcomes.add(replayPass(pass, NO_TENT, null, null, sized, frame, subject));
         for (int i = 0; i < config.mixes().size(); i++) {
+            var target = sized.sizing().mixes().get(i).target();
+            var buildUp = BondTentPlanner.BuildUp.starting(frame.currentYear(), frame.retirementYear(),
+                    config.buildUpStartYears(), target);
             var tent = BondTentPlanner.runFor(sized, config, i, buildUp, realReturns, frame.feeRate(),
                     frame.order());
-            outcomes.add(replayPass(pass, config.mixes().get(i).name(), sized.sizing().mixes().get(i).target(),
-                    tent, sized, frame, subject));
+            outcomes.add(replayPass(pass, config.mixes().get(i).name(), target, tent, sized, frame, subject));
         }
         return List.copyOf(outcomes);
     }

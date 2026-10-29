@@ -159,8 +159,9 @@ final class BondTentPlanner {
     }
 
     /**
-     * The tent for mix {@code mixIndex}: its shares, built to the mix's own target along {@code buildUp}'s line.
-     * {@code twoPass} runs the plan mix (index 0); a replay runs every mix.
+     * The tent for mix {@code mixIndex}: its shares, built along {@code buildUp}'s line to the line's own target,
+     * so the caller passes a line carrying the mix's target. {@code twoPass} runs the plan mix (index 0); a replay
+     * runs every mix.
      */
     static TentRun runFor(Sized sized, BondTentConfig config, int mixIndex, BuildUp buildUp,
                           Map<BondMaturity, Double> realReturns, BigDecimal feeRate, WithdrawalOrder order) {
@@ -175,9 +176,7 @@ final class BondTentPlanner {
             yields.put(maturity, orZero(config.yields().get(maturity)));
         }
         var setup = new PoolStrategy.TentSetup(PoolStrategy.TentSetup.placementFor(order), shares, net, yields);
-        var line = new BuildUp(buildUp.currentYear(), buildUp.retirementYear(), buildUp.start(),
-                sized.sizing().mixes().get(mixIndex).target());
-        return new TentRun(sized.sizing(), line, setup);
+        return new TentRun(sized.sizing(), buildUp, setup);
     }
 
     /** Configures the fresh pools for the tent; a tent-free pass ({@code tent == null}) leaves them untouched. */
