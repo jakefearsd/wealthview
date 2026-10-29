@@ -25,7 +25,7 @@ import IncomeTaxTab from '../components/IncomeTaxTab';
 import TaxShieldTab from '../components/TaxShieldTab';
 import TaxSpaceTab from '../components/TaxSpaceTab';
 import BondTentTab from '../components/bondTent/BondTentTab';
-import { parseBondTent } from '../components/scenario/parseBondTent';
+import { parseBondTent, parseParamsJson } from '../components/scenario/parseBondTent';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
@@ -145,13 +145,13 @@ export default function ProjectionDetailPage() {
         });
         downloadBlob(csv, `projection-${name}-${date}.csv`, 'text/csv');
     };
-    const parsedParams = scenario.params_json ? JSON.parse(scenario.params_json) : {};
+    const parsedParams = parseParamsJson(scenario.params_json);
     const strategyLabels: Record<string, string> = {
         fixed_percentage: 'Fixed Percentage',
         dynamic_percentage: 'Dynamic Percentage',
         vanguard_dynamic_spending: 'Vanguard Dynamic Spending',
     };
-    const strategyLabel = strategyLabels[parsedParams.withdrawal_strategy] || 'Fixed Percentage';
+    const strategyLabel = strategyLabels[parsedParams.withdrawal_strategy ?? ''] || 'Fixed Percentage';
     const peak = result ? findPeakBalance(result.yearly_data) : null;
     const depletion = result ? findDepletionYear(result.yearly_data) : null;
     const feasibility = result?.spending_feasibility ?? null;

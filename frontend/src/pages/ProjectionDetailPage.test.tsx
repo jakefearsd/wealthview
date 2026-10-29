@@ -313,6 +313,19 @@ describe('ProjectionDetailPage', () => {
         });
     });
 
+    describe('stored params_json that is not a usable object', () => {
+        it.each([['malformed', '{not json'], ['a stored null', 'null']])(
+            'still renders the page when params_json is %s',
+            (_label, paramsJson) => {
+                const scenario = makeScenario({ id: 'abc-123', accounts: [makeAccount()], params_json: paramsJson });
+                mockUseApiQuery.mockReturnValue({ data: scenario, loading: false, error: null, refetch: vi.fn() });
+                renderPage();
+
+                expect(screen.getByRole('heading', { name: scenario.name })).toBeInTheDocument();
+            },
+        );
+    });
+
     describe('Bond tent tab', () => {
         const withPlan = makeScenario({
             id: 'abc-123',
