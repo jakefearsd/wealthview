@@ -10,8 +10,6 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -204,7 +202,7 @@ class EntityAccessorRoundtripTest {
         return null;
     }
 
-    @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.NcssCount"})
+    @SuppressWarnings("PMD.CyclomaticComplexity")
     private static Object defaultValueFor(Class<?> type) {
         if (type == String.class) return "test-value";
         if (type == int.class || type == Integer.class) return 42;
@@ -236,17 +234,5 @@ class EntityAccessorRoundtripTest {
         // Any other reference type (e.g. a related JPA entity): return null. JPA
         // permits null for unset relationships, and the setter still counts the line.
         return null;
-    }
-
-    /** Collection constructors return something non-empty so the downstream getter has data. */
-    @SuppressWarnings("unused")
-    private static List<Object> collectionWithDummy(Object item) {
-        return Arrays.asList(item);
-    }
-
-    /** Kept to pin Collections as a valid collection producer. */
-    @SuppressWarnings("unused")
-    private static Object emptyCollectionPlaceholder() {
-        return Collections.emptyList();
     }
 }
