@@ -13,10 +13,20 @@ import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.household.PersonId;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
+import com.wealthview.core.projection.tax.CombinedTaxResult;
 import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.core.projection.tax.TaxCalculationStrategy;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Household task 4: owner-aware traditional/Roth pools in {@link MultiPool}. Verifies
@@ -255,5 +265,24 @@ class MultiPoolOwnerTest {
         pool.getTraditionalByOwner().put(PersonId.PRIMARY, bd("999"));
 
         assertThat(pool.getTraditional()).isEqualByComparingTo(bd("100000"));
+    }
+
+    @Test
+    void executeWithdrawals_afterFirstDeath_billUsesSingleFiling() {
+        var tax = mock(TaxCalculationStrategy.class);
+        when(tax.computeDetailedTax(any(), anyInt(), any(), any(), any()))
+                .thenReturn(new CombinedTaxResult(bd("1000"), ZERO, bd("1000"), ZERO, ZERO, false));
+        var config = PoolConfig.builder(FilingStatus.MARRIED_FILING_JOINTLY, ZERO, ZERO, "fixed", null, null,
+                WithdrawalOrder.TRADITIONAL_FIRST, tax, null).build();
+        var pool = new MultiPool(Map.of(PoolType.TRADITIONAL, List.of(
+                owned("300000", "0", "traditional", "primary"),
+                owned("500000", "0", "traditional", "spouse"))), ZERO, config);
+        pool.applyFirstDeathTransition(PersonId.SPOUSE, PersonId.PRIMARY, false);
+
+        pool.executeWithdrawals(PoolStrategy.WithdrawalCycleInputs.of(bd("10000"), 2030, 75));
+
+        verify(tax, atLeastOnce()).computeDetailedTax(any(), anyInt(), eq(FilingStatus.SINGLE), any(), any());
+        verify(tax, never()).computeDetailedTax(any(), anyInt(), eq(FilingStatus.MARRIED_FILING_JOINTLY),
+                any(), any());
     }
 }

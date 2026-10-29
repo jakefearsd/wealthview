@@ -1030,6 +1030,19 @@ class MultiPoolDeepTest {
         assertThat(result.taxLiability().subtract(trueBill).abs()).isLessThan(bd("1"));
     }
 
+    @Test
+    void executeWithdrawals_zeroBillAfterConversion_keepsConversionBreakdown() {
+        var p = poolWithConversion("0", "500000", "0", "50000", "fixed", null, null,
+                FlatTaxStubs.flatTaxStrategy("0.20"));
+        p.executeRothConversion(YEAR, ZERO, ZERO);
+        var conversionBreakdown = p.getLastTaxBreakdown();
+
+        p.executeWithdrawals(PoolStrategy.WithdrawalCycleInputs.of(ZERO, YEAR, 70));
+
+        assertThat(conversionBreakdown).isPresent();
+        assertThat(p.getLastTaxBreakdown()).isEqualTo(conversionBreakdown);
+    }
+
     /** Independent single-2025 federal tax oracle for the residual tests: a FRESH FederalTaxCalculator
      * over the same bracket fixtures, called directly (not through MultiPool's machinery). */
     private BigDecimal referenceSingle2025Tax(BigDecimal grossIncome) {

@@ -105,14 +105,11 @@
          a suppressed outlier. Stochastic-mortality plumbing (sub-project B, T3)
          pushed ScenarioCrudService's total to 93 (four new small validators
          mirroring the existing household-field validation shape); 94 locks in
-         just above that new next-highest class. The PoolStrategy split (Task 2)
-         moved the one-method sumContribsByOwner helper from the PoolStrategy
-         interface into the nested MultiPool, taking MultiPool's total to 94
-         (the interface no longer carries it); 95 locks in just above that. -->
+         just above that new next-highest class. -->
     <rule ref="category/java/design.xml/CyclomaticComplexity">
         <properties>
             <property name="methodReportLevel" value="22"/>
-            <property name="classReportLevel" value="95"/>
+            <property name="classReportLevel" value="94"/>
         </properties>
     </rule>
 
