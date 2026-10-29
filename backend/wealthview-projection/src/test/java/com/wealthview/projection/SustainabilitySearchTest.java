@@ -368,7 +368,7 @@ class SustainabilitySearchTest {
                 List.of(new BondTentMix("Balanced", shares)), yields);
     }
 
-    /** Sweeps the uniform discretionary level 0..200k and returns how many times sustainability flips to false. */
+    /** Sweeps the uniform discretionary level 0..200k and returns how many times sustainability flips to false (0 means it never flipped, so the sweep proved nothing). */
     private static int sweepTransitions(GuardrailOptimizationInput input) {
         var setup = new OptimizationContextBuilder(null).build(
                 input, input.accounts(), ProjectionTestFixtures.TEST_CMA_MATRIX,
@@ -420,7 +420,7 @@ class SustainabilitySearchTest {
                 .withConfidenceLevel(new BigDecimal("0.90"))
                 .build();
 
-        assertThat(sweepTransitions(input)).isLessThanOrEqualTo(1);
+        assertThat(sweepTransitions(input)).as("sweep reaches both states").isEqualTo(1);
     }
 
     @Test
@@ -440,7 +440,7 @@ class SustainabilitySearchTest {
                     .withConfidenceLevel(new BigDecimal("0.90"))
                     .build();
 
-            assertThat(sweepTransitions(input)).as("build-up %s", buildUp).isLessThanOrEqualTo(1);
+            assertThat(sweepTransitions(input)).as("build-up %s reaches both states", buildUp).isEqualTo(1);
         }
     }
 }

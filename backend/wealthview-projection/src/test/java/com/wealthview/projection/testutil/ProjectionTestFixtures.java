@@ -44,7 +44,6 @@ public final class ProjectionTestFixtures {
         return map;
     }
 
-
     private ProjectionTestFixtures() {}
 
     /**
