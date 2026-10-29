@@ -24,7 +24,6 @@ import static com.wealthview.projection.testutil.ProjectionTestFixtures.incomeSo
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.retiredAt66BirthYear;
 import static com.wealthview.projection.testutil.TierJsonBuilder.tiers;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
 
 class DeterministicProjectionEngineSpendingPlanTest extends DeterministicProjectionEngineTestSupport {
 

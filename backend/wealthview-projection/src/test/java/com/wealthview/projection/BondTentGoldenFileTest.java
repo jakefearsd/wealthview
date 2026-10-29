@@ -36,6 +36,7 @@ class BondTentGoldenFileTest {
         var detail = engine.runDetailed(input);
 
         GoldenFiles.assertMatches(SCENARIO + ".json", GoldenScenarios.MAPPER.writeValueAsString(detail.result()));
-        GoldenFiles.assertMatches(SCENARIO + ".tent.json", GoldenScenarios.MAPPER.writeValueAsString(detail.bondTent()));
+        GoldenFiles.assertMatches(SCENARIO + ".tent.json",
+                GoldenScenarios.MAPPER.writeValueAsString(detail.bondTent()));
     }
 }

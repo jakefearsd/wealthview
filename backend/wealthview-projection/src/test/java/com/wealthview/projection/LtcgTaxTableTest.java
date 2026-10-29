@@ -78,7 +78,6 @@ class LtcgTaxTableTest {
                 LtcgTaxTable.build(capitalGainsCalc(), federalTaxCalc(), 2025, FilingStatus.SINGLE, 20, 0.025, -1);
 
         // High floor so the whole gain lands in the 15% bracket regardless of NIIT; magi 220,000.
-        double floor = 250_000;
         double gain = 50_000;
         var oracle = capitalGainsCalc();
         double expectedY0 = oracle.computeLtcgTax(bd("250000"), bd("50000"), 2025, FilingStatus.SINGLE, 0,

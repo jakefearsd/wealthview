@@ -18,12 +18,12 @@ class TentCoverageTest {
 
     @Test
     void unusedYears_isLeftOverMeanPlanned() {
-        assertThat(TentCoverage.unusedYears(60_000.0, new double[] {30_000.0, 30_000.0})).isEqualTo(2.0);
+        assertThat(TentCoverage.unusedYears(60_000.0, 30_000.0, 30_000.0)).isEqualTo(2.0);
     }
 
     @Test
     void unusedYears_zeroMean_isZero() {
-        assertThat(TentCoverage.unusedYears(60_000.0, new double[] {0.0, 0.0})).isZero();
+        assertThat(TentCoverage.unusedYears(60_000.0, 0.0, 0.0)).isZero();
     }
 
     @Test

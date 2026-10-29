@@ -16,7 +16,6 @@ import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
-import com.wealthview.core.projection.tax.NullStateTaxCalculator;
 import com.wealthview.core.projection.tax.StateTaxCalculator;
 import com.wealthview.core.projection.tax.StateTaxCalculatorFactory;
 import com.wealthview.persistence.entity.StandardDeductionEntity;
@@ -34,11 +33,9 @@ import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWi
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.incomeSource;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.levelSchedule;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.oneTimeIncomeSource;
-import static com.wealthview.projection.testutil.ProjectionTestFixtures.property;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.retiredAt66BirthYear;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.selfEmploymentSource;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.socialSecuritySource;
-import static com.wealthview.projection.testutil.TierJsonBuilder.tiers;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -165,7 +162,7 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
             @Override
             public BigDecimal computeTax(BigDecimal grossIncome, int taxYear, FilingStatus status) {
                 return grossIncome.compareTo(BigDecimal.ZERO) > 0
-                        ? grossIncome.multiply(bd("0.06")).setScale(4, java.math.RoundingMode.HALF_UP)
+                        ? grossIncome.multiply(bd("0.06")).setScale(4, RoundingMode.HALF_UP)
                         : BigDecimal.ZERO;
             }
 

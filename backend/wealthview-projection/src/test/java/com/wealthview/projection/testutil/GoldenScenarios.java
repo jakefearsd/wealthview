@@ -2,6 +2,7 @@ package com.wealthview.projection.testutil;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -28,8 +29,8 @@ import com.wealthview.persistence.repository.LtcgBracketRepository;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -144,7 +145,7 @@ public final class GoldenScenarios {
         }
 
         var household = resolveHousehold(paramsJson, endAge);
-        return new ProjectionInput(UUID.nameUUIDFromBytes(scenarioName.getBytes()), scenarioName,
+        return new ProjectionInput(UUID.nameUUIDFromBytes(scenarioName.getBytes(StandardCharsets.UTF_8)), scenarioName,
                 retirementDate, endAge, inflationRate, paramsJson, accounts, spendingProfile,
                 referenceYear, incomeSources, null, List.of(), household);
     }
@@ -225,7 +226,7 @@ public final class GoldenScenarios {
     private static String readResource(String path) throws IOException {
         try (var is = GoldenScenarios.class.getClassLoader().getResourceAsStream(path)) {
             if (is == null) throw new IOException("Resource not found: " + path);
-            return new String(is.readAllBytes());
+            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
         }
     }
 }

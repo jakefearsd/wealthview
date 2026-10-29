@@ -8,11 +8,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
-import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
 
-import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.acct;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.createInput;

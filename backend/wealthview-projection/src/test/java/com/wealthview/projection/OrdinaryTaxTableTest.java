@@ -11,7 +11,6 @@ import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
-import static com.wealthview.core.testutil.TaxBracketFixtures.mfj2025Brackets;
 import static com.wealthview.core.testutil.TaxBracketFixtures.single2022Brackets;
 import static com.wealthview.core.testutil.TaxBracketFixtures.single2025Brackets;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubMfj2025;

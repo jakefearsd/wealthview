@@ -14,7 +14,6 @@ import static com.wealthview.projection.testutil.ProjectionTestFixtures.createIn
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.property;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.propertyNoLoan;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
 
 class DeterministicProjectionEnginePropertyTest extends DeterministicProjectionEngineTestSupport {
 

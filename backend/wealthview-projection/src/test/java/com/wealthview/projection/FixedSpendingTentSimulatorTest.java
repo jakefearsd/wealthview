@@ -1,6 +1,7 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -89,7 +90,8 @@ class FixedSpendingTentSimulatorTest {
 
     private static ProjectionInput projectionOf(GuardrailOptimizationInput input, String essential,
                                                 String discretionary) {
-        return new ProjectionInput(UUID.nameUUIDFromBytes("sim".getBytes()), "Sim", input.retirementDate(),
+        return new ProjectionInput(UUID.nameUUIDFromBytes("sim".getBytes(StandardCharsets.UTF_8)), "Sim",
+                input.retirementDate(),
                 input.endAge(), input.inflationRate(), "{}", input.accounts(),
                 new SpendingProfileInput(bd(essential), bd(discretionary), "[]"), 2030, List.of(), null,
                 List.of());
@@ -151,7 +153,8 @@ class FixedSpendingTentSimulatorTest {
                 conversions.put(year, bd("50000"));
             }
         }
-        var projection = new ProjectionInput(UUID.nameUUIDFromBytes("g".getBytes()), "Sim", input.retirementDate(),
+        var projection = new ProjectionInput(UUID.nameUUIDFromBytes("g".getBytes(StandardCharsets.UTF_8)), "Sim",
+                input.retirementDate(),
                 input.endAge(), input.inflationRate(), "{}", input.accounts(),
                 new SpendingProfileInput(bd("0"), bd("0"), "[]"), 2030, List.of(),
                 new GuardrailSpendingInput(yearly, conversions), List.of(), null);
@@ -181,7 +184,8 @@ class FixedSpendingTentSimulatorTest {
             yearly.add(new GuardrailYearlySpending(year, year - 1965, bd("60000"), bd("0"), bd("0"), bd("60000"),
                     bd("0"), bd("0"), bd("60000"), "Core"));
         }
-        return new ProjectionInput(UUID.nameUUIDFromBytes("m7".getBytes()), "Sim", input.retirementDate(),
+        return new ProjectionInput(UUID.nameUUIDFromBytes("m7".getBytes(StandardCharsets.UTF_8)), "Sim",
+                input.retirementDate(),
                 input.endAge(), input.inflationRate(), "{}", input.accounts(),
                 new SpendingProfileInput(bd("0"), bd("0"), "[]"), 2030, List.of(),
                 new GuardrailSpendingInput(yearly, conversions), List.of(), null);
@@ -302,7 +306,8 @@ class FixedSpendingTentSimulatorTest {
     @Test
     void simulate_noSpendingPlan_throws() {
         var input = flatInput(90, cashTent());
-        var noPlan = new ProjectionInput(UUID.nameUUIDFromBytes("sim".getBytes()), "Sim", input.retirementDate(),
+        var noPlan = new ProjectionInput(UUID.nameUUIDFromBytes("sim".getBytes(StandardCharsets.UTF_8)), "Sim",
+                input.retirementDate(),
                 input.endAge(), input.inflationRate(), "{}", input.accounts(), null, 2030, List.of(), null,
                 List.of());
 

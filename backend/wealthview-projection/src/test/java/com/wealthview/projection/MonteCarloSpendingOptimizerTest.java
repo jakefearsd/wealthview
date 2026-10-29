@@ -10,8 +10,6 @@ import org.junit.jupiter.api.Test;
 import com.wealthview.core.projection.dto.AssetAllocation;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.GuardrailPhaseInput;
-import com.wealthview.core.projection.dto.GuardrailProfileResponse;
-import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
@@ -1853,7 +1851,7 @@ class MonteCarloSpendingOptimizerTest {
         var progressiveBrackets = (org.mockito.stubbing.Answer<BigDecimal>) inv -> {
             double income = ((BigDecimal) inv.getArgument(0)).doubleValue();
             if (income <= 0) return BigDecimal.ZERO;
-            double tax = 0;
+            double tax;
             if (income <= 50_000) {
                 tax = income * 0.10;
             } else if (income <= 100_000) {
@@ -1997,7 +1995,9 @@ class MonteCarloSpendingOptimizerTest {
 
     @Test
     void splitWithdrawal_allOrdersAndPreAge595_correctDistribution() {
-        double taxable = 100, traditional = 200, roth = 300;
+        double taxable = 100;
+        double traditional = 200;
+        double roth = 300;
         double need = 150;
 
         // taxable_first: draws 100 from taxable, 50 from traditional

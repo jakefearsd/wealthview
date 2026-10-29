@@ -1,7 +1,6 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -17,6 +16,7 @@ import com.wealthview.core.projection.household.PersonId;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.by;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -30,15 +30,6 @@ class MultiPoolTentReservationTest {
     private static final List<PoolType> ROTH_FIRST = List.of(PoolType.ROTH, PoolType.TAXABLE, PoolType.TRADITIONAL);
     private static final List<PoolType> TRADITIONAL_FIRST =
             List.of(PoolType.TRADITIONAL, PoolType.TAXABLE, PoolType.ROTH);
-
-    private static Map<BondMaturity, BigDecimal> by(String us, String sh, String in, String lg) {
-        var map = new EnumMap<BondMaturity, BigDecimal>(BondMaturity.class);
-        map.put(BondMaturity.ULTRASHORT, bd(us));
-        map.put(BondMaturity.SHORT, bd(sh));
-        map.put(BondMaturity.INTERMEDIATE, bd(in));
-        map.put(BondMaturity.LONG, bd(lg));
-        return map;
-    }
 
     private static PoolStrategy.TentSetup setup(List<PoolType> order, Map<BondMaturity, BigDecimal> mix,
                                                  Map<BondMaturity, BigDecimal> real) {

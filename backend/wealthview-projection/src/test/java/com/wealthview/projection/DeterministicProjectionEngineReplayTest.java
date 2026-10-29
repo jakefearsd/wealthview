@@ -1,6 +1,7 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.EnumMap;
 import java.util.List;
@@ -86,7 +87,7 @@ class DeterministicProjectionEngineReplayTest {
 
     private static ProjectionInput input(String paramsJson, int retirementYear, int endAge, BigDecimal inflation,
                                          ProjectionAccountInput account) {
-        return new ProjectionInput(UUID.nameUUIDFromBytes("replay".getBytes()), "Replay",
+        return new ProjectionInput(UUID.nameUUIDFromBytes("replay".getBytes(StandardCharsets.UTF_8)), "Replay",
                 LocalDate.of(retirementYear, 1, 1), endAge, inflation, paramsJson, List.of(account),
                 new SpendingProfileInput(bd("40000"), bd("0"), "[]"), 2026, List.of(), null, List.of());
     }

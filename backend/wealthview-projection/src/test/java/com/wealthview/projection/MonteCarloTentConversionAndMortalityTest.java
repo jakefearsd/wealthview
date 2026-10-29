@@ -1,6 +1,7 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
@@ -234,7 +235,7 @@ class MonteCarloTentConversionAndMortalityTest {
     private static ProjectionIncomeSourceInput income(String name, IncomeSourceType type, String amount,
                                                       String owner, String survivorPercent) {
         return new ProjectionIncomeSourceInput(
-                UUID.nameUUIDFromBytes((name + owner).getBytes()), name, type, bd(amount),
+                UUID.nameUUIDFromBytes((name + owner).getBytes(StandardCharsets.UTF_8)), name, type, bd(amount),
                 62, null, bd("0.025"), false, "taxable",
                 null, null, null, null, null, null, owner, bd(survivorPercent));
     }

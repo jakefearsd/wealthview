@@ -1,6 +1,7 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.EnumMap;
 import java.util.List;
@@ -38,7 +39,6 @@ import static org.mockito.Mockito.when;
 class DeterministicProjectionEngineBondTentTest {
 
     private static final int CURRENT_YEAR = 2026;
-    private static final BigDecimal FEE = new BigDecimal("0.002");
     private static final String PLAN_MIX = """
             {"name": "Plan", "shares": {"ultrashort": 0.2, "short": 0.3, "intermediate": 0.5, "long": 0}}""";
     private static final String YIELDS = """
@@ -67,7 +67,7 @@ class DeterministicProjectionEngineBondTentTest {
     private static ProjectionInput input(String extraParams, int retirementYear, SpendingProfileInput spending) {
         var params = """
                 {"birth_year": 1969, "fee_rate": 0.002%s}""".formatted(extraParams);
-        return new ProjectionInput(UUID.nameUUIDFromBytes("tent".getBytes()), "Tent",
+        return new ProjectionInput(UUID.nameUUIDFromBytes("tent".getBytes(StandardCharsets.UTF_8)), "Tent",
                 LocalDate.of(retirementYear, 1, 1), 90, bd("0.025"), params,
                 List.of(acct("600000", "0", "0.05", "taxable"), acct("400000", "0", "0.05", "traditional")),
                 spending, CURRENT_YEAR, List.of(), null, List.of());
@@ -162,7 +162,7 @@ class DeterministicProjectionEngineBondTentTest {
         // still holds stocks, so the tent must migrate there rather than be spent.
         var params = "{\"birth_year\": 1969, \"fee_rate\": 0.002, \"withdrawal_order\": \"taxable_first\", "
                 + tentJson("3", 3, PLAN_MIX) + "}";
-        var input = new ProjectionInput(UUID.nameUUIDFromBytes("tent".getBytes()), "Tent",
+        var input = new ProjectionInput(UUID.nameUUIDFromBytes("tent".getBytes(StandardCharsets.UTF_8)), "Tent",
                 LocalDate.of(2029, 1, 1), 90, bd("0.025"), params,
                 List.of(acct("300000", "0", "0.05", "taxable"), acct("700000", "0", "0.05", "traditional")),
                 new SpendingProfileInput(bd("40000"), bd("20000"), "[]"), CURRENT_YEAR, List.of(), null, List.of());
@@ -311,7 +311,7 @@ class DeterministicProjectionEngineBondTentTest {
 
     private static List<String> finalBalanceLines(ListAppender<ILoggingEvent> appender, Level level) {
         return appender.list.stream()
-                .filter(e -> e.getLevel() == level)
+                .filter(e -> level.equals(e.getLevel()))
                 .map(ILoggingEvent::getFormattedMessage)
                 .filter(m -> m.contains("final balance"))
                 .toList();

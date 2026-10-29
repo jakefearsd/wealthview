@@ -1,7 +1,6 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -10,8 +9,6 @@ import org.junit.jupiter.api.Test;
 import com.wealthview.core.projection.dto.AssetAllocation;
 import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
-import com.wealthview.core.projection.dto.PoolType;
-import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.FederalOnlyTaxStrategy;

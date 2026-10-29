@@ -104,7 +104,8 @@ class TaxableLotsTest {
     void consolidateIfNeeded_overCap_mergesOldestPreservingTotals() {
         var lots = new TaxableLots();
         for (int i = 0; i < 10; i++) { lots.addLot(100); lots.grow(0.0); }
-        double vBefore = lots.totalValue(), bBefore = lots.totalBasis();
+        double vBefore = lots.totalValue();
+        double bBefore = lots.totalBasis();
         lots.consolidateIfNeeded(3);
         assertThat(lots.totalValue()).isEqualTo(vBefore, within(1e-6));
         assertThat(lots.totalBasis()).isEqualTo(bBefore, within(1e-6));

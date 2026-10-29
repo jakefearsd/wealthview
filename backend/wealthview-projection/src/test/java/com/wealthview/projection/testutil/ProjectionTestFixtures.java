@@ -3,6 +3,7 @@ package com.wealthview.projection.testutil;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -31,6 +32,18 @@ import com.wealthview.projection.DeterministicProjectionEngine;
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 
 public final class ProjectionTestFixtures {
+
+    /** A per-maturity decimal map in ultrashort/short/intermediate/long order. */
+    public static Map<BondMaturity, BigDecimal> by(String ultrashort, String shortTerm, String intermediate,
+                                                   String longTerm) {
+        var map = new EnumMap<BondMaturity, BigDecimal>(BondMaturity.class);
+        map.put(BondMaturity.ULTRASHORT, bd(ultrashort));
+        map.put(BondMaturity.SHORT, bd(shortTerm));
+        map.put(BondMaturity.INTERMEDIATE, bd(intermediate));
+        map.put(BondMaturity.LONG, bd(longTerm));
+        return map;
+    }
+
 
     private ProjectionTestFixtures() {}
 

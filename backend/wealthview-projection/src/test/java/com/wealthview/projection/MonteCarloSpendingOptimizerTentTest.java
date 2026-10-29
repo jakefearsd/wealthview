@@ -1,7 +1,6 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;

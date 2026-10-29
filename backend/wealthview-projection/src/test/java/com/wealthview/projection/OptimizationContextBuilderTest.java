@@ -436,7 +436,7 @@ class OptimizationContextBuilderTest {
 
     @Test
     void build_taxableAccountBondAllocation_taxableEquityShareReflectsSplit() {
-        var allocation = new AssetAllocation(java.util.Map.of(
+        var allocation = new AssetAllocation(Map.of(
                 AssetClass.US_STOCK, new BigDecimal("0.6"), AssetClass.BOND, new BigDecimal("0.4")));
         var input = inputWithInterestYield(null, allocation);
 

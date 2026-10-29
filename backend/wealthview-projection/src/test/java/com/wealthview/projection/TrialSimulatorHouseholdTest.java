@@ -18,8 +18,6 @@ class TrialSimulatorHouseholdTest {
     private final TrialSimulator simulator = new TrialSimulator();
 
     /** Builds a household SimulationConfig (taxable_first, tracked). */
-    // ExcessiveParameterList mirrors the SimulationConfig canonical shape for readable test call sites.
-    @SuppressWarnings("PMD.ExcessiveParameterList")
     private static TrialSimulator.SimulationConfig cfg(
             double initTaxable, double initTraditional, double initRoth,
             String order, OrdinaryTaxTable[] tables, double[] base,

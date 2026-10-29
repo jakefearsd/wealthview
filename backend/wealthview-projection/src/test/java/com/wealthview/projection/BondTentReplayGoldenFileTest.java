@@ -1,6 +1,5 @@
 package com.wealthview.projection;
 
-
 import org.junit.jupiter.api.Test;
 
 import com.wealthview.core.projection.dto.HistoricalCrash;

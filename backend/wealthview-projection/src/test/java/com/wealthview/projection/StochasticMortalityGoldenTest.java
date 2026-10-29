@@ -1,6 +1,7 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -171,7 +172,8 @@ class StochasticMortalityGoldenTest {
     private static ProjectionIncomeSourceInput income(String name, IncomeSourceType type, String amount,
                                                       String owner, String survivorPercent) {
         return new ProjectionIncomeSourceInput(
-                UUID.nameUUIDFromBytes((name + owner).getBytes()), name, type, new BigDecimal(amount),
+                UUID.nameUUIDFromBytes((name + owner).getBytes(StandardCharsets.UTF_8)), name, type,
+                new BigDecimal(amount),
                 62, null, new BigDecimal("0.025"), false, "taxable",
                 null, null, null, null, null, null, owner, new BigDecimal(survivorPercent));
     }

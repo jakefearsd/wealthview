@@ -25,11 +25,9 @@ class BlockBootstrapReturnGeneratorTest {
             0.0331, -0.1863, 0.2831, 0.1049,
     };
 
-    private final double[] historicalReturns = HISTORICAL_RETURNS;
-
     @Test
     void generateReturnSequence_correctLength() {
-        var generator = new BlockBootstrapReturnGenerator(historicalReturns, 5.0, new Random(42));
+        var generator = new BlockBootstrapReturnGenerator(HISTORICAL_RETURNS, 5.0, new Random(42));
 
         double[] sequence = generator.generateReturnSequence(30);
 
@@ -38,8 +36,8 @@ class BlockBootstrapReturnGeneratorTest {
 
     @Test
     void generateReturnSequence_valuesFromHistoricalData() {
-        var generator = new BlockBootstrapReturnGenerator(historicalReturns, 5.0, new Random(42));
-        Set<Double> historicalSet = Arrays.stream(historicalReturns).boxed().collect(Collectors.toSet());
+        var generator = new BlockBootstrapReturnGenerator(HISTORICAL_RETURNS, 5.0, new Random(42));
+        Set<Double> historicalSet = Arrays.stream(HISTORICAL_RETURNS).boxed().collect(Collectors.toSet());
 
         double[] sequence = generator.generateReturnSequence(30);
 
@@ -52,8 +50,8 @@ class BlockBootstrapReturnGeneratorTest {
 
     @Test
     void generateReturnSequence_withSeed_reproducible() {
-        var gen1 = new BlockBootstrapReturnGenerator(historicalReturns, 5.0, new Random(123));
-        var gen2 = new BlockBootstrapReturnGenerator(historicalReturns, 5.0, new Random(123));
+        var gen1 = new BlockBootstrapReturnGenerator(HISTORICAL_RETURNS, 5.0, new Random(123));
+        var gen2 = new BlockBootstrapReturnGenerator(HISTORICAL_RETURNS, 5.0, new Random(123));
 
         double[] seq1 = gen1.generateReturnSequence(30);
         double[] seq2 = gen2.generateReturnSequence(30);
@@ -63,7 +61,7 @@ class BlockBootstrapReturnGeneratorTest {
 
     @Test
     void generateReturnSequence_blockStructure_adjacentReturnsOftenConsecutive() {
-        var generator = new BlockBootstrapReturnGenerator(historicalReturns, 5.0, new Random(42));
+        var generator = new BlockBootstrapReturnGenerator(HISTORICAL_RETURNS, 5.0, new Random(42));
 
         // Generate many sequences and count how often adjacent returns are consecutive
         // in the historical array (indicating they came from the same block)
@@ -74,11 +72,11 @@ class BlockBootstrapReturnGeneratorTest {
             double[] sequence = generator.generateReturnSequence(30);
             for (int i = 0; i < sequence.length - 1; i++) {
                 totalPairs++;
-                int idx1 = findIndex(historicalReturns, sequence[i]);
-                int idx2 = findIndex(historicalReturns, sequence[i + 1]);
+                int idx1 = findIndex(HISTORICAL_RETURNS, sequence[i]);
+                int idx2 = findIndex(HISTORICAL_RETURNS, sequence[i + 1]);
                 // Consecutive in historical array (with wrapping)
                 if (idx1 >= 0 && idx2 >= 0
-                        && ((idx2 == idx1 + 1) || (idx1 == historicalReturns.length - 1 && idx2 == 0))) {
+                        && ((idx2 == idx1 + 1) || (idx1 == HISTORICAL_RETURNS.length - 1 && idx2 == 0))) {
                     consecutivePairs++;
                 }
             }

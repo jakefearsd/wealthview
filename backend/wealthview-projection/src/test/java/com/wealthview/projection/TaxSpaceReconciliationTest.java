@@ -1,6 +1,7 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -71,7 +72,8 @@ class TaxSpaceReconciliationTest {
                         Optional.of(new BigDecimal("0.05")), "roth"),
                 new HypotheticalAccountInput(new BigDecimal("120000"), BigDecimal.ZERO, AssetAllocation.ALL_US,
                         Optional.of(new BigDecimal("0.05")), new BigDecimal("40000"), "taxable"));
-        return new ProjectionInput(UUID.nameUUIDFromBytes(CONVERSION_GROSS_UP.getBytes()), CONVERSION_GROSS_UP,
+        return new ProjectionInput(UUID.nameUUIDFromBytes(CONVERSION_GROSS_UP.getBytes(StandardCharsets.UTF_8)),
+                CONVERSION_GROSS_UP,
                 LocalDate.parse("2025-01-01"), 90, new BigDecimal("0.02"), params, accounts,
                 new SpendingProfileInput(new BigDecimal("50000"), BigDecimal.ZERO, null), 2025, List.of(), null,
                 List.of(), null);

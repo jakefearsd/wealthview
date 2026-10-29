@@ -28,7 +28,6 @@ import static com.wealthview.projection.testutil.ProjectionTestFixtures.createGu
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.createInput;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTax;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.incomeSource;
-import static com.wealthview.projection.testutil.ProjectionTestFixtures.property;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.retiredAt66BirthYear;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.socialSecuritySource;
 import static org.assertj.core.api.Assertions.assertThat;

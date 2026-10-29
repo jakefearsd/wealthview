@@ -2,6 +2,7 @@ package com.wealthview.projection;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -550,7 +551,8 @@ class EngineInvariantsTest {
     private static final UUID HH_SS_PRIMARY_ID = UUID.fromString("00000000-0000-0000-0000-0000000000a3");
     private static final UUID HH_SS_SPOUSE_ID = UUID.fromString("00000000-0000-0000-0000-0000000000a4");
     private static final UUID HH_PENSION_ID = UUID.fromString("00000000-0000-0000-0000-0000000000a5");
-    private static final UUID HH_SCENARIO_ID = UUID.nameUUIDFromBytes("household-invariants".getBytes());
+    private static final UUID HH_SCENARIO_ID =
+            UUID.nameUUIDFromBytes("household-invariants".getBytes(StandardCharsets.UTF_8));
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("householdScenarios")
