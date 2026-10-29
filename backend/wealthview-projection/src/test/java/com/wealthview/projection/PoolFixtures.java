@@ -22,10 +22,9 @@ import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
  * sites across 9 files, 6 private {@code grouped()}/{@code pool()} clones).
  *
  * <p><strong>Package placement.</strong> This class lives in {@code com.wealthview.projection}
- * (NOT the usual {@code .testutil} sub-package) because {@code PoolStrategy} is a package-private
- * sealed interface -- {@code PoolConfig}, though itself an implicitly-public nested
- * record, cannot be named outside {@code com.wealthview.projection} since the enclosing interface
- * itself isn't visible there. Every consuming test class is already in this same package.
+ * (NOT the usual {@code .testutil} sub-package) because {@code PoolConfig}, {@code MultiPool} and
+ * {@code PoolStrategy} are package-private top-level types, so none of them can be named outside
+ * {@code com.wealthview.projection}. Every consuming test class is already in this same package.
  *
  * <p>{@link #singleFilerConfig} composes {@code PoolConfig.builder(...)} (Task 14) --
  * its defaults (empty capital-market map, zero inflation/dividend/interest/fee, no LTCG/federal

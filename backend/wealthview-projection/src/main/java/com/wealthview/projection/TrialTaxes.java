@@ -19,8 +19,8 @@ final class TrialTaxes {
 
     /**
      * T18a-4: 10% IRC 72(t) additional tax on traditional distributions before age 59½ (the 59 1/2
-     * calendar year from {@code AgeMilestones}, legacy 60 -- already used above by
-     * {@code preAge595} to steer clear of traditional draws). Flat 10% on the ACTUAL dollars
+     * calendar year from {@code AgeMilestones}, legacy 60 -- already used by
+     * TrialSimulator's {@code preAge595} to steer clear of traditional draws). Flat 10% on the ACTUAL dollars
      * debited from traditional for this year's spending draw ({@code traditionalDrawn} -- branch-
      * agnostic); Roth
      * conversions are OUT OF SCOPE. Funded via the simple (non-grossed-up) tax cascade -- hot-loop

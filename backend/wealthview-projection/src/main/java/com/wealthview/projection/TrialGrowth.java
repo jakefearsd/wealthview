@@ -25,7 +25,7 @@ final class TrialGrowth {
     /** The per-year inputs of {@link #applyTentGrowth}: the tent year index, the three pool returns, and the
      * year's ordinary tax table and base income. */
     record TentGrowthYear(int tentYear, double taxableReturn, double traditionalReturn, double rothReturn,
-                                  OrdinaryTaxTable table, double base) {
+                          OrdinaryTaxTable table, double base) {
     }
 
     /** A pool's return once its tent sleeves earn their own: {@code grown / balance - 1}, or the raw

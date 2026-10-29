@@ -2,13 +2,14 @@ package com.wealthview.projection;
 
 /**
  * Per-year spending resolution for {@link TrialSimulator}: the surplus/withdrawal split, the planned-vs-adapted
- * total, and the simulated guardrail-adaptation rule. Static and allocation-free in the hot loop.
+ * total, and the simulated guardrail-adaptation rule. Static; {@code adaptYearSpending} is allocation-free in the
+ * hot loop.
  */
 final class TrialSpending {
 
     /** Audit A4 bundle: the year's surplus/withdrawal split for spending and base-income tax. */
     record SpendingFunding(double grossSurplus, double fundedFromSurplus,
-                                   double unfundedBaseTax, double withdrawal) {}
+                           double unfundedBaseTax, double withdrawal) {}
 
     /** Splits this year's income against spending into: the gross surplus, the portion of the base
      * income tax funded from that surplus, the unfunded base-tax remainder (drained from pools), and

@@ -117,7 +117,6 @@ final class WithdrawalTaxBillSolver {
         static final OrdinaryTax NONE = new OrdinaryTax(BigDecimal.ZERO, null);
     }
 
-
     /**
      * The converged audit-C2 gross-up: how much EXTRA traditional income the fixed point below
      * settled on, and the resulting total bill. {@code recorded} is NOT threaded through

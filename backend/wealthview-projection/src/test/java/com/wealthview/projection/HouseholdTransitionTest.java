@@ -780,7 +780,7 @@ class HouseholdTransitionTest extends DeterministicProjectionEngineTestSupport {
         // engine's own annotated output. LTCG stacks on ordinary (34,000 - 17,350 age-aware single
         // deduction [15,750 base + 1,600 age-65 adder, the survivor is 78] = 16,650 floor; Phase 1a:
         // the stacking floor nets the SAME age-aware deduction the ordinary tax uses -- see
-        // PoolStrategy#resolveOrdinaryDeduction. Previously 18,250 / 1,485.00, when the floor
+        // WithdrawalTaxBillSolver (BillRun#resolveOrdinaryDeduction). Previously 18,250 / 1,485.00, when the floor
         // netted only the base deduction and so overstated this 65+ filer's LTCG tax by 240).
         var ltcgOracle = new CapitalGainsTaxCalculator(ltcgRepo);
         BigDecimal exactGainTax = ltcgOracle.computeLtcgTax(bd("16650"), bd("40000"), transitionYear,

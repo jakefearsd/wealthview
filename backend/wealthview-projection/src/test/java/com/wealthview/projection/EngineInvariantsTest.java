@@ -81,7 +81,7 @@ import static org.mockito.Mockito.mock;
  * spending) rather than a pool debit — that slice never touches the pool, so subtracting the full
  * {@code taxLiability} over-counts by exactly {@code min(grossSurplus, totalObligation)}; and (b)
  * the audit-C2 traditional tax gross-up fixed point, which converges to within {@code
- * MultiPool.GROSS_UP_TOLERANCE} ($1) of the true self-consistent bill, not exactly.
+ * WithdrawalTaxBillSolver.GROSS_UP_TOLERANCE} ($1) of the true self-consistent bill, not exactly.
  *
  * <p>Rather than special-casing scenario shapes, both exclusions are folded into ONE per-year
  * tolerance formula, derived entirely from exposed DTO fields (verified exact: {@code
