@@ -28,6 +28,7 @@ import com.wealthview.persistence.repository.LtcgBracketRepository;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -57,6 +58,12 @@ public final class GoldenScenarios {
 
     public static final ObjectMapper MAPPER = JsonMapper.builder()
             .enable(SerializationFeature.INDENT_OUTPUT)
+            .build();
+
+    /** The application's wire naming (global snake_case), for goldens that pin what the API returns. */
+    public static final ObjectMapper SNAKE_CASE_MAPPER = JsonMapper.builder()
+            .enable(SerializationFeature.INDENT_OUTPUT)
+            .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
             .build();
 
     /** The three real calculators the golden engine is wired with, backed by 2025 fixture stubs. */

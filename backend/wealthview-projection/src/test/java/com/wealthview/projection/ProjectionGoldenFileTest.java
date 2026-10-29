@@ -1,20 +1,12 @@
 package com.wealthview.projection;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.skyscreamer.jsonassert.JSONAssert;
-import org.skyscreamer.jsonassert.JSONCompareMode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import com.wealthview.projection.testutil.GoldenFiles;
 import com.wealthview.projection.testutil.GoldenScenarios;
 
 class ProjectionGoldenFileTest {
-
-    private static final Logger log = LoggerFactory.getLogger(ProjectionGoldenFileTest.class);
 
     @ParameterizedTest(name = "golden file: {0}")
     @ValueSource(strings = {
@@ -46,19 +38,6 @@ class ProjectionGoldenFileTest {
 
         var actualJson = GoldenScenarios.MAPPER.writeValueAsString(result);
 
-        var goldenPath = goldenFilePath(scenario);
-        if (Boolean.getBoolean("update.golden") || !Files.exists(goldenPath)) {
-            Files.createDirectories(goldenPath.getParent());
-            Files.writeString(goldenPath, actualJson);
-            log.info("Updated golden file: {}", goldenPath);
-            return;
-        }
-
-        var expectedJson = Files.readString(goldenPath);
-        JSONAssert.assertEquals(expectedJson, actualJson, JSONCompareMode.STRICT);
-    }
-
-    private Path goldenFilePath(String scenario) {
-        return Path.of("src/test/resources/golden/" + scenario + ".json");
+        GoldenFiles.assertMatches(scenario + ".json", actualJson);
     }
 }

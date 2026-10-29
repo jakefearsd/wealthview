@@ -1,16 +1,13 @@
 package com.wealthview.projection;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.EnumMap;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
-import org.skyscreamer.jsonassert.JSONAssert;
-import org.skyscreamer.jsonassert.JSONCompareMode;
 
 import com.wealthview.core.projection.BondTentAssumptions;
 import com.wealthview.core.projection.dto.BondMaturity;
+import com.wealthview.projection.testutil.GoldenFiles;
 import com.wealthview.projection.testutil.GoldenScenarios;
 
 import static org.mockito.Mockito.mock;
@@ -38,17 +35,7 @@ class BondTentGoldenFileTest {
 
         var detail = engine.runDetailed(input);
 
-        assertGolden(SCENARIO + ".json", GoldenScenarios.MAPPER.writeValueAsString(detail.result()));
-        assertGolden(SCENARIO + ".tent.json", GoldenScenarios.MAPPER.writeValueAsString(detail.bondTent()));
-    }
-
-    private static void assertGolden(String fileName, String actualJson) throws Exception {
-        var path = Path.of("src/test/resources/golden/" + fileName);
-        if (Boolean.getBoolean("update.golden") || !Files.exists(path)) {
-            Files.createDirectories(path.getParent());
-            Files.writeString(path, actualJson);
-            return;
-        }
-        JSONAssert.assertEquals(Files.readString(path), actualJson, JSONCompareMode.STRICT);
+        GoldenFiles.assertMatches(SCENARIO + ".json", GoldenScenarios.MAPPER.writeValueAsString(detail.result()));
+        GoldenFiles.assertMatches(SCENARIO + ".tent.json", GoldenScenarios.MAPPER.writeValueAsString(detail.bondTent()));
     }
 }
