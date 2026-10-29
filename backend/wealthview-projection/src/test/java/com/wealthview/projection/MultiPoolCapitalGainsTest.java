@@ -67,10 +67,10 @@ class MultiPoolCapitalGainsTest {
     }
 
     /** Threads a standard-deduction source for the LTCG-floor netting fix. */
-    private static PoolStrategy.PoolConfig config(String dividendYield, WithdrawalOrder order,
+    private static PoolConfig config(String dividendYield, WithdrawalOrder order,
                                                    CapitalGainsTaxCalculator cg,
                                                    FederalTaxCalculator federalTaxCalculator) {
-        return new PoolStrategy.PoolConfig(
+        return new PoolConfig(
                 FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null, order,
                 null, null, Map.of(), ZERO, cg, bd(dividendYield), ZERO, ZERO, BASE_YEAR, federalTaxCalculator);
     }
@@ -148,7 +148,7 @@ class MultiPoolCapitalGainsTest {
         var federal = federalTaxCalc();
         var combinedTaxCalc = new CombinedTaxCalculator(federal, new NullStateTaxCalculator(),
                 bd("12000"), bd("25000"));
-        var config = new PoolStrategy.PoolConfig(
+        var config = new PoolConfig(
                 FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST,
                 combinedTaxCalc, null, Map.of(), ZERO, capitalGainsCalc(), ZERO, ZERO, ZERO, BASE_YEAR,
                 federal);
@@ -179,7 +179,7 @@ class MultiPoolCapitalGainsTest {
         var federal = new FederalTaxCalculator(taxBracketRepo, deductionRepo);
         var combinedAge66 = new CombinedTaxCalculator(federal, new NullStateTaxCalculator(),
                 ZERO, ZERO, 1959);
-        var config = new PoolStrategy.PoolConfig(
+        var config = new PoolConfig(
                 FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST,
                 combinedAge66, null, Map.of(), ZERO, capitalGainsCalc(), ZERO, ZERO, ZERO, BASE_YEAR,
                 federal);
@@ -205,7 +205,7 @@ class MultiPoolCapitalGainsTest {
     void executeWithdrawals_traditionalGrossUp_ltcgStacksOnOrdinaryIncludingGrossUpSlice() {
         var federal = federalTaxCalc();
         var combined = new CombinedTaxCalculator(federal, new NullStateTaxCalculator(), ZERO, ZERO);
-        var config = new PoolStrategy.PoolConfig(
+        var config = new PoolConfig(
                 FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST,
                 combined, null, Map.of(), ZERO, capitalGainsCalc(), ZERO, ZERO, ZERO, BASE_YEAR, federal);
         var p = new PoolStrategy.MultiPool(
@@ -340,7 +340,7 @@ class MultiPoolCapitalGainsTest {
         // = 6902.8921 / 0.9248 = 7464.2000.
         // With baseYear == withdrawal year (no deflation) the same fixture charges NO NIIT (MAGI < 200k)
         // and prices 6000 / (1 - 0.15 * 0.4) = 6382.9787 instead.
-        var poolConfig = new PoolStrategy.PoolConfig(
+        var poolConfig = new PoolConfig(
                 FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST,
                 null, null, Map.of(), bd("0.025"), capitalGainsCalc(), bd("0"), ZERO, ZERO,
                 2015,  // D16: baseYear BEFORE withdrawal year

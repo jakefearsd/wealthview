@@ -69,7 +69,7 @@ final class PoolStrategyAssembler {
         // constant only if the scenario itself has no rate (resolveProjectionParams already defaults
         // it, so this fallback is effectively unreachable in practice).
         BigDecimal inflationRate = scenarioInflationRate != null ? scenarioInflationRate : CMA_INFLATION_RATE;
-        var config = PoolStrategy.PoolConfig.builder(
+        var config = PoolConfig.builder(
                 FilingStatus.resolve(params.filingStatus(), params.spouseBirthYear()),
                 params.otherIncome() != null ? params.otherIncome() : BigDecimal.ZERO,
                 params.annualRothConversion() != null ? params.annualRothConversion() : BigDecimal.ZERO,

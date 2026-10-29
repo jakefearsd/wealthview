@@ -60,7 +60,7 @@ class MultiPoolDeepTest {
                                                         String annualConv, String rothStrategy,
                                                         String targetRate, Integer startYear,
                                                         TaxCalculationStrategy taxCalc) {
-        var config = new PoolStrategy.PoolConfig(
+        var config = new PoolConfig(
                 FilingStatus.SINGLE, ZERO, bd(annualConv), rothStrategy,
                 targetRate != null ? bd(targetRate) : null,
                 startYear, WithdrawalOrder.TAXABLE_FIRST, taxCalc, null);
@@ -608,7 +608,7 @@ class MultiPoolDeepTest {
     void computeEffectiveOtherIncome_sumsAllComponents() {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "100", "0", "0", "0", "0"),
-                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, bd("10000"), ZERO, "fixed", null, null,
+                ZERO, new PoolConfig(FilingStatus.SINGLE, bd("10000"), ZERO, "fixed", null, null,
                         WithdrawalOrder.TAXABLE_FIRST, null, null));
 
         var effective = p.computeEffectiveOtherIncome(bd("5000"), bd("2000"));
@@ -620,7 +620,7 @@ class MultiPoolDeepTest {
     void getMagi_returnsOtherIncome() {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "100", "0", "0", "0", "0"),
-                ZERO, new PoolStrategy.PoolConfig(FilingStatus.MARRIED_FILING_JOINTLY, bd("55000"), ZERO, "fixed", null, null,
+                ZERO, new PoolConfig(FilingStatus.MARRIED_FILING_JOINTLY, bd("55000"), ZERO, "fixed", null, null,
                         WithdrawalOrder.TAXABLE_FIRST, null, null));
 
         assertThat(p.getMagi()).isEqualByComparingTo(bd("55000"));
@@ -857,7 +857,7 @@ class MultiPoolDeepTest {
 
     private PoolStrategy.MultiPool poolWithEarlyAccessAge(WithdrawalOrder order, int earlyAccessAge,
                                                          BigDecimal dsBracketRate) {
-        var config = PoolStrategy.PoolConfig.builder(FilingStatus.SINGLE, ZERO, ZERO, "fixed",
+        var config = PoolConfig.builder(FilingStatus.SINGLE, ZERO, ZERO, "fixed",
                         null, null, order, FlatTaxStubs.flatTaxStrategy("0.10"), dsBracketRate)
                 .earlyAccessAge(earlyAccessAge)
                 .build();

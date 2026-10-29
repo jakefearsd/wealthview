@@ -29,8 +29,8 @@ class PoolStrategyTentTest {
             new HypotheticalAccountInput(bd("1000000"), BigDecimal.ZERO, AssetAllocation.ALL_US, Optional.empty(),
                     "taxable"));
 
-    private static PoolStrategy.PoolConfig config() {
-        return new PoolStrategy.PoolConfig(FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO, "fixed", null, null,
+    private static PoolConfig config() {
+        return new PoolConfig(FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO, "fixed", null, null,
                 WithdrawalOrder.TAXABLE_FIRST, null, null, CMA, BigDecimal.ZERO);
     }
 

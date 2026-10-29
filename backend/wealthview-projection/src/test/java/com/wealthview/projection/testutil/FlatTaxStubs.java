@@ -43,7 +43,7 @@ import static org.mockito.Mockito.when;
  *
  * <p>{@link #flatTaxStrategy(String)} is the {@link TaxCalculationStrategy}-typed sibling migrated
  * from {@code MultiPoolDeepTest.flatTaxCalc} (the audit's "7th variant") -- a different interface
- * entirely (used to build a {@code PoolStrategy.PoolConfig} directly rather than mocking
+ * entirely (used to build a {@code PoolConfig} directly rather than mocking
  * {@link FederalTaxCalculator}), included here because it is the same "flat proportional tax" idea
  * this class collects.
  */

@@ -99,7 +99,7 @@ class PoolStrategyReturnTest {
 
     @Test
     void multiPool_perPoolGrowth_usesEachTypesOwnReturn() {
-        var config = new PoolStrategy.PoolConfig(FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO,
+        var config = new PoolConfig(FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO,
                 "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST, null, null, GEO, BigDecimal.ZERO);
         // Each account overrides with its own nominal return; zero inflation ⇒ real == nominal.
         var pool = PoolStrategy.create(List.<ProjectionAccountInput>of(
@@ -120,7 +120,7 @@ class PoolStrategyReturnTest {
     // ZERO (legacy callers stay fee-free), so this test deliberately exercises the canonical ctor.
     @Test
     void multiPool_perPoolGrowth_subtractsFeeRateUniformlyAcrossPools() {
-        var config = new PoolStrategy.PoolConfig(FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO,
+        var config = new PoolConfig(FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO,
                 "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST, null, null, GEO, BigDecimal.ZERO,
                 null, BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("0.0025"), 2025, null);
         var pool = PoolStrategy.create(List.<ProjectionAccountInput>of(
@@ -139,8 +139,8 @@ class PoolStrategyReturnTest {
     // API #23 / #5: a pool whose accounts all open at $0 (a brand-new account, or the Roth pool a
     // conversion creates) used to be weighted by a zero balance and grow at 0% for the whole run.
 
-    private static PoolStrategy.PoolConfig zeroInflationConfig() {
-        return new PoolStrategy.PoolConfig(FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO,
+    private static PoolConfig zeroInflationConfig() {
+        return new PoolConfig(FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO,
                 "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST, null, null, GEO, BigDecimal.ZERO);
     }
 

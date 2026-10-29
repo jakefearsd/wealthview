@@ -36,7 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class PoolStrategyCharacterizationTest {
 
-    private static PoolStrategy.PoolConfig fixedConfig() {
+    private static PoolConfig fixedConfig() {
         return PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST);
     }
 

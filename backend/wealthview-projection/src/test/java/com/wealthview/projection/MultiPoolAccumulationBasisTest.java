@@ -68,8 +68,8 @@ class MultiPoolAccumulationBasisTest {
      * (bond share 0, so it is a no-op for the split math) -- proves the accumulation-year no-op
      * holds even with real yield params configured, exactly as the task requires.
      */
-    private static PoolStrategy.PoolConfig config(CapitalGainsTaxCalculator cg) {
-        return new PoolStrategy.PoolConfig(
+    private static PoolConfig config(CapitalGainsTaxCalculator cg) {
+        return new PoolConfig(
                 FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST,
                 null, null, Map.of(), ZERO, cg, bd("0.02"), bd("0.04"), ZERO, BASE_YEAR, null);
     }
@@ -182,7 +182,7 @@ class MultiPoolAccumulationBasisTest {
         // need is drawn entirely from Roth, leaving realizedGain 0 -- isolating the dividend tax):
         // a scenario that is retired from year one never takes the accumulation-year branch, so
         // its numbers must be completely unaffected by C8.
-        var rothOnlyOrderConfig = new PoolStrategy.PoolConfig(
+        var rothOnlyOrderConfig = new PoolConfig(
                 FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null, WithdrawalOrder.ROTH_FIRST,
                 null, null, Map.of(), ZERO, capitalGainsCalc(), bd("0.02"), bd("0.10"), ZERO,
                 BASE_YEAR, null);

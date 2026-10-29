@@ -55,7 +55,7 @@ class MultiPoolTaxSaleGainTest {
     private static PoolStrategy.MultiPool pool(String taxableBalance, String taxableBasis,
                                                WithdrawalOrder order, String annualConversion) {
         var federal = federal();
-        var config = PoolStrategy.PoolConfig.builder(FilingStatus.SINGLE, ZERO, bd(annualConversion), "fixed",
+        var config = PoolConfig.builder(FilingStatus.SINGLE, ZERO, bd(annualConversion), "fixed",
                         null, null, order, new FederalOnlyTaxStrategy(federal), null)
                 .capitalGainsTaxCalculator(capitalGains())
                 .federalTaxCalculator(federal)

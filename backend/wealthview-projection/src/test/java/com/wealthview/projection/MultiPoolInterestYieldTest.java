@@ -69,11 +69,11 @@ class MultiPoolInterestYieldTest {
         return new HypotheticalAccountInput(bd(balance), ZERO, ZERO, type);
     }
 
-    private static PoolStrategy.PoolConfig config(String dividendYield, String interestYield,
+    private static PoolConfig config(String dividendYield, String interestYield,
                                                    CapitalGainsTaxCalculator cg,
                                                    FederalTaxCalculator federalTaxCalculator,
                                                    com.wealthview.core.projection.tax.TaxCalculationStrategy taxCalculator) {
-        return new PoolStrategy.PoolConfig(
+        return new PoolConfig(
                 FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null, WithdrawalOrder.ROTH_FIRST,
                 taxCalculator, null, Map.of(), ZERO, cg, bd(dividendYield), bd(interestYield), ZERO,
                 BASE_YEAR, federalTaxCalculator);
