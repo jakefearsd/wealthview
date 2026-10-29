@@ -6,6 +6,19 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Saving a scenario with a spending profile that does not exist now returns 404. It used to save with no spending plan.
+- Bond tent sizing on the scenario form: "Why it differs from the rule of thumb" now shows for every mix, not only the plan mix.
+- The converted cash-reserve notice on the Spending Optimizer page now shows without expanding Advanced Settings. Notices are announced to screen readers as status.
+- Crash replay chart: years before 1954 that use long-run averages are shaded and labelled. For a scenario that is already retired, the offset-0 option and the chart line read "Today" instead of "At retirement" or "Retire <year>". The start-year error clears as soon as the input is fixed.
+- Engine robustness, with no change to projected numbers: a near-empty Monte Carlo tent is treated as empty, and negative pre-retirement contributions no longer distort the tent build-up return. Bad tent sizing inputs and replay data with no overlapping years now give clearer errors.
+
+### Fixed
+- A scenario whose stored parameters are malformed now opens with the bond tent off instead of failing the page.
+
+### Upgrade notes
+- Migration V086 marks optimized profiles that still carry a cash reserve as out of date. V085 converted only scenarios with an active plan, so these profiles were missed. Re-optimize them.
+
 ## [1.4.0] — 2026-10-24
 
 The bond tent (roadmap item B5): configure a tent of short- to long-term

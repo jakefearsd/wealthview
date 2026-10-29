@@ -375,6 +375,9 @@ clears the other, and clearing both falls back to a withdrawal-rate strategy. Th
 scenario response echoes both `spending_profile` and `guardrail_profile` so a client can
 render whichever is active.
 
+`PUT` and `POST` return 404 when `spending_profile_id` names a spending profile that does not exist in the
+caller's tenant; the scenario is not saved.
+
 `compare` takes `{ "scenario_ids": ["...", "..."] }` with 2 or 3 ids.
 
 `run` returns `scenario_id`, `yearly_data`, `final_balance`, `years_in_retirement`,
@@ -407,11 +410,23 @@ when there are no retired years; `terminal_value` is null when absent).
 Both are read-only and need a saved scenario with an active spending plan and a bond tent; otherwise they return
 400 `A bond tent analysis needs a spending plan and a bond tent`. An unknown scenario is a 404.
 
-`simulation` also returns 400 `A bond tent simulation needs a retirement date` when the scenario has no retirement date.
-It takes no parameters and returns `trial_count`, `planned_years` and `columns`: the no-tent column
-(`name` "No tent", null `tent_target`, `years_covered_median` and `years_covered_worst10`), then one per mix. Each
-column has `name`, `tent_target`, `success_rate` (0-1; every year paid in full), `years_covered_median`,
-`years_covered_worst10` and `balance_at90_median` (null when the horizon ends before age 90).
+`simulation` runs the scenario's planned spending through Monte Carlo market paths. It runs once with no
+tent and once with each configured mix. All columns use the same simulated paths, so they differ only by the
+tent. It takes no parameters.
+
+The response has `trial_count`, `planned_years` (the tent's configured coverage in years) and `columns`. The
+first column is the no-tent column: `name` is "No tent", and `tent_target`, `years_covered_median` and
+`years_covered_worst10` are null. Each following column is one mix, with these fields:
+
+- `name` and `tent_target` (the tent size in dollars)
+- `success_rate`: 0 to 1, the share of trials in which every year's planned spending was paid in full
+- `years_covered_median` and `years_covered_worst10`: the years of spending the tent covered, at the median
+  trial and at the 10th percentile
+- `balance_at90_median`: the median balance at age 90, or null when the horizon ends before age 90
+
+`simulation` also returns 400 `A bond tent simulation needs a retirement date` when the scenario has no
+retirement date. The spending-plan and bond-tent check runs first, so a scenario missing both gets the
+400 `A bond tent analysis needs a spending plan and a bond tent` message.
 
 `replay` takes exactly one of `crash` (`oil_shock_1973`, `dot_com_2000`, `financial_crisis_2008` or
 `inflation_2022`) or `start_year` (1954-2025, a one-year window), plus `offset` (default 0, from -3 to 3): the
