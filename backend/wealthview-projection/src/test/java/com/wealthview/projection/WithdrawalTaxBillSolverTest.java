@@ -133,4 +133,18 @@ class WithdrawalTaxBillSolverTest {
         verify(tax, times(3)).computeDetailedTax(any(), anyInt(), any(), any(), any());
         assertThat(bill.recordedBreakdown()).contains(last);
     }
+
+    @Test
+    void settle_zeroOrdinaryIncomeZeroTax_callsCalculatorButRecordsNothing() {
+        var tax = stubbedTax(CombinedTaxResult.ZERO);
+        var solver = solver(tax);
+        // No ordinary income, but a 5,000 realized gain puts LTCG income in front of the calculator.
+        var in = new BillInputs(YEAR, ZERO, ZERO, ZERO, bd("5000"), ZERO, ZERO, ZERO, ZERO, 65,
+                bd("100000"), bd("100000"), FilingStatus.SINGLE, ZERO, ZERO);
+
+        var bill = solver.settle(in, x -> ZERO);
+
+        verify(tax, times(1)).computeDetailedTax(any(), anyInt(), any(), any(), any());
+        assertThat(bill.recordedBreakdown()).isEmpty();
+    }
 }
