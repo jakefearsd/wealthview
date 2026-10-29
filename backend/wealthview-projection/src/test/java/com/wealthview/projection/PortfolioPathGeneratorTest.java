@@ -577,6 +577,24 @@ class PortfolioPathGeneratorTest {
     }
 
     @Test
+    void generate_preRetirementNegativeContribution_recordsFlooredBeforeBalance() {
+        var healthy = new HypotheticalAccountInput(new BigDecimal("100000"), BigDecimal.ZERO,
+                AssetAllocation.ALL_US, Optional.empty(), "taxable");
+        var drained = new HypotheticalAccountInput(new BigDecimal("10000"), new BigDecimal("-30000"),
+                AssetAllocation.ALL_US, Optional.empty(), "taxable");
+        var model = PoolReturnModel.from(List.of(healthy, drained), 0.0);
+
+        var paths = PortfolioPathGenerator.generate(1, 1, 3, model, FLAT_US_MATRIX, new Random(1L), 0.0,
+                TWO_ROW_MATURITIES);
+
+        var tent = paths.tentPaths();
+        double before = tent.poolBeforeGrowth(0, 0, PoolType.TAXABLE);
+        double after = tent.poolAfterGrowth(0, 0, PoolType.TAXABLE);
+        assertThat(before).isEqualTo(100_000, within(1e-6));
+        assertThat(after / before - 1).isEqualTo(0.10, within(1e-9));
+    }
+
+    @Test
     void generate_withoutMaturities_hasNoTentPaths() {
         var model = PoolReturnModel.from(List.of(allocationAccount("100000", AssetAllocation.ALL_US, "taxable")),
                 0.0);

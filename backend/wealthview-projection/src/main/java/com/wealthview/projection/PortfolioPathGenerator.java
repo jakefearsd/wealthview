@@ -185,7 +185,8 @@ final class PortfolioPathGenerator {
                 double contributed = balance + account.contribution();
                 balance = Math.max(0, contributed * (1 + real[y] - feeRate));
                 if (recorder != null) {
-                    recorder.addAccountYear(trial, y, account.poolType(), contributed, balance);
+                    // Floored like the balance: a negative "before" would distort the pool's replayed return.
+                    recorder.addAccountYear(trial, y, account.poolType(), Math.max(0, contributed), balance);
                 }
             }
             balances[i] = balance;
