@@ -77,7 +77,7 @@ class SustainabilitySearchTest {
      * baseline is the median of the per-trial start totals instead) with a minority of "crashing" trials (steep, sustained decline) and a majority of
      * "flat" trials, so the no-adaptation median trajectory (dominated by the flat majority) reads
      * as healthy while the crashing minority's OWN trajectory falls far below it -- exactly the
-     * signal {@link TrialSimulator#adaptYearSpending} cuts on.
+     * signal {@link TrialSpending#adaptYearSpending} cuts on.
      */
     private static SustainabilitySearch.SearchContext crashMinorityContext(double maxAdjRate,
                                                                             boolean gateOnAdaptiveRules) {

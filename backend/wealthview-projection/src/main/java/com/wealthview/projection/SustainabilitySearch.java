@@ -366,7 +366,7 @@ final class SustainabilitySearch {
      * holds trivially (lower spending only preserves balances). With the T24 adaptive-rules gate
      * the rule's corridor and median-reference inputs are themselves re-derived from each candidate
      * schedule, so cross-candidate monotonicity is NOT formally proven — like the
-     * with-rules-&gt;=-no-rules success monotonicity (see {@code TrialSimulator#adaptYearSpending}),
+     * with-rules-&gt;=-no-rules success monotonicity (see {@code TrialSpending#adaptYearSpending}),
      * it is empirically pinned: {@code GuardrailAdaptiveGateIntegrationTest}'s permanent grid sweep
      * (1000-unit steps plus 100-unit refinement through the transition, adaptation-gated stressed
      * fixture) asserts exactly one sustainable→unsustainable transition.

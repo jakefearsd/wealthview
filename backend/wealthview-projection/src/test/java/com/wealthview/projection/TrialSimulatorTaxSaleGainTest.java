@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
 /** D5 (Phase 1a), Monte Carlo side: non-spending taxable sales accumulate their realized gain on
- * {@link TrialPools}; {@link TrialSimulator#ltcgTaxForYear} taxes it with the year's LTCG and prices
+ * {@link TrialPools}; {@link TrialTaxes#ltcgTaxForYear} taxes it with the year's LTCG and prices
  * the LTCG bill's own funding sale. */
 class TrialSimulatorTaxSaleGainTest {
 
@@ -60,7 +60,7 @@ class TrialSimulatorTaxSaleGainTest {
         var tp = gainPools();
         tp.sellTaxableForTax(4_000);   // accumulates 2,000 of gain
 
-        double tax = TrialSimulator.ltcgTaxForYear(tp, 8_000, 0, LtcgTaxTable.flat(0.15), 0, 0);
+        double tax = TrialTaxes.ltcgTaxForYear(tp, 8_000, 0, LtcgTaxTable.flat(0.15), 0, 0);
 
         assertThat(tax).isEqualTo(1500.0 / 0.925, within(0.01));
         assertThat(tp.drainTaxSaleGain()).isEqualTo(0.0, within(1e-12));
@@ -71,7 +71,7 @@ class TrialSimulatorTaxSaleGainTest {
         var tp = lossPools();
         tp.sellTaxableForTax(40_000);  // accumulates -20,000
 
-        double tax = TrialSimulator.ltcgTaxForYear(tp, 8_000, 0, LtcgTaxTable.flat(0.15), 0, 0);
+        double tax = TrialTaxes.ltcgTaxForYear(tp, 8_000, 0, LtcgTaxTable.flat(0.15), 0, 0);
 
         assertThat(tax).isEqualTo(0.0, within(1e-12));
         assertThat(tp.drainTaxSaleGain()).isEqualTo(0.0, within(1e-12));
@@ -82,7 +82,7 @@ class TrialSimulatorTaxSaleGainTest {
         var tp = gainPools();
         tp.sellTaxableForTax(4_000);
 
-        double tax = TrialSimulator.ltcgTaxForYear(tp, 8_000, 0, null, 0, 0);
+        double tax = TrialTaxes.ltcgTaxForYear(tp, 8_000, 0, null, 0, 0);
 
         assertThat(tax).isEqualTo(0.0, within(1e-12));
         assertThat(tp.drainTaxSaleGain()).isEqualTo(0.0, within(1e-12));

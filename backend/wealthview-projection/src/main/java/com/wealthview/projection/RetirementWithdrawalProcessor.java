@@ -243,7 +243,7 @@ final class RetirementWithdrawalProcessor {
      * deposits a surplus in the same year. Deriving from the SAME {@code scaledSpending} the
      * {@code grossSurplus} branch nets against makes it impossible for the draw and the surplus
      * decision to disagree about which spending figure is real; it is also exactly the MC engine's
-     * rule (floors pre-scaled at build time, {@code TrialSimulator.resolveSpendingFunding} nets
+     * rule (floors pre-scaled at build time, {@code TrialSpending.resolveSpendingFunding} nets
      * income at 100%) — cross-engine parity.
      */
     private static BigDecimal resolveScaledPortfolioNeed(

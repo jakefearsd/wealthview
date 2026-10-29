@@ -58,7 +58,7 @@ final class TrialPools {
 
     /** D5: realized FIFO gain of this trial-year's NON-spending taxable sales (tax cascades,
      * pre-60 conversion-tax sale), drained once per year by
-     * {@link TrialSimulator#ltcgTaxForYear}. Negative for loss lots. */
+     * {@link TrialTaxes#ltcgTaxForYear}. Negative for loss lots. */
     private double taxSaleGain;
 
     // ArrayIsStoredDirectly: pools is a fresh 5-element array the caller (TrialPools.seed, or a

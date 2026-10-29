@@ -2,7 +2,6 @@ package com.wealthview.projection;
 
 import org.springframework.lang.Nullable;
 
-import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 
 /**
@@ -19,15 +18,6 @@ import com.wealthview.core.projection.strategy.WithdrawalOrder;
  * sequences (on the {@link SimulationConfig}) and never draws random numbers itself.
  */
 final class TrialSimulator {
-
-    /** Defensive cap on the audit-C2 gross-up rate: a real marginal rate cannot reach 100% (which
-     * would make the T*m/(1-m) closed form diverge), and this model's brackets never approach it --
-     * 50% is a generous ceiling that only ever bites on a corrupt/out-of-range input. */
-    private static final double GROSS_UP_RATE_CAP = 0.50;
-
-    /** IRC 72(t) -- 10% additional tax on early (pre-59½) traditional-account distributions, a
-     * statutory constant (T18a-4). */
-    private static final double EARLY_WITHDRAWAL_PENALTY_RATE = 0.10;
 
     // Household task 6: the owner-aware double[5] pool layout {joint-taxable, trad-primary,
     // trad-spouse, roth-primary, roth-spouse} and its low-level mechanics live in TrialPools. Task
@@ -185,10 +175,10 @@ final class TrialSimulator {
             // pre-C1 caller) makes this byte-identical to the old growTaxableWithDividend
             // (interest income always 0, baseWithInterest == base).
             var growthResult = tent == null
-                    ? applyGrowthAndInterestTax(tp, taxableReturn, config.dividendYield(), config.interestYield(),
-                            config.taxableEquityShare(), table, view.base())
-                    : applyTentGrowth(tp, tent, config, new TentGrowthYear(tentYear, taxableReturn,
-                            traditionalReturn, rothReturn, table, view.base()));
+                    ? TrialGrowth.applyGrowthAndInterestTax(tp, taxableReturn, config.dividendYield(),
+                            config.interestYield(), config.taxableEquityShare(), table, view.base())
+                    : TrialGrowth.applyTentGrowth(tp, tent, config, new TrialGrowth.TentGrowthYear(tentYear,
+                            taxableReturn, traditionalReturn, rothReturn, table, view.base()));
             double dividendIncome = growthResult.dividendIncome();
             double baseWithInterest = growthResult.baseWithInterest();
             if (tent == null) {
@@ -230,7 +220,7 @@ final class TrialSimulator {
             // differs -- the entire tax/withdrawal/RMD/LTCG year-step below is shared verbatim (no
             // forked tax logic). The chained assignment updates prevSpending in lock-step without
             // adding a statement to this NCSS-capped hot method.
-            double spending = prevSpending = resolveYearSpending(config, y, view.floor(),
+            double spending = prevSpending = TrialSpending.resolveYearSpending(config, y, view.floor(),
                     view.discretionary(), trialStartTotal, prevSpending);
             // A4: tax on this year's base (outside) income is a real obligation every year, not
             // just when income exceeds spending -- fund it from any surplus first; the unfunded
@@ -242,7 +232,7 @@ final class TrialSimulator {
             // like the deterministic engine's extraPoolFundedTax now is. surplusTax[y] is the
             // precomputed full-year tax on this year's taxable base income -- see
             // OptimizationContextBuilder#computeSurplusTax.
-            var funding = resolveSpendingFunding(view.income(), spending, view.surplusTax());
+            var funding = TrialSpending.resolveSpendingFunding(view.income(), spending, view.surplusTax());
             double withdrawal = funding.withdrawal();
 
             // Split withdrawal across pools (59.5 rule: taxable only before age 60). aux bundles the
@@ -276,7 +266,7 @@ final class TrialSimulator {
             WithdrawalOutcome outcome = applyTrialWithdrawals(tp, drawn, withdrawalTax, hasPools, table,
                     baseWithInterest + rmdForced + actualConv);
 
-            applyEarlyWithdrawalPenalty(tp, outcome.traditionalDrawn(), age, config.earlyAccessAge());
+            TrialTaxes.applyEarlyWithdrawalPenalty(tp, outcome.traditionalDrawn(), age, config.earlyAccessAge());
 
             // The base-income-tax deduction is NOT part of drawn (it drains via
             // deductTaxFromPoolsGrossedUp below, like withdrawalTax), so this metric already measures
@@ -291,13 +281,13 @@ final class TrialSimulator {
             // funding draw (and the LTCG bracket floor) stacks on.
             double ordinaryStack = baseWithInterest + rmdForced + actualConv + outcome.traditionalDrawn();
 
-            settleBaseIncomeTaxAndSurplus(tp, funding.grossSurplus(), funding.fundedFromSurplus(),
+            TrialTaxes.settleBaseIncomeTaxAndSurplus(tp, funding.grossSurplus(), funding.fundedFromSurplus(),
                     funding.unfundedBaseTax(), table, ordinaryStack);
 
             // T18a-3: aux.rentalIncome() threads this year's net rental income into the NIIT Net
             // Investment Income base only (never the LTCG bracket tax) -- zero when no rental array
             // is configured.
-            applyLtcgTax(tp, outcome.realizedGain(), dividendIncome, aux.ltcgTable(), ordinaryStack, table,
+            TrialTaxes.applyLtcgTax(tp, outcome.realizedGain(), dividendIncome, aux.ltcgTable(), ordinaryStack, table,
                     aux.rentalIncome());
 
             tp.clampNonNegative();
@@ -341,207 +331,6 @@ final class TrialSimulator {
         }
     }
 
-    /** Audit A4 bundle: the year's surplus/withdrawal split for spending and base-income tax. */
-    private record SpendingFunding(double grossSurplus, double fundedFromSurplus,
-                                   double unfundedBaseTax, double withdrawal) {}
-
-    /** Splits this year's income against spending into: the gross surplus, the portion of the base
-     * income tax funded from that surplus, the unfunded base-tax remainder (drained from pools), and
-     * the spending withdrawal need. Extracted from {@link #simulateTrial} to keep the NCSS-capped hot
-     * method within budget. */
-    private static SpendingFunding resolveSpendingFunding(double income, double spending, double baseIncomeTax) {
-        double grossSurplus = income - spending;
-        double fundedFromSurplus = Math.min(Math.max(0, grossSurplus), baseIncomeTax);
-        return new SpendingFunding(grossSurplus, fundedFromSurplus,
-                baseIncomeTax - fundedFromSurplus, Math.max(0, spending - income));
-    }
-
-    /**
-     * Resolves this trial-year's total spending. On the no-rules path (no
-     * {@link GuardrailAdaptation} on the config) this is the fixed planned schedule
-     * {@code floor + discretionary}, byte-identical to pre-C9. On the with-rules pass it is the
-     * corridor-coupled adaptation of {@link #adaptYearSpending} (audit C9).
-     */
-    private static double resolveYearSpending(SimulationConfig config, int y,
-                                               double floor, double discretionary,
-                                               double trialStartTotal, double prevSpending) {
-        double plannedSpending = floor + discretionary;
-        GuardrailAdaptation adaptation = config.adaptation();
-        return adaptation != null
-                ? adaptYearSpending(adaptation, y, plannedSpending, floor, trialStartTotal, prevSpending)
-                : plannedSpending;
-    }
-
-    /**
-     * Applies the simulated guardrail-adaptation rule (audit C9) for one trial-year: returns the
-     * TOTAL spending the trial should attempt this year, adapting the planned schedule toward the
-     * displayed corridor based on the trial's actual portfolio state.
-     *
-     * <p><b>Corridor coupling — precise semantics.</b> The trigger signal is a portfolio-ratio
-     * PROXY — {@code impliedSpending = plannedSpending * (trialStartBalance /
-     * expectedMedianStart[y])} — GATED BY the displayed corridor thresholds; it is NOT derived the
-     * way the corridor itself was ({@link SpendingCorridorCalculator} builds the band from
-     * cross-trial percentile dispersion of sustainable capacity, whereas this signal is a simple
-     * ratio scaling of the plan by the trial's portfolio state relative to the no-adaptation
-     * median). When the proxy falls below the displayed lower guardrail ({@code corridorLow[y]})
-     * the trial CUTS discretionary toward the proxy ITSELF — so simulated spending CAN fall below
-     * {@code corridorLow[y]}, bounded only by the floor and the year-over-year rate cap. Otherwise
-     * it RECOVERS toward the planned schedule (the upper guardrail {@code corridorHigh[y]} is the
-     * ceiling of that recovery, but the no-ratchet cap at {@code plannedSpending <=
-     * corridorHigh[y]} always binds first — see constraint 2, so the upper band is display-only
-     * in-simulation). The with-rules success rate therefore measures "success when following this
-     * specific ratio-cut rule", not "spending always kept inside the shown corridor".
-     *
-     * <p><b>Bounds.</b> The year-over-year change is capped at {@code maxAnnualAdjustmentRate}
-     * relative to the prior year's spending (the same relative form the pre-optimization
-     * {@link SpendingSmoother#applyYearOverYearSmoothing} uses). Result is then capped at
-     * {@code plannedSpending} (never exceed the plan — recovering cuts, never an unbounded
-     * prosperity ratchet) and floored at {@code floor} (the essential floor is inviolate — cuts
-     * never take spending below it). Because floors are never cut, the adaptation cannot cause a
-     * floor shortfall within its own year; across cumulative multi-year tax paths (RMD force-outs,
-     * gross-ups, LTCG interactions) with-rules-&gt;=-no-rules success monotonicity is NOT formally
-     * proven — it is empirically pinned by the integration tests (including the RMD/tax-dynamics
-     * pairwise pins) and a 60,000-trial-pair adversarial probe that found zero floor or
-     * final-balance regressions.
-     *
-     * <p>Pure, allocation-free, no branching on trial identity — safe for the hot loop.
-     */
-    static double adaptYearSpending(GuardrailAdaptation adapt, int y,
-                                     double plannedSpending, double floor,
-                                     double trialStartBalance, double prevSpending) {
-        double rate = adapt.maxAnnualAdjustmentRate();
-        double expected = adapt.expectedStartBalance()[y];
-        double ratio = expected > 0 ? trialStartBalance / expected : 1.0;
-        double impliedSpending = plannedSpending * ratio;
-
-        double target;
-        if (impliedSpending < adapt.corridorLow()[y]) {
-            // Lower guardrail breached: cut toward the implied capacity.
-            target = impliedSpending;
-        } else {
-            // At/above the lower guardrail: recover toward the planned schedule, ceilinged by the
-            // upper guardrail (which is >= plan, so the plan cap below binds first).
-            target = Math.min(plannedSpending, adapt.corridorHigh()[y]);
-        }
-
-        double maxUp = prevSpending * (1 + rate);
-        double maxDown = prevSpending * (1 - rate);
-        double adapted = Math.max(maxDown, Math.min(maxUp, target));
-        adapted = Math.min(adapted, plannedSpending);   // no prosperity ratchet
-        return Math.max(adapted, floor);                // essential floor inviolate
-    }
-
-    /**
-     * T18a-4: 10% IRC 72(t) additional tax on traditional distributions before age 59½ (the 59 1/2
-     * calendar year from {@code AgeMilestones}, legacy 60 -- already used above by
-     * {@code preAge595} to steer clear of traditional draws). Flat 10% on the ACTUAL dollars
-     * debited from traditional for this year's spending draw ({@code traditionalDrawn} -- branch-
-     * agnostic); Roth
-     * conversions are OUT OF SCOPE. Funded via the simple (non-grossed-up) tax cascade -- hot-loop
-     * cheap, matching the Roth-conversion-tax drain's own no-gross-up design.
-     */
-    private static void applyEarlyWithdrawalPenalty(TrialPools tp, double traditionalDrawn, int age,
-                                                    int earlyAccessAge) {
-        if (age < earlyAccessAge && traditionalDrawn > 0) {
-            tp.deductTaxFromPools(traditionalDrawn * EARLY_WITHDRAWAL_PENALTY_RATE);
-        }
-    }
-
-    /**
-     * Like {@link TrialPools#deductTaxFromPools} but additionally grosses up the traditional slice
-     * of the drain (audit C2): a tax payment sourced from the traditional pool is itself an ordinary-income
-     * distribution and must fund its own tax. Closed-form on the geometric series T + Tm + Tm² + ...
-     * = T·m/(1−m) (T = the traditional dollars this drain just pulled, capped at
-     * {@link #GROSS_UP_RATE_CAP}), applied as a single additional draw directly against the
-     * traditional pool -- the series itself compounds against traditional, since taxable is by
-     * definition already exhausted once the base cascade reaches it.
-     *
-     * <p>Audit C5 coherence: {@code m} is the EXACT marginal rate at the post-draw income point
-     * ({@code table.rateAt(stackedBase + T)}), read from the SAME table {@link #simulateTrial}
-     * uses for exact incremental pricing -- not the old flat annual chord. {@code stackedBase} is
-     * each caller's view of the ordinary income already realized this year BEFORE this drain
-     * (base income + actual conversion + traditional spending draw + forced RMD excess, as far as
-     * the year has progressed at that call site -- C5 review fix). The closed-form T·m/(1−m)
-     * structure itself is deliberately kept (an approximation the design brief explicitly permits
-     * to stay), and the gross-up draws of EARLIER tax drains in the same year are not themselves
-     * added to later drains' {@code stackedBase} -- that residual second-order sequencing effect
-     * mirrors audit C2/T10's own "closed-form, not iterative" scope boundary. {@code table} is
-     * null exactly when {@code hasPools} is false, making every call a no-op, same as the old
-     * {@code marginalRate=0} behavior.
-     */
-    private static void deductTaxFromPoolsGrossedUp(double tax, TrialPools tp,
-                                                      OrdinaryTaxTable table, double stackedBase) {
-        double traditionalBefore = tp.traditionalTotal();
-        tp.deductTaxFromPools(tax);
-        double traditionalDrawn = traditionalBefore - tp.traditionalTotal();
-        if (traditionalDrawn > 0 && table != null) {
-            double m = Math.min(Math.max(table.rateAt(stackedBase + traditionalDrawn), 0.0), GROSS_UP_RATE_CAP);
-            double grossUp = traditionalDrawn * m / (1 - m);
-            // Household task 6: the gross-up drains PROPORTIONALLY across the two traditional pools,
-            // capped at the available traditional total so no slot is driven negative (mirrors the
-            // pre-household Math.max(0, traditional - grossUp) flooring). Single-person: all on TRAD_P.
-            double tradTotal = tp.traditionalTotal();
-            tp.debitPair(TRAD_P, TRAD_S, Math.min(grossUp, Math.max(0, tradTotal)));
-        }
-    }
-
-    /**
-     * Settles the year's base-income-tax obligation and surplus deposit (audit A4).
-     * Deposits whatever surplus remains after funding the year's base income tax to taxable
-     * (at cost), then drains the unfunded remainder straight from the pools via the shared
-     * taxable-first cascade -- exactly like the ordinary withdrawal tax and LTCG tax: never part
-     * of the spending draw. The funding draw IS grossed up when it
-     * touches traditional (audit C2), at the year's full ordinary stack (C5 review fix), cross-engine
-     * parity with the deterministic engine's {@code extraPoolFundedTax} treatment.
-     */
-    private static void settleBaseIncomeTaxAndSurplus(TrialPools tp,
-                                                       double grossSurplus, double fundedFromSurplus,
-                                                       double unfundedBaseTax, OrdinaryTaxTable table,
-                                                       double ordinaryStack) {
-        if (grossSurplus > 0) {
-            double netSurplus = grossSurplus - fundedFromSurplus;
-            if (netSurplus > 0) {
-                tp.creditTaxable(netSurplus);
-            }
-        }
-        if (unfundedBaseTax > 0) {
-            deductTaxFromPoolsGrossedUp(unfundedBaseTax, tp, table, ordinaryStack);
-        }
-    }
-
-    /**
-     * Audit C1: prices and funds the tax on this year's ordinary-interest income, exactly (audit
-     * C5) via {@code table.incrementalTax(base, interestIncome)} -- interest is the FIRST ordinary
-     * income stacked directly on the year's base (realized as soon as growth runs, before RMD/
-     * conversion/the spending draw). Like the RMD/withdrawal tax it is drained from the pools,
-     * grossed up when it touches traditional (audit C2). A {@code null} table (no tax modeling this
-     * trial) or non-positive interest income leaves the pools untouched.
-     */
-    private static void applyInterestTax(TrialPools tp, double interestIncome,
-                                          OrdinaryTaxTable table, double base) {
-        if (table == null || interestIncome <= 0) {
-            return;
-        }
-        double interestTax = table.incrementalTax(base, interestIncome);
-        if (interestTax > 0) {
-            deductTaxFromPoolsGrossedUp(interestTax, tp, table, base);
-        }
-    }
-
-    /** Bundles {@link TrialPools#growTaxable} and {@link #applyInterestTax} (audit
-     * C1) into a single call, keeping {@link #simulateTrial}'s NCSS-capped hot method lean.
-     * {@code baseWithInterest} is the ordinary-income base every later pricing call this
-     * trial-year (RMD, conversion, spending draw) stacks on top of. */
-    private record GrowthYieldResult(double dividendIncome, double baseWithInterest) {}
-
-    private static GrowthYieldResult applyGrowthAndInterestTax(TrialPools tp,
-            double taxableReturn, double dividendYield, double interestYield, double taxableEquityShare,
-            OrdinaryTaxTable table, double base) {
-        var split = tp.growTaxable(taxableReturn, dividendYield, interestYield, taxableEquityShare);
-        applyInterestTax(tp, split.interestIncome(), table, base);
-        return new GrowthYieldResult(split.dividendIncome(), base + split.interestIncome());
-    }
-
     /** The tent when it still holds anything this year, else {@code null} (the untented path). */
     @Nullable
     private static TrialTent activeTent(@Nullable TrialTent tent) {
@@ -551,45 +340,6 @@ final class TrialSimulator {
     /** The tent's coverage count, or {@code NaN} without a tent. */
     private static double yearsCovered(@Nullable TrialTent tent) {
         return tent == null ? Double.NaN : tent.yearsCovered();
-    }
-
-    /** The per-year inputs of {@link #applyTentGrowth}: the tent year index, the three pool returns, and the
-     * year's ordinary tax table and base income. */
-    private record TentGrowthYear(int tentYear, double taxableReturn, double traditionalReturn, double rothReturn,
-                                  OrdinaryTaxTable table, double base) {
-    }
-
-    /** A pool's return once its tent sleeves earn their own: {@code grown / balance - 1}, or the raw
-     * {@code poolReturn} when the pool is empty. */
-    private static double effectiveReturn(TrialTent tent, PoolType pool, double balance, double poolReturn) {
-        return balance == 0 ? poolReturn : tent.preparedGrowth(pool) / balance - 1;
-    }
-
-    /**
-     * The tent's growth step: every pool grows at its effective return (growth part at the pool return,
-     * sleeves at their own), the taxable pool through the reservation-aware split so the sleeves' typed
-     * interest is taxed as ordinary income. Reads sleeve interest and the growth-index return from the
-     * start-of-year sleeves and balances, then grows the sleeves and advances the index.
-     */
-    private static GrowthYieldResult applyTentGrowth(TrialPools tp, TrialTent tent, SimulationConfig config,
-            TentGrowthYear year) {
-        double taxableReturn = year.taxableReturn();
-        double traditionalReturn = year.traditionalReturn();
-        double rothReturn = year.rothReturn();
-        double base = year.base();
-        double taxable = tp.taxable();
-        double traditional = tp.traditionalTotal();
-        double roth = tp.rothTotal();
-        double growth = tent.growthReturn(taxable, traditional, roth, taxableReturn, traditionalReturn, rothReturn);
-        var split = tp.growTaxable(effectiveReturn(tent, PoolType.TAXABLE, taxable, taxableReturn),
-                config.dividendYield(), config.interestYield(), config.taxableEquityShare(),
-                tent.totalIn(PoolType.TAXABLE), tent.interestIn(PoolType.TAXABLE));
-        applyInterestTax(tp, split.interestIncome(), year.table(), base);
-        tp.growNonTaxablePools(effectiveReturn(tent, PoolType.TRADITIONAL, traditional, traditionalReturn),
-                effectiveReturn(tent, PoolType.ROTH, roth, rothReturn));
-        tent.growSleeves(year.tentYear());
-        tent.advanceIndex(growth);
-        return new GrowthYieldResult(split.dividendIncome(), base + split.interestIncome());
     }
 
     /**
@@ -608,72 +358,6 @@ final class TrialSimulator {
         }
         tent.clampAll(tp.taxable(), tp.traditionalTotal(), tp.rothTotal());
         tent.recordCoverageYear(y, before);
-    }
-
-    /**
-     * Applies the long-term capital-gains tax on this year's realized spending gain plus qualified
-     * dividend plus (D5) the accumulated gain of every tax-funding sale -- see
-     * {@link #ltcgTaxForYear} -- exactly (audit C5) via {@code ltcgTable}, evaluated at the ACTUAL full ordinary
-     * stack for this trial-year ({@code ordinaryStack} = base income + actual capped Roth
-     * conversion + actual traditional spending draw + forced RMD excess) -- fixing the old
-     * {@code LtcgRateCalculator}'s omission of every same-year draw from the floor it probed,
-     * which could silently under-price a gain those draws push across the 0%/15% boundary
-     * (C5 review fix: the floor now also includes the RMD excess and uses the CAPPED actual
-     * conversion, not the pre-cap target).
-     *
-     * <p>Like the RMD/withdrawal tax it is an additional outflow drained taxable-first from the
-     * pools (retirement-scoped; the MC path is retirement-only), grossed up when it touches
-     * traditional (audit C2) -- using the ORDINARY table at the same stacked point for the
-     * gross-up rate, not the LTCG rate: the traditional draw funding this bill is itself ordinary
-     * income once withdrawn, regardless of what kind of tax it is paying. A {@code null} table (no
-     * capital-gains calculator wired) or a non-positive net LTCG income leaves the pools
-     * untouched. {@code netRentalIncome} (T18a-3) joins the NIIT Net Investment Income base only
-     * (never the LTCG bracket tax) -- see {@link LtcgTaxTable#taxAt(double, double, double)}.
-     */
-    private static void applyLtcgTax(TrialPools tp, double realizedGain,
-                                      double dividendIncome, LtcgTaxTable ltcgTable,
-                                      double ordinaryStack, OrdinaryTaxTable ordinaryTable,
-                                      double netRentalIncome) {
-        double ltcgTax = ltcgTaxForYear(tp, realizedGain, dividendIncome, ltcgTable, ordinaryStack,
-                netRentalIncome);
-        if (ltcgTax > 0) {
-            deductTaxFromPoolsGrossedUp(ltcgTax, tp, ordinaryTable, ordinaryStack);
-        }
-        // The LTCG bill's own funding sale was priced inside ltcgTaxForYear; discard what that drain
-        // just accumulated so it is not carried into next year.
-        tp.drainTaxSaleGain();
-    }
-
-    /**
-     * D5: this trial-year's LTCG tax on the spending sale's {@code realizedGain} + qualified
-     * {@code dividendIncome} + every non-spending taxable sale's accumulated gain (drained from
-     * {@code tp}; a net loss floors LTCG income at zero), INCLUDING the gain of the sale that will
-     * fund this bill -- closed form {@code sale = tax / (1 - r)} from one measured chord {@code r}, with
-     * the tax re-priced at the jump's gain (no further polish passes: the hot-loop budget; the
-     * deterministic engine polishes up to 3 times). A
-     * {@code null} table returns 0 (the accumulator is still drained).
-     */
-    static double ltcgTaxForYear(TrialPools tp, double realizedGain, double dividendIncome,
-                                 @Nullable LtcgTaxTable ltcgTable, double ordinaryStack, double netRentalIncome) {
-        double ltcgIncome = Math.max(0, realizedGain + tp.drainTaxSaleGain() + dividendIncome);
-        if (ltcgTable == null || ltcgIncome <= 0) {
-            return 0;
-        }
-        double stack = Math.max(0, ordinaryStack);
-        double tax = ltcgTable.taxAt(stack, ltcgIncome, netRentalIncome);
-        double taxableAvail = Math.max(0, tp.taxable());
-        double sale0 = Math.min(tax, taxableAvail);
-        if (sale0 <= 0) {
-            return tax;
-        }
-        double gain0 = tp.peekTaxableSaleGain(sale0);
-        if (gain0 <= 0) {
-            return tax;
-        }
-        double taxPerSaleDollar = (ltcgTable.taxAt(stack, ltcgIncome + gain0, netRentalIncome) - tax) / sale0;
-        double warmSale = Math.min(tax / (1 - Math.min(Math.max(taxPerSaleDollar, 0), GROSS_UP_RATE_CAP)),
-                taxableAvail);
-        return ltcgTable.taxAt(stack, ltcgIncome + tp.peekTaxableSaleGain(warmSale), netRentalIncome);
     }
 
     /** Bundles {@link #simulateTrial}'s remaining per-year array-or-default lookups (dynamic-
@@ -815,7 +499,7 @@ final class TrialSimulator {
         tp.debitPair(ROTH_P, ROTH_S, drawn.roth());
         double traditionalDrawn = drawn.traditional();
         if (hasPools) {
-            deductTaxFromPoolsGrossedUp(withdrawalTax, tp, table, base + traditionalDrawn);
+            TrialTaxes.deductTaxFromPoolsGrossedUp(withdrawalTax, tp, table, base + traditionalDrawn);
         }
         return new WithdrawalOutcome(realizedGain, traditionalDrawn);
     }

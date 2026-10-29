@@ -124,7 +124,7 @@ class GuardrailAdaptiveGateIntegrationTest {
      * refinement through the transition window, asserting EXACTLY ONE sustainable-to-unsustainable
      * transition (a re-entrant "sustainable again above an unsustainable level" pocket would break
      * bisection). Mirrors the empirically-pinned-not-proven stance documented on
-     * {@code TrialSimulator#adaptYearSpending} and
+     * {@code TrialSpending#adaptYearSpending} and
      * {@code SustainabilitySearch#binarySearchDiscretionary}.
      */
     @Test

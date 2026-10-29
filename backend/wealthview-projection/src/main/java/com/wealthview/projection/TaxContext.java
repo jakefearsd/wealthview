@@ -13,7 +13,7 @@ package com.wealthview.projection;
  * decomposition so the optimizer and {@link SustainabilitySearch} can share it.
  *
  * <p>{@code rentalIncomeByYear} (T18a-3) is the per-year net taxable rental income, threaded into
- * the NIIT Net Investment Income base ({@code TrialSimulator#applyLtcgTax}). Derived as the delta
+ * the NIIT Net Investment Income base ({@code TrialTaxes#applyLtcgTax}). Derived as the delta
  * between the rental-aware {@code ordinaryBaseIncomeByYear} and the crude (non-rental-aware) base
  * taxable-income array (see {@code OptimizationContextBuilder}) -- a documented approximation that
  * can under-count in the rare year where the aggregate goes negative and gets floor-clamped at
