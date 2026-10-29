@@ -200,6 +200,15 @@ describe('SpendingOptimizerPage', () => {
         expect(screen.getByRole('link', { name: 'your scenario' })).toHaveAttribute('href', '/projections/sc-1');
     });
 
+    it('showsConvertedNotice_advancedCollapsed_visibleByRole', async () => {
+        mockGetScenario.mockResolvedValue(tentScenario({ converted_from_cash_reserve: true }));
+        renderPage();
+        await waitFor(() => expect(screen.getByText('Advanced Settings')).toBeInTheDocument());
+
+        expect(screen.getByRole('status')).toHaveTextContent(/Your 2\.5-year cash reserve is now a 2\.5-year bond tent/);
+        expect(screen.queryByText(/Cash reserve has moved/)).not.toBeInTheDocument();
+    });
+
     it('shows the converted notice for a converted scenario', async () => {
         const user = userEvent.setup();
         mockGetScenario.mockResolvedValue(tentScenario({ converted_from_cash_reserve: true }));

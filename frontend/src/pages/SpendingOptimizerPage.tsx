@@ -408,6 +408,13 @@ export default function SpendingOptimizerPage() {
                             </FormField>
                         </div>
 
+                        {/* Shown outside the collapsible: the one-time migration notice must not hide. */}
+                        {tent?.converted_from_cash_reserve && (
+                            <div style={{ marginTop: '1.5rem', fontSize: '0.85rem', color: '#555' }}>
+                                <ConvertedTentNotice tent={tent} />
+                            </div>
+                        )}
+
                         {/* Advanced Settings */}
                         <div style={{ borderTop: '1px solid #eee', marginTop: '1.5rem', paddingTop: '1rem' }}>
                             <button type="button" onClick={() => setShowAdvanced(!showAdvanced)}
@@ -418,9 +425,7 @@ export default function SpendingOptimizerPage() {
                             {showAdvanced && (
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', marginTop: '0.75rem' }}>
                                     <div style={{ gridColumn: '1 / -1', fontSize: '0.85rem', color: '#555' }}>
-                                        {tent?.converted_from_cash_reserve ? (
-                                            <ConvertedTentNotice tent={tent} />
-                                        ) : (
+                                        {!tent?.converted_from_cash_reserve && (
                                             <span>
                                                 Cash reserve has moved. A cash reserve is the simplest kind of bond tent: a few
                                                 years of spending held in a money market fund. Set it up under <strong>Bond tent</strong> in{' '}
