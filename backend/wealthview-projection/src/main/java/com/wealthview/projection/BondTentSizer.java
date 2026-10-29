@@ -34,14 +34,14 @@ final class BondTentSizer {
         if (shares.sum().signum() == 0) {
             throw new IllegalArgumentException("Bond tent mix has no shares: at least one maturity needs a share");
         }
-        if (!(inflationRate > -1.0)) {
+        if (isInvalidRate(inflationRate)) {
             throw new IllegalArgumentException("Inflation rate must be above -100%, got " + inflationRate);
         }
         double total = 0.0;
         for (var maturity : BondMaturity.values()) {
             double share = toDouble(shares.get(maturity));
             double nominal = toDouble(yields.get(maturity));
-            if (!(nominal > -1.0)) {
+            if (isInvalidRate(nominal)) {
                 throw new IllegalArgumentException(
                         "Bond tent " + maturity + " yield must be above -100%, got " + nominal);
             }
@@ -108,12 +108,17 @@ final class BondTentSizer {
     }
 
     private static void requireCoverageAndYield(double coverageYears, double realYield) {
-        if (!(coverageYears >= 0.0)) {
+        if (Double.isNaN(coverageYears) || coverageYears < 0.0) {
             throw new IllegalArgumentException("Bond tent coverage years must not be negative, got " + coverageYears);
         }
-        if (!(realYield > -1.0)) {
+        if (isInvalidRate(realYield)) {
             throw new IllegalArgumentException("Bond tent real yield must be above -100%, got " + realYield);
         }
+    }
+
+    /** A rate at or below -100% (or NaN) makes {@code 1 + rate} zero, negative or undefined. */
+    private static boolean isInvalidRate(double rate) {
+        return Double.isNaN(rate) || rate <= -1.0;
     }
 
     private static BondTentSizingReason largestComponent(double... components) {
