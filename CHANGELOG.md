@@ -6,6 +6,27 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.4.1] — 2026-10-29
+
+A fix release. Web sign-in now works for accounts with MFA turned on, and it
+clears the bond tent follow-ups from 1.4.0: a few error and display fixes, a
+scenario-save check, and one migration (V086). No API additions and no `wv`
+script or environment changes.
+
+### Fixed
+- **Web sign-in works for accounts with MFA turned on.** The login page used to
+  treat the server's "MFA required" reply as a successful sign-in and land on a
+  broken session. It now shows a second step that takes the 6-digit
+  authenticator code or an 8-character recovery code and finishes the login
+  through `POST /api/v1/auth/mfa/challenge`. If the step expires (after five
+  minutes) the page returns to the password form and says so, and a code in
+  neither format is rejected before it is sent. Spaces, dashes and lower case
+  are accepted.
+- The mobile app's message for an account with MFA turned on now says to sign in
+  on the web app. It used to say to turn MFA off on the web, which has no
+  setting for that.
+- A scenario whose stored parameters are malformed now opens, with the bond tent off, in both the edit form and the scenario detail page instead of failing the page.
+
 ### Changed
 - Saving a scenario with a spending profile that does not exist now returns 404. It used to save with no spending plan.
 - Bond tent sizing on the scenario form: "Why it differs from the rule of thumb" now shows for every mix, not only the plan mix.
@@ -13,15 +34,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 - Crash replay chart: years before 1954 that use long-run averages are shaded and labelled. For a scenario that is already retired, the offset-0 option and the chart line read "Today" instead of "At retirement" or "Retire <year>". The start-year error clears as soon as the input is fixed.
 - Engine robustness, with no change to projected numbers, except Monte Carlo bond tent results for scenarios whose pre-retirement withdrawals drain an account: a near-empty Monte Carlo tent is treated as empty, and negative pre-retirement contributions no longer distort the tent build-up return. Bad tent sizing inputs and replay data with no overlapping years now give clearer errors.
 
-### Fixed
-- **Web sign-in works for accounts with MFA turned on.** The login page used to
-  treat the server's "MFA required" reply as a successful sign-in and land on a
-  broken session. It now shows a second step that takes the 6-digit
-  authenticator code or an 8-character recovery code and finishes the login
-  through `POST /api/v1/auth/mfa/challenge`.
-- A scenario whose stored parameters are malformed now opens, with the bond tent off, in both the edit form and the scenario detail page instead of failing the page.
-
 ### Upgrade notes
+- `wv update` delivers this release; no `wv` script reinstall is needed.
 - Migration V086 marks optimized profiles that still carry a cash reserve as out of date. V085 converted only scenarios with an active plan, so these profiles were missed. Re-optimize them.
 
 ## [1.4.0] — 2026-10-24
@@ -915,7 +929,8 @@ First tagged release. Consolidates all development prior to the 1.0 cut.
 - Test-first workflow mandated by `CLAUDE.md`; no production code without a
   failing test.
 
-[Unreleased]: https://github.com/jakefearsd/wealthview/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/jakefearsd/wealthview/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/jakefearsd/wealthview/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/jakefearsd/wealthview/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/jakefearsd/wealthview/compare/v1.2.8...v1.3.0
 [1.2.8]: https://github.com/jakefearsd/wealthview/compare/v1.2.7...v1.2.8
