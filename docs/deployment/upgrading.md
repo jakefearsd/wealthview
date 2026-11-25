@@ -220,6 +220,10 @@ files already account for them:
 > **Never start the new `db` service and the app together on an empty volume.**
 > The app would run every migration against the empty database and start
 > serving it. Bring up `db` alone, restore, then start the app.
+>
+> In a source-tree deployment that means **no `./wv up` between pulling the
+> release and finishing step 6**: `./wv up` recreates every changed service,
+> including `db`. `./wv update` is safe, because it only replaces the app.
 
 ### Procedure (16 → 18)
 

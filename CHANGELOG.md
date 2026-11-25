@@ -6,12 +6,23 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-11-25
+
+The database moves from PostgreSQL 16 to 18.7. A major PostgreSQL version
+cannot read the previous one's data files, so existing installs move their data
+with a dump and restore. The procedure is documented and uses the existing `wv
+backup`, `wv verify` and `wv restore`. No application, API, migration or
+environment changes: the 1.5.0 app also runs on PostgreSQL 16, so you can update
+the app first and move the database when convenient.
+
 ### Changed
 - **PostgreSQL 16 → 18 (18.7).** The `db` service in both compose files now runs `postgres:18`, pinned by digest, on a new `pgdata18` volume mounted at `/var/lib/postgresql` (the 18 image moved its data directory). The integration tests, `wv verify` and the load-test stack run 18 too, and a test now fails if the test database drifts from the production major version.
 
 ### Upgrade notes
 - **This is a major database upgrade and needs a dump and restore.** An 18 server cannot read a 16 data directory, and `wv update` does not touch the database. Follow "PostgreSQL major upgrades" in `docs/deployment/upgrading.md`: stop the app, `wv backup` and `wv verify` (which now restores into 18), recreate only `db`, `wv restore`, then compare row counts.
 - Do not start the new `db` and the app together before restoring: on the new, empty volume the app would migrate a blank database and serve it.
+- **Source-tree deployments: do not run `./wv up` after pulling 1.5.0 until the database is migrated.** `./wv up` recreates every changed service, so `db` would come up on the new, empty `pgdata18` volume. `./wv update` is safe (it only replaces the app container).
+- Production hosts keep their own compose file in `/etc/wealthview`, so nothing changes for the database until you copy in the new `db` service as the procedure describes.
 - The old `pgdata` volume is left untouched as the rollback copy. Remove it with `docker volume rm wealthview_pgdata` once 18 is settled; `wv down --with-volumes` would delete `pgdata18` too.
 
 ## [1.4.2] — 2026-11-25
@@ -962,7 +973,8 @@ First tagged release. Consolidates all development prior to the 1.0 cut.
 - Test-first workflow mandated by `CLAUDE.md`; no production code without a
   failing test.
 
-[Unreleased]: https://github.com/jakefearsd/wealthview/compare/v1.4.2...HEAD
+[Unreleased]: https://github.com/jakefearsd/wealthview/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/jakefearsd/wealthview/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/jakefearsd/wealthview/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/jakefearsd/wealthview/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/jakefearsd/wealthview/compare/v1.3.0...v1.4.0
