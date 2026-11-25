@@ -6,6 +6,31 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.4.2] — 2026-11-25
+
+A security release. It upgrades the libraries and base images behind the
+running app to clear published vulnerabilities, four of them critical in the
+embedded Tomcat web server. No feature, API, migration, environment or `wv`
+script changes.
+
+### Security
+- Spring Boot 4.1.1 → 4.2.0, which brings:
+  - Tomcat 11.0.27: fixes four critical advisories, including authentication bypasses in DIGEST and FORM login and an HTTP/2 SNI validation bypass. WealthView does not use those login methods, but the fixes are in the server it ships.
+  - Jackson 2.21.8 and 3.1.8: fixes several high-severity denial-of-service issues in JSON parsing.
+  - OpenTelemetry 1.68: fixes a CPU-exhaustion issue when parsing an incoming tracing header.
+- The runtime image moves to Java 25.0.5.1 (the October 2026 Java security update) on Alpine 3.24.4.
+- PostgreSQL 16.15 → 16.16 in both compose files.
+- Web build and test tooling: 17 npm advisories cleared (none of these packages ship in the app bundle served to browsers).
+
+### Changed
+- Flyway 13.10.3 → 13.13.0. Existing migrations are unchanged and replay cleanly.
+- Optional observability overlay: Prometheus 3.16.0 and Grafana 13.3.2.
+- Mobile app: React Native 0.88.1.
+
+### Upgrade notes
+- `wv update` delivers this release; no `wv` script reinstall is needed.
+- `wv update` replaces only the app container, so the database stays on its current image until you move it. To take PostgreSQL 16.16, copy the `db` service's new `image:` line from this release's `docker-compose.prod.yml` into your host's compose file (`WV_COMPOSE_FILE`, typically `/etc/wealthview/docker-compose.prod.yml`), take a backup with `wv backup`, then recreate the container with `docker compose -p wealthview -f /etc/wealthview/docker-compose.prod.yml --env-file /etc/wealthview/.env up -d db`. 16.15 → 16.16 is a minor release: the data directory is reused as-is, with no dump or restore.
+
 ## [1.4.1] — 2026-10-29
 
 A fix release. Web sign-in now works for accounts with MFA turned on, and it
@@ -929,7 +954,8 @@ First tagged release. Consolidates all development prior to the 1.0 cut.
 - Test-first workflow mandated by `CLAUDE.md`; no production code without a
   failing test.
 
-[Unreleased]: https://github.com/jakefearsd/wealthview/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/jakefearsd/wealthview/compare/v1.4.2...HEAD
+[1.4.2]: https://github.com/jakefearsd/wealthview/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/jakefearsd/wealthview/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/jakefearsd/wealthview/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/jakefearsd/wealthview/compare/v1.2.8...v1.3.0
