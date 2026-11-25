@@ -195,6 +195,83 @@ not find it locally and will try to pull after all.
 
 ---
 
+## PostgreSQL major upgrades
+
+`wv update` only replaces the app container; it never touches the `db` service.
+A **minor** PostgreSQL update (16.15 → 16.16) is just a new `image:` line and
+`docker compose up -d db`. The data directory is reused as-is.
+
+A **major** upgrade (16 → 18) is different: a PostgreSQL 18 server cannot open
+a 16 data directory. The data moves by dump and restore into a fresh cluster on
+a new volume. The compose files do this with a separate volume per major
+(`pgdata` held 16; `pgdata18` holds 18), so the old cluster is never modified
+and stays available as the rollback copy.
+
+Two layout changes come with the PostgreSQL 18 image, and the shipped compose
+files already account for them:
+
+- `PGDATA` moved to `/var/lib/postgresql/18/docker` and the image declares its
+  `VOLUME` at `/var/lib/postgresql`. The volume must be mounted at
+  `/var/lib/postgresql`. The old `/var/lib/postgresql/data` mount no longer
+  works.
+- `wv verify` launches a throwaway `postgres:18`, so verifying a 16-era dump
+  is also a dry run of the restore into 18.
+
+> **Never start the new `db` service and the app together on an empty volume.**
+> The app would run every migration against the empty database and start
+> serving it. Bring up `db` alone, restore, then start the app.
+
+### Procedure (16 → 18)
+
+Run from the source tree, or with `sudo wv` and the compose file in
+`/etc/wealthview` on a production host. Commands that name the compose project
+assume the default `wealthview`; add `-f /etc/wealthview/docker-compose.prod.yml
+--env-file /etc/wealthview/.env` on a production host.
+
+```bash
+# 1. Stop the app first, so nothing writes after the dump.
+docker compose -p wealthview stop app
+
+# 2. Back up the 16 database and prove the dump restores into PostgreSQL 18.
+./wv backup
+./wv verify backups/wealthview_<ts>.dump       # throwaway postgres:18
+
+# 3. Record exact per-table row counts to compare against after the restore.
+docker exec wealthview-db-1 psql -U wv_app -d wealthview -tA -c \
+  "SELECT format('SELECT %L, count(*) FROM %I;', relname, relname) FROM pg_stat_user_tables ORDER BY 1" \
+  | docker exec -i wealthview-db-1 psql -U wv_app -d wealthview -tA > counts-16.txt
+
+# 4. Switch to the new db service definition. In the source tree, pull the
+#    release. On a production host, copy the db service (image, the
+#    pgdata18:/var/lib/postgresql mount) and the top-level volumes block from
+#    this release's docker-compose.prod.yml into /etc/wealthview.
+
+# 5. Recreate ONLY db. It initialises an empty 18 cluster in pgdata18.
+docker compose -p wealthview up -d --no-deps db
+docker exec wealthview-db-1 psql -U wv_app -d wealthview -tAc "SHOW server_version"
+
+# 6. Restore the dump. This prompts, restores, then starts the app and waits
+#    for the health check.
+./wv restore backups/wealthview_<ts>.dump
+
+# 7. Compare. pg_restore errors are reported as warnings, so do not skip this.
+docker exec wealthview-db-1 psql -U wv_app -d wealthview -tA -c \
+  "SELECT format('SELECT %L, count(*) FROM %I;', relname, relname) FROM pg_stat_user_tables ORDER BY 1" \
+  | docker exec -i wealthview-db-1 psql -U wv_app -d wealthview -tA > counts-18.txt
+diff counts-16.txt counts-18.txt
+```
+
+**Rollback.** Put the 16 `db` service definition back (image and the
+`pgdata:/var/lib/postgresql/data` mount), then run `docker compose -p wealthview
+up -d --no-deps db` and start the app. The `pgdata` volume was never written
+by 18, so it comes back exactly as it was at step 2.
+
+**Cleanup.** Once you trust 18, remove the old cluster with
+`docker volume rm wealthview_pgdata`. Do not run `./wv down --with-volumes`
+for this: it deletes `pgdata18` as well.
+
+---
+
 ## How Flyway Migrations Work
 
 WealthView uses [Flyway](https://flywaydb.org/) for database schema management.

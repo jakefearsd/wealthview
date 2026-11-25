@@ -118,7 +118,7 @@ fork or mirror needs `docker login ghcr.io` with a `read:packages` token before
 | `backup` | `pg_dump -Fc`. `--encrypt` `--remote` `--label TEXT` `--dry-run` |
 | `backups` (`list-backups`) | List backups with size + age |
 | `restore <file>` | `pg_restore --clean --if-exists`. `--dry-run` |
-| `verify <file>` | Round-trip a dump through a throwaway `postgres:16` |
+| `verify <file>` | Round-trip a dump through a throwaway `postgres:18` |
 | `update` | Backup → pull (dev: build) → swap → health-check → auto-rollback. `--no-pull` `--build` `--no-rollback` (`--no-build` is a deprecated alias for `--no-pull`) |
 | `rollback` | Revert the app to the image recorded by the last `update`; re-pins `WEALTHVIEW_IMAGE` and `WEALTHVIEW_VERSION` |
 | `migrate-out` | Build a portable bundle. `--dest DIR` `--no-encrypt` |
@@ -358,7 +358,7 @@ A backup that can't be restored is worse than no backup. Verify periodically:
 ./wv verify backups/wealthview_<ts>.dump
 ```
 
-`verify` spins up a throwaway `postgres:16` container with a unique random
+`verify` spins up a throwaway `postgres:18` container with a unique random
 password, restores the backup into it, runs sanity queries (top five tables by
 row count, then the total `public` table count), then tears the container and
 its volume down. It fails if no user tables are present or if fewer than five
@@ -470,7 +470,7 @@ Each rotation:
      available; otherwise it warns and restarts the app so
      `SuperAdminInitializer` syncs the new value at boot.
    - `DB_PASSWORD` — runs `ALTER USER wv_app WITH PASSWORD …` against the live
-     database first, then restarts the app. (The `pgdata` volume is initialised
+     database first, then restarts the app. (The `pgdata18` volume is initialised
      once with the original password; this is what keeps `.env` and the role in
      sync.)
 4. Waits for the health check and prompts you to take a fresh backup so

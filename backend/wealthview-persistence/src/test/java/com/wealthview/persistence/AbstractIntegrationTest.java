@@ -20,7 +20,7 @@ public abstract class AbstractIntegrationTest {
     static final PostgreSQLContainer POSTGRES;
 
     static {
-        POSTGRES = new PostgreSQLContainer("postgres:16")
+        POSTGRES = new PostgreSQLContainer("postgres:18")
                 .withDatabaseName("wealthview_test")
                 .withUsername("test")
                 .withPassword("test");

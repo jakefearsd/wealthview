@@ -178,7 +178,7 @@ class AccountControllerTest {
 mvn -pl wealthview-persistence test -Dtest=AccountRepositoryIntegrationTest
 ```
 
-Testcontainers spins up a real PostgreSQL 16 container. H2 is never used — it masks
+Testcontainers spins up a real PostgreSQL 18 container. H2 is never used — it masks
 PostgreSQL-specific behaviour. Extend `com.wealthview.persistence.AbstractIntegrationTest`, which
 owns the shared container (started once in a static initialiser, so it is reused across every test
 class in the same JVM) and wires it in via `@DynamicPropertySource`:

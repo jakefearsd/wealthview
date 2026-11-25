@@ -19,7 +19,7 @@ root builds the Vite/React frontend on `node:24-alpine`, builds the Maven
 backend on `maven:3.9-eclipse-temurin-25`, and ships a runtime layer of
 `eclipse-temurin:25-jre-alpine` that serves both the API and the built SPA from
 a single Spring Boot process on container port 8080, as the non-root user `wv`.
-All three base images are pinned by digest. PostgreSQL 16 (also digest-pinned)
+All three base images are pinned by digest. PostgreSQL 18 (also digest-pinned)
 holds all state; Flyway runs schema migrations at app start, so there is never
 a manual SQL step.
 
@@ -28,7 +28,7 @@ a manual SQL step.
 production host needs Docker, the compose file, the env file and registry
 access — no source tree and no JDK.
 
-Stack: Java 25, Spring Boot 4.2, Hibernate 7, PostgreSQL 16, React 19, Vite,
+Stack: Java 25, Spring Boot 4.2, Hibernate 7, PostgreSQL 18, React 19, Vite,
 PostgreSQL JDBC + Flyway 13. Latest released version: **v1.4.2**.
 
 Three Compose files live at the repo root:

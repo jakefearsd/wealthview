@@ -131,7 +131,7 @@ Services and URLs:
 The k6 container sits behind a compose profile (`--profile k6`) so it only
 runs when `run.sh` invokes it, and never as part of `up`.
 
-Everything except the DB image (`postgres:16`) tracks `:latest` — Prometheus,
+Everything except the DB image (`postgres:18`) tracks `:latest` — Prometheus,
 Grafana, Pyroscope and k6 will drift over time. Pin them in
 `docker-compose.loadtest.yml` if you need two runs months apart to be
 comparable.

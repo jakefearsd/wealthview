@@ -60,7 +60,7 @@ what the code actually does — anything not yet built is confined to the
 | HTTP Client    | Axios                                                   |
 | Backend        | Java 25, Spring Boot 4.2, Spring Web MVC, Jackson 3      |
 | Build          | Maven (multi-module backend), npm workspaces (JS)       |
-| ORM / DB       | Spring Data JPA (Hibernate 7), PostgreSQL 16+, Flyway 13 |
+| ORM / DB       | Spring Data JPA (Hibernate 7), PostgreSQL 18+, Flyway 13 |
 | Auth           | Spring Security, JWT access + refresh tokens, TOTP MFA, bcrypt |
 | Caching        | Caffeine (account balances, latest prices, exchange rates, mobile app versions) |
 | Scheduling     | Spring @Scheduled (cron expressions)                    |

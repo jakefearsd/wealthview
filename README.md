@@ -188,7 +188,7 @@ run `./wv update`, which pulls the published image.
 | Frontend  | React 19.2, TypeScript 5.9, Vite 8, React Router 8, Recharts 3, Axios |
 | Mobile    | React Native 0.87, React Navigation 7                     |
 | Backend   | Java 25, Spring Boot 4.2, Spring Security, JPA/Hibernate 7, Jackson 3 |
-| Database  | PostgreSQL 16 with Flyway 13 migrations                   |
+| Database  | PostgreSQL 18 with Flyway 13 migrations                   |
 | Caching   | Caffeine (account balances, latest prices, exchange rates) |
 | Build     | Maven multi-module (backend), npm workspaces (shared, frontend, mobile) |
 | Testing   | JUnit 5, Mockito, AssertJ, Testcontainers, Vitest 5, Playwright (e2e), Jest (mobile) |

@@ -21,7 +21,7 @@ React SPA  <-->  Spring Boot REST API  <-->  PostgreSQL
 | Frontend  | React 19, TypeScript, Vite, React Router 8, Recharts, Axios |
 | Backend   | Java 25, Spring Boot 4.2.0, Spring Security, Spring Data JPA / Hibernate 7 |
 | JSON      | Jackson 3 (`tools.jackson.*`; annotations remain `com.fasterxml.jackson.annotation`) |
-| Database  | PostgreSQL 16 with Flyway 13 migrations                   |
+| Database  | PostgreSQL 18 with Flyway 13 migrations                   |
 | Build     | Maven multi-module (backend), npm workspaces (frontend, mobile, shared) |
 | Testing   | JUnit 5, Mockito, AssertJ, Testcontainers, Vitest, React Testing Library |
 | Analysis  | Checkstyle, SpotBugs, PMD, CPD, JaCoCo                    |
@@ -279,7 +279,7 @@ wealthview/
 ## Testing Conventions Worth Knowing
 
 - Controller slice tests use `@WebMvcTest` with **`@MockitoBean`** — `@MockBean` was removed in Spring Boot 4 and appears nowhere in the tree.
-- Repository and API integration tests use Testcontainers with PostgreSQL 16; H2 is never used.
+- Repository and API integration tests use Testcontainers with PostgreSQL 18; H2 is never used.
 - `wealthview-app` holds ~50 `*IT.java` Failsafe integration tests that drive real HTTP against a fully started app.
 
 ## Further Reading

@@ -5,7 +5,7 @@
 # it also runs on the wv_die paths.
 
 # Postgres image used for verification — keep aligned with docker-compose.yml.
-WV_VERIFY_PG_IMAGE="postgres:16"
+WV_VERIFY_PG_IMAGE="postgres:18"
 
 wv_verify() {
     local file=""
@@ -61,7 +61,7 @@ USAGE
 
     # Registered BEFORE `docker run` so a half-created container is still reaped
     # when the launch itself fails and wv_die fires. `-v` is not optional:
-    # postgres:16 declares VOLUME /var/lib/postgresql/data, and `docker rm -f`
+    # postgres:18 declares VOLUME /var/lib/postgresql, and `docker rm -f`
     # without it strands that anonymous volume — a full copy of the restored
     # database — even for a container started with --rm. This used to be a
     # RETURN trap, which `exit` (and therefore wv_die) never runs, so the

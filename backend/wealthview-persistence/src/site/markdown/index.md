@@ -7,7 +7,7 @@ migration history.
 No business logic lives here. Entities are **never** passed beyond `wealthview-core` boundaries —
 service methods map them to DTOs (records) before returning.
 
-Runs on Hibernate 7 via the Spring Boot 4.2 BOM, against PostgreSQL 16 with Flyway 13.
+Runs on Hibernate 7 via the Spring Boot 4.2 BOM, against PostgreSQL 18 with Flyway 13.
 `ddl-auto` is `validate` and `open-in-view` is `false`: Flyway owns the schema outright.
 
 ---
@@ -161,7 +161,7 @@ reference data sets.
 
 ## Test Setup
 
-Integration tests use **Testcontainers** with a real PostgreSQL 16 container. H2 is never used.
+Integration tests use **Testcontainers** with a real PostgreSQL 18 container. H2 is never used.
 Tests extend `com.wealthview.persistence.AbstractIntegrationTest` to share the container
 instance across test classes in the same JVM, avoiding repeated startup overhead. Flyway runs
 against the container, so every test also exercises migration correctness.

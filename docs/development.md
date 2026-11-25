@@ -147,7 +147,7 @@ mvn test -Dtest="AccountServiceTest#methodName"
 **Test infrastructure:**
 
 - Unit tests use JUnit 5 + Mockito with AssertJ assertions
-- Integration tests use Testcontainers with PostgreSQL 16 (never H2)
+- Integration tests use Testcontainers with PostgreSQL 18 (never H2)
 - Failsafe in `wealthview-app` matches `**/*IT.java` and forces `spring.profiles.active=it`
 - The `wealthview-app` module holds **50 `*IT.java` classes** covering the HTTP API, auth/transport
   boundaries, tenant isolation, fuzzing, stock splits and metrics

@@ -4,7 +4,7 @@
 
 WealthView is a self-hosted, multi-tenant personal finance app (investments, rental properties, retirement projections). See PROJECT.md for full architecture, data model, and feature roadmap.
 
-**Tech stack:** Java 25 / Spring Boot 4.2 / Maven multi-module backend, React 19 / Vite frontend, PostgreSQL 16+, Docker Compose deployment.
+**Tech stack:** Java 25 / Spring Boot 4.2 / Maven multi-module backend, React 19 / Vite frontend, PostgreSQL 18+, Docker Compose deployment.
 
 **Monorepo layout:**
 - `backend/` — Maven multi-module: wealthview-api, wealthview-core, wealthview-persistence, wealthview-import, wealthview-projection, wealthview-app
@@ -118,7 +118,7 @@ If you catch yourself writing production code first, stop, delete it, write the 
 - Test both happy path and error paths (400, 401, 403, 404).
 
 ### Repository / Integration Tests
-- Use **Testcontainers** with PostgreSQL 16. Never use H2 — it masks PostgreSQL-specific behavior.
+- Use **Testcontainers** with PostgreSQL 18. Never use H2 — it masks PostgreSQL-specific behavior.
 - Annotate with `@DataJpaTest` + `@Testcontainers` + `@AutoConfigureTestDatabase(replace = NONE)`.
 - Flyway migrations run automatically against the Testcontainers instance.
 - Test custom queries, not Spring Data's auto-generated CRUD.
@@ -273,7 +273,7 @@ and `guardrail_profile` (summary) so the UI can display whichever is active.
 
 ---
 
-## Database Conventions (PostgreSQL 16+)
+## Database Conventions (PostgreSQL 18+)
 
 ### Naming
 - **Tables:** `snake_case`, plural: `accounts`, `holdings`, `property_expenses`.

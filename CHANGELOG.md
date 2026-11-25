@@ -6,6 +6,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **PostgreSQL 16 → 18 (18.7).** The `db` service in both compose files now runs `postgres:18`, pinned by digest, on a new `pgdata18` volume mounted at `/var/lib/postgresql` (the 18 image moved its data directory). The integration tests, `wv verify` and the load-test stack run 18 too, and a test now fails if the test database drifts from the production major version.
+
+### Upgrade notes
+- **This is a major database upgrade and needs a dump and restore.** An 18 server cannot read a 16 data directory, and `wv update` does not touch the database. Follow "PostgreSQL major upgrades" in `docs/deployment/upgrading.md`: stop the app, `wv backup` and `wv verify` (which now restores into 18), recreate only `db`, `wv restore`, then compare row counts.
+- Do not start the new `db` and the app together before restoring: on the new, empty volume the app would migrate a blank database and serve it.
+- The old `pgdata` volume is left untouched as the rollback copy. Remove it with `docker volume rm wealthview_pgdata` once 18 is settled; `wv down --with-volumes` would delete `pgdata18` too.
+
 ## [1.4.2] — 2026-11-25
 
 A security release. It upgrades the libraries and base images behind the

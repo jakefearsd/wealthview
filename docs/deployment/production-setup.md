@@ -54,7 +54,7 @@ You will add a proxy (or a Cloudflare Tunnel) in a separate, later step.
 
 | Container | Role |
 |-----------|------|
-| **db** | PostgreSQL 16, image pinned by digest. Data lives in the named Docker volume `pgdata`. **No host port published** (unlike the dev compose file, which publishes 5433). |
+| **db** | PostgreSQL 18, image pinned by digest. Data lives in the named Docker volume `pgdata18`, mounted at `/var/lib/postgresql` (the PostgreSQL 18 image layout). The older `pgdata` volume holds the pre-18 cluster and is unused. **No host port published** (unlike the dev compose file, which publishes 5433). |
 | **app** | Spring Boot application serving the API and the React SPA at `/`. Image is `${WEALTHVIEW_IMAGE:-ghcr.io/jakefearsd/wealthview}:${WEALTHVIEW_VERSION}` — `WEALTHVIEW_VERSION` is mandatory, and the compose file rejects an empty value with an explicit error. Publishes `${APP_PORT:-80}:8080` on the host — this is what your edge proxy or Cloudflare Tunnel points at. Runs as the non-root user `wv` with a container-level HEALTHCHECK against `/actuator/health`. |
 | **backup** | Alpine 3.20 container with `postgresql16-client`, running `crond`. Executes `pg_dump -Fc` at **03:00 daily** (container timezone, UTC by default) into a `backups/` directory bind-mounted next to the compose file. Prunes dumps older than `BACKUP_RETENTION_DAYS` (default 14). |
 
@@ -483,7 +483,7 @@ docker compose -f docker-compose.prod.yml exec backup /backup.sh
 ./wv verify backups/wealthview_<ts>_first-run.dump
 ```
 
-`./wv verify` restores the dump into a throwaway `postgres:16` container with a
+`./wv verify` restores the dump into a throwaway `postgres:18` container with a
 random password, runs sanity queries, and tears it down — it never touches the
 live database. Schedule it weekly.
 
@@ -728,7 +728,7 @@ is up and running:
 ```bash
 # Lifecycle
 ./wv up                     # start, wait for health (prod: builds only the backup sidecar)
-./wv down                   # stop; preserve the pgdata volume
+./wv down                   # stop; preserve the pgdata18 volume
 ./wv restart                # down then up
 ./wv status                 # compose ps + one-shot health probe
 ./wv logs app               # tail one service (--tail N, --no-follow)
@@ -764,7 +764,8 @@ is up and running:
 | `./infra/backup/` | `Dockerfile` + `backup.sh` + `restore.sh` + `crontab` for the backup container. Tracked in the repo. |
 | `./infra/observability/` | Prometheus config + rules and Grafana provisioning/dashboards. |
 | `./.wv-previous-image` | Full image reference (`repository:tag`) recorded by `wv update` for `wv rollback`. Path overridable via `WV_PREVIOUS_IMAGE_FILE`. |
-| `pgdata` (named volume) | PostgreSQL data directory. Survives `./wv down`; destroyed by `./wv down --with-volumes`. |
+| `pgdata18` (named volume) | PostgreSQL 18 data directory, mounted at `/var/lib/postgresql`. Survives `./wv down`; destroyed by `./wv down --with-volumes`. |
+| `pgdata` (named volume) | The pre-18 (PostgreSQL 16) cluster, unused since the 18 upgrade and kept only as a rollback copy. Also destroyed by `./wv down --with-volumes`; remove it on its own with `docker volume rm wealthview_pgdata` once 18 is settled. |
 | Container `8080` | Spring Boot HTTP listener. Mapped to host `${APP_PORT}` (default 80) by the prod compose file, and to host 80 unconditionally by the dev one. |
 | Container `5432` | PostgreSQL. **Not published** by `docker-compose.prod.yml`; published as host 5433 by `docker-compose.yml`. |
 

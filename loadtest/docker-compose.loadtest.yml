@@ -2,7 +2,7 @@ name: wealthview-loadtest
 
 services:
   loadtest-db:
-    image: postgres:16
+    image: postgres:18
     environment:
       POSTGRES_DB: wealthview_loadtest
       POSTGRES_USER: wv_loadtest
@@ -10,7 +10,7 @@ services:
     ports:
       - "5434:5432"
     volumes:
-      - loadtest-db-data:/var/lib/postgresql/data
+      - loadtest-db-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U wv_loadtest -d wealthview_loadtest"]
       interval: 3s

@@ -164,7 +164,7 @@ The default Compose setup runs two containers:
 
 | Container | Role |
 |-----------|------|
-| **db** | PostgreSQL 16 (image pinned by digest). Data persists in the named Docker volume `pgdata`. Published on host port **5433**. |
+| **db** | PostgreSQL 18 (image pinned by digest). Data persists in the named Docker volume `pgdata18`. Published on host port **5433**. |
 | **app** | Spring Boot application serving both the API and the built React SPA. Container port 8080, published on host port **80**. |
 
 The image is built by the multi-stage `Dockerfile` at the repo root: Node 24
@@ -198,7 +198,7 @@ For an interactive shell inside the container:
 ## Stopping / restarting
 
 ```bash
-./wv down                   # stop everything, preserve the pgdata volume
+./wv down                   # stop everything, preserve the pgdata18 volume
 ./wv down --with-volumes    # DESTROY the database volume (prompts first)
 ./wv restart                # down, then up (volumes preserved)
 ./wv up                     # rebuild and restart after a code change

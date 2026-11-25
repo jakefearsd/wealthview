@@ -19,7 +19,7 @@
     <description>
         Self-hosted, multi-tenant personal finance platform covering investment portfolio monitoring,
         rental property tracking, and tax-aware retirement projection modeling.
-        Built on Java 25 / Spring Boot 4.1 / PostgreSQL 16.
+        Built on Java 25 / Spring Boot 4.2 / PostgreSQL 18.
     </description>
     <url>https://github.com/jakefearsd/wealthview</url>
     <inceptionYear>2024</inceptionYear>
@@ -93,7 +93,7 @@
              set no init-sqls in any profile). v13's new Java 21 floor is satisfied by our
              Java 25 toolchain. It is validated end-to-end by FlywayMigrationIntegrationTest
              plus every Testcontainers slice, all of which replay the full 89-migration
-             history against a real PostgreSQL 16 on each run.
+             history against a real PostgreSQL 18 on each run.
 
              Deliberately NOT overridden: opentelemetry (micrometer-tracing-bridge-otel is
              compiled against a BOM-pinned OTel API, and a mismatch shows up at prod runtime

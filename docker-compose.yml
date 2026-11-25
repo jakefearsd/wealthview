@@ -1,7 +1,7 @@
 services:
   db:
-    # Pinned by digest (postgres:16, server version 16.16 at time of pin).
-    image: postgres:16@sha256:07abc3f43c9395b0bdbbab36bc25ddb0e8d83cd4fcafb5fb7d6abe14ff156dd8
+    # Pinned by digest (postgres:18, server version 18.7 at time of pin).
+    image: postgres:18@sha256:c699303802144847d238196173655dbbecf7a96aeca1565f2b02eb671a1f0b6b
     environment:
       POSTGRES_DB: wealthview
       POSTGRES_USER: wv_app
@@ -9,7 +9,15 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # PostgreSQL 18 images keep PGDATA at /var/lib/postgresql/18/docker and
+      # declare the VOLUME one level up, so the mount is /var/lib/postgresql (a
+      # mount at .../data, the 16-and-older layout, no longer works).
+      #
+      # pgdata18, not pgdata: an 18 server cannot open a 16 data directory, so
+      # the major upgrade is dump + restore into a fresh volume. The old
+      # `pgdata` volume is left untouched as the rollback copy. See
+      # docs/deployment/upgrading.md, "PostgreSQL major upgrades".
+      - pgdata18:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U wv_app -d wealthview"]
       interval: 5s
@@ -40,4 +48,8 @@ services:
       retries: 3
 
 volumes:
+  # Holds the PostgreSQL 16 cluster from before the 18 upgrade. Unused by any
+  # service; kept so a rollback (or a re-run of the dump) is still possible.
+  # Remove it with `docker volume rm <project>_pgdata` once 18 is settled.
   pgdata:
+  pgdata18:

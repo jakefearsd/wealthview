@@ -228,7 +228,7 @@ without touching production data:
 What it does:
 
 1. Decrypts the file first if it ends in `.age` (needs `BACKUP_ENCRYPTION_KEY_FILE`).
-2. Launches a throwaway `postgres:16` container with a random name and password.
+2. Launches a throwaway `postgres:18` container with a random name and password.
 3. Waits up to 30s for it to accept connections.
 4. Runs `pg_restore --clean --if-exists` into it.
 5. Prints the top 5 tables by live row count, then asserts at least 5 public tables exist.

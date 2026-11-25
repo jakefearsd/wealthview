@@ -29,13 +29,13 @@ households (tenants), each with fully isolated data.
 | Frontend | React 19, Vite, TypeScript, Recharts, Axios |
 | Backend | Java 25, Spring Boot 4.2.0, Spring Security, Spring Data JPA |
 | JSON | Jackson 3 (`tools.jackson.*`; annotations stay `com.fasterxml.jackson.annotation`) |
-| Database | PostgreSQL 16, Flyway 13 (81 versioned + 9 repeatable migrations), Hibernate 7 |
+| Database | PostgreSQL 18, Flyway 13 (81 versioned + 9 repeatable migrations), Hibernate 7 |
 | Auth | JWT bearer tokens + CSRF-protected cookies, bcrypt (strength 12), TOTP MFA, invite-code registration |
 | Import | Apache Commons CSV 1.14.1, OFX4J 1.39, jsoup 1.23.1 |
 | Caching | Caffeine 3.2.4 — five named caches, Micrometer-instrumented |
 | Scheduling | Spring `@Scheduled` — weekday price sync, nightly stock-split sync, weekly Zillow valuation |
 | Observability | Micrometer + Prometheus, OpenTelemetry tracing bridge, JSON logging via logstash-logback-encoder |
-| Testing | JUnit 5, Mockito (`@MockitoBean`), AssertJ, Testcontainers 2.0.5 (PostgreSQL 16) |
+| Testing | JUnit 5, Mockito (`@MockitoBean`), AssertJ, Testcontainers 2.0.5 (PostgreSQL 18) |
 | Build | Maven (multi-module), Node 24 / npm workspaces |
 | Deployment | Docker Compose (single fat JAR + PostgreSQL) |
 

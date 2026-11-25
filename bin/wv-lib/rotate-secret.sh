@@ -18,7 +18,7 @@ Supported NAME values:
                            takes effect immediately.
     DB_PASSWORD            24-char base64. Updated in .env AND in PostgreSQL
                            via ALTER USER, then the app restarts.
-                           NOTE: pgdata is initialised once with the original
+                           NOTE: the db volume is initialised once with the original
                            password; this command keeps both in sync.
 
 OPTIONS
