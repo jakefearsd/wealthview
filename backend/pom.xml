@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.1</version>
+        <version>4.2.0</version>
         <relativePath/>
     </parent>
 
@@ -75,10 +75,10 @@
         <jjwt.version>0.13.0</jjwt.version>
         <commons-csv.version>1.14.1</commons-csv.version>
         <ofx4j.version>1.39</ofx4j.version>
-        <jsoup.version>1.23.2</jsoup.version>
+        <jsoup.version>1.24.1</jsoup.version>
         <caffeine.version>3.3.1</caffeine.version>
         <samstevens-totp.version>1.7.1</samstevens-totp.version>
-        <guava.version>33.7.2-jre</guava.version>
+        <guava.version>33.8.0-jre</guava.version>
         <jsonassert.version>1.5.3</jsonassert.version>
         <logstash-logback-encoder.version>9.0</logstash-logback-encoder.version>
         <!-- Spring Boot BOM overrides. These artifacts are declared without a <version>
@@ -87,7 +87,7 @@
              documented mechanism). The earlier postgresql and httpclient5 patch overrides
              were dropped at Boot 4.1.1, whose BOM caught up to (and passed) them.
 
-             flyway 12.4.0 -> 13.x is a MAJOR (Boot 4.1.1 still pins 12.4.0). Its two documented breaking changes do not
+             flyway 12.x -> 13.x is a MAJOR (Boot 4.2.0 still pins 12.11.0). Its two documented breaking changes do not
              reach us: the createSchema -> beforeCreateSchema callback rename (we ship no
              callbacks at all, only V__/R__ migrations) and initSQL -> afterConnect.sql (we
              set no init-sqls in any profile). v13's new Java 21 floor is satisfied by our
@@ -98,11 +98,11 @@
              Deliberately NOT overridden: opentelemetry (micrometer-tracing-bridge-otel is
              compiled against a BOM-pinned OTel API, and a mismatch shows up at prod runtime
              rather than in tests, which is exactly why green tests are not reassurance). -->
-        <flyway.version>13.10.3</flyway.version>
+        <flyway.version>13.13.0</flyway.version>
         <!-- Quality tool versions -->
         <spotbugs-maven-plugin.version>4.10.5.0</spotbugs-maven-plugin.version>
         <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
-        <jacoco-plugin.version>0.8.15</jacoco-plugin.version>
+        <jacoco-plugin.version>0.8.16</jacoco-plugin.version>
         <pmd-plugin.version>3.28.0</pmd-plugin.version>
         <!-- Quality-tool CORE versions overridden to Java-25-capable releases.
              Plugin versions stay; only the analysis engine they embed is pinned.
@@ -115,13 +115,13 @@
              ignored - but forcing PMD core 7.26.0 surfaced 4 new rule violations
              that 7.17.0 doesn't flag, so the override was reverted rather than
              fixing unrelated findings as a side effect of a build-tooling commit.) -->
-        <checkstyle.core.version>14.3.0</checkstyle.core.version>
+        <checkstyle.core.version>14.4.0</checkstyle.core.version>
         <!-- Site tool versions -->
         <maven-site-plugin.version>4.0.0-M16</maven-site-plugin.version>
         <project-info-reports-plugin.version>3.9.0</project-info-reports-plugin.version>
         <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
-        <maven-surefire-report-plugin.version>3.6.0</maven-surefire-report-plugin.version>
-        <versions-maven-plugin.version>2.23.0</versions-maven-plugin.version>
+        <maven-surefire-report-plugin.version>3.6.1</maven-surefire-report-plugin.version>
+        <versions-maven-plugin.version>2.25.3</versions-maven-plugin.version>
         <!-- JaCoCo coverage gate thresholds (jacoco:check on the verify phase).
              Defaults are conservative; each gated module overrides these in its
              own <properties> block. LINE minimums track the CLAUDE.md targets;
@@ -377,7 +377,7 @@
                 <plugin>
                     <groupId>org.pitest</groupId>
                     <artifactId>pitest-maven</artifactId>
-                    <version>1.30.1</version>
+                    <version>1.30.2</version>
                     <dependencies>
                         <dependency>
                             <groupId>org.pitest</groupId>
