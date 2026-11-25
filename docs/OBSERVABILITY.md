@@ -365,7 +365,7 @@ docker compose -f docker-compose.prod.yml \
                up -d
 ```
 
-Images are pinned: `prom/prometheus:v3.15.0` and `grafana/grafana:13.2.4`.
+Images are pinned: `prom/prometheus:v3.16.0` and `grafana/grafana:13.3.2`.
 Both services are `restart: unless-stopped`.
 
 ### Required env vars

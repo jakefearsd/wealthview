@@ -661,7 +661,7 @@ Sundays in the container's timezone (UTC unless you change it).
 
 ## Optional: observability stack
 
-`docker-compose.observability.yml` layers Prometheus 3.15.0 and Grafana 13.2.4
+`docker-compose.observability.yml` layers Prometheus 3.16.0 and Grafana 13.3.2
 on top of the production stack:
 
 ```bash

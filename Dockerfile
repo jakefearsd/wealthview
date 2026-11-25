@@ -1,9 +1,9 @@
 # Stage 1: Build frontend
-# Pinned by digest (node:24-alpine, NODE_VERSION=24.22.0 at time of pin).
+# Pinned by digest (node:24-alpine, NODE_VERSION=24.22.3 at time of pin).
 # Moved off the node:20 line in 2026-08: Node 20 reached end-of-life in April 2026
 # and stopped receiving security patches. 24.x is the current Active LTS line.
 # To upgrade: `docker pull node:<tag>` then `docker inspect --format='{{index .RepoDigests 0}}' node:<tag>`.
-FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS frontend-build
+FROM node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS frontend-build
 WORKDIR /app
 # Workspace manifests — must all be present for `npm ci` to resolve the
 # workspace topology even though we only build frontend in this stage.
@@ -38,10 +38,10 @@ COPY backend backend
 RUN cd backend && mvn clean package -DskipTests -q
 
 # Stage 3: Runtime
-# Pinned by digest (eclipse-temurin:25-jre-alpine, JDK 25.0.4.1+1 at time of pin).
+# Pinned by digest (eclipse-temurin:25-jre-alpine, JDK 25.0.5.1+2 at time of pin).
 # To upgrade: `docker pull eclipse-temurin:25-jre-alpine` then
 # `docker inspect --format='{{index .RepoDigests 0}}' eclipse-temurin:25-jre-alpine`.
-FROM eclipse-temurin:25-jre-alpine@sha256:3c0a9084927a221ccd1d007fcaf614465672c0af37aaa834c5184483afe56d61
+FROM eclipse-temurin:25-jre-alpine@sha256:69c2a26e9894016e274c880fa542956d005b3755f84db765145185e87405bd89
 WORKDIR /app
 # `wv prune` scopes itself to this project by filtering on this label, so it can
 # reclaim orphaned dev-rebuild images without touching other projects sharing the
