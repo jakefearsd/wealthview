@@ -10,7 +10,9 @@ public record NotificationPreferenceRequest(
         // does NOT cascade into a collection's elements without it. Without the cascade a null
         // "enabled" reached NotificationPreferenceService and auto-unboxed into the entity's
         // primitive boolean, surfacing a malformed request as a 500 instead of a 400.
-        @NotNull @Valid List<PreferenceItem> preferences
+        // It sits on the type argument, not the List: Hibernate Validator 9.1.6 deprecates
+        // container-level @Valid (HV000271).
+        @NotNull List<@Valid PreferenceItem> preferences
 ) {
     public record PreferenceItem(
             @NotNull String notificationType,
