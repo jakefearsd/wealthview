@@ -58,7 +58,7 @@ what the code actually does — anything not yet built is confined to the
 | Mobile         | React Native 0.87, React Navigation 7                   |
 | Shared code    | `@wealthview/shared` npm workspace (API client, formatting, portfolio math) |
 | HTTP Client    | Axios                                                   |
-| Backend        | Java 25, Spring Boot 4.1, Spring Web MVC, Jackson 3      |
+| Backend        | Java 25, Spring Boot 4.2, Spring Web MVC, Jackson 3      |
 | Build          | Maven (multi-module backend), npm workspaces (JS)       |
 | ORM / DB       | Spring Data JPA (Hibernate 7), PostgreSQL 16+, Flyway 13 |
 | Auth           | Spring Security, JWT access + refresh tokens, TOTP MFA, bcrypt |
@@ -67,7 +67,7 @@ what the code actually does — anything not yet built is confined to the
 | Price Feed     | Finnhub API (free tier, 60 req/min) — quotes and stock splits |
 | Property Data  | Zillow valuation scraping via jsoup (optional, off by default) |
 | File Import    | Apache Commons CSV, OFX4J (OFX/QFX parsing)             |
-| Testing        | JUnit 5, Mockito, AssertJ, Testcontainers (Postgres), Vitest 4, Playwright, Jest |
+| Testing        | JUnit 5, Mockito, AssertJ, Testcontainers (Postgres), Vitest 5, Playwright, Jest |
 | Quality gates  | PMD, CPD, SpotBugs, Checkstyle, JaCoCo (all fail `mvn verify`); PIT advisory |
 | Observability  | Micrometer + Actuator (`/actuator/prometheus`), structured JSON logs |
 | Deployment     | Docker Compose (Spring Boot fat JAR serving the built SPA + Postgres) |

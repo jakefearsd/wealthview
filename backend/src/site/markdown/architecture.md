@@ -217,7 +217,7 @@ Constructor injection is used exclusively. With Spring Boot's single-constructor
 * **Text blocks** for SQL fragments, JSON literals, and test fixtures
 * **`Optional<T>`** returned from all finder methods — `.get()` without a check is forbidden
 
-### Framework Notes (Spring Boot 4.1 / Jackson 3)
+### Framework Notes (Spring Boot 4.2 / Jackson 3)
 
 * JSON is Jackson 3: runtime types are imported from `tools.jackson.*`, while annotations
   remain `com.fasterxml.jackson.annotation.*`.
@@ -225,5 +225,5 @@ Constructor injection is used exclusively. With Spring Boot's single-constructor
   appears nowhere in the tree.
 * Spring Security route matchers use **`PathPatternRequestMatcher`**, not
   `AntPathRequestMatcher`.
-* Persistence is Hibernate 7 via the Boot 4.1 BOM; `ddl-auto` is `validate` and
+* Persistence is Hibernate 7 via the Boot 4.2 BOM; `ddl-auto` is `validate` and
   `open-in-view` is `false` — Flyway 13 owns the schema.

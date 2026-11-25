@@ -4,7 +4,7 @@
 
 WealthView is a self-hosted, multi-tenant personal finance app (investments, rental properties, retirement projections). See PROJECT.md for full architecture, data model, and feature roadmap.
 
-**Tech stack:** Java 25 / Spring Boot 4.1 / Maven multi-module backend, React 19 / Vite frontend, PostgreSQL 16+, Docker Compose deployment.
+**Tech stack:** Java 25 / Spring Boot 4.2 / Maven multi-module backend, React 19 / Vite frontend, PostgreSQL 16+, Docker Compose deployment.
 
 **Monorepo layout:**
 - `backend/` — Maven multi-module: wealthview-api, wealthview-core, wealthview-persistence, wealthview-import, wealthview-projection, wealthview-app

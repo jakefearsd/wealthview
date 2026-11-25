@@ -7,7 +7,7 @@ migration history.
 No business logic lives here. Entities are **never** passed beyond `wealthview-core` boundaries —
 service methods map them to DTOs (records) before returning.
 
-Runs on Hibernate 7 via the Spring Boot 4.1 BOM, against PostgreSQL 16 with Flyway 13.
+Runs on Hibernate 7 via the Spring Boot 4.2 BOM, against PostgreSQL 16 with Flyway 13.
 `ddl-auto` is `validate` and `open-in-view` is `false`: Flyway owns the schema outright.
 
 ---
